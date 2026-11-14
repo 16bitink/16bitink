@@ -116,6 +116,12 @@ export class MissionScene extends Phaser.Scene {
     cam.centerOn(Math.round(t.x), Math.round(t.y));
   }
 
+  /** The camera's view in world px (where sounds are heard from). */
+  get view(): { left: number; right: number; top: number; bottom: number } {
+    const v = this.cameras.main.worldView;
+    return { left: v.x, right: v.right, top: v.y, bottom: v.bottom };
+  }
+
   toWorld(clientX: number, clientY: number): { x: number; y: number } {
     const r = this.game.canvas.getBoundingClientRect();
     const x = ((clientX - r.left) / r.width) * this.scale.width;

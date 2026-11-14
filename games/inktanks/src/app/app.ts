@@ -1,4 +1,5 @@
 import type { GameEvent, GameHost, OfferPlace } from '@16bitink/game-sdk';
+import { SoundBoard } from '../audio/sound';
 import { hasLevel, installPaidLevels, levelFor } from '../content/levels';
 import { chapterOf, CHAPTERS, FREE_LEVELS, gate, type GateContext } from '../logic/campaign';
 import { Match } from '../logic/match/match';
@@ -29,6 +30,7 @@ export class App {
   private readonly hud: HTMLElement;
   private readonly surface: HTMLElement;
   private readonly stage: Stage;
+  private readonly sound: SoundBoard;
   private save: SaveData;
   private note: string | null;
   private paidError: string | null = null;
@@ -53,6 +55,11 @@ export class App {
     this.save = loaded.save;
     this.note = loaded.problem ? 'Your saved game could not be read, so it starts fresh.' : null;
     if (loaded.problem) console.warn(`[inktanks] ${loaded.problem}`);
+    this.sound = new SoundBoard(!this.save.sound);
+    // Every button clicks (menus, cards, the workshop, the HUD's buttons).
+    this.root.addEventListener('click', (e) => {
+      if ((e.target as Element | null)?.closest?.('button')) this.sound.click();
+    });
     const bar = showBoot(this.screen);
     this.host.loading?.progress(0, 'rolling out the tanks…');
     this.stage = new Stage(this.surface, {
@@ -143,6 +150,7 @@ export class App {
       },
       toggleSound: () => {
         this.save = { ...this.save, sound: !this.save.sound };
+        this.sound.setMuted(!this.save.sound);
         this.persist();
         this.menu();
       },
@@ -226,7 +234,7 @@ export class App {
         this.track({ ...ref, type: 'level_end', result: 'quit', seconds: Math.round(m.t) });
         this.map();
       },
-    }, { seen: this.save.seenBlueprints, mark: () => this.markBlueprintsSeen() });
+    }, { seen: this.save.seenBlueprints, mark: () => this.markBlueprintsSeen() }, this.sound);
   }
 
   /** The first-blueprints tip was shown: never again for this player. */
@@ -287,6 +295,7 @@ export class App {
   destroy(): void {
     this.leaveScreen?.();
     this.endRun();
+    this.sound.destroy();
     this.stage.destroy();
     this.root.remove();
   }

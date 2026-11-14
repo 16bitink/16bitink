@@ -1,3 +1,5 @@
+import { MissionSound } from '../audio/missionSound';
+import type { SoundBoard } from '../audio/sound';
 import type { Match } from '../logic/match/match';
 import { matchReport, type MatchReport } from '../logic/match/report';
 import { Controls } from '../scenes/mission/controls';
@@ -30,8 +32,10 @@ export class MissionRun {
   private paused = false;
   private ended = false;
   private outro: ReturnType<typeof setTimeout> | null = null;
+  private readonly sound: MissionSound | null;
 
-  constructor(private readonly stage: Stage, private readonly hudRoot: HTMLElement, private readonly cardRoot: HTMLElement, surface: HTMLElement, readonly match: Match, private readonly exits: MissionExits, firstBlueprints?: { seen: boolean; mark: () => void }) {
+  constructor(private readonly stage: Stage, private readonly hudRoot: HTMLElement, private readonly cardRoot: HTMLElement, surface: HTMLElement, readonly match: Match, private readonly exits: MissionExits, firstBlueprints?: { seen: boolean; mark: () => void }, board?: SoundBoard) {
+    this.sound = board ? new MissionSound(board, match) : null;
     const map = paintLandMap(match.land, Math.min(0.25, 200 / match.land.width));
     hudRoot.hidden = false;
     hudRoot.style.display = '';
@@ -56,8 +60,12 @@ export class MissionRun {
       input: (p) => this.controls.read(p),
       onEvents: (events) => {
         for (const e of events) this.hud.event(match, e);
+        this.sound?.events(events, this.scene.view);
       },
-      onFrame: () => match.player && this.hud.update(match, match.player, this.controls.touchUsed, (x, y) => this.scene.toScreen(x, y)),
+      onFrame: () => {
+        this.sound?.frame(this.scene.view, this.paused);
+        if (match.player) this.hud.update(match, match.player, this.controls.touchUsed, (x, y) => this.scene.toScreen(x, y));
+      },
       onOver: () => this.finish(),
     }, 'free', key));
   }
@@ -96,6 +104,7 @@ export class MissionRun {
 
   destroy(): void {
     if (this.outro) clearTimeout(this.outro);
+    this.sound?.destroy();
     this.off.abort();
     this.controls.destroy();
     this.hudRoot.innerHTML = '';

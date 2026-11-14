@@ -188,8 +188,11 @@ Replaces the chapter-2 Kit slot idea. Pick one gadget in the briefing. 2 charges
 
 ### Phases
 - **Phase A (engine, biggest lever), done Nov 14:** sight blocked by walls, alert states and icons, the ambush bonus, low cover, cover HP, bots shooting cover, telegraphed big shots. Retune chapter 1 with the lab after (still to do).
-- **Phase B, done Nov 14 (sounds still to do):** the gadget slot (mines, oil, smoke), their art, a gadget pick in the briefing.
+- **Phase B, done Nov 14 (sounds added Nov 14, see "Sound" below):** the gadget slot (mines, oil, smoke), their art, a gadget pick in the briefing.
 - **Phase C:** flank damage, recon on the briefing map, chapter 1 levels re-laid for 2–3 approaches.
+
+### Sound (Nov 14)
+Synthesized with Web Audio like the other games, no audio files (`src/audio/`). `sfx.ts` maps every match event to cues (pure, `test/sound.test.ts`); `synth.ts` holds the recipes and level trims; `loops.ts` runs the player's engine (pitch follows speed; tracks clatter, Hover whines), storm wind and the cargo helicopter's rotor; `missionSound.ts` glues one mission. The player's own shots play centred at full level, enemy sounds are placed around the camera (pan, fade out by 0.75 screen widths beyond the view) at 0.7. Structures sound by material (crumble, timber snap, fuel blast). A repair kit sounds when the kit count drops. Every button clicks. The menu's Sound switch mutes all of it. The dev mission page plays sound too (`&mute=1` to silence).
 
 ### As built (Nov 14)
 Code: `src/logic/bots/perception.ts` (sight, hiding, the shot line), `bots/awareness.ts` (alert states, hearing), `bots/brain.ts` and `bots/control.ts` (cover shooting, the telegraph, mine avoidance), `bots/playerBot.ts` (the sim's stand-in), `match/gadgets.ts` and `match/gadgetUse.ts`, `match/combat.ts` (ambush, low cover); the view in `src/render/alertView.ts`, `render/gadgetView.ts`, the aim line in `render/fx.ts`, the HUD and briefing picker. Tests: `test/tactics.test.ts`, `test/gadgets.test.ts`.

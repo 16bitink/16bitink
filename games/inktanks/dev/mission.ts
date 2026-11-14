@@ -1,4 +1,6 @@
 import { labLevel } from '../src/sim/levels';
+import { MissionSound } from '../src/audio/missionSound';
+import { SoundBoard } from '../src/audio/sound';
 
 const hasLabLevel = (n: number): boolean => {
   try {
@@ -57,6 +59,10 @@ let scene: MissionScene | null = null;
 // One set of controls for the page; each retry's HUD rebinds its buttons.
 const controls = new Controls(document.getElementById('game')!, (x, y) => scene!.toWorld(x, y));
 
+/** Sound as in the game (`&mute=1` for none). */
+const board = new SoundBoard(query.get('mute') === '1');
+let sound: MissionSound | null = null;
+
 function start(): void {
   overlay.innerHTML = '';
   tries++;
@@ -67,12 +73,19 @@ function start(): void {
   hudRoot.style.display = '';
   const hud = new Hud(hudRoot, map);
   controls.bindButtons(hud.swapBtn, hud.repairBtn, hud.gadgetBtn);
+  sound?.destroy();
+  const ms = new MissionSound(board, match);
+  sound = ms;
   const sc = new MissionScene(match, {
     input: (p) => controls.read(p),
     onEvents: (events) => {
       for (const e of events) hud.event(match, e);
+      ms.events(events, sc.view);
     },
-    onFrame: () => match.player && hud.update(match, match.player, controls.touchUsed, (x, y) => sc.toScreen(x, y)),
+    onFrame: () => {
+      ms.frame(sc.view, sc.paused);
+      if (match.player) hud.update(match, match.player, controls.touchUsed, (x, y) => sc.toScreen(x, y));
+    },
     onOver: () => {
       const r = matchReport(match);
       kept = mergeIntel(kept, r.intel);
