@@ -1,9 +1,9 @@
 import type { Material } from '../damage';
 import type { Shape } from '../geom';
-import { buildLand, groundAt, SCREEN, type LandDef, type StructureDef } from '../land';
-import { DRIVE_FAMILIES, GUN_FAMILIES, HULL_FAMILIES, type Family, type Loadout, type Mk, type Part } from '../parts';
+import { buildLand, groundAt, isDeep, SCREEN, type LandDef, type StructureDef } from '../land';
+import { DRIVE_FAMILIES, DRIVES, FAMILIES, GUN_FAMILIES, HULL_FAMILIES, type DriveFamily, type Family, type Loadout, type Mk, type Part } from '../parts';
 import type { Pt } from '../vec';
-import type { BonusDef, CrateDef, EnemyDef, LevelDef, ObjectiveDef, Place } from './types';
+import type { AllyDef, BonusDef, CrateDef, EnemyDef, FriendDef, LevelDef, ObjectiveDef, Place } from './types';
 
 /** What the loader needs of a structure kind (the chapter's kinds table has more). */
 export interface StructKind {
@@ -14,10 +14,22 @@ export interface StructKind {
   readonly cover?: boolean;
   readonly roof?: boolean;
   readonly low?: boolean;
+  readonly crest?: boolean;
+  readonly deck?: boolean;
+  readonly burns?: boolean;
+  /** Chapter 5: a tree's canopy radius, a young tree (Tracks and Heavies flatten it, others go round), a log bridge. */
+  readonly canopy?: number;
+  readonly thicket?: boolean;
+  readonly span?: boolean;
 }
 
 export type ResolvedEnemy = Omit<EnemyDef, 'at' | 'tank'> & { readonly at: Pt; readonly loadout: Loadout; readonly index: number };
 export type ResolvedCrate = Omit<CrateDef, 'at'> & { readonly at: Pt };
+export type ResolvedAlly = Omit<AllyDef, 'at'> & { readonly at: Pt };
+export type ResolvedFriend = Omit<FriendDef, 'at' | 'tank'> & { readonly at: Pt; readonly loadout: Loadout };
+
+/** The structure kind an allied gun tower stands on. */
+export const TOWER_KIND = 'cementTower';
 
 /** A level checked and built: every name resolved to a point. */
 export interface LoadedLevel {
@@ -26,6 +38,8 @@ export interface LoadedLevel {
   readonly start: Pt;
   readonly enemies: readonly ResolvedEnemy[];
   readonly crates: readonly ResolvedCrate[];
+  readonly allies: readonly ResolvedAlly[];
+  readonly friends: readonly ResolvedFriend[];
 }
 
 export class LevelError extends Error {
@@ -36,6 +50,10 @@ export class LevelError extends Error {
 }
 
 const ROUTED = new Set(['patrol', 'convoy', 'runner']);
+/** The levels that may mix enemy clans (chapters 4 and 5, Frostridge and Deepwood). */
+export const MIXED_CLANS = { from: 31, to: 50 } as const;
+/** The levels where the clans may fight each other (chapter 5, Deepwood). */
+export const CLAN_WAR = { from: 41, to: 50 } as const;
 
 /** Parses "cannon2/medium1/halftracks1" (Mk 1–3 after each family). */
 export function parseTank(spec: string): Loadout {
@@ -82,17 +100,49 @@ export function loadLevel(def: LevelDef, kinds: Readonly<Record<string, StructKi
     const k = kinds[s.kind];
     if (!k) return soft(`structure ${i}: unknown kind "${s.kind}"`, []);
     inside(s, `structure ${i} (${s.kind})`);
-    return [{ id: s.id ?? `${s.kind}${i}`, kind: s.kind, x: s.x, y: s.y, shape: k.shape, material: k.material, hp: k.hp, flattenable: k.flattenable, cover: k.cover, roof: k.roof, low: k.low, tag: s.tag }];
+    return [{ id: s.id ?? `${s.kind}${i}`, kind: s.kind, x: s.x, y: s.y, shape: k.shape, material: k.material, hp: k.hp, flattenable: k.flattenable, cover: k.cover, roof: k.roof, low: k.low, crest: k.crest, deck: k.deck, burns: k.burns, canopy: k.canopy, thicket: k.thicket, span: k.span, tag: s.tag }];
   });
+  // Each gun tower stands on a tower base of its own (indestructible; shots and sight pass it).
+  const allies = (def.allies ?? []).map((a, i): ResolvedAlly => ({ ...a, at: place(a.at, `ally ${i} (${a.kind})`) }));
+  const towerKind = kinds[TOWER_KIND];
+  if (allies.length > 0 && !towerKind) err(`allies need the "${TOWER_KIND}" structure kind`);
+  allies.forEach((a, i) => structures.push({ id: `allyTower${i}`, kind: TOWER_KIND, x: a.at.x, y: a.at.y, shape: towerKind!.shape, material: towerKind!.material, hp: 0, perch: true }));
+  // An avalanche's drifts lie on the map dormant until their cornice breaks (chapter 4, match/avalanche.ts).
+  for (const a of def.avalanches ?? []) {
+    a.drifts.forEach((d, i) => {
+      const k = kinds[d.kind];
+      if (!k) return soft(`avalanche "${a.by}" drift ${i}: unknown kind "${d.kind}"`, null);
+      inside(d, `avalanche "${a.by}" drift ${i}`);
+      structures.push({ id: d.id ?? `${a.by}-snow${i}`, kind: d.kind, x: d.x, y: d.y, shape: k.shape, material: k.material, hp: k.hp, low: k.low, flattenable: k.flattenable, dormant: a.by });
+    });
+  }
   const ids = new Set<string>();
   for (const s of structures) {
     if (ids.has(s.id)) soft(`duplicate structure id "${s.id}"`, null);
     ids.add(s.id);
   }
+  for (const a of def.avalanches ?? []) {
+    if (!ids.has(a.by) || structures.find((x) => x.id === a.by)?.dormant) soft(`avalanche: no structure with id "${a.by}" to bring it down`, null);
+    if (a.drifts.length === 0) soft(`avalanche "${a.by}": no drifts`, null);
+  }
+  for (const h of def.heights ?? []) if (!(h.r > 0)) soft(`height at (${h.x}, ${h.y}) needs a positive radius`, null);
+  for (const f of def.floods ?? []) {
+    if ((f.by === undefined) === (f.at === undefined)) soft('flood: give it either "by" (a structure id) or "at" (seconds, a tide)', null);
+    else if (f.by !== undefined && !ids.has(f.by)) soft(`flood: no structure with id "${f.by}" to hold it back`, null);
+  }
+  for (const [i, p] of (def.issue ?? []).entries()) if (!(FAMILIES as readonly string[]).includes(p?.family) || ![1, 2, 3, 4, 5].includes(p?.mk)) soft(`issue ${i}: not a part`, null);
   const land: LandDef = { id: def.id, name: def.name, cols: map.cols, rows: map.rows, base: map.base, terrain: map.terrain, structures, roads: map.roads, points: map.points };
   const built = buildLand(land);
-  const dry = (p: Pt, what: string): Pt => (groundAt(built, p.x, p.y) === 'water' ? soft(`${what} (${p.x}, ${p.y}) is in water`, p) : p);
+  // Hover tanks may start on deep water; everything else must start on dry ground.
+  const dry = (p: Pt, what: string, floats = false): Pt => (!floats && isDeep(groundAt(built, p.x, p.y)) ? soft(`${what} (${p.x}, ${p.y}) is in water`, p) : p);
   const start = dry(place(def.start, 'start'), 'start');
+  // A barge's river road and an afloat boss's ring must run over deep water.
+  const wet = (k: string, what: string): void => {
+    (map.roads[k] ?? []).forEach((p, i) => (isDeep(groundAt(built, p.x, p.y)) ? undefined : soft(`${what}: road "${k}" point ${i} (${p.x}, ${p.y}) is not on deep water`, null)));
+  };
+  if (def.objective.kind === 'escort' && def.objective.vessel === 'barge') wet(def.objective.road, 'objective escort (barge)');
+  if (def.objective.kind === 'fortress' && def.objective.boss.afloat) wet(def.objective.boss.road, 'objective fortress (afloat boss)');
+  def.enemies.forEach((e, i) => (e.vessel === 'barge' && e.route ? wet(e.route, `enemy ${i} (barge)`) : undefined));
   const enemies = def.enemies.map((e, i): ResolvedEnemy => {
     const what = `enemy ${i} (${e.role})`;
     if (ROUTED.has(e.role)) {
@@ -107,22 +157,36 @@ export function loadLevel(def: LevelDef, kinds: Readonly<Record<string, StructKi
       return err(`${what}: ${(x as Error).message}`);
     }
     const { at, tank: _tank, ...rest } = e;
-    return { ...rest, at: dry(place(at, what), what), loadout, index: i };
+    return { ...rest, at: dry(place(at, what), what, e.vessel === 'barge' || DRIVES[loadout.drive.family as DriveFamily].floats === true), loadout, index: i };
   });
   const crates = def.crates.map((c, i): ResolvedCrate => ({ ...c, at: dry(place(c.at, `crate ${i}`), `crate ${i}`) }));
   // One enemy faction per level, so a mission reads as "against the Boars" (owner, Nov 14: no red and yellow for no reason).
+  // Chapter 4's exception (all three clans pushed north): a level there may say `mixedClans: true`.
   const clans = [...new Set(def.enemies.map((e) => e.clan))];
-  if (clans.length > 1) err(`enemies mix factions (${clans.join(', ')}): a level is against one faction`);
-  checkObjective(def.objective, { point: (k, w) => place(k, w), road, tag: (t, w) => (structures.some((s) => s.tag === t) ? undefined : err(`${w}: no structure tagged "${t}"`)), enemies: def.enemies, err });
+  if (def.mixedClans && (def.number < MIXED_CLANS.from || def.number > MIXED_CLANS.to)) soft(`mixedClans is for chapters 4–5 only (levels ${MIXED_CLANS.from}–${MIXED_CLANS.to})`, null);
+  if (def.clanWar && (!def.mixedClans || def.number < CLAN_WAR.from || def.number > CLAN_WAR.to)) soft(`clanWar is for chapter 5 only (levels ${CLAN_WAR.from}–${CLAN_WAR.to}), with mixedClans`, null);
+  const friends = (def.friends ?? []).flatMap((f, i): ResolvedFriend[] => {
+    const what = `friend ${i}`;
+    if (f.join !== undefined && !ids.has(f.join)) return soft(`${what}: no structure with id "${f.join}" to join from`, []);
+    try {
+      const { at, tank, ...rest } = f;
+      return [{ ...rest, at: dry(place(at, what), what), loadout: parseTank(tank) }];
+    } catch (x) {
+      return soft(`${what}: ${(x as Error).message}`, []);
+    }
+  });
+  if (clans.length > 1 && !def.mixedClans) err(`enemies mix factions (${clans.join(', ')}): a level is against one faction (chapter 4 may set mixedClans: true)`);
+  checkObjective(def.objective, { point: (k, w) => place(k, w), road, has: (id) => structures.some((s) => s.id === id), tag: (t, w) => (structures.some((s) => s.tag === t) ? undefined : err(`${w}: no structure tagged "${t}"`)), enemies: def.enemies, err });
   def.bonus.forEach((b, i) => checkBonus(b, i, err));
   if (problems.length > 0) throw new LevelError(`${def.number} ${def.name}`, problems.join('\n  '));
-  return { def, land, start, enemies, crates };
+  return { def, land, start, enemies, crates, allies, friends };
 }
 
 interface Checks {
   readonly point: (k: string, what: string) => Pt;
   readonly road: (k: string, what: string) => void;
   readonly tag: (t: string, what: string) => void;
+  readonly has: (id: string) => boolean;
   readonly enemies: readonly EnemyDef[];
   readonly err: (msg: string) => never;
 }
@@ -135,6 +199,7 @@ function checkObjective(o: ObjectiveDef, c: Checks): void {
   switch (o.kind) {
     case 'raid':
       c.tag(o.tag, w);
+      if (o.column) has('convoy');
       break;
     case 'escort':
       c.road(o.road, w);
@@ -170,6 +235,7 @@ function checkObjective(o: ObjectiveDef, c: Checks): void {
     case 'chase':
       has('runner');
       c.point(o.base, w);
+      if (o.gate !== undefined && !c.has(o.gate)) c.err(`${w}: no structure with id "${o.gate}" for the gate`);
       break;
     case 'fortress':
       c.road(o.boss.road, w);

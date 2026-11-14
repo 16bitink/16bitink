@@ -27,7 +27,7 @@ describe('save', () => {
     ['not JSON', '{oops'],
     ['an array', '[]'],
     ['another version', JSON.stringify({ v: 99, progress: newProgress() })],
-    ['a bad family', stored({ ...newProgress(), unlocked: ['laser'] })],
+    ['a bad family', stored({ ...newProgress(), unlocked: ['plasma'] })],
     ['negative intel', stored({ ...newProgress(), intel: { cannon: -3 } })],
     ['NaN xp', stored({ ...newProgress(), xp: 'lots' })],
     ['medals for level 0', stored({ ...newProgress(), medals: { 0: [true, true, true] } })],

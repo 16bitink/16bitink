@@ -121,6 +121,7 @@ export const SCREENS_CSS = `
 .ikt .mkchip { display: inline-block; padding: 0 5px; color: #14110c; font-weight: bold; text-shadow: none; box-shadow: inset 0 0 0 1px rgba(0,0,0,.45); }
 .ikt .fam .ic em { position: absolute; right: 1px; bottom: -2px; font-size: 12px; font-style: normal; color: var(--gold); }
 .ikt .fam .acts { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 0 2px; }
+.ikt .fam .grule { grid-column: 1 / -1; line-height: 1.35; } .ikt .fam .grule em { font-style: normal; }
 .ikt .why { font-size: 12px; color: var(--dim); }
 .ikt .promo { text-align: center; padding: 10px; background: #3a2c14; box-shadow: inset 0 0 0 2px var(--gold); animation: ikt-pop 0.8s steps(6) both; }
 .ikt .modal { width: min(520px, 94vw); text-align: center; display: flex; flex-direction: column; gap: 12px; align-items: center; }

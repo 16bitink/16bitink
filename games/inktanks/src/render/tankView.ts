@@ -9,11 +9,26 @@ import { WORLD_URLS, worldKey } from './worldArt';
 
 /** The escort truck, and the level 10 fortress with its body, treads and turret mounts. */
 const FORT: FortressArt = WORLD.vehicles.fortress;
+
+/**
+ * A boss body's art by its BossDef.body name: any vehicle in the world
+ * manifest with a body and treads. PLACEHOLDER: a boss whose art isn't in yet
+ * (level 20's 'sandCrawler') draws as the fortress until the art lands.
+ */
+export function bossArt(name: string | null): FortressArt {
+  const v = name ? (WORLD.vehicles as unknown as Readonly<Record<string, Partial<FortressArt> | undefined>>)[name] : undefined;
+  return v?.body && v.treads?.length ? (v as FortressArt) : FORT;
+}
 const TRUCK = WORLD.vehicles.truck;
+/** Chapter 3's barge (absent: the barge draws as the truck). */
+const BARGE = (WORLD.vehicles as unknown as Readonly<Record<string, { readonly frames: readonly string[] } | undefined>>).barge;
 /** Fortress body drawn at this scale of its 288 px art: the level's turret mounts are sized to it. */
 const FORT_SCALE = 0.7;
-const TURRET_SCALE: Readonly<Record<string, number>> = { fortressCannon: 0.5, fortressMG: 0.7, fortressRockets: 0.7 };
-const TURRET_OF: Readonly<Record<string, string>> = { cannon: 'fortressCannon', machinegun: 'fortressMG', rockets: 'fortressRockets' };
+const TURRET_SCALE: Readonly<Record<string, number>> = { fortressCannon: 0.5, fortressMG: 0.7, fortressRockets: 0.7, fortressMortar: 0.5, fortressRail: 0.5 };
+/** Where an allied gun tower's turret sits, from the tower's ground origin (the cement tower art’s roof hatch). */
+const TOWER_TOP = { dx: 2, dy: -46, scale: 1 } as const;
+/** A boss turret's art by its gun. */
+const TURRET_OF: Readonly<Record<string, string>> = { cannon: 'fortressCannon', machinegun: 'fortressMG', rockets: 'fortressRockets', mortar: 'fortressMortar', laser: 'fortressRail', rail: 'fortressRail' };
 
 /** The fixed sun: shadows fall right and up (as the art tests). */
 export const SHADOW = { x: 0.78, y: -0.58 };
@@ -27,6 +42,8 @@ const BAR = { tank: { w: 40, lift: 46 }, truck: { w: 52, lift: 62 }, crew: { w: 
 export const footDepth = (y: number): number => 1000 + y / 10;
 /** Native px a drive rolls per frame step. */
 const ROLL_STEP = 6;
+/** Hover skirt frames, ms each. */
+const HOVER_FRAME_MS = 90;
 /** The crew's facing for a world heading (0 = east, y down): s, e, n or w. */
 export function crewFacing(heading: number): 's' | 'e' | 'n' | 'w' {
   const c = Math.cos(heading);
@@ -72,6 +89,10 @@ export class TankView {
 
   /** Draws the tank; a dropping tank falls in from above, large and faint. */
   update(t: Tank, parent?: Tank): void {
+    if (t.body === 'barge') {
+      this.updateBarge(t);
+      return;
+    }
     if (t.role === 'truck' || t.role === 'boss' || t.role === 'bossTurret' || t.role === 'crew') {
       this.updateVehicle(t, parent);
       return;
@@ -92,7 +113,9 @@ export class TankView {
     const scale = 1;
     const x = Math.round(t.x);
     const y = Math.round(t.y);
-    const frame = k.drive[Math.floor(t.rolled / ROLL_STEP) % k.drive.length]!;
+    // Hover's frames are its skirt rippling: they play standing still too.
+    const step = t.stats.floats ? Math.floor(performance.now() / HOVER_FRAME_MS) : Math.floor(t.rolled / ROLL_STEP);
+    const frame = k.drive[step % k.drive.length]!;
     const lift = 6;
     this.bank.apply(this.shadow, k.hull, t.heading);
     this.shadow.setPosition(x + SHADOW.x * lift, y + SHADOW.y * lift).setScale(scale);
@@ -139,8 +162,24 @@ export class TankView {
     const x = Math.round(t.x);
     const y = Math.round(t.y);
     const step = Math.floor(t.rolled / (t.role === 'crew' ? 4 : ROLL_STEP));
+    if (t.role === 'bossTurret' && t.parent === null) {
+      // An allied gun tower: one of our own turrets sitting in the tower's top ring.
+      if (this.loadoutRef !== t.loadout) {
+        this.loadoutRef = t.loadout;
+        this.keys = tankKeys(t, this.bank);
+      }
+      const k = this.keys!;
+      const ty = y + TOWER_TOP.dy;
+      const tx = x + TOWER_TOP.dx;
+      const depth = footDepth(y + 60) + DEPTH.turret;
+      this.bank.apply(this.tShadow, k.turret, t.turret);
+      this.bank.apply(this.turret, k.turret, t.turret);
+      this.tShadow.setVisible(t.alive).setPosition(tx + SHADOW.x * 6, ty + SHADOW.y * 6).setScale(TOWER_TOP.scale).setDepth(depth - 0.01);
+      this.turret.setVisible(t.alive).setPosition(tx, ty).setScale(TOWER_TOP.scale).setDepth(depth);
+      return;
+    }
     if (t.role === 'bossTurret') {
-      const name = TURRET_OF[t.loadout.gun.family] ?? 'fortressCannon';
+      const name = t.body ?? TURRET_OF[t.loadout.gun.family] ?? 'fortressCannon';
       const key = worldKey(`vehicles/${name}-${t.alive ? 1 : 0}`);
       const sc = TURRET_SCALE[name] ?? 0.7;
       const depth = footDepth((parent?.y ?? t.y) + 20) + DEPTH.turret;
@@ -163,9 +202,10 @@ export class TankView {
     const boss = t.role === 'boss';
     // A truck's tarp takes its side's colour (Ink blue for yours, the clan's for a convoy), as a tank's stripe does.
     const truckKey = (frame: string): string => this.bank.tinted(worldKey(`vehicles/${frame}`), worldKey('vehicles/truck-1-stripe'), shade(CLAN_COLOUR[t.clan], TARP_SHADE));
-    const body = boss ? worldKey(`vehicles/${FORT.body}`) : truckKey('truck-1');
+    const art = boss ? bossArt(t.body) : FORT;
+    const body = boss ? worldKey(`vehicles/${art.body}`) : truckKey('truck-1');
     const sc = boss ? FORT_SCALE : 1;
-    const frames = boss ? FORT.treads : TRUCK.frames.slice(1);
+    const frames = boss ? art.treads : TRUCK.frames.slice(1);
     const d = footDepth(y + 20);
     this.bank.apply(this.shadow, body, t.heading);
     this.shadow.setVisible(true).setPosition(x + SHADOW.x * 8 * sc, y + SHADOW.y * 8 * sc).setScale(sc).setDepth(DEPTH.shadow);
@@ -179,6 +219,34 @@ export class TankView {
       this.bank.apply(this.hull, truckKey(TRUCK.frames[1]!), t.heading);
     }
     this.drawBar(t, x, y, boss ? BAR.boss : BAR.truck);
+  }
+
+  /**
+   * A barge (chapter 3: level 23's escort, level 29's convoy): its own art
+   * (vehicles.barge, 128 frame like the truck, swapping its two frames as it
+   * moves: the bow wave shifts). An armed one carries its turret amidships.
+   */
+  private updateBarge(t: Tank): void {
+    for (const i of [this.shadow, this.drive, this.hull, this.tShadow, this.turret]) i.setVisible(false);
+    if (this.bar) for (const b of this.bar) b.setVisible(false);
+    if (!t.alive) return;
+    const x = Math.round(t.x);
+    const y = Math.round(t.y);
+    const frames = BARGE?.frames ?? [];
+    const frame = frames.length > 0 ? frames[Math.floor(t.rolled / (ROLL_STEP * 2)) % frames.length]! : 'truck-1';
+    const body = worldKey(`vehicles/${frame}`);
+    const d = footDepth(y + 20);
+    this.bank.apply(this.hull, body, t.heading);
+    this.hull.setVisible(true).setPosition(x, y).setScale(1).setDepth(d + DEPTH.hull);
+    if (t.role === 'tank') {
+      if (this.loadoutRef !== t.loadout) {
+        this.loadoutRef = t.loadout;
+        this.keys = tankKeys(t, this.bank);
+      }
+      this.bank.apply(this.turret, this.keys!.turret, t.turret);
+      this.turret.setVisible(true).setPosition(x, y).setScale(1).setDepth(d + DEPTH.turret);
+    }
+    this.drawBar(t, x, y, BAR.truck);
   }
 
   destroy(): void {

@@ -3,7 +3,7 @@ import { GADGETS, type GadgetKind } from './match/types';
 import type { Medals } from './mission/outcome';
 import { FAMILIES, slotOf, type Family, type Loadout, type Mk, type Part } from './parts';
 import { RESEARCH_MAX, type Research, type ResearchLine } from './stats';
-import { canFit, LINES_BY_SLOT, newProgress, STARTER_FAMILIES, type IntelBag, type Progress } from './workshop';
+import { canFit, LINES_BY_SLOT, newProgress, STARTER_FAMILIES, type GadgetBag, type IntelBag, type Progress } from './workshop';
 
 /**
  * The saved game, through host.storage: the player's Progress (medals,
@@ -46,6 +46,29 @@ function intelBag(x: unknown, what: string): IntelBag {
   for (const [k, n] of Object.entries(x)) {
     if (!isFamily(k) || !isCount(n)) bad(`${what}.${k}`);
     out[k as Family] = n as number;
+  }
+  return out;
+}
+
+/** Gadget blueprints and Mks: absent in saves from before gadget tiers, so missing means none / Mk I. */
+function gadgetBag(x: unknown): GadgetBag {
+  if (x === undefined) return {};
+  if (!isObj(x)) return bad('gadgetIntel');
+  const out: Partial<Record<GadgetKind, number>> = {};
+  for (const [k, n] of Object.entries(x)) {
+    if (!isGadget(k) || !isCount(n)) bad(`gadgetIntel.${k}`);
+    out[k as GadgetKind] = n as number;
+  }
+  return out;
+}
+
+function gadgetMkBook(x: unknown): Partial<Record<GadgetKind, Mk>> {
+  if (x === undefined) return {};
+  if (!isObj(x)) return bad('gadgetMk');
+  const out: Partial<Record<GadgetKind, Mk>> = {};
+  for (const [k, n] of Object.entries(x)) {
+    if (!isGadget(k) || !isMk(n)) bad(`gadgetMk.${k}`);
+    out[k as GadgetKind] = n as Mk;
   }
   return out;
 }
@@ -121,6 +144,8 @@ function progress(x: unknown): Progress {
     xp: x.xp as number,
     medals: medals(x.medals),
     loadout,
+    gadgetIntel: gadgetBag(x.gadgetIntel),
+    gadgetMk: gadgetMkBook(x.gadgetMk),
   };
   // A fitting you no longer own (or never did) swaps for the starter's families rather than failing the save.
   const fits = [loadout.gun, loadout.hull, loadout.drive].every((q) => canFit(p, q));

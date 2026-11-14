@@ -26,6 +26,24 @@ const PLACEHOLDER_FILTER: Readonly<Record<Ground, string>> = {
   mud: 'sepia(1) saturate(0.8) brightness(0.55)',
   water: 'hue-rotate(150deg) saturate(1.6) brightness(0.75)',
   bridge: 'sepia(1) saturate(0.35) brightness(0.72)',
+  canyonRock: 'sepia(1) saturate(0.7) hue-rotate(-12deg) brightness(0.7)',
+  packedSand: 'sepia(0.85) saturate(0.6) brightness(1.2)',
+  sandTrack: 'sepia(0.85) saturate(0.6) brightness(1.1)',
+  sandTrackH: 'sepia(0.85) saturate(0.6) brightness(1.1)',
+  swampWater: 'hue-rotate(110deg) saturate(1.2) brightness(0.6)',
+  shallows: 'hue-rotate(60deg) saturate(0.8) brightness(0.7)',
+  marsh: 'saturate(0.7) brightness(0.85)',
+  snow: 'grayscale(1) brightness(1.9)',
+  snowTrack: 'grayscale(1) brightness(1.6)',
+  snowTrackH: 'grayscale(1) brightness(1.6)',
+  frozenDirt: 'sepia(0.6) saturate(0.4) brightness(0.8)',
+  ice: 'hue-rotate(170deg) saturate(0.5) brightness(1.5)',
+  thinIce: 'hue-rotate(170deg) saturate(0.8) brightness(1.2)',
+  // Chapter 5 (the forest art is in; these only show if a texture is missing).
+  forestFloor: 'saturate(0.8) brightness(0.6)',
+  forestTrail: 'sepia(1) saturate(0.6) brightness(0.7)',
+  forestTrailH: 'sepia(1) saturate(0.6) brightness(0.7)',
+  clearing: 'sepia(0.7) saturate(0.7) brightness(0.9)',
 };
 
 function groundUrl(name: Ground): string | null {
@@ -40,6 +58,17 @@ export function preloadGround(scene: Phaser.Scene): void {
   }
   const test = Object.values(testGround)[0];
   if (test) scene.load.image('ground:test', test);
+}
+
+/**
+ * Paint order of a ground index. The first LEGACY grounds keep their index order
+ * (chapter 1's look is unchanged); later grounds follow, sorted by the world
+ * manifest's `order`, which may be fractional (canyonRock 1.5, packedSand 2.5).
+ */
+const LEGACY = 7;
+function paintRank(gi: number): number {
+  if (gi < LEGACY) return gi;
+  return LEGACY + (WORLD.ground[GROUNDS[gi]!]?.order ?? gi) / 100;
 }
 
 /** Every ground type as a canvas to make patterns from. */
@@ -81,6 +110,16 @@ export class GroundStream {
 
   get count(): number {
     return this.chunks.size;
+  }
+
+  /** The ground changed under the land (a dam broke, the tide came in): every chunk is painted afresh as it's next seen. */
+  repaint(): void {
+    for (const img of this.chunks.values()) {
+      const tex = img.texture.key;
+      img.destroy();
+      this.scene.textures.remove(tex);
+    }
+    this.chunks.clear();
   }
 
   /** Bytes held by live chunk textures. */
@@ -127,7 +166,7 @@ export class GroundStream {
     const n = CHUNK / CELL + 3;
     const present = new Set<number>();
     for (let gy = gy0; gy < gy0 + n; gy++) for (let gx = gx0; gx < gx0 + n; gx++) present.add(this.groundIdx(gx, gy));
-    for (const gi of [...present].sort((a, b) => a - b)) {
+    for (const gi of [...present].sort((a, b) => paintRank(a) - paintRank(b) || a - b)) {
       const g = GROUNDS[gi]!;
       if (g === base) continue;
       this.blend(ctx, g, x0, y0, (gx, gy) => this.groundIdx(gx, gy) === gi);

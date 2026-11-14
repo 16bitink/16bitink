@@ -1,6 +1,6 @@
 import { sumIntel } from '../intel';
 import type { HullFamily, Part } from '../parts';
-import type { IntelBag } from '../workshop';
+import type { GadgetBag, IntelBag } from '../workshop';
 import type { Match } from './match';
 import type { Tank } from './types';
 
@@ -15,6 +15,8 @@ export interface MatchReport {
   readonly victims: Tank['victims'];
   readonly intel: IntelBag;
   readonly intelCount: number;
+  /** Gadget blueprints earned (using gadgets on enemies, spare crate charges). */
+  readonly gadgetIntel: GadgetBag;
   readonly usedKit: boolean;
   /** The alarm went off at least once. */
   readonly alarm: boolean;
@@ -36,6 +38,7 @@ export function matchReport(m: Match): MatchReport {
     victims: p.victims,
     intel: m.intel,
     intelCount: sumIntel(m.intel),
+    gadgetIntel: m.gadgetIntel,
     usedKit: p.usedKit,
     alarm: m.alarm.firstAt !== null,
     hullsUsed: p.hullsUsed,

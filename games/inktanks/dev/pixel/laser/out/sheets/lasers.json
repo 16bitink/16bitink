@@ -1,0 +1,14 @@
+{
+ "turretLaser-mk3": {
+  "x": -36,
+  "y": -9
+ },
+ "turretLaser-mk2": {
+  "x": 4,
+  "y": -14
+ },
+ "turretLaser-mk1": {
+  "x": 39,
+  "y": -16
+ }
+}

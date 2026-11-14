@@ -1,0 +1,443 @@
+{
+ "frames": [
+  {
+   "filename": "inktanks-burning-tree 0.png",
+   "frame": {
+    "x": 0,
+    "y": 0,
+    "w": 84,
+    "h": 152
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 84,
+    "h": 152
+   },
+   "sourceSize": {
+    "w": 84,
+    "h": 152
+   },
+   "pivot": {
+    "x": 2.0238095238095237,
+    "y": 1.5460526315789473
+   },
+   "duration": 83
+  },
+  {
+   "filename": "inktanks-burning-tree 1.png",
+   "frame": {
+    "x": 84,
+    "y": 0,
+    "w": 84,
+    "h": 152
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 84,
+    "h": 152
+   },
+   "sourceSize": {
+    "w": 84,
+    "h": 152
+   },
+   "pivot": {
+    "x": 2.0238095238095237,
+    "y": 1.5460526315789473
+   },
+   "duration": 83
+  },
+  {
+   "filename": "inktanks-burning-tree 2.png",
+   "frame": {
+    "x": 168,
+    "y": 0,
+    "w": 84,
+    "h": 152
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 84,
+    "h": 152
+   },
+   "sourceSize": {
+    "w": 84,
+    "h": 152
+   },
+   "pivot": {
+    "x": 2.0238095238095237,
+    "y": 1.5460526315789473
+   },
+   "duration": 83
+  },
+  {
+   "filename": "inktanks-burning-tree 3.png",
+   "frame": {
+    "x": 252,
+    "y": 0,
+    "w": 84,
+    "h": 152
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 84,
+    "h": 152
+   },
+   "sourceSize": {
+    "w": 84,
+    "h": 152
+   },
+   "pivot": {
+    "x": 2.0238095238095237,
+    "y": 1.5460526315789473
+   },
+   "duration": 83
+  },
+  {
+   "filename": "inktanks-burning-tree 4.png",
+   "frame": {
+    "x": 0,
+    "y": 152,
+    "w": 84,
+    "h": 152
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 84,
+    "h": 152
+   },
+   "sourceSize": {
+    "w": 84,
+    "h": 152
+   },
+   "pivot": {
+    "x": 2.0238095238095237,
+    "y": 1.5460526315789473
+   },
+   "duration": 83
+  },
+  {
+   "filename": "inktanks-burning-tree 5.png",
+   "frame": {
+    "x": 84,
+    "y": 152,
+    "w": 84,
+    "h": 152
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 84,
+    "h": 152
+   },
+   "sourceSize": {
+    "w": 84,
+    "h": 152
+   },
+   "pivot": {
+    "x": 2.0238095238095237,
+    "y": 1.5460526315789473
+   },
+   "duration": 83
+  },
+  {
+   "filename": "inktanks-burning-tree 6.png",
+   "frame": {
+    "x": 168,
+    "y": 152,
+    "w": 84,
+    "h": 152
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 84,
+    "h": 152
+   },
+   "sourceSize": {
+    "w": 84,
+    "h": 152
+   },
+   "pivot": {
+    "x": 2.0238095238095237,
+    "y": 1.5460526315789473
+   },
+   "duration": 83
+  },
+  {
+   "filename": "inktanks-burning-tree 7.png",
+   "frame": {
+    "x": 252,
+    "y": 152,
+    "w": 84,
+    "h": 152
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 84,
+    "h": 152
+   },
+   "sourceSize": {
+    "w": 84,
+    "h": 152
+   },
+   "pivot": {
+    "x": 2.0238095238095237,
+    "y": 1.5460526315789473
+   },
+   "duration": 83
+  },
+  {
+   "filename": "inktanks-burning-tree 8.png",
+   "frame": {
+    "x": 0,
+    "y": 304,
+    "w": 84,
+    "h": 152
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 84,
+    "h": 152
+   },
+   "sourceSize": {
+    "w": 84,
+    "h": 152
+   },
+   "pivot": {
+    "x": 2.0238095238095237,
+    "y": 1.5460526315789473
+   },
+   "duration": 83
+  },
+  {
+   "filename": "inktanks-burning-tree 9.png",
+   "frame": {
+    "x": 84,
+    "y": 304,
+    "w": 84,
+    "h": 152
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 84,
+    "h": 152
+   },
+   "sourceSize": {
+    "w": 84,
+    "h": 152
+   },
+   "pivot": {
+    "x": 2.0238095238095237,
+    "y": 1.5460526315789473
+   },
+   "duration": 83
+  },
+  {
+   "filename": "inktanks-burning-tree 10.png",
+   "frame": {
+    "x": 168,
+    "y": 304,
+    "w": 84,
+    "h": 152
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 84,
+    "h": 152
+   },
+   "sourceSize": {
+    "w": 84,
+    "h": 152
+   },
+   "pivot": {
+    "x": 2.0238095238095237,
+    "y": 1.5460526315789473
+   },
+   "duration": 83
+  },
+  {
+   "filename": "inktanks-burning-tree 11.png",
+   "frame": {
+    "x": 252,
+    "y": 304,
+    "w": 84,
+    "h": 152
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 84,
+    "h": 152
+   },
+   "sourceSize": {
+    "w": 84,
+    "h": 152
+   },
+   "pivot": {
+    "x": 2.0238095238095237,
+    "y": 1.5460526315789473
+   },
+   "duration": 83
+  },
+  {
+   "filename": "inktanks-burning-tree 12.png",
+   "frame": {
+    "x": 0,
+    "y": 456,
+    "w": 84,
+    "h": 152
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 84,
+    "h": 152
+   },
+   "sourceSize": {
+    "w": 84,
+    "h": 152
+   },
+   "pivot": {
+    "x": 2.0238095238095237,
+    "y": 1.5460526315789473
+   },
+   "duration": 83
+  },
+  {
+   "filename": "inktanks-burning-tree 13.png",
+   "frame": {
+    "x": 84,
+    "y": 456,
+    "w": 84,
+    "h": 152
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 84,
+    "h": 152
+   },
+   "sourceSize": {
+    "w": 84,
+    "h": 152
+   },
+   "pivot": {
+    "x": 2.0238095238095237,
+    "y": 1.5460526315789473
+   },
+   "duration": 83
+  },
+  {
+   "filename": "inktanks-burning-tree 14.png",
+   "frame": {
+    "x": 168,
+    "y": 456,
+    "w": 84,
+    "h": 152
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 84,
+    "h": 152
+   },
+   "sourceSize": {
+    "w": 84,
+    "h": 152
+   },
+   "pivot": {
+    "x": 2.0238095238095237,
+    "y": 1.5460526315789473
+   },
+   "duration": 83
+  },
+  {
+   "filename": "inktanks-burning-tree 15.png",
+   "frame": {
+    "x": 252,
+    "y": 456,
+    "w": 84,
+    "h": 152
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 84,
+    "h": 152
+   },
+   "sourceSize": {
+    "w": 84,
+    "h": 152
+   },
+   "pivot": {
+    "x": 2.0238095238095237,
+    "y": 1.5460526315789473
+   },
+   "duration": 83
+  }
+ ],
+ "meta": {
+  "app": "PixelLab VFX Creator",
+  "image": "inktanks-burning-tree.png",
+  "format": "RGBA8888",
+  "size": {
+   "w": 336,
+   "h": 608
+  },
+  "scale": "1",
+  "anchor": {
+   "kind": "origin",
+   "x": 170,
+   "y": 235
+  },
+  "frameTags": [
+   {
+    "name": "inktanks-burning-tree",
+    "from": 0,
+    "to": 15,
+    "direction": "forward"
+   }
+  ]
+ }
+}

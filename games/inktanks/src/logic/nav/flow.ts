@@ -1,5 +1,5 @@
-import { CELL } from '../land';
-import type { NavGrid } from './grid';
+import { CELL, GROUNDS, isDeep, type Land } from '../land';
+import { nearestPassable, type NavGrid } from './grid';
 
 /**
  * Flow fields: one Dijkstra pass from a goal cell gives every cell its cost
@@ -117,7 +117,8 @@ export function flowDir(nav: NavGrid, f: FlowField, x: number, y: number): numbe
 export class FlowCache {
   private readonly fields = new Map<number, FlowField>();
   builds = 0;
-  constructor(private readonly nav: NavGrid, private readonly max = 48) {}
+  /** `land`: given, a goal out on deep water (a barge, a boat, chapter 3) is fielded from the nearest bank cell. */
+  constructor(private readonly nav: NavGrid, private readonly max = 48, private readonly land: Land | null = null) {}
 
   get(x: number, y: number): FlowField | null {
     const gx = Math.floor(x / CELL);
@@ -130,10 +131,22 @@ export class FlowCache {
       this.fields.set(goal, hit);
       return hit;
     }
-    const f = buildFlow(this.nav, goal);
+    const f = buildFlow(this.nav, this.bankFor(goal, x, y));
     this.builds++;
     this.fields.set(goal, f);
     if (this.fields.size > this.max) this.fields.delete(this.fields.keys().next().value!);
     return f;
+  }
+
+  /**
+   * A goal cell on deep water that this grid can't enter: the field leads to
+   * the nearest open cell instead (the bank), so a ground tank chasing a
+   * barge drives along the shore rather than into the river. Only deep water:
+   * goals inside walls keep their old behaviour (chapters 1–2 are tuned on it).
+   */
+  private bankFor(goal: number, x: number, y: number): number {
+    if (!this.land || this.nav.cost[goal]! > 0 || !isDeep(GROUNDS[this.land.ground[goal]!]!)) return goal;
+    const p = nearestPassable(this.nav, x, y, 12);
+    return p ? Math.floor(p.y / CELL) * this.nav.cols + Math.floor(p.x / CELL) : goal;
   }
 }

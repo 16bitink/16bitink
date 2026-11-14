@@ -35,6 +35,8 @@ export class App {
   private run: MissionRun | null = null;
   private leaveScreen: (() => void) | null = null;
   private seq = 0;
+  /** The chapter the map shows (0-based): the last one played or picked. */
+  private mapChapter = 0;
   private bootDone!: () => void;
   /** Resolves once the menu is drawn over the loaded map. */
   readonly ready = new Promise<void>((resolve) => {
@@ -148,15 +150,18 @@ export class App {
     }));
   }
 
-  map(): void {
+  map(chapter = this.mapChapter): void {
     this.endRun();
+    this.mapChapter = chapter;
+    this.stage.map.showChapter(chapter);
     this.show(() => showMap(this.screen, {
-      progress: this.save.progress, gate: this.gateCtx,
+      progress: this.save.progress, chapter, gate: this.gateCtx,
       names: (n) => levelFor(n)?.def.name ?? null,
       project: (x, y) => this.stage.map.toScreen(x, y),
     }, {
       level: (n) => this.open(n),
-      chapter: (i) => this.open(CHAPTERS[i]!.first),
+      // A chapter whose levels are here shows its map; one that isn't says why (paywall, coming).
+      chapter: (i) => (hasLevel(CHAPTERS[i]!.first) && gate(CHAPTERS[i]!.first, this.gateCtx) !== 'paywall' ? this.map(i) : this.open(CHAPTERS[i]!.first)),
       workshop: () => this.workshop(() => this.map(), 'Map'),
       menu: () => this.menu(),
     }));
@@ -185,11 +190,12 @@ export class App {
   private newMatch(n: number, playerBot = false): Match {
     const level = levelFor(n)!;
     const p = this.save.progress;
-    return new Match({ level, seed: (Date.now() + ++this.seq * 7919) % 1_000_000, player: { loadout: p.loadout, research: p.research, kits: perksOf(p.xp).repairKits, gadget: this.save.gadget }, playerBot });
+    return new Match({ level, seed: (Date.now() + ++this.seq * 7919) % 1_000_000, player: { loadout: p.loadout, research: p.research, kits: perksOf(p.xp).repairKits, gadget: this.save.gadget, gadgetMk: p.gadgetMk }, playerBot });
   }
 
   briefing(n: number): void {
     this.endRun();
+    this.mapChapter = chapterOf(n).index;
     // The briefing's match is the one Start plays: its objective gives the title and the map's marks.
     const m = this.newMatch(n);
     this.show(() => showBriefing(this.screen, m, this.save.progress, {

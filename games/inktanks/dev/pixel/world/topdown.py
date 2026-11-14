@@ -93,7 +93,28 @@ def truck(state: int, phase: int) -> PMesh:
 
 # --- the Boar land fortress --------------------------------------------------------------------------------------------
 
-MOUNTS = {'cannon': (0, 14), 'mgLeft': (-40, -56), 'mgRight': (40, -56), 'rockets': (0, 74)}
+# Where level 10's turrets stand on the body (art px from the frame centre, north up; the game draws the body at 0.7).
+MOUNTS = {'cannonLeft': (-49, -43), 'cannonRight': (49, -43), 'rockets': (0, 49), 'mg': (0, -83)}
+MOUNT_TURRET = {'cannonLeft': 'fortressCannon', 'cannonRight': 'fortressCannon', 'rockets': 'fortressRockets', 'mg': 'fortressMG'}
+# A turret race's radius by turret: a little inside the turret's drawn base at its in-game scale, so the turret hides it.
+RING_R = {'fortressCannon': 20, 'fortressMortar': 20, 'fortressRockets': 20, 'fortressMG': 13}
+
+
+def race(m: PMesh, x: float, y: float, r: float, z: float, rng: random.Random) -> None:
+    """A turret race: a bolted steel ring with a darker bearing inside (never a black hole)."""
+    cylinder(m, (x, y), r, z, z + 1.2, lambda q: hls(0.08, 0.06, 0.42), rng, sides=24)
+    cylinder(m, (x, y), r - 3, z + 1.2, z + 1.5, lambda q: hls(0.08, 0.08, 0.26), rng, sides=24)
+    for i in range(12):
+        a = 2 * math.pi * (i + 0.5) / 12
+        m.box(x + (r - 1.5) * math.cos(a), y + (r - 1.5) * math.sin(a), z + 1.5, 1.4, 1.4, 0.6, 0, STEEL(rng))
+
+
+def sponson(m: PMesh, x: float, y: float, r: float, z0: float, z1: float, rng: random.Random) -> None:
+    """A round armoured platform for a turret standing past the deck's edge."""
+    cylinder(m, (x, y), r, z0, z1, ARMOUR_DARK, rng, sides=24, top=ARMOUR)
+    for i in range(16):
+        a = 2 * math.pi * (i + 0.5) / 16
+        m.box(x + (r - 1.6) * math.cos(a), y + (r - 1.6) * math.sin(a), z1 + 0.3, 1.4, 1.4, 0.6, 0, STEEL(rng))
 
 
 def treads(phase: int) -> PMesh:
@@ -123,7 +144,7 @@ def fortress_body() -> PMesh:
         for y in (-70, -40, 30, 60):
             m.box(side * 70, y, 20.6, 16, 10, 3, 0, LINK(rng))
     # Deck plates with seams and rivets.
-    for (x0, y0, x1, y1) in ((-50, -86, 50, -30), (-50, -26, -18, 50), (18, -26, 50, 50), (-50, 54, 50, 100)):
+    for (x0, y0, x1, y1) in ((-50, -86, 50, -30), (-50, -26, -18, 50), (-16, -26, 16, 50), (18, -26, 50, 50), (-50, 54, 50, 100)):
         m.box((x0 + x1) / 2, (y0 + y1) / 2, 23.8, x1 - x0 - 2, y1 - y0 - 2, 1.2, 0, ARMOUR(rng))
         for (a, b, c, d) in ((x0, y0, x1, y0), (x0, y1, x1, y1), (x0, y0, x0, y1), (x1, y0, x1, y1)):
             rivets(m, a + 2 * (x0 == a == c), b + 2, c - 2 * (x1 == a == c), d - 2, 24.4, 7, rng)
@@ -141,8 +162,8 @@ def fortress_body() -> PMesh:
             p1 = (side * (34 + 22 * f1 ** 1.4), -112 - 26 * f1, 12 + 5 * math.sin(f1 * math.pi))
             bar(tusk, p0, p1, 7.5 * (1 - f0 * 0.75), IVORY(rng))
         m.add(tusk)
-    cylinder(m, (0, -100), 9, 20, 23, lambda r: hls(0.1, 0.45, 0.6), rng, sides=14)
-    lump(m, (0, -100, 23), (6, 6, 2), lambda r: hls(0.05, 0.4, 0.3), rng, n=6)
+    cylinder(m, (0, -105), 7, 18, 21, lambda r: hls(0.1, 0.45, 0.6), rng, sides=14)
+    lump(m, (0, -105, 21), (4.6, 4.6, 1.6), lambda r: hls(0.05, 0.4, 0.3), rng, n=6)
     # The engine deck at the rear: a grille, two exhaust stacks, a hatch on each side of the main turret.
     for k in range(9):
         m.box(0, 84 + k * 2.2, 25, 40, 1.2, 1.0, 0, hls(0, 0, 0.16))
@@ -150,10 +171,13 @@ def fortress_body() -> PMesh:
         cylinder(m, (side * 40, 92), 6, 24, 34, STEEL, rng, sides=12, top=lambda r: hls(0, 0, 0.08))
         cylinder(m, (side * 36, -14), 6.5, 24, 26, ARMOUR_DARK, rng, sides=12)
         bar(m, (side * 30, -14, 26.5), (side * 42, -14, 26.5), 1.6, STEEL(rng))
-    # The turret rings.
+    # The turret races where level 10's turrets stand; the cannons' stand on sponsons out over the fenders.
     for name, (x, y) in MOUNTS.items():
-        r = {'cannon': 30, 'rockets': 22}.get(name, 14)
-        cylinder(m, (x, y), r, 24, 25, lambda q: hls(0, 0, 0.12), rng, sides=24)
+        r = RING_R[MOUNT_TURRET[name]]
+        z = 25.0
+        if abs(x) > 30:
+            sponson(m, x, y, r + 4, 18, 25, rng)
+        race(m, x, y, r, z, rng)
     return m
 
 
@@ -272,8 +296,7 @@ def main() -> None:
     (out / 'place.json').write_text(json.dumps(place, indent=1))
     meta = {'truck': {'size': 128, 'frames': ['truck-1', 'truck-1-f2'], 'wreck': 'truck-0', 'facing': 'north'},
             'fortress': {'size': 288, 'body': 'fortress-body', 'treads': ['fortress-treads', 'fortress-treads-f2'],
-                         'mounts': {k: {'at': list(v), 'turret': 'fortressCannon' if k == 'cannon' else 'fortressRockets' if k == 'rockets' else 'fortressMG'}
-                                    for k, v in MOUNTS.items()},
+                         'mounts': {k: {'at': list(v), 'turret': MOUNT_TURRET[k]} for k, v in MOUNTS.items()},
                          'turrets': {'fortressCannon': {'size': 144, 'muzzle': MUZZLE['fortressCannon']}, 'fortressMG': {'size': 64, 'muzzle': MUZZLE['fortressMG']},
                                      'fortressRockets': {'size': 64, 'muzzle': MUZZLE['fortressRockets']}}, 'facing': 'north'}}
     (OUT / 'topdown.json').write_text(json.dumps(meta, indent=1))

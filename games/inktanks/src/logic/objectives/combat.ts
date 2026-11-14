@@ -6,6 +6,7 @@ import { mergeIntel } from '../intel';
 import { tankStats } from '../stats';
 import { angleTo } from '../vec';
 import { bossRage, type Rage } from './bossRage';
+import { makeRail, railTowards } from '../match/rail';
 import { BASE, nearest, type Objective } from './types';
 
 /** Assault: destroy every enemy tank in the area (timed waves still to come count too). */
@@ -30,16 +31,25 @@ export function assault(m: Match): Objective {
   };
 }
 
-/** Ace: destroy the named ace. Its intel is taken on the kill, so it can't be lost. */
+/** "Sly, Rook and Grim". */
+const listNames = (names: readonly string[]): string => (names.length < 2 ? (names[0] ?? 'the ace') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`);
+
+/**
+ * Ace: destroy the named ace, or every ace on the level (chapter 5, level 47
+ * "Old Rivals": Sly, Rook and Grim together). Each ace's intel is taken on its
+ * kill, so it can't be lost.
+ */
 export function ace(m: Match): Objective {
-  const theAce = () => m.tanks.find((t) => t.ace && t.team !== 0) ?? null;
+  const aces = () => m.tanks.filter((t) => t.ace && t.team !== 0);
+  // Aces still to come (a wave) count too.
+  const total = Math.max(1, m.level.enemies.filter((e) => e.ace).length);
+  const names = m.level.enemies.filter((e) => e.ace && e.name).map((e) => e.name!);
   return {
     ...BASE,
     kind: 'ace',
-    title: `Destroy ${theAce()?.name ?? 'the ace'}`,
+    title: total > 1 ? `Destroy ${listNames(names)} together` : `Destroy ${aces()[0]?.name ?? 'the ace'}`,
     step: () => {
-      const a = theAce();
-      if (!a || a.alive) return;
+      if (!aces().some((a) => !a.alive)) return;
       for (const p of m.pickups) {
         if (p.kind !== 'intel' || !p.ace || p.taken) continue;
         p.taken = true;
@@ -47,15 +57,22 @@ export function ace(m: Match): Objective {
       }
     },
     status: () => {
-      const a = theAce();
-      return { text: a ? `Destroy ${a.name}, the ${a.crew} ace` : 'Destroy the ace', target: a?.alive ? a : null, done: !!a && !a.alive, failed: null };
+      const all = aces();
+      const up = all.filter((a) => a.alive);
+      const a = all[0];
+      const down = all.length - up.length;
+      const text = total > 1 ? `Aces destroyed ${down}/${total}` : a ? `Destroy ${a.name}, the ${a.crew} ace` : 'Destroy the ace';
+      return { text, target: m.player ? nearest(m.player, up) : (up[0] ?? null), done: all.length > 0 && up.length === 0 && down >= total, failed: null };
     },
     playerHint: (t) => {
-      const a = theAce();
-      return a?.alive ? { goal: a, goalRadius: t.stats.gun.range * 0.6, target: a.id } : null;
+      const a = nearest(t, aces().filter((x) => x.alive));
+      return a ? { goal: a, goalRadius: t.stats.gun.range * 0.6, target: a.id } : null;
     },
   };
 }
+
+/** The level 10 fortress's body: the defaults a BossDef can change. */
+export const BOSS_BODY = { art: 'fortress', radius: 70, armour: 14 } as const;
 
 /** Fortress guns are slow to reload: the boss is a puzzle of angles, not a wall of fire. */
 const BOSS_RELOAD = 1.8;
@@ -64,16 +81,24 @@ const BOSS_RELOAD = 1.8;
 export function fortress(m: Match, def: Extract<ObjectiveDef, { kind: 'fortress' }>): Objective {
   const b = def.boss;
   const road = m.road(b.road);
-  const body = addTank(m, { name: b.name, clan: 'boars', team: ENEMY_TEAM, role: 'boss', loadout: { gun: { family: 'cannon', mk: 2 }, hull: { family: 'heavy', mk: 2 }, drive: { family: 'tracks', mk: 2 } }, at: road[0]!, heading: angleTo(road[0]!, road[1]!) });
-  body.stats = { ...body.stats, maxHp: b.hp, speed: b.speed, radius: 70, armour: 14 };
+  const clan = b.clan ?? 'boars';
+  const body = addTank(m, { name: b.name, clan, team: ENEMY_TEAM, role: 'boss', loadout: { gun: { family: 'cannon', mk: 2 }, hull: { family: 'heavy', mk: 2 }, drive: { family: 'tracks', mk: 2 } }, at: road[0]!, heading: angleTo(road[0]!, road[1]!) });
+  body.stats = { ...body.stats, maxHp: b.hp, speed: b.speed, radius: b.radius ?? BOSS_BODY.radius, armour: b.armour ?? BOSS_BODY.armour };
   body.hp = b.hp;
+  body.body = b.body ?? BOSS_BODY.art;
+  // A boat (the Ironclad): deep water only, so the bank stops a charge as the fort walls do.
+  body.keel = b.afloat === true;
+  // A train (chapter 4): on its rails only, a capsule as long as its body.
+  if (b.rail) body.rail = makeRail(road);
+  body.length = b.length ?? 0;
   for (const tu of b.turrets) {
-    const t = addTank(m, { name: `${b.name} ${tu.gun}`, clan: 'boars', team: ENEMY_TEAM, role: 'bossTurret', loadout: { gun: { family: tu.gun, mk: 1 }, hull: { family: 'heavy', mk: 1 }, drive: { family: 'tracks', mk: 1 } }, at: road[0]! });
+    const t = addTank(m, { name: `${b.name} ${tu.gun}`, clan, team: ENEMY_TEAM, role: 'bossTurret', loadout: { gun: { family: tu.gun, mk: 1 }, hull: { family: 'heavy', mk: 1 }, drive: { family: 'tracks', mk: 1 } }, at: road[0]! });
     const st = tankStats(t.loadout);
     t.stats = { ...st, maxHp: tu.hp, radius: 22, gun: { ...st.gun, reload: st.gun.reload * BOSS_RELOAD } };
     t.hp = tu.hp;
     t.parent = body.id;
     t.mount = { dx: tu.dx, dy: tu.dy };
+    if (tu.art) t.body = tu.art;
     m.brains.set(t.id, createBrain(t, null, m.difficulty, m.rng.fork(t.id)));
     // Turrets fight from where they sit, with a turret's eyes.
     Object.assign(m.brains.get(t.id)!, { role: 'turret', sight: 460 });
@@ -85,7 +110,9 @@ export function fortress(m: Match, def: Extract<ObjectiveDef, { kind: 'fortress'
   const ringDrive = () => {
     const next = road[roadI % road.length]!;
     if (Math.hypot(next.x - body.x, next.y - body.y) < 50) roadI++;
-    return { move: { kind: 'point' as const, angle: angleTo(body, next), mag: 1 }, aim: null, fire: false, swap: false, repair: false };
+    // A train shuttles along its line: from end to end and back, steering by the line, not the straight angle.
+    const to = body.rail ? railTowards(body.rail, next) : next;
+    return { move: { kind: 'point' as const, angle: angleTo(body, to), mag: 1 }, aim: null, fire: false, swap: false, repair: false };
   };
   return {
     ...BASE,

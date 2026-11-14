@@ -1,4 +1,5 @@
 import type Phaser from 'phaser';
+import { inFog } from '../logic/match/fog';
 import type { Match } from '../logic/match/match';
 
 /**
@@ -32,6 +33,13 @@ export function preloadAlerts(scene: Phaser.Scene): void {
   }
 }
 
+/** Lost in a sandstorm (past the storm's sight from you) or in a fog bank: its marks mustn't give it away. */
+function inStorm(m: Match, t: { x: number; y: number }): boolean {
+  const p = m.player;
+  if (m.fogNow.length > 0 && inFog(m.fogNow, t.x, t.y)) return true;
+  return m.sight < Infinity && p !== null && Math.hypot(t.x - p.x, t.y - p.y) > m.sight + 40;
+}
+
 export class AlertLayer {
   private readonly marks = new Map<number, { obj: Phaser.GameObjects.Image | Phaser.GameObjects.Text; state: Shown }>();
   private rings: Phaser.GameObjects.Graphics | null = null;
@@ -51,7 +59,7 @@ export class AlertLayer {
       if (b.role === 'player' || b.aware === 'calm') continue;
       const t = m.tank(id);
       if (!t?.alive || t.team === 0 || t.role === 'bossTurret') continue;
-      if (t.x < view.x - 60 || t.x > view.right + 60 || t.y < view.y - 80 || t.y > view.bottom + 60) continue;
+      if (t.x < view.x - 60 || t.x > view.right + 60 || t.y < view.y - 80 || t.y > view.bottom + 60 || inStorm(m, t)) continue;
       // Waves and hunters are always alert: only mark them while they're fighting, so the "!" still means something.
       if (b.role === 'wave' || b.role === 'hunter') continue;
       if (b.aware === 'alert' && m.t - b.awareSince > ALERT_POP) continue;
@@ -88,7 +96,7 @@ export class AlertLayer {
     g.clear();
     for (const t of m.tanks) {
       if (!t.alive || t.role === 'truck' || t.role === 'crew' || t.role === 'boss') continue;
-      if (t.x < view.x - 40 || t.x > view.right + 40 || t.y < view.y - 80 || t.y > view.bottom + 40) continue;
+      if (t.x < view.x - 40 || t.x > view.right + 40 || t.y < view.y - 80 || t.y > view.bottom + 40 || inStorm(m, t)) continue;
       const gun = t.stats.gun;
       let left = 0;
       let total = 0;

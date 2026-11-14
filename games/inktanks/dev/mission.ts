@@ -1,10 +1,20 @@
-import { CH1_LEVELS, ch1Level } from '../src/content/ch1/levels';
+import { labLevel } from '../src/sim/levels';
+
+const hasLabLevel = (n: number): boolean => {
+  try {
+    labLevel(n);
+    return true;
+  } catch {
+    return false;
+  }
+};
 import { mergeIntel, sumIntel } from '../src/logic/intel';
 import { buildLand } from '../src/logic/land';
 import { parseTank } from '../src/logic/level/load';
 import { Match } from '../src/logic/match/match';
 import { matchReport } from '../src/logic/match/report';
 import type { GadgetKind } from '../src/logic/match/types';
+import type { Mk } from '../src/logic/parts';
 import { outcome } from '../src/logic/mission/outcome';
 import type { IntelBag } from '../src/logic/workshop';
 import { Controls } from '../src/scenes/mission/controls';
@@ -17,12 +27,13 @@ import { HUD_CSS } from '../src/ui/hudCss';
 import type Phaser from 'phaser';
 
 /**
- * A playable chapter 1 level, starting at its start point.
- *   ?level=N      the level (1–10)
+ * A playable level, starting at its start point.
+ *   ?level=N      the level (1–10, or a paid level built in content/paid.ts)
  *   ?seed=S       the match seed
  *   ?tank=gun/hull/drive   your tank, e.g. cannon1/medium1/halftracks1 (default: the starter)
  *   ?kits=N       repair kits
  *   ?gadget=G     mines (default), oil, smoke or none
+ *   ?gmk=N        every gadget at Mk N (1–5, default 1)
  *   ?rot=rot32    RotSprite instead of free rotation
  *   ?bot=1        a bot drives your tank (watch a level)
  *   ?t=N          fast-forward N seconds before showing it
@@ -31,12 +42,13 @@ import type Phaser from 'phaser';
  * picked up is kept across retries (shown on the panel).
  */
 document.head.insertAdjacentHTML('beforeend', `<style>${HUD_CSS}</style>`);
-const level = ch1Level(Math.min(CH1_LEVELS.length, Math.max(1, qnum('level', 1))));
+const level = labLevel(qnum('level', 1));
 const def = level.def;
 const land = buildLand(level.land);
 const map = paintLandMap(land, Math.min(0.25, 200 / land.width));
 const overlay = document.getElementById('overlay')!;
 const gadget = query.get('gadget') ?? 'mines';
+const gmk = Math.min(5, Math.max(1, qnum('gmk', 1))) as Mk;
 const tank = parseTank(query.get('tank') ?? 'machinegun1/light1/wheels1');
 let kept: IntelBag = {};
 let game: Phaser.Game | null = null;
@@ -48,7 +60,7 @@ const controls = new Controls(document.getElementById('game')!, (x, y) => scene!
 function start(): void {
   overlay.innerHTML = '';
   tries++;
-  const match = new Match({ level, seed: qnum('seed', Date.now() % 100000) + tries, player: { loadout: tank, kits: qnum('kits', 1), gadget: gadget === 'none' ? null : (gadget as GadgetKind) }, playerBot: query.get('bot') === '1' });
+  const match = new Match({ level, seed: qnum('seed', Date.now() % 100000) + tries, player: { loadout: tank, kits: qnum('kits', 1), gadget: gadget === 'none' ? null : (gadget as GadgetKind), gadgetMk: { mines: gmk, oil: gmk, smoke: gmk } }, playerBot: query.get('bot') === '1' });
   for (let t = qnum('t', 0); t > 0 && !match.over; t -= 1 / 30) match.step(1 / 30);
   match.drainEvents();
   const hudRoot = document.getElementById('hud')!;
@@ -67,7 +79,7 @@ function start(): void {
       setTimeout(() => {
         hud.hide();
         const shown = { ...r, intel: kept, intelCount: sumIntel(kept) };
-        showResults(overlay, def, match.objective.title, shown, outcome(def, r, undefined), retry, def.number < CH1_LEVELS.length ? `?level=${def.number + 1}` : null);
+        showResults(overlay, def, match.objective.title, shown, outcome(def, r, undefined), retry, hasLabLevel(def.number + 1) ? `?level=${def.number + 1}` : null);
         if (query.has('demo')) setReady();
       }, 1200);
     },

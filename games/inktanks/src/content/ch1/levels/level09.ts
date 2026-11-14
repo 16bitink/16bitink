@@ -13,7 +13,7 @@ const WALL2 = row('wallStone', 400, 1080, 58, 60);
 
 export const LEVEL_09: LevelDef = {
   id: 'ch1-09', number: 9, name: 'Through the Pass', type: 'breakout',
-  briefing: 'The fort gate lies at the end of the pass, and the pass doubles back on itself. Get there in two and a half minutes. Their bombers drop where you are heading: watch for the red rings and keep moving.',
+  briefing: 'Our fort lies at the end of the pass, and the pass doubles back on itself; its gun towers cover the last stretch. Get there in two and a half minutes. Their bombers drop where you are heading: watch for the red rings and keep moving.',
   teaches: 'Air raids, pace',
   map: {
     cols: 4, rows: 3, base: 'grassDry',
@@ -23,7 +23,8 @@ export const LEVEL_09: LevelDef = {
       ...each('rockB', [[900, 150], [1300, 420], [2100, 120], [2700, 400], [3200, 200], [2900, 700], [2300, 950], [1500, 650], [800, 900], [1100, 1250], [1900, 1450], [2600, 1200], [3300, 1480]]),
       ...row('wallBrick', 1600, 300, 1, 0), ...row('wallBrickV', 3600, 700, 2, 0, 140), ...row('wallBrickV', 200, 800, 2, 0, 140), ...row('wallBrick', 2400, 1330, 2, 130),
       ...each('bush', [[600, 400], [1900, 250], [3000, 850], [1200, 800], [700, 1450], [2900, 1300]]),
-      { kind: 'fortWallV', x: 3800, y: 1250 }, { kind: 'fortTower', x: 3790, y: 1110 },
+      // Our fort's west wall, the gate gap between its two gun towers.
+      ...row('cementWallV', 3800, 1160, 3, 0, -63), ...row('cementWallV', 3800, 1270, 2, 0, 63), ...row('cementWall', 3640, 1590, 2, 63),
     ],
     points: {
       g1: { x: 1500, y: 160 }, t1: { x: 2500, y: 450 }, g2: { x: 3500, y: 300 },
@@ -46,8 +47,10 @@ export const LEVEL_09: LevelDef = {
     { role: 'guard', clan: 'boars', tank: TANK.scout2, at: 'g6' },
     { role: 'hunter', clan: 'boars', tank: TANK.scout, at: { x: 60, y: 120 }, speedMult: 0.9 },
   ],
+  // Our fort: its gun towers open up on whatever chases you in.
+  allies: [{ kind: 'tower', at: { x: 3790, y: 1110 }, gun: 'cannon', wake: 750 }, { kind: 'tower', at: { x: 3790, y: 1520 }, gun: 'machinegun', wake: 750 }],
   crates: [{ at: { x: 800, y: 420 } }, { at: { x: 3300, y: 450 }, content: 'kit' }, { at: { x: 1800, y: 950 } }, { at: { x: 500, y: 1200 }, content: 'kit' }, { at: { x: 2200, y: 1500 } }],
-  objective: { kind: 'breakout', exit: 'gate', radius: 120, artillery: { every: 5, radius: 70, damage: 45, warn: 1.8 } },
+  objective: { kind: 'breakout', exit: 'gate', to: 'our fort', radius: 120, artillery: { every: 5, radius: 70, damage: 45, warn: 1.8 } },
   bonus: [{ kind: 'time', under: 120 }, { kind: 'kills', n: 4 }],
   loot: LOOT_LATE,
 };

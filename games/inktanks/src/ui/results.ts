@@ -9,6 +9,9 @@ import type { Progress } from '../logic/workshop';
 import { bpAmount, workshopButton } from './blueprint';
 import { clock, esc, render } from './dom';
 import { partIcon } from './tankArt';
+import { GADGET_NAME } from '../logic/match/gadgets';
+import { GADGETS } from '../logic/match/types';
+import { gadgetIconUrl } from '../scenes/mission/hud';
 import { rankLine, strapBig } from './rankArt';
 
 /** What each rank brings (design doc "Military ranks"), for the promotion moment. */
@@ -54,7 +57,11 @@ export function showResults(root: HTMLElement, d: ResultsData, a: ResultsActions
   const lines = [d.title, bonusText(def.bonus[0]), bonusText(def.bonus[1])];
   const medals = lines.map((t, i) => `<div class="bonus${o.medals[i] ? '' : ' dimt'}"><span class="medal${o.medals[i] ? ' on' : ''}${o.fresh[i] ? ' pop' : ''}" style="animation-delay:${0.3 + i * 0.4}s"></span>${esc(t)}${o.fresh[i] ? ' <span class="green t12">new</span>' : ''}</div>`).join('');
   const intel = FAMILIES.filter((f) => (r.intel[f] ?? 0) > 0)
-    .map((f) => `${partIcon({ family: f, mk: 1 })}<span>${esc(familyName(f))}</span><span class="bpn">${bpAmount(r.intel[f] ?? 0, true, f)}</span>`).join('');
+    .map((f) => `${partIcon({ family: f, mk: 1 })}<span>${esc(familyName(f))}</span><span class="bpn">${bpAmount(r.intel[f] ?? 0, true, f)}</span>`).join('')
+    + GADGETS.filter((g) => (r.gadgetIntel?.[g] ?? 0) > 0).map((g) => {
+      const url = gadgetIconUrl(g);
+      return `<span class="ic">${url ? `<img src="${url}" alt="">` : ''}</span><span>${esc(GADGET_NAME[g])}</span><span class="bpn">+${r.gadgetIntel[g]}</span>`;
+    }).join('');
   const ready = newlyAffordable(d.before, d.after);
   const readyHtml = ready.length > 0
     ? `<div class="ready-line">Upgrade ready: ${esc(ready.slice(0, 2).map((u) => u.label).join(', '))}${ready.length > 2 ? ` +${ready.length - 2} more` : ''}</div>`

@@ -6,6 +6,9 @@ import { CELL, GROUNDS, type Land } from '../../logic/land';
  */
 const COLOURS: Readonly<Record<string, string>> = {
   grass: '#6f8f45', grassDry: '#9a9a55', dirt: '#8a6c45', sand: '#cdb67a', mud: '#5e4a33', water: '#3e6f8e', bridge: '#7a6448',
+  canyonRock: '#9a6a48', packedSand: '#c4a46e', sandTrack: '#b89a68', sandTrackH: '#b89a68',
+  swampWater: '#3a5e5a', shallows: '#5e7058', marsh: '#62744a',
+  snow: '#e8ecee', snowTrack: '#c8ccc8', snowTrackH: '#c8ccc8', frozenDirt: '#8a8070', ice: '#a8cce0', thinIce: '#8ab8d8',
 };
 const PAPER = '#d9ccaa';
 

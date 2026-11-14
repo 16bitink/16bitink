@@ -1,0 +1,34 @@
+{
+ "driveHover-H-mk3|L": {
+  "x": -11,
+  "y": -7
+ },
+ "driveHover-H-mk3|R": {
+  "x": 1,
+  "y": -7
+ },
+ "driveHover-H-mk2|L": {
+  "x": 94,
+  "y": -7
+ },
+ "driveHover-H-mk2|R": {
+  "x": 106,
+  "y": -8
+ },
+ "driveHover-M-mk3|L": {
+  "x": -17,
+  "y": 88
+ },
+ "driveHover-M-mk3|R": {
+  "x": -5,
+  "y": 88
+ },
+ "driveHover-L-mk3|L": {
+  "x": 71,
+  "y": 82
+ },
+ "driveHover-L-mk3|R": {
+  "x": 83,
+  "y": 82
+ }
+}

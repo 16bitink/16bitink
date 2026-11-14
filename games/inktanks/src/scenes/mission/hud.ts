@@ -1,8 +1,9 @@
-import { damageTaken } from '../../logic/damage';
+import { armourAgainst, damageTaken } from '../../logic/damage';
+import { inFog } from '../../logic/match/fog';
 import { sumIntel } from '../../logic/intel';
 import type { Match } from '../../logic/match/match';
-import type { MatchEvent, Tank } from '../../logic/match/types';
-import { familyName, withPart, type Family, type Part } from '../../logic/parts';
+import type { GadgetKind, MatchEvent, Tank } from '../../logic/match/types';
+import { familyName, HULLS, withPart, type Family, type Part } from '../../logic/parts';
 import { mkBadge, partName } from '../../ui/tankArt';
 import { fireRate, tankStats, type TankStats } from '../../logic/stats';
 import { partsArt } from '../../render/partsArt';
@@ -34,6 +35,8 @@ const FRIENDLY_POP_GAP = 1.5;
 const LOW_HP = 0.4;
 const $ = <T extends HTMLElement>(root: HTMLElement, sel: string): T => root.querySelector(sel) as T;
 
+/** The set pieces' calls (objectives/setPieces.ts). */
+const SETPIECE_POP = { flagOurs: 'Flag raised!', flagLost: 'Flag lost!', photo: 'Photographed!', gate: 'The gate opens!', avalanche: 'Avalanche!' } as const;
 /** The fortress boss's phase 2 calls (objectives/bossRage.ts). */
 const BOSS_POP = { enraged: 'Enraged! It charges', charge: 'Charge!', ram: 'Rammed!', stunned: 'Dazed! Hit it ×1.5' } as const;
 
@@ -63,6 +66,8 @@ export class Hud {
   private gadgetShown = '';
   private gadgetTipped = false;
   private readonly friendlyAt = new Map<number, number>();
+  /** When the last "Reeds ablaze!" popped (match time). */
+  private burnPopAt = -99;
   private cardFor: number | null = null;
   private loadoutRef: Tank['loadout'] | null = null;
 
@@ -108,7 +113,7 @@ export class Hud {
       if (t) this.line(t.role === 'crew' ? `${t.name} is home` : `<b class="red">${who(t)} got away</b>`);
     } else if (e.kind === 'pickup' && e.what === 'intel' && m.tank(e.tank)?.isPlayer) this.blueprints(m, e.amount, e.family);
     else if (e.kind === 'pickup' && e.what === 'kit' && m.tank(e.tank)?.isPlayer) this.showTip(m, `Repair kit! ${this.useKey()} to fix your tank`);
-    else if (e.kind === 'pickup' && e.what === 'gadget' && m.tank(e.tank)?.isPlayer) this.line(`+1 ${GADGET_NAME[m.player?.gadget ?? 'mines']}`);
+    else if (e.kind === 'pickup' && e.what === 'gadget' && m.tank(e.tank)?.isPlayer) this.gadgetPickup(m, e.gadget ?? m.player?.gadget ?? 'mines', e.found === true, e.spare === true);
     else if (e.kind === 'ambush') this.pop(m, e.x, e.y, 'Ambush ×2');
     else if (e.kind === 'friendly' && m.t - (this.friendlyAt.get(e.target) ?? -9) > FRIENDLY_POP_GAP) {
       // One pop per tank every so often: a machinegun burst through a friend is one "Friendly fire!", not twenty.
@@ -116,7 +121,25 @@ export class Hud {
       this.pop(m, e.x, e.y, 'Friendly fire!');
     }
     else if (e.kind === 'mine') this.pop(m, e.x, e.y, 'Mine!');
+    else if (e.kind === 'ignite') this.pop(m, e.x, e.y, 'Ablaze!');
+    // Reeds alight: one pop per blaze, not one per clump the fire spreads to.
+    else if (e.kind === 'burn' && e.what === 'alight' && m.t - this.burnPopAt > 4) {
+      this.burnPopAt = m.t;
+      this.pop(m, e.x, e.y, e.tree ? 'The trees are burning!' : 'Reeds ablaze!');
+    }
+    else if (e.kind === 'objective') this.line(`<b class="gold">${e.text}</b>`);
     else if (e.kind === 'boss') this.pop(m, e.x, e.y, BOSS_POP[e.what]);
+    else if (e.kind === 'weather') this.weather(m, e.what, e.in, e.storm);
+    else if (e.kind === 'ice') this.pop(m, e.x, e.y, e.what === 'crack' ? (e.tank === m.player?.id ? 'The ice is cracking: get off!' : 'Ice cracking!') : 'Through the ice!');
+    else if (e.kind === 'setpiece') this.pop(m, e.x, e.y, SETPIECE_POP[e.what]);
+  }
+
+  /** Sandstorms and blizzards: a warning a few seconds ahead, then a line as one rolls in and passes. */
+  private weather(m: Match, what: 'coming' | 'start' | 'end', inS: number | undefined, storm: 'sandstorm' | 'blizzard'): void {
+    const [Name, name, more] = storm === 'blizzard' ? ['Blizzard', 'blizzard', ' The wind will push you.'] : ['Sandstorm', 'sandstorm', ''];
+    if (what === 'coming') this.showTip(m, `<b class="gold">${Name} coming${inS ? ` in ${inS} s` : ''}!</b> You'll only see close by: find cover or press on.${more}`);
+    else if (what === 'start') this.line(`<b class="gold">${Name}! Nobody can see far</b>`);
+    else this.line(`The ${name} has passed`);
   }
 
   /** A word that floats up from a world point and fades ("Ambush ×2"). */
@@ -144,10 +167,17 @@ export class Hud {
     });
   }
 
-  /** The gadget's icon and charges, with its key; on a phone, the big button. */
+  /** "+1 Mines"; a found one-use gets a tip; a spare charge when full turns into a blueprint. */
+  private gadgetPickup(m: Match, g: GadgetKind, found: boolean, spare: boolean): void {
+    if (found) this.showTip(m, `Found ${GADGET_NAME[g]}! One use: ${this.touch ? 'tap the gadget button' : 'press <kbd>G</kbd>'}`);
+    else this.line(spare ? `+1 ${GADGET_NAME[g]} blueprint (full up)` : `+1 ${GADGET_NAME[g]}`);
+  }
+
+  /** The gadget's icon and charges, with its key; on a phone, the big button. A found one-use shows instead, lit gold. */
   private drawGadget(m: Match, p: Tank): void {
-    const g = p.gadget;
-    const key = `${g}/${p.gadgetCharges}/${this.touch}`;
+    const g = p.found ?? p.gadget;
+    const n = p.found ? 1 : p.gadgetCharges;
+    const key = `${g}/${p.found}/${n}/${this.touch}`;
     if (key === this.gadgetShown) return;
     this.gadgetShown = key;
     if (!g) {
@@ -156,12 +186,13 @@ export class Hud {
     }
     const url = gadgetIconUrl(g);
     const icon = url ? `<img src="${url}" alt="">` : `<i>${GADGET_NAME[g].slice(0, 1)}</i>`;
-    const cls = p.gadgetCharges > 0 ? 'on' : 'off';
+    const cls = `${n > 0 ? 'on' : 'off'}${p.found ? ' found' : ''}`;
     this.gadget.className = `gadget ${cls}`;
-    this.gadget.innerHTML = `${icon}<b>${p.gadgetCharges}</b>${this.touch || p.gadgetCharges === 0 ? '' : '<kbd>G</kbd>'}`;
-    this.gadget.title = GADGET_NAME[g];
-    this.gadgetBtn.innerHTML = `${url ? `<img src="${url}" alt="">` : GADGET_NAME[g]}<b>${p.gadgetCharges}</b>`;
-    this.gadgetBtn.classList.toggle('off', p.gadgetCharges === 0);
+    this.gadget.innerHTML = `${icon}<b>${n}</b>${this.touch || n === 0 ? '' : '<kbd>G</kbd>'}`;
+    this.gadget.title = p.found ? `${GADGET_NAME[g]} (found, one use)` : GADGET_NAME[g];
+    this.gadgetBtn.innerHTML = `${url ? `<img src="${url}" alt="">` : GADGET_NAME[g]}<b>${n}</b>`;
+    this.gadgetBtn.classList.toggle('off', n === 0);
+    this.gadgetBtn.classList.toggle('found', p.found !== null);
     if (!this.gadgetTipped && p.gadgetCharges > 0 && m.t > 1.5 && m.t < 30) {
       this.gadgetTipped = true;
       const verb = g === 'mines' ? 'lay a mine' : g === 'oil' ? 'spill an oil slick' : 'pop smoke';
@@ -245,7 +276,7 @@ export class Hud {
     this.drawArrow(status.target, project);
     this.swapBtn.style.display = touch && p.onPart !== null ? 'block' : 'none';
     this.repairBtn.style.display = touch ? 'block' : 'none';
-    this.gadgetBtn.style.display = touch && p.gadget ? 'block' : 'none';
+    this.gadgetBtn.style.display = touch && (p.gadget || p.found) ? 'block' : 'none';
     this.drawCard(m, p);
     this.drawMini(m, p);
   }
@@ -283,7 +314,9 @@ export class Hud {
     for (const t of m.tanks) {
       if (!t.alive || t.role === 'bossTurret') continue;
       // Enemies show when close, or for 2 s after they fire (or always, carrying the prototype).
-      const seen = t.isPlayer || t.team === p.team || m.t - t.firedAt < 2 || Math.hypot(t.x - p.x, t.y - p.y) < 560 || t.ace || t.role === 'boss';
+      // A fog bank (chapter 3) hides an enemy in it as the map's eyes go: only its fire shows.
+      const fogged = m.fogNow.length > 0 && t.team !== p.team && inFog(m.fogNow, t.x, t.y);
+      const seen = t.isPlayer || t.team === p.team || m.t - t.firedAt < 2 || (!fogged && Math.hypot(t.x - p.x, t.y - p.y) < Math.min(560, m.sight)) || t.ace || t.role === 'boss';
       if (!seen) continue;
       c.fillStyle = t.isPlayer ? '#3c6cc8' : t.team === 0 ? '#8cc85a' : t.ace || t.role === 'boss' ? '#f0c040' : '#d85a3a';
       const r = t.isPlayer ? 3.5 : 2.5;
@@ -327,13 +360,13 @@ export function iconHtml(p: Part): string {
 }
 
 function diffs(a: TankStats, b: TankStats): string {
-  const ref = { drive: 'halftracks' as const, armour: 7 };
-  const dps = (s: TankStats) => damageTaken(s.gun.damage, s.gun.family, ref.drive, ref.armour) * s.gun.shots * fireRate(s.gun);
+  // Against a Medium hull on Half-tracks (its heat armour for the Flamer).
+  const dps = (s: TankStats) => damageTaken(s.gun.damage, s.gun.family, 'halftracks', armourAgainst(HULLS.medium, s.gun.family)) * s.gun.shots * fireRate(s.gun);
   const rows: [string, number, number][] = [['HP', a.maxHp, b.maxHp], ['Speed', a.speed, b.speed], ['Damage/s', dps(a), dps(b)], ['Range', a.gun.range, b.gun.range]];
   return rows
     .filter(([, x, y]) => Math.abs(x - y) > 0.5)
     .map(([n, x, y]) => `<div class="d ${y > x ? 'up' : 'down'}">${n} ${Math.round(x)} → ${Math.round(y)}</div>`)
-    .join('');
+    .join('') + (b.gun.minRange > 0 && a.gun.minRange === 0 ? `<div class="d">Lobs over walls · can't hit under ${b.gun.minRange} px</div>` : '');
 }
 
 

@@ -1,0 +1,14 @@
+{
+ "turretRail-mk3": {
+  "x": -36,
+  "y": -5
+ },
+ "turretRail-mk2": {
+  "x": 5,
+  "y": -11
+ },
+ "turretRail-mk1": {
+  "x": 41,
+  "y": -14
+ }
+}

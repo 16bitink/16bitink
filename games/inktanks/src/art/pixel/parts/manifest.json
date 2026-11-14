@@ -18,12 +18,17 @@
   "drives": [
    "driveWheels",
    "driveHalftrack",
-   "driveTracks"
+   "driveTracks",
+   "driveHover"
   ],
   "turrets": [
    "turretMG",
    "turretCannon",
-   "turretRocket"
+   "turretRocket",
+   "turretMortar",
+   "turretFlamer",
+   "turretLaser",
+   "turretRail"
   ]
  },
  "tiers": [
@@ -76,7 +81,28 @@
   "turretCannon-mk3",
   "turretRocket-mk1",
   "turretRocket-mk2",
-  "turretRocket-mk3"
+  "turretRocket-mk3",
+  "turretMortar-mk1",
+  "turretMortar-mk2",
+  "turretMortar-mk3",
+  "turretFlamer-mk1",
+  "turretFlamer-mk2",
+  "turretFlamer-mk3",
+  "driveHover-L-mk1",
+  "driveHover-L-mk2",
+  "driveHover-L-mk3",
+  "driveHover-M-mk1",
+  "driveHover-M-mk2",
+  "driveHover-M-mk3",
+  "driveHover-H-mk1",
+  "driveHover-H-mk2",
+  "driveHover-H-mk3",
+  "turretLaser-mk1",
+  "turretLaser-mk2",
+  "turretLaser-mk3",
+  "turretRail-mk1",
+  "turretRail-mk2",
+  "turretRail-mk3"
  ],
  "ring": {
   "hullLight-mk1": [
@@ -322,6 +348,78 @@
     15.6,
     -7.4
    ]
+  ],
+  "turretMortar-mk1": [
+   [
+    0.0,
+    -12.3
+   ]
+  ],
+  "turretMortar-mk2": [
+   [
+    0.0,
+    -12.8
+   ]
+  ],
+  "turretMortar-mk3": [
+   [
+    0.0,
+    -14.0
+   ]
+  ],
+  "turretFlamer-mk1": [
+   [
+    0.0,
+    -28.3
+   ]
+  ],
+  "turretFlamer-mk2": [
+   [
+    0.0,
+    -30.0
+   ]
+  ],
+  "turretFlamer-mk3": [
+   [
+    0.0,
+    -34.8
+   ]
+  ],
+  "turretLaser-mk1": [
+   [
+    0.0,
+    -35.4
+   ]
+  ],
+  "turretLaser-mk2": [
+   [
+    0.0,
+    -38.2
+   ]
+  ],
+  "turretLaser-mk3": [
+   [
+    0.0,
+    -43.0
+   ]
+  ],
+  "turretRail-mk1": [
+   [
+    0.0,
+    -37.4
+   ]
+  ],
+  "turretRail-mk2": [
+   [
+    0.0,
+    -41.2
+   ]
+  ],
+  "turretRail-mk3": [
+   [
+    0.0,
+    -47.0
+   ]
   ]
  },
  "frames": {
@@ -504,6 +602,66 @@
    "driveTracks-mk3",
    "driveTracks-mk3-f1",
    "driveTracks-mk3-f2"
+  ],
+  "driveHover-L-mk1": [
+   "driveHover-L-mk1",
+   "driveHover-L-mk1-f1",
+   "driveHover-L-mk1-f2"
+  ],
+  "driveHover-L-mk2": [
+   "driveHover-L-mk2",
+   "driveHover-L-mk2-f1",
+   "driveHover-L-mk2-f2"
+  ],
+  "driveHover-L-mk3": [
+   "driveHover-L-mk3",
+   "driveHover-L-mk3-f1",
+   "driveHover-L-mk3-f2"
+  ],
+  "driveHover-M-mk1": [
+   "driveHover-M-mk1",
+   "driveHover-M-mk1-f1",
+   "driveHover-M-mk1-f2"
+  ],
+  "driveHover-M-mk2": [
+   "driveHover-M-mk2",
+   "driveHover-M-mk2-f1",
+   "driveHover-M-mk2-f2"
+  ],
+  "driveHover-M-mk3": [
+   "driveHover-M-mk3",
+   "driveHover-M-mk3-f1",
+   "driveHover-M-mk3-f2"
+  ],
+  "driveHover-H-mk1": [
+   "driveHover-H-mk1",
+   "driveHover-H-mk1-f1",
+   "driveHover-H-mk1-f2"
+  ],
+  "driveHover-H-mk2": [
+   "driveHover-H-mk2",
+   "driveHover-H-mk2-f1",
+   "driveHover-H-mk2-f2"
+  ],
+  "driveHover-H-mk3": [
+   "driveHover-H-mk3",
+   "driveHover-H-mk3-f1",
+   "driveHover-H-mk3-f2"
+  ],
+  "driveHover-mk1": [
+   "driveHover-mk1",
+   "driveHover-mk1-f1",
+   "driveHover-mk1-f2"
+  ],
+  "driveHover-mk2": [
+   "driveHover-mk2",
+   "driveHover-mk2-f1",
+   "driveHover-mk2-f2"
+  ],
+  "driveHover-mk3": [
+   "driveHover-mk3",
+   "driveHover-mk3-f1",
+   "driveHover-mk3-f2"
   ]
  },
  "hullSize": {
@@ -562,6 +720,23 @@
     "mk2": "driveTracks-H-mk2",
     "mk3": "driveTracks-H-mk3"
    }
+  },
+  "driveHover": {
+   "L": {
+    "mk1": "driveHover-L-mk1",
+    "mk2": "driveHover-L-mk2",
+    "mk3": "driveHover-L-mk3"
+   },
+   "M": {
+    "mk1": "driveHover-M-mk1",
+    "mk2": "driveHover-M-mk2",
+    "mk3": "driveHover-M-mk3"
+   },
+   "H": {
+    "mk1": "driveHover-H-mk1",
+    "mk2": "driveHover-H-mk2",
+    "mk3": "driveHover-H-mk3"
+   }
   }
  },
  "aliases": {
@@ -573,7 +748,10 @@
   "driveHalftrack-mk3": "driveHalftrack-L-mk3",
   "driveTracks-mk1": "driveTracks-L-mk1",
   "driveTracks-mk2": "driveTracks-L-mk2",
-  "driveTracks-mk3": "driveTracks-L-mk3"
+  "driveTracks-mk3": "driveTracks-L-mk3",
+  "driveHover-mk1": "driveHover-L-mk1",
+  "driveHover-mk2": "driveHover-L-mk2",
+  "driveHover-mk3": "driveHover-L-mk3"
  },
  "stripe": [
   "hullLight-mk1",
@@ -595,6 +773,14 @@
   "driveTracks": "icons/driveTracks.png",
   "turretMG": "icons/turretMG.png",
   "turretCannon": "icons/turretCannon.png",
-  "turretRocket": "icons/turretRocket.png"
+  "turretRocket": "icons/turretRocket.png",
+  "turretMortar": "icons/turretMortar.png",
+  "turretFlamer": "icons/turretFlamer.png",
+  "driveHover": "icons/driveHover.png",
+  "turretLaser": "icons/turretLaser.png",
+  "turretRail": "icons/turretRail.png"
+ },
+ "notes": {
+  "driveHover": "frames are a skirt ripple and turning lift fans, not a rolling tread; play them at any speed, also when standing still"
  }
 }

@@ -149,7 +149,13 @@ describe('raid and rescue', () => {
     expect(Math.hypot(crews[0]!.x - p.x, crews[0]!.y - p.y)).toBeLessThan(d0);
     for (const c of crews) put(c, POINTS.a!);
     m.step(1 / 30);
+    // Everyone aboard: the pick-up truck drives off, and the mission ends once it's gone.
+    expect(m.over).toBeNull();
+    const truck = m.objective.props()[0]!;
+    expect(truck.kind).toBe('truck');
+    steps(m, 3);
     expect(m.over?.passed).toBe(true);
+    expect(Math.hypot(m.objective.props()[0]!.x - truck.x, m.objective.props()[0]!.y - truck.y)).toBeGreaterThan(150);
   });
   it('rescue: losing a crew fails', () => {
     const m = make(rescueLevel);
@@ -253,7 +259,7 @@ describe('hold, capture, recon', () => {
 });
 
 describe('salvage and breakout', () => {
-  it('salvage: picking up the prototype stages the waves; the pick-up wins', () => {
+  it('salvage: picking up the prototype stages the waves and calls the chopper; it lands, loads and flies off with it', () => {
     const m = make(ch1Level(8));
     const p = m.player!;
     const proto = m.pickups.find((x) => x.kind === 'proto')!;
@@ -263,8 +269,28 @@ describe('salvage and breakout', () => {
     expect(p.carrying).toBe(true);
     m.step(1 / 30, IDLE);
     expect(m.pendingWaves()).toBe(waves - 2);
-    put(p, m.point('pickup'));
+    const heli = () => m.objective.props()[0];
+    expect(heli()?.kind).toBe('heli');
+    expect(heli()!.alt).toBe(1);
+    // Waiting on the pad before it lands doesn't win yet.
+    const pad = m.point('pickup');
+    put(p, pad);
     m.step(1 / 30, IDLE);
+    expect(m.over).toBeNull();
+    for (let i = 0; i < 30 * 30 && heli()!.alt > 0; i++) {
+      for (const t of m.tanks) if (t.team !== 0) t.alive = false;
+      put(p, pad);
+      m.step(1 / 30, IDLE);
+    }
+    expect(heli()!.alt).toBe(0);
+    for (let i = 0; i < 30 * 2.5; i++) {
+      put(p, pad);
+      m.step(1 / 30, IDLE);
+    }
+    expect(p.carrying).toBe(false);
+    expect(heli()!.cargo).toBe(true);
+    expect(m.over).toBeNull();
+    for (let i = 0; i < 30 * 5 && !m.over; i++) m.step(1 / 30, IDLE);
     expect(m.over?.passed).toBe(true);
   });
   it('breakout: artillery marks then lands; the exit wins, the timer fails', () => {

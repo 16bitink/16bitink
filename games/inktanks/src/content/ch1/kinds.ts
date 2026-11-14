@@ -16,6 +16,18 @@ export interface KindDef {
   readonly roof?: boolean;
   /** Low cover: shots pass over it in their first 50 px (hug it and fire out); it doesn't block sight. */
   readonly low?: boolean;
+  /** A dune crest (chapter 2): blocks sight, not shots or driving. */
+  readonly crest?: boolean;
+  /** A deck on the ground (chapter 3 boardwalks, jetties): blocks nothing. */
+  readonly deck?: boolean;
+  /** Catches fire from a Flamer and spreads (chapter 3 reeds, chapter 5 trees). */
+  readonly burns?: boolean;
+  /** Chapter 5: a tree's canopy radius (blocks sight and shots; the trunk blocks driving). */
+  readonly canopy?: number;
+  /** Chapter 5: a young tree: Tracks and Heavies flatten it, every other drive goes round. */
+  readonly thicket?: boolean;
+  /** Chapter 5: a log bridge (driven over; breaks into water). */
+  readonly span?: boolean;
   /** Placeholder fill for the renderer until the art lands. */
   readonly colour: number;
   /** Height in native px (for the castle projection placeholder). */
@@ -62,6 +74,10 @@ const PLACEHOLDER_KINDS: Readonly<Record<string, KindDef>> = {
   /** Rescue: a crew's cage. */
   cage: { shape: rectShape(56, 56), material: 'wood', hp: 60, colour: 0x6a5030, height: 34 },
   fortTower: { shape: { kind: 'circle', r: 44 }, material: 'stone', hp: 0, colour: 0x6e6a62, height: 70 },
+  /** Our side's modern defences (owner, Nov 14): white cement walls and square gun towers, in place of the ancient stone. */
+  cementWall: { shape: rectShape(240, 30), material: 'stone', hp: 0, colour: 0xd8d8d0, height: 50 },
+  cementWallV: { shape: rectShape(30, 240), material: 'stone', hp: 0, colour: 0xd8d8d0, height: 50 },
+  cementTower: { shape: rectShape(80, 80), material: 'stone', hp: 0, colour: 0xd8d8d0, height: 70 },
 };
 
 /** Our kind names → the world manifest's structure names. */
@@ -73,6 +89,7 @@ export const ART_NAME: Readonly<Record<string, string>> = {
   /** Ground pieces: drawn under the land by the ground stream where a 'bridge' patch lies, never placed as structures. */
   bridgeDeck: 'bridgeDeck', bridgeDeckV: 'bridgeDeckV', cage: 'cage', fuelBarrels: 'fuelBarrels', radarMast: 'radarMast', hangar: 'hangar',
   fortWall: 'fortWallH', fortWallV: 'fortWallV', fortGate: 'fortGate', wagon: 'wagon', fortTower: 'fortTower',
+  cementWall: 'cementWallH', cementWallV: 'cementWallV', cementTower: 'cementTower',
   sandbags: 'sandbagH', sandbagsV: 'sandbagV', hayBale: 'hayBale', crate: 'crate',
 };
 
@@ -94,11 +111,15 @@ function worldShape(name: string): Shape | null {
  * where it has the structure (never guessed), the placeholders elsewhere.
  * HP stays ours for now (the manifest's is a suggestion; tune in the content pass).
  */
-export const KINDS: Readonly<Record<string, KindDef>> = Object.fromEntries(
-  Object.entries(PLACEHOLDER_KINDS).map(([kind, k]) => {
-    const name = ART_NAME[kind];
-    const shape = name ? worldShape(name) : null;
-    const w = name ? WORLD[name] : undefined;
-    return [kind, shape && w ? { ...k, shape, flattenable: w.flattenable || undefined, cover: w.cover || undefined } : k];
-  }),
-);
+export function withWorldShapes(placeholders: Readonly<Record<string, KindDef>>, artName: Readonly<Record<string, string>>): Readonly<Record<string, KindDef>> {
+  return Object.fromEntries(
+    Object.entries(placeholders).map(([kind, k]) => {
+      const name = artName[kind];
+      const shape = name ? worldShape(name) : null;
+      const w = name ? WORLD[name] : undefined;
+      return [kind, shape && w ? { ...k, shape, flattenable: w.flattenable || undefined, cover: w.cover || undefined } : k];
+    }),
+  );
+}
+
+export const KINDS: Readonly<Record<string, KindDef>> = withWorldShapes(PLACEHOLDER_KINDS, ART_NAME);

@@ -66,8 +66,11 @@ export class WorldFx {
   }
 
   onEvent(e: MatchEvent): void {
+    // The Flamer's stream draws itself (flameView.ts): no muzzle puff or hit spark per tick.
+    if (e.kind === 'fire' && e.shot === 'flame') return;
     if (e.kind === 'fire') this.puffs.push({ x: e.x, y: e.y, r: e.shot === 'tracer' ? 5 : 10, t: 0, life: 0.08, colour: 0xffe2a0 });
-    else if (e.kind === 'hit') this.puffs.push({ x: e.x, y: e.y, r: e.shot === 'tracer' ? 4 : 12, t: 0, life: 0.18, colour: 0xffb060 });
+    // A Laser's hit has its own spark (effectView.ts).
+    else if (e.kind === 'hit' && e.shot !== 'beam') this.puffs.push({ x: e.x, y: e.y, r: e.shot === 'tracer' ? 4 : 12, t: 0, life: 0.18, colour: 0xffb060 });
     else if (e.kind === 'explode' || e.kind === 'mark') this.bombs.onEvent(e, this.now);
     else if (e.kind === 'kill') this.puffs.push({ x: 0, y: 0, r: 0, t: 0, life: 0, colour: 0 });
     else if (e.kind === 'aim') this.aimLines.push({ tank: e.tank, angle: e.angle, len: e.len, until: e.until, width: e.width ?? 0, dur: e.dur ?? 0.4 });
@@ -80,7 +83,8 @@ export class WorldFx {
     this.bombs.update(m);
     const g = this.shots.clear();
     for (const s of m.shots) {
-      if (s.x < view.x - 50 || s.x > view.right + 50 || s.y < view.y - 50 || s.y > view.bottom + 50) continue;
+      // Lobbed shells are LobLayer's (lobView.ts): arc, shadow and landing ring.
+      if (s.lob || s.x < view.x - 50 || s.x > view.right + 50 || s.y < view.y - 50 || s.y > view.bottom + 50) continue;
       const sp = Math.hypot(s.vx, s.vy);
       const ux = s.vx / sp;
       const uy = s.vy / sp;
@@ -179,7 +183,7 @@ export class WorldFx {
         g.lineStyle(2, MK_COLOUR[p.part.mk].hex, 0.8 + 0.2 * Math.sin(m.t * 5)).strokeCircle(p.x, p.y, 26);
       } else if (p.kind === 'gadget') {
         g.lineStyle(2, 0xe0b040, 0.55 + 0.35 * Math.sin(m.t * 4)).strokeCircle(p.x, p.y, 24);
-        const icon = gadgetIconKey(m.player?.gadget ?? 'mines');
+        const icon = gadgetIconKey(p.gadget ?? m.player?.gadget ?? 'mines');
         if (!this.items.has(p.id) && this.scene.textures.exists(icon)) this.items.set(p.id, this.scene.add.image(p.x, p.y, icon).setScale(0.8).setDepth(DEPTH.pickups + 1));
         else if (!this.scene.textures.exists(icon)) g.fillStyle(0xe0b040, 0.9).fillCircle(p.x, p.y, 8);
       } else if (p.kind === 'kit' || p.kind === 'intel' || p.kind === 'proto') {

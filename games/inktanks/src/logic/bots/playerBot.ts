@@ -1,5 +1,4 @@
 import { wantsSwap } from '../loot';
-import { GADGET } from '../match/gadgets';
 import type { Match } from '../match/match';
 import type { Tank } from '../match/types';
 import type { Pt } from '../vec';
@@ -29,7 +28,7 @@ function lootPick(m: Match, t: Tank, range: number): { id: number; x: number; y:
     let v = 0;
     if (p.kind === 'crate') v = 6;
     else if (p.kind === 'kit') v = t.kits < t.maxKits ? 7 : 0;
-    else if (p.kind === 'gadget') v = t.gadget && t.gadgetCharges < GADGET.max ? 5 : 0;
+    else if (p.kind === 'gadget') v = p.gadget && p.gadget !== t.gadget ? (t.found ? 0 : 5) : t.gadget ? 4 : 0;
     else if (p.kind === 'intel') v = 6 + Object.values(p.bag).reduce((s: number, n) => s + (n ?? 0), 0);
     else if (p.kind === 'part') v = wantsSwap(t.loadout, p.part, t.lastHitDrive) ? p.part.mk * 5 : 0;
     const score = v / (1 + d / 220);
@@ -73,12 +72,13 @@ export function coverSpotNear(m: Match, t: Tank, target: Tank): Pt | null {
 
 /** When the stand-in uses its gadget: a mine when chased, smoke when low, oil on a close chaser. */
 function wantsGadget(m: Match, t: Tank, seen: readonly Tank[]): boolean {
-  if (!t.gadget || t.gadgetCharges <= 0 || m.t - t.gadgetT < GADGET_GAP) return false;
+  const kind = t.found ?? t.gadget;
+  if (!kind || (!t.found && t.gadgetCharges <= 0) || m.t - t.gadgetT < GADGET_GAP) return false;
   const alertNear = seen.filter((o) => o.role === 'tank' && m.brains.get(o.id)?.aware === 'alert' && Math.hypot(o.x - t.x, o.y - t.y) < 280);
   if (alertNear.length === 0) return false;
   const share = t.hp / t.stats.maxHp;
-  if (t.gadget === 'smoke') return share < 0.35;
-  if (t.gadget === 'oil') return alertNear.some((o) => Math.hypot(o.x - t.x, o.y - t.y) < 200);
+  if (kind === 'smoke') return share < 0.35;
+  if (kind === 'oil') return alertNear.some((o) => Math.hypot(o.x - t.x, o.y - t.y) < 200);
   // A mine where a chaser will roll: it's coming at me, or I'm hurt and backing off.
   const mineNear = m.gadgets.mines.some((x) => x.alive && Math.hypot(x.x - t.x, x.y - t.y) < 120);
   const chased = alertNear.some((o) => Math.cos(o.heading - Math.atan2(t.y - o.y, t.x - o.x)) > 0.6 && o.speed > 20);

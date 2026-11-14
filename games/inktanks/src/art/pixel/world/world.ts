@@ -61,6 +61,23 @@ export interface FortressArt {
   readonly files: Readonly<Record<string, string>>;
 }
 
+/** A looping effect strip (manifest.effects: the Flamer's jet, burning reeds): frames side by side, anchor in a frame. */
+export interface EffectArt {
+  readonly file: string;
+  readonly frame: Pt;
+  readonly frames: number;
+  readonly fps: number;
+  readonly anchor: Pt;
+  readonly loop: boolean;
+}
+
+/** A tiled overlay (manifest.overlays: sandstorm, fog). */
+export interface OverlayArt {
+  readonly file: string;
+  readonly size: number;
+  readonly tile: boolean;
+}
+
 export interface WorldManifest {
   readonly density: 'C';
   readonly unit: number;
@@ -72,6 +89,8 @@ export interface WorldManifest {
     readonly truck: { readonly size: number; readonly frames: readonly string[]; readonly wreck: string; readonly files: Readonly<Record<string, string>> };
     readonly fortress: FortressArt;
   };
+  readonly overlays?: Readonly<Record<string, OverlayArt>>;
+  readonly effects?: Readonly<Record<string, EffectArt>>;
 }
 
 export const WORLD = manifestJson as unknown as WorldManifest;

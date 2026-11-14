@@ -1,7 +1,9 @@
 import { familyName, FAMILIES, MAX_MK, roman, slotOf, type Family } from './parts';
 import { RANKS, perksOf, type RankId } from './rank';
 import { type ResearchLine } from './stats';
-import { LINES_BY_SLOT, MK_COST, researchCost, UNLOCK_COST, type NextMk, type Progress } from './workshop';
+import { GADGET_NAME } from './match/gadgets';
+import { GADGETS, type GadgetKind } from './match/types';
+import { GADGET_MK_COST, gadgetMkOf, LINES_BY_SLOT, MK_COST, researchCost, UNLOCK_COST, type NextMk, type Progress } from './workshop';
 
 /**
  * Blueprints are the player-facing name of intel (code keeps `intel`).
@@ -9,8 +11,10 @@ import { LINES_BY_SLOT, MK_COST, researchCost, UNLOCK_COST, type NextMk, type Pr
  * you can pay for right now, and which became payable during a mission.
  */
 export interface Upgrade {
-  readonly kind: 'unlock' | 'mk' | 'research';
-  readonly family: Family;
+  readonly kind: 'unlock' | 'mk' | 'research' | 'gadget';
+  /** The part family; absent for a gadget tier. */
+  readonly family?: Family;
+  readonly gadget?: GadgetKind;
   /** The Mk reached (kind mk) or the research line. */
   readonly mk?: NextMk;
   readonly line?: ResearchLine;
@@ -43,6 +47,12 @@ export function affordableUpgrades(p: Progress, rank: RankId = rankIdOf(p.xp)): 
       const cost = researchCost(p, f, line);
       if (cost !== null && have >= cost) out.push({ kind: 'research', family: f, line, cost, key: `research:${f}:${line}:${cost}`, label: `${name} ${LINE_NAMES[line]}` });
     }
+  }
+  for (const g of GADGETS) {
+    const mk = gadgetMkOf(p, g);
+    if (mk >= MAX_MK) continue;
+    const next = (mk + 1) as NextMk;
+    if (maxMk >= next && (p.gadgetIntel[g] ?? 0) >= GADGET_MK_COST[next]) out.push({ kind: 'gadget', gadget: g, mk: next, cost: GADGET_MK_COST[next], key: `gadget:${g}:${next}`, label: `${GADGET_NAME[g]} Mk ${roman(next)}` });
   }
   return out;
 }

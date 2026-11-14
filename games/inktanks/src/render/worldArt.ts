@@ -1,4 +1,4 @@
-import { ART_NAME } from '../content/ch1/kinds';
+import { ALL_ART_NAME as ART_NAME } from '../content/kinds';
 import { WORLD, type StructureArt } from '../art/pixel/world/world';
 
 /**

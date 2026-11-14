@@ -11,7 +11,9 @@ export class StructGrid {
   constructor(private readonly structs: readonly StructRt[], private readonly size = 160) {
     this.stamp = new Uint32Array(structs.length);
     structs.forEach((s, i) => {
-      const b = shapeBounds(s.def.shape, s.def.x, s.def.y);
+      // A tree's canopy (chapter 5) reaches past its trunk: index the canopy, so lines past it find it.
+      const c = s.def.canopy;
+      const b = c ? { x0: s.def.x - c, y0: s.def.y - c, x1: s.def.x + c, y1: s.def.y + c } : shapeBounds(s.def.shape, s.def.x, s.def.y);
       for (let by = Math.floor(b.y0 / size); by <= Math.floor(b.y1 / size); by++) {
         for (let bx = Math.floor(b.x0 / size); bx <= Math.floor(b.x1 / size); bx++) {
           const k = by * 4096 + bx;

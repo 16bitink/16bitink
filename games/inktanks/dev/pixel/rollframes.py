@@ -105,7 +105,8 @@ def main() -> None:
     check = '--check' in sys.argv
     jobs: list[tuple[Path, list[Path], int | None]] = []
     for base in sorted(PARTS.glob('drive*.png')):
-        if base.stem.endswith(('-f1', '-f2')):
+        if base.stem.endswith(('-f1', '-f2')) or base.stem.startswith('driveHover'):
+            # A hover's frames are a skirt ripple, not a tread (dev/pixel/hover/build.py makes them).
             continue
         jobs.append((base, [base.with_name(f'{base.stem}-f1.png'), base.with_name(f'{base.stem}-f2.png')], None))
     jobs.append((VEHICLES / 'truck-1.png', [VEHICLES / 'truck-1-f2.png'], TRUCK_MAX_RUN))

@@ -1,0 +1,46 @@
+{
+ "place": {
+  "harvester-body": {
+   "x": -83,
+   "y": 111
+  },
+  "harvester-treads": {
+   "x": 73,
+   "y": 112
+  },
+  "harvester-treads-f2": {
+   "x": 233,
+   "y": 112
+  }
+ },
+ "mounts": {
+  "cannonLeft": {
+   "at": [
+    -49,
+    -43
+   ],
+   "turret": "fortressCannon"
+  },
+  "cannonRight": {
+   "at": [
+    49,
+    -43
+   ],
+   "turret": "fortressCannon"
+  },
+  "rail": {
+   "at": [
+    0,
+    40
+   ],
+   "turret": "fortressRail"
+  },
+  "mg": {
+   "at": [
+    0,
+    -84
+   ],
+   "turret": "fortressMG"
+  }
+ }
+}

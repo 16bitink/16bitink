@@ -8,14 +8,14 @@ import { STARTER_LOADOUT } from '../logic/parts';
 const CW = 80;
 const CH = 60;
 
-const GROUND: Readonly<Record<string, string>> = { grass: ' ', grassDry: ' ', dirt: ':', sand: '.', mud: ',', water: '~', bridge: '=' };
+const GROUND: Readonly<Record<string, string>> = { grass: ' ', grassDry: ' ', dirt: ':', sand: '.', mud: ',', water: '~', bridge: '=', swampWater: '~', shallows: ',', marsh: ' ', snow: ' ', snowTrack: ':', snowTrackH: ':', frozenDirt: ':', ice: '_', thinIce: '%', forestFloor: ' ', forestTrail: ':', forestTrailH: ':', clearing: ':' };
 const ROLE: Readonly<Record<string, string>> = { guard: 'G', patrol: 'P', wave: 'W', convoy: 'V', hunter: 'H', runner: 'R', turret: 'U' };
 const MARK: Readonly<Record<string, string>> = { zone: 'Z', flag: 'F', spot: 'O', exit: 'E', pickup: 'X', artillery: '*' };
 
 export const MAP_LEGEND = [
   'S start   G guard  P patrol  W wave (where it enters)  V convoy  H hunter  R runner  U turret  A ace  B boss  t truck',
-  'c crate   T target  C cage  Z hold zone  F flag  O recon spot  E exit  X pick-up / home   - routes and roads',
-  '# solid   n low cover (sandbags, hay, crates; fences stay +)  + flattenable (fence, pine)  " cover (bush, crops)  ~ water  = bridge  : dirt  , mud  . sand',
+  'c crate   T target  C cage (or a crew’s snowdrift)  & avalanche snow (falls when its cornice breaks)  Z hold zone  F flag  O recon spot  E exit  X pick-up / home   - routes and roads',
+  '# solid   n low cover (sandbags, hay, crates; fences stay +)  + flattenable (fence, pine)  " cover (bush, crops, reeds)  ^ dune crest  ~ water  = bridge, boardwalk  : dirt, packed snow, frozen dirt  , mud, shallows  . sand  _ ice  % thin ice',
 ].join('\n');
 
 /** The level's layout as text, for the lab: ground, structures, routes, then start, enemies, crates and objective marks on top. */
@@ -38,7 +38,9 @@ export function asciiMap(level: LoadedLevel): string {
     }
   }
   for (const s of m.structs) {
-    const ch = s.def.tag === 'cage' ? 'C' : s.def.tag ? 'T' : s.def.cover ? '"' : s.def.flattenable ? '+' : s.def.low ? 'n' : '#';
+    // Boardwalks and jetties lie on the ground: the bridge '=' under them shows.
+    if (s.def.deck) continue;
+    const ch = s.dormant ? '&' : s.def.tag === 'cage' || s.def.tag === 'drift' ? 'C' : s.def.tag ? 'T' : s.def.crest ? '^' : s.def.cover ? '"' : s.def.flattenable ? '+' : s.def.low ? 'n' : '#';
     const b = shapeBounds(s.def.shape, s.def.x, s.def.y);
     for (let y = b.y0 + CH / 2; y < b.y1; y += CH) for (let x = b.x0 + CW / 2; x < b.x1; x += CW) put(x, y, ch);
     put(s.def.x, s.def.y, ch);

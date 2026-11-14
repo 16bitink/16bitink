@@ -1,5 +1,6 @@
 import { MISSION_NAMES } from '../logic/campaign';
-import { GADGET_NAME, GADGET_TEXT } from '../logic/match/gadgets';
+import { gadgetCharges, gadgetText } from '../logic/gadgetTiers';
+import { GADGET_NAME } from '../logic/match/gadgets';
 import { CLAN_COLOUR, CLAN_INFO, rivalOf } from '../logic/match/names';
 import { GADGETS, type Clan, type GadgetKind } from '../logic/match/types';
 import { gadgetIconUrl } from '../scenes/mission/hud';
@@ -7,11 +8,13 @@ import type { Match } from '../logic/match/match';
 import { bonusText } from '../logic/mission/bonus';
 import type { Medals } from '../logic/mission/outcome';
 import { perksOf } from '../logic/rank';
-import type { Progress } from '../logic/workshop';
+import { gadgetMkOf, type Progress } from '../logic/workshop';
 import { paintLandMap } from '../scenes/mission/landMap';
 import { workshopButton } from './blueprint';
 import { esc, render } from './dom';
-import { partIcon, partName, tankCanvas } from './tankArt';
+import { mkBadge, partIcon, partName, tankCanvas } from './tankArt';
+import { partLabel } from '../logic/parts';
+import type { LevelDef } from '../logic/level/types';
 
 /** The commander's portrait, once the art exists; a missing file just leaves it out. */
 const portraits = import.meta.glob<string>('../art/pixel/ui/commander.png', { eager: true, query: '?url', import: 'default' });
@@ -30,13 +33,16 @@ export interface BriefingActions {
  * line, the two bonus objectives (lit when already earned), a small map
  * with your start and the target, and the tank you're taking.
  */
-/** The 3-way gadget picker: icon, name, the one-line rule; the picked one is lit. */
-function gadgetPicker(picked: GadgetKind): string {
+const chargesLine = (n: number): string => `Gadget (G) · ${n} a level · crates may hold others`;
+
+/** The 3-way gadget picker: icon, name with its Mk, the one-line rule at that Mk; the picked one is lit. */
+function gadgetPicker(p: Progress, picked: GadgetKind): string {
   const opt = (g: GadgetKind): string => {
     const url = gadgetIconUrl(g);
-    return `<button class="gpick${g === picked ? ' on' : ''}" data-act="pick" data-g="${g}" title="${esc(GADGET_TEXT[g])}">${url ? `<img src="${url}" alt="">` : ''}<span>${esc(GADGET_NAME[g])}</span></button>`;
+    const mk = gadgetMkOf(p, g);
+    return `<button class="gpick${g === picked ? ' on' : ''}" data-act="pick" data-g="${g}" title="${esc(gadgetText(g, mk))}">${url ? `<img src="${url}" alt="">` : ''}<span>${esc(GADGET_NAME[g])} ${mkBadge(mk)}</span></button>`;
   };
-  return `<div class="dimt t12 hide-short">Gadget (G) · 2 a level</div><div class="gpicks">${GADGETS.map(opt).join('')}</div><div class="t12 gtext hide-short">${esc(GADGET_TEXT[picked])}</div>`;
+  return `<div class="dimt t12 hide-short gcount">${chargesLine(gadgetCharges(picked, gadgetMkOf(p, picked)))}</div><div class="gpicks">${GADGETS.map(opt).join('')}</div><div class="t12 gtext hide-short">${esc(gadgetText(picked, gadgetMkOf(p, picked)))}</div>`;
 }
 
 /** "Enemy: Weasels, fast scouts on wheels", the name in the faction's stripe colour. */
@@ -52,7 +58,8 @@ export function showBriefing(root: HTMLElement, m: Match, p: Progress, a: Briefi
   let picked: GadgetKind = m.player?.gadget ?? 'mines';
   const def = m.level.def;
   const had: Medals = p.medals[def.number] ?? [false, false, false];
-  const l = p.loadout;
+  // Parts the level issues (level 21's Hover) show on your tank: it's what you drive this time.
+  const l = m.player?.loadout ?? p.loadout;
   const bonus = def.bonus.map((b, i) => `<div class="bonus"><span class="medal${had[i + 1] ? ' on' : ''}"></span>${esc(bonusText(b))}</div>`).join('');
   render(root, 'dark briefing', `
     <div class="panel sheet rise">
@@ -66,6 +73,13 @@ export function showBriefing(root: HTMLElement, m: Match, p: Progress, a: Briefi
             <div class="objective"><span class="medal${had[0] ? ' on' : ''}"></span>${esc(m.objective.title)}</div></div>
           </div>
           ${def.timeLimit ? `<div class="t12 red">Time limit ${Math.floor(def.timeLimit / 60)}:${String(def.timeLimit % 60).padStart(2, '0')}</div>` : ''}
+          ${m.storm ? `<div class="t12 gold">${m.storm.kind === 'blizzard' ? 'Blizzards' : 'Sandstorms'}: every ${Math.round(m.storm.every)} s, sight ${m.storm.sight} px for ${Math.round(m.storm.last)} s${m.storm.kind === 'blizzard' ? ', a wind pushes you' : ''}</div>` : ''}
+          ${m.fog ? '<div class="t12 gold">Fog banks: inside one you can’t be seen, and nobody sees through it</div>' : ''}
+          ${tideLine(def.floods)}
+          ${def.fire ? `<div class="t12 red">Forest fire${def.fire.at ? ` from ${Math.floor(def.fire.at / 60)}:${String(Math.round(def.fire.at % 60)).padStart(2, '0')}` : ''}: it spreads tree to tree; stay out of burning trees</div>` : ''}
+          ${def.clanWar ? '<div class="t12 gold">The clans fight each other too: let them</div>' : ''}
+          ${def.friends?.length ? `<div class="t12 gold">${def.friends.length} clan crew${def.friends.length > 1 ? 's' : ''} will fight on your side${def.friends.some((f) => f.join) ? ' once you free them' : ''}</div>` : ''}
+          ${def.issue?.length ? `<div class="t12 gold">Issued for this mission: ${def.issue.map((x) => esc(partLabel(x))).join(', ')}</div>` : ''}
           <div class="dimt t12">Bonus objectives</div>
           ${bonus}
           <p class="t12 hide-short">${esc(def.briefing)}</p>
@@ -74,7 +88,7 @@ export function showBriefing(root: HTMLElement, m: Match, p: Progress, a: Briefi
           <div class="mapbox"></div>
           <div class="row"><div class="pic"></div><div class="col"><div class="row">${partIcon(l.gun)}${partIcon(l.hull)}${partIcon(l.drive)}</div>
             <div class="t12 hide-short">${[l.gun, l.hull, l.drive].map(partName).join(' · ')}</div><div class="t12 dimt">Repair kits: ${perksOf(p.xp).repairKits}</div></div></div>
-          <div class="gadgets">${gadgetPicker(picked)}</div>
+          <div class="gadgets">${gadgetPicker(p, picked)}</div>
         </div>
       </div>
       <div class="row center"><button class="btn" data-act="back">Map</button>${workshopButton(p)}<button class="btn go" data-act="start">Start</button></div>
@@ -87,7 +101,8 @@ export function showBriefing(root: HTMLElement, m: Match, p: Progress, a: Briefi
       a.gadget(g);
       const box = root.querySelector<HTMLElement>('.gadgets')!;
       for (const b of box.querySelectorAll<HTMLElement>('.gpick')) b.classList.toggle('on', b.dataset.g === g);
-      box.querySelector('.gtext')!.textContent = GADGET_TEXT[g];
+      box.querySelector('.gtext')!.textContent = gadgetText(g, gadgetMkOf(p, g));
+      box.querySelector('.gcount')!.textContent = chargesLine(gadgetCharges(g, gadgetMkOf(p, g)));
     },
   });
   root.querySelector('.pic')!.appendChild(tankCanvas(l, 1));
@@ -127,4 +142,10 @@ function briefingMap(m: Match): HTMLCanvasElement {
   g.fillStyle = '#3c6cc8';
   g.fillRect(m.start.x * s - 4, m.start.y * s - 4, 8, 8);
   return c;
+}
+
+/** "The tide comes in at 1:30": a level's timed floods, for the briefing. */
+function tideLine(floods: LevelDef['floods']): string {
+  const at = (floods ?? []).find((f) => f.at !== undefined)?.at;
+  return at === undefined ? '' : `<div class="t12 gold">The tide comes in at ${Math.floor(at / 60)}:${String(Math.round(at % 60)).padStart(2, '0')}: the shallows go under</div>`;
 }

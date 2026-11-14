@@ -12,9 +12,10 @@ describe('the level lab', () => {
     expect(parseArgs(['--map', '4'])).toMatchObject({ level: 4, mapOnly: true });
     expect(parseArgs(['--chapter', '--seeds', '2']).chapter).toBe(true);
     expect(parseArgs(['--all']).all).toBe(true);
-    expect(() => parseArgs(['--level', '11'])).toThrow();
+    expect(parseArgs(['--level', '11']).level).toBe(11);
+    expect(() => parseArgs(['--level', '51'])).toThrow();
     expect(() => parseArgs([])).toThrow(/--level/);
-    expect(() => parseArgs(['--level', '1', '--tank', 'laser1/light1/wheels1'])).toThrow();
+    expect(() => parseArgs(['--level', '1', '--tank', 'plasma1/light1/wheels1'])).toThrow();
   });
 
   it('prints a line per seed, a summary and the map', () => {

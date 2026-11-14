@@ -3,7 +3,7 @@ import type { ObjectiveDef } from '../level/types';
 import type { Match } from '../match/match';
 import type { Tank } from '../match/types';
 import type { Pt } from '../vec';
-import { BASE, dist, nearest, type Mark, type Objective } from './types';
+import { BASE, dist, nearest, type Mark, type Objective, type Prop } from './types';
 
 const inside = (t: Tank, c: Pt, r: number) => t.alive && dist(t, c) <= r;
 
@@ -31,7 +31,8 @@ interface Flag extends Pt {
 }
 
 /**
- * Capture: take the flags and hold them all at once. A flag moves towards
+ * Capture: take the flags (flagpoles: ours runs up as we take one, theirs as
+ * they retake it) and hold them all at once. A flag moves towards
  * whoever stands alone in its ring (contested: no change); enemies send
  * waves and hunters to the nearest flag that isn't theirs.
  */
@@ -50,7 +51,11 @@ export function capture(m: Match, def: Extract<ObjectiveDef, { kind: 'capture' }
       for (const f of flags) {
         const us = m.tanks.some((t) => t.team === 0 && t.role === 'tank' && inside(t, f, r));
         const them = m.tanks.some((t) => t.team !== 0 && t.role === 'tank' && inside(t, f, r));
+        const was = f.hold;
         if (us !== them) f.hold = Math.max(-1, Math.min(1, f.hold + ((us ? 1 : -1) * 2 * dt) / takes));
+        // The set piece: our flag runs up the pole when it's ours, theirs when they take it back.
+        if (f.hold >= 1 && was < 1) m.emit({ kind: 'setpiece', what: 'flagOurs', x: f.x, y: f.y });
+        if (f.hold <= -1 && was > -1) m.emit({ kind: 'setpiece', what: 'flagLost', x: f.x, y: f.y });
       }
       allFor = ours() === flags.length ? allFor + dt : 0;
     },
@@ -69,18 +74,20 @@ export function capture(m: Match, def: Extract<ObjectiveDef, { kind: 'capture' }
       return next ? { goal: next, goalRadius: r * 0.4, stay: true } : null;
     },
     marks: () => flags.map((f): Mark => ({ kind: 'flag', x: f.x, y: f.y, r, state: f.hold >= 1 ? 'ours' : f.hold <= -1 ? 'theirs' : 'neutral', progress: (f.hold + 1) / 2 })),
+    props: () => flags.map((f): Prop => ({ kind: 'flag', x: f.x, y: f.y, hold: f.hold })),
   };
 }
 
 /**
- * Recon: get within range of each spot and stay there unseen for a moment.
+ * Recon: get within range of each spot (an enemy camp) and stay there unseen
+ * for a moment while the camera works; then it's photographed (a flash).
  * Being seen isn't a fail: guards that spot you raise the alarm, which calls
  * the level's 'alarm' waves (reinforcements).
  */
 export function recon(m: Match, def: Extract<ObjectiveDef, { kind: 'recon' }>): Objective {
   const r = def.radius ?? 150;
   const dwell = def.dwell ?? 2;
-  const spots = def.spots.map((k) => ({ ...m.point(k), t: 0 }));
+  const spots = def.spots.map((k) => ({ ...m.point(k), t: 0, at: -1 }));
   const seen = (p: Tank): boolean => {
     for (const [id, b] of m.brains) {
       const e = m.tank(id);
@@ -98,7 +105,15 @@ export function recon(m: Match, def: Extract<ObjectiveDef, { kind: 'recon' }>): 
       const p = m.player;
       if (!p?.alive) return;
       spotted = seen(p);
-      for (const s of spots) if (s.t < dwell && inside(p, s, r) && !spotted) s.t = Math.min(dwell, s.t + dt);
+      for (const s of spots) {
+        if (s.t >= dwell || !inside(p, s, r) || spotted) continue;
+        s.t = Math.min(dwell, s.t + dt);
+        // The set piece: the camera's flash, "Photographed!".
+        if (s.t >= dwell) {
+          s.at = m.t;
+          m.emit({ kind: 'setpiece', what: 'photo', x: s.x, y: s.y });
+        }
+      }
     },
     status: () => {
       const done = spots.filter((s) => s.t >= dwell).length;
@@ -110,5 +125,6 @@ export function recon(m: Match, def: Extract<ObjectiveDef, { kind: 'recon' }>): 
       return next ? { goal: next, goalRadius: r * 0.4, sneak: true, urgent: true } : null;
     },
     marks: () => spots.map((s): Mark => ({ kind: 'spot', x: s.x, y: s.y, r, state: s.t >= dwell ? 'done' : 'neutral', progress: s.t / dwell })),
+    props: () => spots.filter((s) => s.t > 0).map((s): Prop => ({ kind: 'camera', x: s.x, y: s.y, r, progress: s.t / dwell, done: s.t >= dwell, since: s.at < 0 ? 0 : m.t - s.at })),
   };
 }

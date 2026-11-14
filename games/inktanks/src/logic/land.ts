@@ -1,5 +1,5 @@
 import type { Material } from './damage';
-import { distToSegment, type Bounds, type Shape } from './geom';
+import { distToSegment, segmentHits, type Bounds, type Shape } from './geom';
 import type { Pt } from './vec';
 
 /**
@@ -11,8 +11,44 @@ export const SCREEN = { w: 960, h: 540 } as const;
 /** The ground and navigation grid's cell, native px. */
 export const CELL = 40;
 
-export type Ground = 'grass' | 'grassDry' | 'dirt' | 'sand' | 'mud' | 'water' | 'bridge';
-export const GROUNDS: readonly Ground[] = ['grass', 'grassDry', 'dirt', 'sand', 'mud', 'water', 'bridge'];
+/**
+ * Chapter 2's grounds are appended (existing indexes must not move):
+ * canyonRock (drives like dirt), packedSand and sandTrack (north–south ruts) /
+ * sandTrackH (east–west ruts): roads, with no sand penalty.
+ */
+/**
+ * Chapter 3's are appended after them: swampWater (deep, like water: only
+ * Hover crosses it), shallows (wet ground: drives like mud) and marsh (firm
+ * swamp grass, like grass).
+ */
+/**
+ * Chapter 4's after those: snow (deep: Wheels ×0.75, Half-tracks ×0.9),
+ * snowTrack (north–south) / snowTrackH (east–west) packed-snow roads and
+ * frozenDirt (drive like dirt), ice (low grip: every drive slides) and thinIce
+ * (ice that gives way under Heavy hulls, match/ice.ts).
+ */
+/**
+ * Chapter 5's after those: forestFloor (roots and ferns under the old trees:
+ * Wheels ×0.85, Half-tracks ×0.93, nav cost 3, so bots keep to the trails),
+ * forestTrail (north–south) / forestTrailH (east–west), the fast lanes (no
+ * forest penalty), and clearing (open logged ground, drives like dirt).
+ */
+export type Ground =
+  | 'grass' | 'grassDry' | 'dirt' | 'sand' | 'mud' | 'water' | 'bridge' | 'canyonRock' | 'packedSand' | 'sandTrack' | 'sandTrackH' | 'swampWater' | 'shallows' | 'marsh'
+  | 'snow' | 'snowTrack' | 'snowTrackH' | 'frozenDirt' | 'ice' | 'thinIce'
+  | 'forestFloor' | 'forestTrail' | 'forestTrailH' | 'clearing';
+export const GROUNDS: readonly Ground[] = [
+  'grass', 'grassDry', 'dirt', 'sand', 'mud', 'water', 'bridge', 'canyonRock', 'packedSand', 'sandTrack', 'sandTrackH', 'swampWater', 'shallows', 'marsh',
+  'snow', 'snowTrack', 'snowTrackH', 'frozenDirt', 'ice', 'thinIce',
+  'forestFloor', 'forestTrail', 'forestTrailH', 'clearing',
+];
+
+/** Deep water: stops every drive but Hover (design doc "Chapter 3: Mirefen"). */
+export const isDeep = (g: Ground): boolean => g === 'water' || g === 'swampWater';
+/** Grounds that slow like mud (×0.8 for all but Tracks and Hover). */
+export const isMuddy = (g: Ground): boolean => g === 'mud' || g === 'shallows';
+/** Ice (chapter 4): every drive slides on it; thin ice also breaks under Heavy hulls. */
+export const isIcy = (g: Ground): boolean => g === 'ice' || g === 'thinIce';
 
 export type PatchShape =
   | { readonly kind: 'rect'; readonly x: number; readonly y: number; readonly w: number; readonly h: number }
@@ -45,6 +81,47 @@ export interface StructureDef {
   readonly low?: boolean;
   /** Mission tag: 'target' (raid), 'cage' (rescue)… */
   readonly tag?: string;
+  /** A dune crest (chapter 2): blocks sight both ways, but shots fly over it and tanks drive over it. */
+  readonly crest?: boolean;
+  /** An allied gun tower's base: blocks driving, but shots and sight pass it (its gun stands above the fight). */
+  readonly perch?: boolean;
+  /** A deck laid on the ground (boardwalks, jetties, chapter 3): drawn under tanks, blocks nothing. */
+  readonly deck?: boolean;
+  /** Catches fire (reeds, chapter 3): a Flamer sets it alight; it spreads, burns tanks in it, then burns out (match/flame.ts). */
+  readonly burns?: boolean;
+  /** Not there yet (chapter 4): an avalanche's drift, which falls when the structure with this id (its cornice) breaks (match/avalanche.ts). */
+  readonly dormant?: string;
+  /**
+   * A tree's canopy (chapter 5), radius px round its origin: it blocks sight and
+   * shots (the shot hits the tree) while the trunk (`shape`) is all that blocks
+   * driving. A line that starts under the canopy isn't stopped by it (you see and
+   * shoot out from under the branches); one that ends under it is.
+   */
+  readonly canopy?: number;
+  /** A young tree (chapter 5): Tracks and Heavy hulls flatten it, every other drive goes round (solid in the nav grid). */
+  readonly thicket?: boolean;
+  /**
+   * A span (chapter 5's log bridges): drawn on the ground and driven over, low
+   * cover for shots (hit past their first LOW_PASS px, never by a shot fired from
+   * on it); when it breaks, the 'bridge' ground under it turns to water (match/spans.ts).
+   */
+  readonly span?: boolean;
+}
+
+/**
+ * Whether the line a→b is stopped by this structure: by its canopy when it has
+ * one (a circle round the trunk; not when a starts under it), else its footprint.
+ */
+export function lineCrosses(s: StructureDef, ax: number, ay: number, bx: number, by: number): boolean {
+  const r = s.canopy;
+  if (!r) return segmentHits(s.shape, s.x, s.y, ax, ay, bx, by);
+  if ((ax - s.x) ** 2 + (ay - s.y) ** 2 < r * r) return false;
+  return distToSegment(s.x, s.y, ax, ay, bx, by) <= r;
+}
+
+/** Whether a structure's footprint (or canopy) is under (x, y). */
+export function underCanopy(s: StructureDef, x: number, y: number): boolean {
+  return s.canopy !== undefined && (x - s.x) ** 2 + (y - s.y) ** 2 < s.canopy * s.canopy;
 }
 
 export interface LandDef {
@@ -122,7 +199,15 @@ export function groundAt(l: Land, x: number, y: number): Ground {
   return i < 0 ? 'water' : GROUNDS[l.ground[i]!]!;
 }
 
-/** On the map, dry and drivable. */
-export function isDrivable(l: Land, x: number, y: number): boolean {
-  return groundAt(l, x, y) !== 'water';
+/** On the map, and dry (or, for a drive that `floats`, any ground). */
+export function isDrivable(l: Land, x: number, y: number, floats = false): boolean {
+  const i = cellIndex(l, x, y);
+  if (i < 0) return false;
+  return floats || !isDeep(GROUNDS[l.ground[i]!]!);
+}
+
+/** Deep water at (x, y): what only Hover, barges and the Ironclad move on. Off the map is not water. */
+export function isWaterAt(l: Land, x: number, y: number): boolean {
+  const i = cellIndex(l, x, y);
+  return i >= 0 && isDeep(GROUNDS[l.ground[i]!]!);
 }

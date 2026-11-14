@@ -1,3 +1,6 @@
+import { addGadgetIntel, GADGET_MK_COST, raiseGadget } from '../src/logic/workshop';
+import { affordableUpgrades } from '../src/logic/blueprints';
+import { newSave, parseSave, serializeSave } from '../src/logic/save';
 import { describe, expect, it } from 'vitest';
 import { RANKS } from '../src/logic/rank';
 import { MK_COLOUR, partLabel, roman, type Mk } from '../src/logic/parts';
@@ -88,5 +91,30 @@ describe('sim policy', () => {
     expect(noGrindCheck(newProgress()).ok).toBe(false);
     const p = spendIntel(addIntel({ ...newProgress(), xp: RANKS[2]!.xp }, { machinegun: 23, rockets: 3 }));
     expect(noGrindCheck(p).ok).toBe(true);
+  });
+});
+
+describe('gadget tiers in the workshop', () => {
+  it('raise a gadget with its own blueprints, rank-gated like parts', () => {
+    const p = addGadgetIntel(newProgress(), { mines: 30 });
+    expect(raiseGadget(p, 'mines')).toEqual({ ok: false, reason: 'needs Sergeant' });
+    const sgt = { ...p, xp: RANKS.find((r) => r.id === 'sergeant')!.xp };
+    const r = raiseGadget(sgt, 'mines');
+    expect(r.ok && r.progress.gadgetMk.mines).toBe(2);
+    expect(r.ok && r.progress.gadgetIntel.mines).toBe(30 - GADGET_MK_COST[2]);
+    expect(raiseGadget(sgt, 'oil')).toEqual({ ok: false, reason: `needs ${GADGET_MK_COST[2]} Oil slick blueprints` });
+    expect(affordableUpgrades(sgt).some((u) => u.kind === 'gadget' && u.gadget === 'mines')).toBe(true);
+  });
+  it('saves round-trip gadget tiers; older saves without them load as Mk I', () => {
+    const p = { ...newProgress(), gadgetIntel: { smoke: 3 }, gadgetMk: { oil: 4 as const } };
+    const back = parseSave(serializeSave({ ...newSave(), progress: p })).save.progress;
+    expect(back.gadgetIntel).toEqual({ smoke: 3 });
+    expect(back.gadgetMk).toEqual({ oil: 4 });
+    const old = JSON.parse(serializeSave(newSave())) as { progress: Record<string, unknown> };
+    delete old.progress.gadgetIntel;
+    delete old.progress.gadgetMk;
+    const loaded = parseSave(JSON.stringify(old));
+    expect(loaded.problem).toBeNull();
+    expect(loaded.save.progress.gadgetMk).toEqual({});
   });
 });

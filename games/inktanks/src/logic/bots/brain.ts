@@ -11,6 +11,8 @@ import { alwaysAlert, AWARE, sense, type Aware } from './awareness';
 import { GUARD_LEASH, ROLE_SIGHT, SHOOT_BACK, type Difficulty } from './difficulty';
 import { allyInLine, losClear, odds, shotBlocker, VISION } from './perception';
 import { thinkPlayer } from './playerBot';
+import { isLobbed } from '../match/lob';
+import { railClear } from '../match/railgun';
 
 /**
  * A bot's mind. Its role (set by the level) decides what it does when
@@ -23,8 +25,8 @@ export type BotState = 'idle' | 'route' | 'goal' | 'fight' | 'flee' | 'loot';
 
 export interface Brain {
   readonly tankId: number;
-  /** 'player': the sim's stand-in in the player's seat. */
-  readonly role: BotRole | 'player';
+  /** 'player': the sim's stand-in in the player's seat. 'ally': a tank on your side that follows you (chapter 5's freed clan crews). */
+  readonly role: BotRole | 'player' | 'ally';
   readonly diff: Difficulty;
   readonly rng: Rng;
   readonly post: Pt;
@@ -76,7 +78,12 @@ export interface Brain {
   coverSpot: Pt | null;
   /** A calm guard or turret's turret sweeps round this heading. */
   readonly lookBase: number;
+  /** Lobbed guns (the Mortar) with no target in sight: the spot to shell (where it last saw you, or where a friend sees you). */
+  lobAt: Pt | null;
 }
+
+/** A tank on your side (role 'ally') fights within about this of you, and keeps up when further. */
+export const ALLY_STAY = 240;
 
 /** Bots per target that shoot its cover down; the rest flank. */
 export const COVER_SHOOTERS = 1;
@@ -92,7 +99,7 @@ export function createBrain(t: Tank, e: ResolvedEnemy | null, diff: Difficulty, 
     thinkT: rng.range(0, diff.reaction), aimNoise: 0, strafe: rng.chance(0.5) ? 1 : -1, strafeT: 0,
     lastPos: { x: t.x, y: t.y }, stuckT: 0, detourT: 0, detourAngle: 0, holdFire: false, seenCount: 0, alert: null, wantSwap: false, useKit: false, hint: null, snap: null,
     aware: alwaysAlert({ role }, t) ? 'alert' : 'calm', awareSince: 0, awareSpot: null, alertUntil: 0, lastSeen: null, coverShot: null, telegraph: null,
-    useGadget: false, coverSpot: null, lookBase: t.turret,
+    useGadget: false, coverSpot: null, lookBase: t.turret, lobAt: null,
   };
 }
 
@@ -139,6 +146,33 @@ function coverToShoot(m: Match, b: Brain, t: Tank): Brain['coverShot'] {
   return { x: ls.x, y: ls.y, id: s.def.id, of: ls.id };
 }
 
+/** Seconds a mortar keeps shelling where it last saw you, or where a friend sees you. */
+export const LOB_MEMORY = 4;
+
+/**
+ * A mortar with no one in sight shells a spot over the wall: where it saw you
+ * last (LOB_MEMORY s), or where an alert friend sees an enemy right now (a
+ * spotter). Only alert mortars do; the spot must be in its range band.
+ */
+function lobSpotFor(m: Match, b: Brain, t: Tank): Pt | null {
+  if (b.aware !== 'alert') return null;
+  const g = t.stats.gun;
+  const ok = (p: Pt): boolean => {
+    const d = Math.hypot(p.x - t.x, p.y - t.y);
+    return d >= g.minRange && d <= g.range;
+  };
+  const ls = b.lastSeen;
+  if (ls && m.t - ls.t < LOB_MEMORY && ok(ls)) return { x: ls.x, y: ls.y };
+  for (const [id, o] of m.brains) {
+    if (o === b || o.role === 'player' || !o.snap || m.t - o.snap.t > 1 || o.target === null) continue;
+    const friend = m.tank(id);
+    const foe = m.tank(o.target);
+    if (!friend?.alive || friend.team !== t.team || !foe?.alive || foe.team === t.team) continue;
+    if (ok(o.snap)) return { x: o.snap.x, y: o.snap.y };
+  }
+  return null;
+}
+
 export function think(m: Match, b: Brain, t: Tank): void {
   const attacked = m.t - t.lastHitAt < 3;
   const alerted = b.alert !== null && m.t < b.alert.until;
@@ -157,10 +191,18 @@ export function think(m: Match, b: Brain, t: Tank): void {
   const target = shootsBack && m.t - t.lastHitAt > SHOOT_BACK ? null : pickTarget(m, b, t, seen);
   b.target = target?.id ?? null;
   b.snap = target ? { x: target.x, y: target.y, vx: Math.cos(target.heading) * target.speed, vy: Math.sin(target.heading) * target.speed, t: m.t } : null;
-  const wallClear = target ? losClear(m, t.x, t.y, target.x, target.y) : false;
-  b.allyBlocked = target !== null && wallClear && allyInLine(m, t, target.x, target.y);
-  b.los = target ? wallClear && !b.allyBlocked : b.shootAt ? losClear(m, t.x, t.y, b.shootAt.x, b.shootAt.y, b.shootAt.id) : false;
-  b.coverShot = target && b.los ? null : coverToShoot(m, b, t);
+  // A lob flies over walls, cover and friends: a target in sight is a target in reach.
+  const lobs = isLobbed(t.stats.gun);
+  // A Rail's slug (chapter 5) goes through walls and trees: only rock stops it.
+  const pierces = t.stats.gun.shot === 'rail';
+  const clearTo = (x: number, y: number, ignore: string | null = null): boolean => (pierces ? railClear(m, t.x, t.y, x, y) : losClear(m, t.x, t.y, x, y, ignore));
+  const wallClear = target ? lobs || clearTo(target.x, target.y) : false;
+  b.allyBlocked = !lobs && target !== null && wallClear && allyInLine(m, t, target.x, target.y);
+  b.los = target ? wallClear && !b.allyBlocked : b.shootAt ? lobs || clearTo(b.shootAt.x, b.shootAt.y, b.shootAt.id) : false;
+  // With no one in sight, mortars shell (and Rails shoot through cover at) where you were last seen, or where a friend sees you.
+  b.lobAt = (lobs || pierces) && !target && b.role !== 'player' ? lobSpotFor(m, b, t) : null;
+  if (pierces && b.lobAt && !railClear(m, t.x, t.y, b.lobAt.x, b.lobAt.y)) b.lobAt = null;
+  b.coverShot = (target && b.los) || lobs || pierces ? null : coverToShoot(m, b, t);
   // Only an alert bot raises the alarm: a calm or suspicious one hasn't made you out yet.
   if (RAISES_ALARM.has(b.role) && b.aware === 'alert') {
     const spotted = seen.find((o) => o.team === 0);
@@ -181,7 +223,7 @@ function thinkRole(m: Match, b: Brain, t: Tank, target: Tank | null, alerted: bo
   // Alert and lost you: it goes to where it last saw you (not where you are).
   const memory = b.aware === 'alert' && b.lastSeen && m.t - b.lastSeen.t < AWARE.forget ? b.lastSeen : null;
   const alertAt = (alerted ? b.alert : null) ?? memory;
-  const fights = target !== null || b.coverShot !== null;
+  const fights = target !== null || b.coverShot !== null || b.lobAt !== null;
   switch (b.role) {
     case 'turret':
       return set(b, fights ? 'fight' : 'idle', null);
@@ -208,6 +250,13 @@ function thinkRole(m: Match, b: Brain, t: Tank, target: Tank | null, alerted: bo
       const p = m.player;
       const goal = b.hint?.goal ?? (p?.alive ? p : null);
       return goal ? set(b, 'goal', { x: goal.x, y: goal.y }) : set(b, 'idle', null);
+    }
+    case 'ally': {
+      // A freed clan crew (chapter 5): fights near you, else keeps up with you.
+      const p = m.player;
+      b.hint = p?.alive ? { goal: { x: p.x, y: p.y }, goalRadius: ALLY_STAY, stay: true } : null;
+      if (fights) return set(b, 'fight', null);
+      return p?.alive && Math.hypot(p.x - t.x, p.y - t.y) > ALLY_STAY * 0.6 ? set(b, 'goal', { x: p.x, y: p.y }) : set(b, 'idle', null);
     }
     case 'player':
       return;

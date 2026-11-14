@@ -1,6 +1,7 @@
 import { BOSS_STUN_MULT, hitTank } from '../match/combat';
 import type { Match } from '../match/match';
 import { moveBy } from '../match/movement';
+import { railNearest, railPoint } from '../match/rail';
 import { IDLE, type Tank, type TankInput } from '../match/types';
 import { angleTo, wrapAngle, type Pt } from '../vec';
 import type { Hint } from './types';
@@ -33,6 +34,8 @@ export const RAGE = {
   recover: 1.2,
   /** Lane width, as a share of the hull's radius each side. */
   lane: 0.85,
+  /** A train charges only at a player within this of its track, px. */
+  trackSide: 160,
 } as const;
 
 type State =
@@ -65,6 +68,11 @@ export function bossRage(m: Match, body: Tank): Rage {
   const prey = (): Tank | null => {
     const p = m.player;
     if (!p?.alive || Math.hypot(p.x - body.x, p.y - body.y) > RAGE.reach) return null;
+    // A train (chapter 4) only charges down its line: at you when you're on or by the track.
+    if (body.rail) {
+      const on = railPoint(body.rail, railNearest(body.rail, p));
+      if (Math.hypot(on.x - p.x, on.y - p.y) > RAGE.trackSide) return null;
+    }
     return m.lineBlocker(body.x, body.y, p.x, p.y, null) ? null : p;
   };
 
@@ -109,7 +117,7 @@ export function bossRage(m: Match, body: Tank): Rage {
     step: (dt) => {
       if (!body.alive) return;
       const moved = Math.hypot(body.x - last.x, body.y - last.y);
-      const expected = last.speed * dt;
+      const expected = Math.abs(last.speed) * dt;
       switch (s.kind) {
         case 'roam':
           if (m.t >= s.next && prey()) s = { kind: 'turn', until: m.t + RAGE.turnFor };
@@ -118,6 +126,13 @@ export function bossRage(m: Match, body: Tank): Rage {
           const p = m.player;
           const a = p ? angleTo(body, p) : body.heading;
           if (!p?.alive) stop({ kind: 'roam', next: m.t + RAGE.every });
+          else if (body.rail) {
+            // A train can't swing round: it revs up along the line, towards you, whichever way that is.
+            const until = m.t + RAGE.rev;
+            const angle = Math.cos(a - body.heading) >= 0 ? body.heading : wrapAngle(body.heading + Math.PI);
+            s = { kind: 'rev', angle, until };
+            m.emit({ kind: 'aim', tank: body.id, angle, len: RAGE.chargeSpeed * RAGE.chargeTime * 0.8, until, width: body.stats.radius * RAGE.lane * 2, dur: RAGE.rev });
+          }
           else if (Math.abs(wrapAngle(a - body.heading)) < 0.07 || m.t >= s.until) {
             const until = m.t + RAGE.rev;
             s = { kind: 'rev', angle: body.heading, until };

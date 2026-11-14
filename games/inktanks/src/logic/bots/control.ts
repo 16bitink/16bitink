@@ -1,9 +1,11 @@
+import { heightMult } from '../match/heights';
 import type { Match } from '../match/match';
 import { IDLE, type Tank, type TankInput } from '../match/types';
 import { clearLine } from '../nav/grid';
 import { flowDir } from '../nav/flow';
 import { angleTo, wrapAngle, type Pt } from '../vec';
 import { think, type Brain } from './brain';
+import { isLobbed } from '../match/lob';
 
 const STUCK_MOVE = 10;
 const STUCK_TIME = 1.0;
@@ -11,15 +13,30 @@ const DETOUR = 0.9;
 const SEPARATION = 85;
 /** Cannon and Rockets bots hold their aim line this long before they fire (Tactics §4). */
 export const TELEGRAPH = 0.4;
-const TELEGRAPHED: ReadonlySet<string> = new Set(['cannon', 'rockets']);
+// The Laser too (chapter 4): its beam is instant, so the aim line is the only way to read it (dodge into cover).
+const TELEGRAPHED: ReadonlySet<string> = new Set(['cannon', 'rockets', 'laser']);
+/** A mortar bot fights from this share of its range (about 375 px: outside its 200 px minimum with room to spare). */
+export const LOB_KEEP = 0.72;
+/** Against a mortar, fight from this share of its minimum range (inside it, where its shells can't land). */
+export const UNDER_LOB = 0.6;
+/** A Flamer bot fights from this share of its range (about 85 px: well inside its 150 px stream). */
+export const FLAME_KEEP = 0.55;
+/** A Laser bot fights from this share of its range (about 375 px: it out-reaches every direct gun, so it keeps them off). */
+export const LASER_KEEP = 0.78;
+/** A Rail bot fights from this share of its range (about 450 px: far back, shooting through the trees). */
+export const RAIL_KEEP = 0.7;
 /** Bots steer this far round mines they watched being laid. */
 const MINE_AVOID = 70;
 
 /** The way to drive towards `goal`: straight when the line is clear, else down the flow field. */
 export function navAngle(m: Match, t: Tank, goal: Pt): number {
-  if (clearLine(m.nav, t.x, t.y, goal.x, goal.y)) return angleTo(t, goal);
-  const f = m.flow.get(goal.x, goal.y);
-  const a = f ? flowDir(m.nav, f, t.x, t.y) : null;
+  // A barge keeps to its river road: straight at the next point (its route is the channel).
+  if (t.keel) return angleTo(t, goal);
+  // Hover steers by its own grid (deep water open): the water routes are its short cuts.
+  const { nav, flow } = m.navFor(t);
+  if (clearLine(nav, t.x, t.y, goal.x, goal.y)) return angleTo(t, goal);
+  const f = flow.get(goal.x, goal.y);
+  const a = f ? flowDir(nav, f, t.x, t.y) : null;
   return a ?? angleTo(t, goal);
 }
 
@@ -55,7 +72,8 @@ function separate(m: Match, t: Tank, angle: number, ignore: number | null): numb
 function lead(m: Match, b: Brain, t: Tank, o: Tank, shotSpeed: number): Pt {
   const s = b.snap ?? { x: o.x, y: o.y, vx: 0, vy: 0, t: m.t };
   const d = Math.hypot(s.x - t.x, s.y - t.y);
-  const time = d / shotSpeed + (m.t - s.t);
+  // A charged gun (the Rail) flies `charge` s after the pull: lead the target by that too.
+  const time = d / shotSpeed + (m.t - s.t) + t.stats.gun.charge;
   return { x: s.x + s.vx * time, y: s.y + s.vy * time };
 }
 
@@ -85,7 +103,8 @@ function trackStuck(b: Brain, t: Tank, moving: boolean, dt: number): void {
  * it. Machineguns and the player don't.
  */
 function telegraph(m: Match, b: Brain, t: Tank, aim: number | null, fire: boolean): { aim: number | null; fire: boolean } {
-  if (b.role === 'player' || !TELEGRAPHED.has(t.stats.gun.family)) return { aim, fire };
+  // Only enemies warn: the player and our own guns (the gun towers) just fire.
+  if (b.role === 'player' || t.team === 0 || !TELEGRAPHED.has(t.stats.gun.family)) return { aim, fire };
   const tg = b.telegraph;
   if (tg) {
     if (m.t + 1e-9 < tg.until) return { aim: tg.angle, fire: false };
@@ -97,6 +116,73 @@ function telegraph(m: Match, b: Brain, t: Tank, aim: number | null, fire: boolea
   b.telegraph = { angle: t.turret, until };
   m.emit({ kind: 'aim', tank: t.id, angle: t.turret, len: t.stats.gun.range, until });
   return { aim: t.turret, fire: false };
+}
+
+/** Seconds before a shell lands that the stand-in sees its ring and moves (a casual player's read). */
+export const DODGE_WARN = 1.3;
+
+/** How far ahead (px) a dodge checks the ground is drivable. */
+const DODGE_LOOK = 80;
+
+/**
+ * Out of the nearest enemy shell's landing ring it's standing in: the
+ * throttle (+1 forward, −1 reverse) that ends farther from the ring's centre
+ * on drivable ground, or 0 (no shell coming, or nowhere to go).
+ */
+function lobDodge(m: Match, t: Tank): number {
+  let best: { x: number; y: number; d: number } | null = null;
+  for (const s of m.shots) {
+    if (!s.lob || s.team === t.team) continue;
+    const left = (s.range - s.travelled) / Math.max(1, Math.hypot(s.vx, s.vy));
+    if (left > DODGE_WARN) continue;
+    const d = Math.hypot(t.x - s.lob.tx, t.y - s.lob.ty);
+    if (d > s.splash + t.stats.radius + 12 || (best && d >= best.d)) continue;
+    best = { x: s.lob.tx, y: s.lob.ty, d };
+  }
+  if (!best) return 0;
+  const ring = best;
+  const score = (dir: 1 | -1): number => {
+    const x = t.x + Math.cos(t.heading) * DODGE_LOOK * dir;
+    const y = t.y + Math.sin(t.heading) * DODGE_LOOK * dir;
+    return m.navPassable(x, y) ? Math.hypot(x - ring.x, y - ring.y) : -1;
+  };
+  const fwd = score(1);
+  const back = score(-1);
+  if (fwd < 0 && back < 0) return 0;
+  return fwd >= back ? 1 : -1;
+}
+
+/** Seconds before a Rail's slug flies that the stand-in reads its charge line and moves off it (a casual player's read). */
+export const RAIL_DODGE = 0.55;
+
+/**
+ * Off an enemy Rail's charge line it's standing on (chapter 5): the throttle
+ * (+1 forward, −1 reverse) that takes it further from the line on drivable
+ * ground, or 0 (no line on it, or nowhere to go).
+ */
+function railDodge(m: Match, t: Tank): number {
+  let line: { x: number; y: number; ux: number; uy: number } | null = null;
+  for (const o of m.tanks) {
+    if (!o.alive || o.team === t.team || o.charge <= 0 || o.charge > RAIL_DODGE) continue;
+    const ux = Math.cos(o.chargeAngle);
+    const uy = Math.sin(o.chargeAngle);
+    const k = (t.x - o.x) * ux + (t.y - o.y) * uy;
+    const off = Math.abs((t.x - o.x) * uy - (t.y - o.y) * ux);
+    if (k < 0 || k > o.stats.gun.range || off > t.stats.radius + 14) continue;
+    line = { x: o.x, y: o.y, ux, uy };
+    break;
+  }
+  if (!line) return 0;
+  const l = line;
+  const score = (dir: 1 | -1): number => {
+    const x = t.x + Math.cos(t.heading) * DODGE_LOOK * dir;
+    const y = t.y + Math.sin(t.heading) * DODGE_LOOK * dir;
+    return m.navPassable(x, y) ? Math.abs((x - l.x) * l.uy - (y - l.y) * l.ux) : -1;
+  };
+  const fwd = score(1);
+  const back = score(-1);
+  if (fwd < 0 && back < 0) return 0;
+  return fwd >= back ? 1 : -1;
 }
 
 /** Where an idle bot looks: a calm guard or turret sweeps round its post's heading; a suspicious one turns to the spot. */
@@ -115,9 +201,24 @@ export function botInput(m: Match, b: Brain, t: Tank, dt: number): TankInput {
   const target = b.target !== null ? m.tank(b.target) : null;
   const g = t.stats.gun;
   let aim: number | null = lookAround(m, b, t);
+  let aimDist: number | null = null;
   let fire = false;
   const cover = b.coverShot;
-  if (cover && !(target?.alive && b.los)) {
+  const lobs = isLobbed(g);
+  if (lobs && (target?.alive || b.lobAt)) {
+    // A mortar: aim at the spot (the target led by the shell's flight, or the lob spot), lob to its distance.
+    const p = target?.alive ? lead(m, b, t, target, g.shotSpeed) : b.lobAt!;
+    aim = angleTo(t, p) + b.aimNoise;
+    aimDist = Math.hypot(p.x - t.x, p.y - t.y) * (1 + b.aimNoise * 0.5);
+    const d = Math.hypot(p.x - t.x, p.y - t.y);
+    const inBand = d >= g.minRange - (target?.stats.radius ?? 0) && d <= g.range + (target?.stats.radius ?? 0);
+    fire = !b.holdFire && (target?.alive ? b.los : true) && inBand && Math.abs(wrapAngle(t.turret - aim)) < 0.09;
+  } else if (g.shot === 'rail' && !target?.alive && b.lobAt) {
+    // A Rail with no one in sight (chapter 5): fire through the trees where you were seen (the charge's line is the warning).
+    aim = angleTo(t, b.lobAt) + b.aimNoise * 0.5;
+    const d = Math.hypot(b.lobAt.x - t.x, b.lobAt.y - t.y);
+    fire = !b.holdFire && d <= g.range && Math.abs(wrapAngle(t.turret - aim)) < 0.08;
+  } else if (cover && !(target?.alive && b.los)) {
     // Shoot the cover where it last saw you: the shot stops on it.
     aim = angleTo(t, cover) + b.aimNoise * 0.5;
     const d = Math.hypot(cover.x - t.x, cover.y - t.y);
@@ -126,7 +227,11 @@ export function botInput(m: Match, b: Brain, t: Tank, dt: number): TankInput {
     const p = lead(m, b, t, target, g.shotSpeed);
     aim = angleTo(t, p) + b.aimNoise;
     const d = Math.hypot(target.x - t.x, target.y - t.y);
-    fire = !b.holdFire && b.los && d <= g.range + target.stats.radius && Math.abs(wrapAngle(t.turret - aim)) < (g.family === 'machinegun' ? 0.2 : 0.09);
+    // A stream (the Flamer) burns its whole cone: anywhere in it will do.
+    const tol = g.cone > 0 ? g.cone / 2 : g.family === 'machinegun' ? 0.2 : 0.09;
+    // From high ground (chapter 4) shots carry further.
+    const reach = g.cone > 0 || !m.level.def.heights ? g.range : g.range * heightMult(m, t);
+    fire = !b.holdFire && b.los && d <= reach + target.stats.radius && Math.abs(wrapAngle(t.turret - aim)) < tol;
   } else if (b.shootAt) {
     aim = angleTo(t, b.shootAt) + b.aimNoise * 0.5;
     const d = Math.hypot(b.shootAt.x - t.x, b.shootAt.y - t.y);
@@ -135,7 +240,7 @@ export function botInput(m: Match, b: Brain, t: Tank, dt: number): TankInput {
   ({ aim, fire } = telegraph(m, b, t, aim, fire));
   const gadget = b.useGadget;
   b.useGadget = false;
-  if (t.role === 'bossTurret' || b.role === 'turret') return { move: null, aim, fire, swap: false, repair: false };
+  if (t.role === 'bossTurret' || b.role === 'turret') return { move: null, aim, aimDist, fire, swap: false, repair: false };
   let angle: number | null = null;
   let mag = 1;
   switch (b.state) {
@@ -152,7 +257,11 @@ export function botInput(m: Match, b: Brain, t: Tank, dt: number): TankInput {
       const outranges = g.range > target.stats.gun.range + 40 && target.role === 'tank';
       // Kite when it outranges the target, or (the player's stand-in) when outnumbered.
       const kites = (outranges && b.diff.kite > 0.5) || (b.role === 'player' && b.seenCount > 1);
-      const want = kites ? g.range * 0.85 : Math.max(120, g.range * 0.6);
+      // A mortar keeps its distance: well outside its minimum range, inside its maximum.
+      // Against a mortar (with a direct gun): close in under its minimum range, where it can't hit you.
+      const under = !lobs && isLobbed(target.stats.gun) ? target.stats.gun.minRange * UNDER_LOB : null;
+      // A Flamer closes right in: its stream reaches 150 px.
+      const want = lobs ? g.range * LOB_KEEP : g.cone > 0 ? g.range * FLAME_KEEP : g.shot === 'beam' ? g.range * LASER_KEEP : g.shot === 'rail' ? g.range * RAIL_KEEP : under !== null ? Math.max(110, Math.min(under, g.range * 0.6)) : kites ? g.range * 0.85 : Math.max(120, g.range * 0.6);
       b.strafeT -= dt;
       if (b.strafeT <= 0) {
         b.strafeT = b.rng.range(1.2, 2.8);
@@ -212,6 +321,11 @@ export function botInput(m: Match, b: Brain, t: Tank, dt: number): TankInput {
       }
     }
   }
+  // The stand-in reads the landing rings: out of a mortar shell's blast before it lands, forwards
+  // or in reverse, whichever leaves the ring sooner (a tank on Wheels can't spin round in time).
+  // Likewise off a Rail's charge line (chapter 5): the line is the warning.
+  const throttle = b.role === 'player' ? lobDodge(m, t) || railDodge(m, t) : 0;
+  if (throttle !== 0) return { move: { kind: 'tank', throttle, turn: 0 }, aim, aimDist, fire, swap: false, repair: b.useKit, gadget };
   const moving = angle !== null && mag > 0;
   trackStuck(b, t, moving, dt);
   if (b.detourT > 0) {
@@ -221,5 +335,5 @@ export function botInput(m: Match, b: Brain, t: Tank, dt: number): TankInput {
   if (angle !== null && b.state !== 'loot') angle = separate(m, t, angle, b.target);
   if (aim === null && angle !== null) aim = angle;
   const wantSwap = b.state === 'loot' && t.onPart !== null && t.onPart === b.goalPickup;
-  return { move: angle === null ? null : { kind: 'point', angle, mag }, aim, fire, swap: wantSwap, repair: b.useKit, gadget };
+  return { move: angle === null ? null : { kind: 'point', angle, mag }, aim, aimDist, fire, swap: wantSwap, repair: b.useKit, gadget };
 }

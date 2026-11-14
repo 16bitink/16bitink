@@ -1,6 +1,7 @@
 import { COUNTERS } from './damage';
 import { slotOf, type DriveFamily, type Family, type GunFamily, type Loadout, type Mk, type Part } from './parts';
 import type { Rng } from './rng';
+import { GADGETS, type GadgetKind } from './match/types';
 
 /** What a level's rolled crates hold. */
 export interface LootTable {
@@ -16,7 +17,10 @@ export interface LootTable {
 /** Rolled crates hold a gadget charge this often, unless the table says otherwise (Tactics §3). */
 export const GADGET_SHARE = 0.12;
 
-export type CrateContent = { readonly kind: 'part'; readonly part: Part } | { readonly kind: 'kit' } | { readonly kind: 'gadget' };
+export type CrateContent = { readonly kind: 'part'; readonly part: Part } | { readonly kind: 'kit' } | { readonly kind: 'gadget'; readonly gadget?: GadgetKind };
+
+/** Of rolled gadget crates, this share hold a set kind (maybe another than yours: a found one-use); the rest a charge of yours. */
+export const FOUND_SHARE = 0.5;
 
 const MKS: readonly Mk[] = [1, 2, 3];
 
@@ -26,7 +30,7 @@ export function rollMk(rng: Rng, weights: readonly [number, number, number]): Mk
 
 export function rollCrate(rng: Rng, t: LootTable): CrateContent {
   if (rng.chance(t.kitShare)) return { kind: 'kit' };
-  if (rng.chance(t.gadgetShare ?? GADGET_SHARE)) return { kind: 'gadget' };
+  if (rng.chance(t.gadgetShare ?? GADGET_SHARE)) return rng.chance(FOUND_SHARE) ? { kind: 'gadget', gadget: rng.pick(GADGETS) } : { kind: 'gadget' };
   return { kind: 'part', part: { family: rng.pick(t.families), mk: rollMk(rng, t.crateMk) } };
 }
 
@@ -44,7 +48,7 @@ export type Taste = Readonly<Partial<Record<Family, number>>>;
  */
 /** A plain sense of what each family is worth before taste and counters. */
 export const FAMILY_VALUE: Readonly<Record<Family, number>> = {
-  machinegun: 1, cannon: 1.5, rockets: 1.4, light: 1, medium: 1.5, heavy: 1.7, wheels: 1, halftracks: 1.3, tracks: 1.4,
+  machinegun: 1, cannon: 1.5, rockets: 1.4, mortar: 1.4, flamer: 1.4, laser: 1.5, rail: 1.6, light: 1, medium: 1.5, heavy: 1.7, wheels: 1, halftracks: 1.3, tracks: 1.4, hover: 1.3,
 };
 
 export function partScore(p: Part, lastHitDrive: DriveFamily | null, taste: Taste = {}): number {

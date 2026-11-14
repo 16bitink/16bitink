@@ -1,0 +1,14 @@
+{
+ "turretMortar-mk3": {
+  "x": -36,
+  "y": -33
+ },
+ "turretMortar-mk2": {
+  "x": 4,
+  "y": -35
+ },
+ "turretMortar-mk1": {
+  "x": 39,
+  "y": -36
+ }
+}

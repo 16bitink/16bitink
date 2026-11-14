@@ -1,3 +1,5 @@
+import { GADGET_NAME } from './match/gadgets';
+import type { GadgetKind } from './match/types';
 import { familyName, FAMILIES, MAX_MK, roman, slotOf, type Family, type Loadout, type Mk, type Part } from './parts';
 import { perksOf, rankOf, RANKS, type RankId } from './rank';
 import { RESEARCH_MAX, researchSteps, type Research, type ResearchLine } from './stats';
@@ -8,6 +10,8 @@ import { RESEARCH_MAX, researchSteps, type Research, type ResearchLine } from '.
  * changed in place.
  */
 export type IntelBag = Readonly<Partial<Record<Family, number>>>;
+/** Gadget blueprints, per gadget (earned by using it; Tactics §3 "Gadget tiers"). */
+export type GadgetBag = Readonly<Partial<Record<GadgetKind, number>>>;
 
 export interface Progress {
   /** Unspent intel per family. */
@@ -22,12 +26,17 @@ export interface Progress {
   /** Medals per level: main, bonus 1, bonus 2. */
   readonly medals: Readonly<Record<number, readonly [boolean, boolean, boolean]>>;
   readonly loadout: Loadout;
+  /** Unspent gadget blueprints, and each gadget's Mk (Mk I when absent). */
+  readonly gadgetIntel: GadgetBag;
+  readonly gadgetMk: Readonly<Partial<Record<GadgetKind, Mk>>>;
 }
 
 export const UNLOCK_COST = 3;
 export type NextMk = Exclude<Mk, 1>;
 export const MK_COST: Readonly<Record<NextMk, number>> = { 2: 8, 3: 20, 4: 35, 5: 55 };
 export const MK_RANK: Readonly<Record<NextMk, RankId>> = { 2: 'sergeant', 3: 'lieutenant', 4: 'major', 5: 'brigadier' };
+/** Gadget tiers cost fewer blueprints than parts: you earn them a few a mission. Same rank gates (MK_RANK). */
+export const GADGET_MK_COST: Readonly<Record<NextMk, number>> = { 2: 3, 3: 6, 4: 10, 5: 15 };
 export const RESEARCH_COST: readonly number[] = [5, 10, 15];
 
 export const LINES_BY_SLOT = {
@@ -48,6 +57,8 @@ export function newProgress(): Progress {
     xp: 0,
     medals: {},
     loadout: { gun: { family: 'machinegun', mk: 1 }, hull: { family: 'light', mk: 1 }, drive: { family: 'wheels', mk: 1 } },
+    gadgetIntel: {},
+    gadgetMk: {},
   };
 }
 
@@ -69,6 +80,24 @@ export function addIntel(p: Progress, gained: IntelBag): Progress {
     intelTotal[f] = (intelTotal[f] ?? 0) + n;
   }
   return { ...p, intel, intelTotal };
+}
+
+export function addGadgetIntel(p: Progress, gained: GadgetBag): Progress {
+  const bag: Partial<Record<GadgetKind, number>> = { ...p.gadgetIntel };
+  for (const [g, n] of Object.entries(gained) as [GadgetKind, number][]) if (n > 0) bag[g] = (bag[g] ?? 0) + n;
+  return { ...p, gadgetIntel: bag };
+}
+
+export const gadgetMkOf = (p: Progress, g: GadgetKind): Mk => p.gadgetMk[g] ?? 1;
+
+export function raiseGadget(p: Progress, g: GadgetKind): Result {
+  const cur = gadgetMkOf(p, g);
+  if (cur >= MAX_MK) return fail(`already Mk ${roman(MAX_MK)}`);
+  const next = (cur + 1) as NextMk;
+  if (perksOf(p.xp).maxMk < next) return fail(`needs ${RANKS.find((r) => r.id === MK_RANK[next])?.name ?? MK_RANK[next]}`);
+  const have = p.gadgetIntel[g] ?? 0;
+  if (have < GADGET_MK_COST[next]) return fail(`needs ${GADGET_MK_COST[next]} ${GADGET_NAME[g]} blueprints`);
+  return { ok: true, progress: { ...p, gadgetIntel: { ...p.gadgetIntel, [g]: have - GADGET_MK_COST[next] }, gadgetMk: { ...p.gadgetMk, [g]: next } } };
 }
 
 export function unlock(p: Progress, f: Family): Result {

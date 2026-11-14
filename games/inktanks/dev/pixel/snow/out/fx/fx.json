@@ -1,0 +1,47 @@
+{
+ "laserBeam": {
+  "file": "fx/laserBeam.png",
+  "frame": [
+   48,
+   24
+  ],
+  "frames": 6,
+  "fps": 16,
+  "anchor": [
+   24,
+   12
+  ],
+  "loop": true,
+  "note": "an instant beam strip pointing right (+x), even along x: stretch (or tile) it along x from the muzzle to the hit, rotate it to the shot; anchor = its centre line; flicker through the frames while it shows"
+ },
+ "laserHit": {
+  "file": "fx/laserHit.png",
+  "frame": [
+   47,
+   44
+  ],
+  "frames": 8,
+  "fps": 16,
+  "anchor": [
+   27,
+   28
+  ],
+  "loop": false,
+  "note": "one-shot spark where a beam hits; anchor = the hit point"
+ },
+ "iceBreak": {
+  "file": "fx/iceBreak.png",
+  "frame": [
+   91,
+   70
+  ],
+  "frames": 10,
+  "fps": 12,
+  "anchor": [
+   45,
+   25
+  ],
+  "loop": false,
+  "note": "one-shot: cracks race out, the ice shatters and the water splashes; anchor = the middle of the hole; play when thin ice gives way under a Heavy (then show the hole / water ground there)"
+ }
+}

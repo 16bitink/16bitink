@@ -62,8 +62,13 @@ describe('campaign', () => {
     expect(gate(2, ctx(won(1)))).toBe('play');
   });
 
-  it('ships no paid levels to the client yet, and checks what the host sends', () => {
-    expect(INKTANKS_PAID_LEVELS).toEqual([]);
+  it('ships no paid levels to the client, and checks what the host sends', () => {
+    // Paid levels are server data: only levels 11–50, and nothing the client imports pulls them in.
+    expect(INKTANKS_PAID_LEVELS.every((d) => d.number > 10 && d.number <= 50)).toBe(true);
+    const clientImportsPaid = Object.entries(import.meta.glob('../src/**/*.ts', { eager: true, query: '?raw', import: 'default' }) as Record<string, string>)
+      .filter(([f]) => !f.includes('/sim/'))
+      .filter(([, src]) => /from '[^']*(content\/paid|content\/ch[2-9]\/levels)/.test(src));
+    expect(clientImportsPaid.map(([f]) => f)).toEqual([]);
     expect(levelFor(11)).toBeNull();
     expect(installPaidLevels([])).toBe(0);
     expect(() => installPaidLevels({})).toThrow();

@@ -1,3 +1,4 @@
+import { heightMult } from '../match/heights';
 import type { Match } from '../match/match';
 import type { Tank } from '../match/types';
 import type { Pt } from '../vec';
@@ -28,7 +29,7 @@ export const AWARE = {
 
 /** Roles that never calm down. */
 export function alwaysAlert(b: Pick<Brain, 'role'>, t: Pick<Tank, 'role'>): boolean {
-  return b.role === 'wave' || b.role === 'hunter' || b.role === 'player' || t.role === 'bossTurret' || t.role === 'boss';
+  return b.role === 'wave' || b.role === 'hunter' || b.role === 'player' || b.role === 'ally' || t.role === 'bossTurret' || t.role === 'boss';
 }
 
 function setAware(m: Match, b: Brain, state: Aware, spot: Pt | null): void {
@@ -43,10 +44,22 @@ export function makeAlert(m: Match, b: Brain, at: Pt | null): void {
   setAware(m, b, 'alert', at);
 }
 
+/** Mk V smoke: a bot hunting `target` loses it (forgets where it saw it; an alert one goes back to looking). */
+export function loseTrack(m: Match, b: Brain, t: Tank, target: Tank): void {
+  if (b.lastSeen?.id === target.id) b.lastSeen = null;
+  if (b.aware === 'alert' && !alwaysAlert(b, t)) {
+    setAware(m, b, 'suspicious', null);
+    b.awareSpot = null;
+  }
+}
+
 /** Who a bot can see right now, with its awareness's range and cone. */
 export function botSees(m: Match, b: Brain, t: Tank, o: Tank): boolean {
-  if (b.role === 'player') return canSeeOpen(m, t, o, VISION);
-  const range = b.aware === 'calm' ? b.sight : VISION;
+  // A sandstorm caps everyone's eyes (m.sight is Infinity in clear weather).
+  // High ground (chapter 4's ridges) sees further.
+  const up = m.level.def.heights ? heightMult(m, t) : 1;
+  if (b.role === 'player') return canSeeOpen(m, t, o, Math.min(VISION * up, m.sight));
+  const range = Math.min((b.aware === 'calm' ? b.sight : VISION) * up, m.sight);
   return canSee(m, t, o, range, b.aware === 'alert' ? null : AWARE.cone);
 }
 
@@ -67,7 +80,7 @@ function heardShot(m: Match, b: Brain, t: Tank): Tank | null {
  */
 export function sense(m: Match, b: Brain, t: Tank): Tank[] {
   const candidates = enemies(m, t).filter((o) => (o.role !== 'bossTurret' || b.role === 'player') && o.role !== 'crew');
-  if (b.role === 'player') return candidates.filter((o) => canSeeOpen(m, t, o, VISION));
+  if (b.role === 'player') return candidates.filter((o) => canSeeOpen(m, t, o, Math.min(VISION, m.sight)));
   const attacked = m.t - t.lastHitAt < 1;
   const called = b.alert !== null && m.t < b.alert.until;
   if (alwaysAlert(b, t) || attacked || called) setAware(m, b, 'alert', null);

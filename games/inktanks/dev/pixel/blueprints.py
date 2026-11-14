@@ -12,7 +12,8 @@ ICONS = ROOT / 'src/art/pixel/parts/icons'
 FAMILY_ICON = {
     'machinegun': 'turretMG', 'cannon': 'turretCannon', 'rockets': 'turretRocket',
     'light': 'hullLight', 'medium': 'hullMedium', 'heavy': 'hullHeavy',
-    'wheels': 'driveWheels', 'halftracks': 'driveHalftrack', 'tracks': 'driveTracks',
+    'wheels': 'driveWheels', 'halftracks': 'driveHalftrack', 'tracks': 'driveTracks', 'mortar': 'turretMortar',
+    'flamer': 'turretFlamer', 'hover': 'driveHover', 'laser': 'turretLaser', 'rail': 'turretRail',
 }
 PAPER = (58, 124, 196, 255)
 BOX = (18, 16, 55, 48)  # the drawing area on the sheet (erased, then redrawn): most of it, so the part reads at icon size

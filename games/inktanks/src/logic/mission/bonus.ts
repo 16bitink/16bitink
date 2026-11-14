@@ -15,7 +15,7 @@ export function bonusText(b: BonusDef): string {
     case 'noAlarm':
       return 'Never set off the alarm';
     case 'truckHp':
-      return `Keep the truck above ${Math.round(b.min * 100)}% HP`;
+      return `Keep the ${b.vessel ?? 'truck'} above ${Math.round(b.min * 100)}% HP`;
     case 'heavyWithRockets':
       return 'Destroy a Heavy with Rockets';
     case 'swaps':

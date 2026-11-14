@@ -32,6 +32,50 @@ export interface Mark {
   readonly warn?: number;
 }
 
+/** A set piece the objective owns and the view draws: the cargo helicopter, the rescue truck, a flagpole, a recon camera. */
+export type Prop = HeliProp | TruckProp | FlagProp | CameraProp;
+
+/** Capture: a flagpole. `hold` -1 their flag at the top … 0 bare pole … +1 ours at the top. */
+export interface FlagProp {
+  readonly kind: 'flag';
+  readonly x: number;
+  readonly y: number;
+  readonly hold: number;
+}
+
+/** Recon: the camp being photographed: a viewfinder while you dwell (`progress` 0–1), the flash once `done`. */
+export interface CameraProp {
+  readonly kind: 'camera';
+  readonly x: number;
+  readonly y: number;
+  readonly r: number;
+  readonly progress: number;
+  readonly done: boolean;
+  /** Seconds since the photo was taken (the flash fades). */
+  readonly since: number;
+}
+
+/** The rescue's pick-up truck: parked at home, it drives off once every crew is aboard. */
+export interface TruckProp {
+  readonly kind: 'truck';
+  readonly x: number;
+  readonly y: number;
+  readonly heading: number;
+}
+
+export interface HeliProp {
+  readonly kind: 'heli';
+  readonly x: number;
+  readonly y: number;
+  /** 0 on the ground, 1 at flying height. */
+  readonly alt: number;
+  readonly heading: number;
+  /** Carrying the cargo slung under it. */
+  readonly cargo: boolean;
+  /** Rotor speed, 0–1 (idling on the pad is slower). */
+  readonly rotor: number;
+}
+
 export interface ObjectiveStatus {
   /** The HUD line: "Fuel stacks 1/3". */
   readonly text: string;
@@ -60,12 +104,15 @@ export interface Objective {
   /** Inputs for the tanks it drives itself (the escort truck, the boss body, freed crews), else null. */
   drive(t: Tank): TankInput | null;
   marks(): readonly Mark[];
+  /** Set pieces to draw (the cargo helicopter). */
+  props(): readonly Prop[];
   /** The escort truck's HP share at the end, for the truck bonus. */
   truckHpShare(): number | null;
 }
 
 /** The parts every objective leaves alone. */
-export const BASE: Pick<Objective, 'staged' | 'foeHint' | 'drive' | 'marks' | 'truckHpShare'> = {
+export const BASE: Pick<Objective, 'staged' | 'foeHint' | 'drive' | 'marks' | 'props' | 'truckHpShare'> = {
+  props: () => [],
   staged: () => false,
   foeHint: () => null,
   drive: () => null,

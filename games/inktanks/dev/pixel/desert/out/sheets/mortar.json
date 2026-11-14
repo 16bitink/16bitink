@@ -1,0 +1,18 @@
+{
+ "place": {
+  "fortressMortar-1": {
+   "x": -8,
+   "y": 40
+  },
+  "fortressMortar-0": {
+   "x": 112,
+   "y": 40
+  }
+ },
+ "muzzle": [
+  [
+   0,
+   -25
+  ]
+ ]
+}

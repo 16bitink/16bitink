@@ -25,6 +25,20 @@ const realPngs = import.meta.glob<string>('../art/pixel/parts/**/*.png', { eager
 const testManifest = import.meta.glob<PartsManifest>('../../dev/detail-test/assets/C/manifest.json', { eager: true, import: 'default' });
 const testPngs = import.meta.glob<string>('../../dev/detail-test/assets/C/*.png', { eager: true, query: '?url', import: 'default' });
 
+/**
+ * PLACEHOLDER table: a part family whose art isn't installed yet draws as
+ * another family's (key prefix → stand-in prefix). The chapter 3 Flamer and
+ * Hover art is in (Nov 14), so these only fire if a key goes missing.
+ */
+const STAND_IN: Readonly<Record<string, string>> = { turretFlamer: 'turretMG', driveHover: 'driveWheels' };
+
+/** `key` if the art has it, else the same key on the family's stand-in. */
+function orStandIn(urls: ReadonlyMap<string, string>, key: string): string {
+  if (urls.has(key)) return key;
+  const fam = Object.keys(STAND_IN).find((f) => key.startsWith(f));
+  return fam ? key.replace(fam, STAND_IN[fam]!) : key;
+}
+
 const fileName = (path: string): string => path.slice(path.lastIndexOf('/') + 1, -4);
 const relName = (path: string, root: string): string => path.slice(path.indexOf(root) + root.length, -4);
 
@@ -57,14 +71,14 @@ function realArt(m: PartsManifest): PartsArt {
       const fam = ART_FAMILY[p.family];
       const size = m.hullSize?.[ART_FAMILY[hull]] ?? 'L';
       const key = m.drives?.[fam]?.[size]?.[`mk${artMk(p.mk)}`];
-      return key && urls.has(key) ? key : `${fam}-mk${artMk(p.mk)}`;
+      return key && urls.has(key) ? key : orStandIn(urls, `${fam}-mk${artMk(p.mk)}`);
     },
     frames: (k) => m.frames?.[k] ?? [k, `${k}-f1`, `${k}-f2`].filter((f) => urls.has(f)),
-    turret: (p) => `${ART_FAMILY[p.family]}-mk${artMk(p.mk)}`,
+    turret: (p) => orStandIn(urls, `${ART_FAMILY[p.family]}-mk${artMk(p.mk)}`),
     stripe: (k) => (m.stripe.includes(k) && urls.has(`${k}-stripe`) ? `${k}-stripe` : null),
     ring: (k) => m.ring[k] ?? [0, 2],
     muzzles: (k) => m.muzzle?.[k] ?? [[0, -30]],
-    icon: (p) => urls.get(`icons/${ART_FAMILY[p.family]}`) ?? null,
+    icon: (p) => urls.get(`icons/${ART_FAMILY[p.family]}`) ?? urls.get(`icons/${STAND_IN[ART_FAMILY[p.family]] ?? ''}`) ?? null,
   };
 }
 

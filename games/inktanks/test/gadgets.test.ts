@@ -2,13 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { canSee, hidden } from '../src/logic/bots/perception';
 import type { EnemyDef, StructPlace } from '../src/logic/level/types';
 import { GADGET_SHARE, rollCrate } from '../src/logic/loot';
+import { gadgetCharges, gadgetMax, mineTier, OIL_FIRE, oilTier, SCATTER_DAMAGE, smokeTier } from '../src/logic/gadgetTiers';
 import { GADGET } from '../src/logic/match/gadgets';
 import { useGadget } from '../src/logic/match/gadgetUse';
 import { Match } from '../src/logic/match/match';
+import { aimAndFire } from '../src/logic/match/combat';
 import { driveTank } from '../src/logic/match/movement';
 import { touchPickups } from '../src/logic/match/pickups';
 import { IDLE, type GadgetKind, type Tank } from '../src/logic/match/types';
-import { STARTER_LOADOUT } from '../src/logic/parts';
+import { STARTER_LOADOUT, type Mk } from '../src/logic/parts';
 import { createRng } from '../src/logic/rng';
 import { newSave, parseSave, serializeSave } from '../src/logic/save';
 import { LOOT_EARLY } from '../src/content/ch1/levels/kit';
@@ -17,8 +19,8 @@ import { fixture, load } from './fixtures/levels';
 const SCOUT = 'machinegun1/light1/wheels1';
 /** A dummy that can't see or shoot: a turret far from everything, set alert so no ambush ×2. */
 const dummy = (x: number, y: number): EnemyDef => ({ role: 'turret', clan: 'boars', tank: SCOUT, at: { x, y }, hpMult: 3 });
-const make = (gadget: GadgetKind | null, enemies: EnemyDef[] = [dummy(1800, 1000)], structures: StructPlace[] = []) =>
-  new Match({ level: load(fixture({ kind: 'assault' }, enemies, { structures })), seed: 7, player: { loadout: STARTER_LOADOUT, gadget } });
+const make = (gadget: GadgetKind | null, enemies: EnemyDef[] = [dummy(1800, 1000)], structures: StructPlace[] = [], gadgetMk: Partial<Record<GadgetKind, Mk>> = {}) =>
+  new Match({ level: load(fixture({ kind: 'assault' }, enemies, { structures })), seed: 7, player: { loadout: STARTER_LOADOUT, gadget, gadgetMk } });
 const foes = (m: Match): Tank[] => m.tanks.filter((t) => t.team !== 0);
 const put = (t: Tank, x: number, y: number) => Object.assign(t, { x, y, speed: 0 });
 const steps = (m: Match, s: number) => {
@@ -30,7 +32,7 @@ describe('the gadget slot', () => {
   it('2 charges a level; one press, one use; none without a slot', () => {
     const m = make('smoke');
     const p = m.player!;
-    expect(p.gadgetCharges).toBe(GADGET.charges);
+    expect(p.gadgetCharges).toBe(gadgetCharges('smoke', 1));
     expect(useGadget(m, p)).toBe(true);
     expect(useGadget(m, p)).toBe(false);
     m.t += GADGET.cooldown;
@@ -46,7 +48,7 @@ describe('the gadget slot', () => {
     const m = make('mines');
     m.setPlayerGadget('oil');
     expect(m.player!.gadget).toBe('oil');
-    expect(m.player!.gadgetCharges).toBe(GADGET.charges);
+    expect(m.player!.gadgetCharges).toBe(gadgetCharges('oil', 1));
   });
   it('crates roll a gadget charge now and then; the pickup tops you up to the max', () => {
     const rng = createRng(3);
@@ -56,12 +58,14 @@ describe('the gadget slot', () => {
     expect(share).toBeLessThan(GADGET_SHARE * 1.4);
     const m = make('mines');
     const p = m.player!;
-    for (let i = 0; i < GADGET.max; i++) {
+    for (let i = 0; i < 4; i++) {
       m.addPickup({ kind: 'gadget' }, p.x, p.y);
       touchPickups(m, p, IDLE, 1 / 60, false);
     }
-    expect(p.gadgetCharges).toBe(GADGET.max);
-    expect(m.pickups.filter((x) => x.kind === 'gadget' && !x.taken)).toHaveLength(GADGET.charges);
+    // Two top it up to the max; the two spares turn into mine blueprints.
+    expect(p.gadgetCharges).toBe(gadgetMax('mines', 1));
+    expect(m.pickups.filter((x) => x.kind === 'gadget' && !x.taken)).toHaveLength(0);
+    expect(m.gadgetIntel.mines).toBe(2);
   });
 });
 
@@ -85,9 +89,11 @@ describe('mines', () => {
     expect(a!.hp).toBe(hpA);
     steps(m, 0.6);
     expect(mine.alive).toBe(false);
-    expect(hpA - a!.hp).toBeCloseTo(GADGET.mine.damage);
-    expect(hpB - b!.hp).toBeCloseTo(GADGET.mine.damage / 2);
-    expect(a!.trackBrokenUntil).toBeGreaterThan(m.t + GADGET.mine.slowFor - 0.6);
+    expect(hpA - a!.hp).toBeCloseTo(mineTier(1).damage);
+    expect(hpB - b!.hp).toBeCloseTo(mineTier(1).damage / 2);
+    expect(a!.trackBrokenUntil).toBeGreaterThan(m.t + mineTier(1).slowFor - 0.6);
+    // Two enemies hit: 2 mine blueprints.
+    expect(m.gadgetIntel.mines).toBe(2);
   });
   it('a broken track halves speed; your own mines never go off under you', () => {
     const m = make('mines', [dummy(1500, 300)]);
@@ -172,7 +178,7 @@ describe('oil and smoke', () => {
     put(p, 500, 540);
     expect(hidden(m, p)).toBe(false);
     expect(canSee(m, g!, p)).toBe(false);
-    m.t += GADGET.smoke.life + 0.1;
+    m.t += smokeTier(1).life + 0.1;
     expect(canSee(m, g!, p)).toBe(true);
   });
 });
@@ -186,5 +192,143 @@ describe('the save', () => {
     expect(parseSave(JSON.stringify(old)).save.gadget).toBe('mines');
     expect(parseSave(JSON.stringify({ ...old, gadget: 'nuke' })).save.gadget).toBe('mines');
     expect(parseSave(JSON.stringify({ ...old, gadget: 'nuke' })).problem).toBeNull();
+  });
+});
+
+describe('gadget tiers', () => {
+  it('numbers rise with the Mk; Mk III and V add something', () => {
+    expect([1, 2, 3, 4, 5].map((k) => gadgetCharges('mines', k as Mk))).toEqual([2, 3, 3, 4, 4]);
+    expect(gadgetCharges('oil', 5)).toBe(2);
+    expect(mineTier(5).damage).toBeGreaterThan(mineTier(1).damage);
+    expect(mineTier(3).trigger).toBeGreaterThan(mineTier(2).trigger);
+    expect(mineTier(5).scatter).toBe(3);
+    expect(oilTier(2).spread).toBe(0);
+    expect(oilTier(3).spread).toBeGreaterThan(0);
+    expect(oilTier(5).ignites).toBe(true);
+    expect(smokeTier(3).repair).toBeGreaterThan(0);
+    expect(smokeTier(5).blinds).toBe(true);
+    expect(smokeTier(5).r).toBeGreaterThan(smokeTier(1).r);
+  });
+  it('the match takes the workshop Mk: Mk II mines start with 3 charges', () => {
+    const m = make('mines', undefined, undefined, { mines: 2 });
+    expect(m.player!.gadgetCharges).toBe(3);
+    m.setPlayerGadget('oil');
+    expect(m.player!.gadgetCharges).toBe(2);
+  });
+  it('Mk V mines scatter 3 smaller ones', () => {
+    const m = make('mines', undefined, undefined, { mines: 5 });
+    const p = m.player!;
+    put(p, 600, 540);
+    useGadget(m, p);
+    expect(m.gadgets.mines).toHaveLength(3);
+    expect(m.gadgets.mines.every((x) => x.small && x.damage === mineTier(5).damage * SCATTER_DAMAGE)).toBe(true);
+    const xs = m.gadgets.mines.map((x) => x.y);
+    expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(40);
+  });
+  it('Mk III oil: enemies inside shoot wide', () => {
+    const fire = (mk: Mk): number[] => {
+      const m = make('oil', [dummy(1500, 540)], [], { oil: mk });
+      const p = m.player!;
+      const [e] = foes(m);
+      put(p, 1200, 540);
+      p.heading = 0;
+      useGadget(m, p);
+      put(e!, m.gadgets.oils[0]!.x, m.gadgets.oils[0]!.y);
+      const out: number[] = [];
+      for (let i = 0; i < 40; i++) {
+        m.shots = [];
+        e!.reload = 0;
+        e!.turret = 0;
+        m.events = [];
+        aimAndFire(m, e!, { ...IDLE, aim: 0, fire: true }, 1 / 60);
+        const f = m.events.find((x) => x.kind === 'fire');
+        if (f && f.kind === 'fire') out.push(Math.abs(f.angle));
+      }
+      return out;
+    };
+    expect(Math.max(...fire(3))).toBeGreaterThan(Math.max(...fire(1)) + 0.1);
+  });
+  it('Mk V oil: your shot sets it alight and it burns enemies in it', () => {
+    const m = make('oil', [dummy(1500, 540)], [], { oil: 5 });
+    const p = m.player!;
+    const [e] = foes(m);
+    alert(m, e!);
+    put(p, 600, 540);
+    p.heading = 0;
+    useGadget(m, p);
+    const slick = m.gadgets.oils[0]!;
+    put(e!, slick.x, slick.y);
+    const hp = e!.hp;
+    m.shots.push({ id: 999, owner: p.id, team: 0, x: slick.x - 5, y: slick.y, vx: 0, vy: 0, travelled: 0, range: 1, damage: 0, gun: 'machinegun', splash: 0, breaksBrick: false, kind: 'bullet', alive: true });
+    steps(m, 1);
+    expect(slick.burnUntil).toBeGreaterThan(0);
+    expect(e!.hp).toBeLessThan(hp - OIL_FIRE.damage);
+    steps(m, OIL_FIRE.burn);
+    expect(m.gadgets.oils).toHaveLength(0);
+    expect(m.gadgetIntel.oil).toBeGreaterThan(1);
+  });
+  it('Mk I oil never lights', () => {
+    const m = make('oil', undefined, undefined, { oil: 1 });
+    const p = m.player!;
+    put(p, 600, 540);
+    useGadget(m, p);
+    const slick = m.gadgets.oils[0]!;
+    m.shots.push({ id: 999, owner: p.id, team: 0, x: slick.x, y: slick.y, vx: 0, vy: 0, travelled: 0, range: 1, damage: 0, gun: 'machinegun', splash: 0, breaksBrick: false, kind: 'bullet', alive: true });
+    steps(m, 0.2);
+    expect(slick.burnUntil).toBe(-1);
+  });
+  it('Mk III smoke repairs you inside; Mk V makes the hunters lose you', () => {
+    const m = make('smoke', [{ role: 'guard', clan: 'boars', tank: SCOUT, at: { x: 900, y: 540 } }], [], { smoke: 5 });
+    const p = m.player!;
+    put(p, 600, 540);
+    const [g] = foes(m);
+    alert(m, g!);
+    m.brains.get(g!.id)!.lastSeen = { x: p.x, y: p.y, t: m.t, id: p.id };
+    p.hp = p.stats.maxHp * 0.5;
+    useGadget(m, p);
+    expect(m.brains.get(g!.id)!.lastSeen).toBeNull();
+    expect(m.brains.get(g!.id)!.aware).toBe('suspicious');
+    expect(m.gadgetIntel.smoke).toBe(1);
+    const before = p.hp;
+    for (let i = 0; i < 60; i++) m.step(1 / 60, IDLE);
+    expect(p.hp).toBeGreaterThan(before + p.stats.maxHp * 0.02);
+  });
+});
+
+describe('found gadgets', () => {
+  it('a crate of another kind is a one-use the button fires first; only one at a time', () => {
+    const m = make('mines');
+    const p = m.player!;
+    put(p, 600, 540);
+    m.addPickup({ kind: 'gadget', gadget: 'smoke' }, p.x, p.y);
+    m.addPickup({ kind: 'gadget', gadget: 'oil' }, p.x, p.y);
+    touchPickups(m, p, IDLE, 1 / 60, false);
+    expect(p.found).toBe('smoke');
+    expect(m.pickups.filter((x) => x.kind === 'gadget' && !x.taken)).toHaveLength(1);
+    const charges = p.gadgetCharges;
+    expect(useGadget(m, p)).toBe(true);
+    expect(m.gadgets.smokes).toHaveLength(1);
+    expect(p.gadgetCharges).toBe(charges);
+    expect(p.found).toBeNull();
+    // The oil one is still lying there: now it can be taken.
+    touchPickups(m, p, IDLE, 1 / 60, false);
+    expect(p.found).toBe('oil');
+  });
+  it('a crate of your own kind is a charge; rolled crates sometimes hold another kind', () => {
+    const m = make('mines');
+    const p = m.player!;
+    m.addPickup({ kind: 'gadget', gadget: 'mines' }, p.x, p.y);
+    touchPickups(m, p, IDLE, 1 / 60, false);
+    expect(p.gadgetCharges).toBe(gadgetCharges('mines', 1) + 1);
+    expect(p.found).toBeNull();
+    const rng = createRng(5);
+    const kinds = Array.from({ length: 4000 }, () => rollCrate(rng, LOOT_EARLY)).flatMap((r) => (r.kind === 'gadget' ? [r.gadget ?? 'yours'] : []));
+    expect(new Set(kinds)).toEqual(new Set(['yours', 'mines', 'oil', 'smoke']));
+  });
+  it('a level can fix a crate to a gadget', () => {
+    const lv = load(fixture({ kind: 'assault' }, [dummy(1800, 1000)]));
+    const m = new Match({ level: { ...lv, crates: [{ at: { x: 700, y: 540 }, content: { gadget: 'smoke' } }] }, seed: 1, player: { loadout: STARTER_LOADOUT, gadget: 'mines' } });
+    const c = m.pickups.find((x) => x.kind === 'crate');
+    expect(c?.kind === 'crate' && c.content).toEqual({ kind: 'gadget', gadget: 'smoke' });
   });
 });

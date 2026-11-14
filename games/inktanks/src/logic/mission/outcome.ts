@@ -1,6 +1,6 @@
 import type { MatchReport } from '../match/report';
 import { XP } from '../rank';
-import { addIntel, type Progress } from '../workshop';
+import { addGadgetIntel, addIntel, type Progress } from '../workshop';
 import type { LevelDef } from '../level/types';
 import { bonusMet } from './bonus';
 
@@ -33,6 +33,6 @@ export function outcome(def: LevelDef, r: MatchReport, prev: Medals | undefined)
 /** Applies a played mission to progress: intel is kept win or lose, XP and medals only go up. */
 export function applyOutcome(p: Progress, def: LevelDef, r: MatchReport): { progress: Progress; outcome: Outcome } {
   const o = outcome(def, r, p.medals[def.number]);
-  const withIntel = addIntel(p, r.intel);
+  const withIntel = addGadgetIntel(addIntel(p, r.intel), r.gadgetIntel ?? {});
   return { progress: { ...withIntel, xp: withIntel.xp + o.xp, medals: { ...withIntel.medals, [def.number]: o.medals } }, outcome: o };
 }

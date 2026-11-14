@@ -41,6 +41,8 @@ function tiersSave(): Progress {
     unlocked: [...p.unlocked, 'cannon', 'rockets'],
     mk: { ...p.mk, machinegun: 3, cannon: 4, rockets: 5 },
     loadout: { gun: { family: 'rockets', mk: 5 }, hull: { family: 'light', mk: 1 }, drive: { family: 'wheels', mk: 1 } },
+    gadgetIntel: { mines: 12, oil: 2, smoke: 5 },
+    gadgetMk: { mines: 3, oil: 5, smoke: 2 },
   };
 }
 

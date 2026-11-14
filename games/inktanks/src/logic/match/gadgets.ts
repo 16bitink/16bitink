@@ -1,3 +1,5 @@
+import { OIL_FIRE, oilTier } from '../gadgetTiers';
+import type { Mk } from '../parts';
 import type { Pt } from '../vec';
 import type { GadgetKind } from './types';
 
@@ -7,22 +9,16 @@ import type { GadgetKind } from './types';
  * gadgetUse.ts (it needs perception and combat, which read smoke from here).
  */
 export const GADGET = {
-  /** Charges a level starts with, and the most a crate can top you up to. */
-  charges: 2,
-  max: 4,
   /** One press, one use. */
   cooldown: 0.6,
-  mine: { arm: 1, trigger: 28, damage: 90, splash: 40, slow: 0.5, slowFor: 3 },
-  oil: { r: 60, life: 8, speed: 0.4, turn: 0.35 },
-  smoke: { r: 90, life: 6 },
+  /** The rest scale with the Mk: gadgetTiers.ts. */
+  mine: { arm: 1, splash: 40, slow: 0.5 },
+  oil: { speed: 0.4, turn: 0.35 },
 } as const;
 
 export const GADGET_NAME: Readonly<Record<GadgetKind, string>> = { mines: 'Mines', oil: 'Oil slick', smoke: 'Smoke' };
-export const GADGET_TEXT: Readonly<Record<GadgetKind, string>> = {
-  mines: 'Arms in 1 s; an enemy rolling over it takes 90 damage and a broken track.',
-  oil: 'A 60 px slick for 8 s: enemies slide at 40% speed and can’t turn well.',
-  smoke: 'A 90 px cloud for 6 s that blocks sight both ways.',
-};
+/** Every gadget at Mk I (enemies and tests that don't say). */
+export const MK1_GADGETS: Readonly<Record<GadgetKind, Mk>> = { mines: 1, oil: 1, smoke: 1 };
 
 export interface Mine {
   readonly id: number;
@@ -31,6 +27,11 @@ export interface Mine {
   readonly team: number;
   readonly owner: number;
   readonly armAt: number;
+  readonly damage: number;
+  readonly trigger: number;
+  readonly slowFor: number;
+  /** One of a Mk V scatter (drawn smaller). */
+  readonly small: boolean;
   /** Enemy bots that watched it being laid: only they steer round it. */
   readonly known: ReadonlySet<number>;
   alive: boolean;
@@ -43,7 +44,13 @@ export interface Patch {
   readonly r: number;
   readonly team: number;
   readonly at: number;
-  readonly until: number;
+  until: number;
+  readonly mk: Mk;
+  /** Oil: enemies that have slid in it (gadget blueprints once each). */
+  readonly slowed: Set<number>;
+  /** A Mk V slick set alight: burning until then (-1 not alight), next damage tick. */
+  burnUntil: number;
+  burnTick: number;
 }
 
 export interface Gadgets {
@@ -99,4 +106,15 @@ export function dropPoint(kind: GadgetKind, t: { x: number; y: number; heading: 
   if (kind === 'smoke') return { x: t.x, y: t.y };
   const back = t.stats.radius + 8;
   return { x: t.x - Math.cos(t.heading) * back, y: t.y - Math.sin(t.heading) * back };
+}
+
+/** A shot of `team` over its own Mk V slick sets it alight (it burns OIL_FIRE.burn s, then it's gone). */
+export function igniteOil(m: { readonly gadgets: Gadgets; readonly t: number; emit(e: { kind: 'ignite'; x: number; y: number; r: number }): void }, team: number, x: number, y: number): void {
+  for (const p of m.gadgets.oils) {
+    if (p.team !== team || p.burnUntil >= 0 || p.until <= m.t || !inside(p, x, y) || !oilTier(p.mk).ignites) continue;
+    p.burnUntil = m.t + OIL_FIRE.burn;
+    p.burnTick = m.t;
+    p.until = p.burnUntil;
+    m.emit({ kind: 'ignite', x: p.x, y: p.y, r: p.r });
+  }
 }

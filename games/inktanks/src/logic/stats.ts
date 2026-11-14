@@ -30,15 +30,25 @@ export interface GunStats {
   readonly shot: ShotKind;
   readonly turretTurn: number;
   readonly spread: number;
+  /** Lobbed guns: the nearest a shell can land, px (0: none). */
+  readonly minRange: number;
+  /** Heat damage (the Flamer): meets heat armour. */
+  readonly heat: boolean;
+  /** Stream guns: the cone's full width, radians (0: not a stream). */
+  readonly cone: number;
   /** Rounds per belt, 0 for a gun without one. */
   readonly belt: number;
   /** Seconds to load a new belt; Reload research shortens it as it does `reload`. */
   readonly beltReload: number;
+  /** Charged guns (the Rail): seconds from the pull to the shot (0: fires at once). */
+  readonly charge: number;
 }
 
 export interface TankStats {
   readonly maxHp: number;
+  /** Kinetic armour, and heat armour (lower; what the Flamer meets). Armour research raises both. */
   readonly armour: number;
+  readonly heatArmour: number;
   /** Native px per second on open ground. */
   readonly speed: number;
   readonly turn: number;
@@ -48,6 +58,18 @@ export interface TankStats {
   readonly engineFactor: number;
   readonly sand: number;
   readonly mud: number;
+  /** Grip on sand (1: no sliding); Grip research raises it. */
+  readonly sandGrip: number;
+  /** Grip on every other ground (1: none of Hover's drift); Grip research raises it. */
+  readonly grip: number;
+  /** Crosses deep water (Hover). */
+  readonly floats: boolean;
+  /** Deep snow's speed multiplier (chapter 4; Grip research takes part of it away). */
+  readonly snow: number;
+  /** Grip on ice (chapter 4; Grip research raises it). */
+  readonly iceGrip: number;
+  /** The forest floor's speed multiplier (chapter 5, off the trails; Grip research takes part of it away). */
+  readonly forest: number;
   readonly radius: number;
   readonly hull: HullFamily;
   readonly drive: DriveFamily;
@@ -81,6 +103,7 @@ export function tankStats(l: Loadout, research?: Research): TankStats {
   return {
     maxHp: Math.round(hull.hp * HP_SCALE * TIER_BONUS[l.hull.mk] * drive.hpFactor * bonus(research, h, 'hp')),
     armour: hull.armour * bonus(research, h, 'armour'),
+    heatArmour: hull.heatArmour * bonus(research, h, 'armour'),
     speed: drive.speed * TIER_BONUS[l.drive.mk] * engineFactor * bonus(research, d, 'speed'),
     turn: drive.turn * grip,
     pivots: drive.pivots,
@@ -88,6 +111,12 @@ export function tankStats(l: Loadout, research?: Research): TankStats {
     engineFactor,
     sand: gripped(drive.sand, grip),
     mud: gripped(drive.mud, grip),
+    sandGrip: Math.min(1, drive.sandGrip * grip),
+    grip: Math.min(1, (drive.grip ?? 1) * grip),
+    floats: drive.floats === true,
+    snow: gripped(drive.snow ?? 1, grip),
+    iceGrip: Math.min(1, (drive.iceGrip ?? drive.grip ?? 1) * grip),
+    forest: gripped(drive.forest ?? 1, grip),
     radius: hull.radius,
     hull: h,
     drive: d,
@@ -103,8 +132,12 @@ export function tankStats(l: Loadout, research?: Research): TankStats {
       shot: gun.shot,
       turretTurn: gun.turretTurn,
       spread: gun.spread,
+      minRange: gun.minRange ?? 0,
+      heat: gun.heat === true,
+      cone: gun.cone ?? 0,
       belt: gun.belt ?? 0,
       beltReload: (gun.beltReload ?? 0) / bonus(research, g, 'reload'),
+      charge: gun.charge ?? 0,
     },
   };
 }
@@ -114,7 +147,7 @@ export function fireRate(g: GunStats): number {
   return g.belt > 0 ? g.belt / (g.belt * g.reload + g.beltReload) : 1 / g.reload;
 }
 
-/** Sustained damage per second of `a`'s gun on `b`, counters and armour included. */
+/** Sustained damage per second of `a`'s gun on `b`, counters and armour (heat or kinetic) included. */
 export function dps(a: TankStats, b: TankStats, damageFn: (dmg: number, gun: GunFamily, drive: DriveFamily, armour: number) => number): number {
-  return damageFn(a.gun.damage, a.gun.family, b.drive, b.armour) * a.gun.shots * fireRate(a.gun);
+  return damageFn(a.gun.damage, a.gun.family, b.drive, a.gun.heat ? b.heatArmour : b.armour) * a.gun.shots * fireRate(a.gun);
 }

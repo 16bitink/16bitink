@@ -5,6 +5,13 @@ import { GroundStream, preloadGround } from '../../render/ground';
 import { AlertLayer, preloadAlerts } from '../../render/alertView';
 import { preloadFx, WorldFx } from '../../render/fx';
 import { GadgetLayer, preloadGadgets } from '../../render/gadgetView';
+import { HeliLayer, preloadHeli } from '../../render/heliView';
+import { LobLayer } from '../../render/lobView';
+import { preloadStorm, StormLayer } from '../../render/stormView';
+import { FlameLayer, preloadFlames } from '../../render/flameView';
+import { EffectLayer, preloadEffects } from '../../render/effectView';
+import { FogLayer, preloadFog } from '../../render/fogView';
+import { SetPieceLayer } from '../../render/setPieceView';
 import { RotBank, textureMegabytes, type RotMode } from '../../render/rotBank';
 import { preloadStructures, StructLayer } from '../../render/structView';
 import { preloadParts, tankKeys, TankView } from '../../render/tankView';
@@ -30,7 +37,12 @@ export function preloadMission(scene: Phaser.Scene): void {
   preloadStructures(scene);
   preloadFx(scene);
   preloadGadgets(scene);
+  preloadHeli(scene);
   preloadAlerts(scene);
+  preloadStorm(scene);
+  preloadFlames(scene);
+  preloadEffects(scene);
+  preloadFog(scene);
 }
 
 export class MissionScene extends Phaser.Scene {
@@ -38,6 +50,13 @@ export class MissionScene extends Phaser.Scene {
   private structs!: StructLayer;
   private fx!: WorldFx;
   private gadgets!: GadgetLayer;
+  private heli!: HeliLayer;
+  private lobs!: LobLayer;
+  private storm!: StormLayer;
+  private flames!: FlameLayer;
+  private effects!: EffectLayer;
+  private fog!: FogLayer;
+  private setPieces!: SetPieceLayer;
   private alerts!: AlertLayer;
   readonly bank: RotBank;
   private readonly views = new Map<number, TankView>();
@@ -61,6 +80,13 @@ export class MissionScene extends Phaser.Scene {
     this.structs = new StructLayer(this, m.structs);
     this.fx = new WorldFx(this);
     this.gadgets = new GadgetLayer(this);
+    this.heli = new HeliLayer(this);
+    this.lobs = new LobLayer(this);
+    this.storm = new StormLayer(this);
+    this.flames = new FlameLayer(this);
+    this.effects = new EffectLayer(this);
+    this.fog = new FogLayer(this);
+    this.setPieces = new SetPieceLayer(this);
     this.alerts = new AlertLayer(this);
     if (this.bank.mode === 'rot32') this.warmAll();
     this.cameras.main.setBounds(0, 0, m.land.width, m.land.height).setRoundPixels(true);
@@ -119,7 +145,12 @@ export class MissionScene extends Phaser.Scene {
     }
     if (steps === 4) this.acc = 0;
     const events = m.drainEvents();
-    for (const e of events) this.fx.onEvent(e);
+    for (const e of events) {
+      this.fx.onEvent(e);
+      this.effects.onEvent(e);
+    }
+    // A dam broke or the tide came in: the ground under the land changed.
+    if (events.some((e) => e.kind === 'flood')) this.ground?.repaint();
     this.hooks.onEvents(events);
     this.centre();
     const view = this.cameras.main.worldView;
@@ -127,8 +158,15 @@ export class MissionScene extends Phaser.Scene {
     this.structs.update(view, m.player);
     this.fx.update(m, dt, view);
     this.gadgets.update(m);
+    this.heli.update(m, dt);
+    this.lobs.update(m);
+    this.setPieces.update(m);
     this.drawTanks(view);
+    this.flames.update(m);
+    this.effects.update(m);
+    this.fog.update(m);
     this.alerts.update(m, view);
+    this.storm.update(m, dt, view);
     this.hooks.onFrame(dt);
     if (m.over && !this.ended) {
       this.ended = true;

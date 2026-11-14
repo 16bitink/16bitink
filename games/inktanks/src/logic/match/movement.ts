@@ -1,7 +1,8 @@
 import { pushOut } from '../geom';
 import { GADGET, oilUnder } from './gadgets';
-import { groundAt, isDrivable } from '../land';
-import { unblock } from '../nav/grid';
+import { groundAt, isDrivable, isIcy, isMuddy, isWaterAt, type Ground } from '../land';
+import { driveRail } from './rail';
+import { spinePoint } from './body';
 import { clamp, turnTowards, wrapAngle } from '../vec';
 import type { Match } from './match';
 import type { Tank, TankInput } from './types';
@@ -12,23 +13,56 @@ const REVERSE = 0.6;
 /** Beyond this angle off the heading, a pointing stick backs up instead of turning round. */
 const BACK_UP = 2.4;
 export const CARRY_SLOW = 0.8;
+/**
+ * Levels after this one let a wedged tank drive out (moveBy). Chapters 1–2 keep
+ * the old rule (a tank pushed half over water or off the map edge sticks):
+ * their levels were tuned on it (level 14's storm raiders, measured Nov 14).
+ */
+export const WEDGE_FIX_FROM = 20;
+/**
+ * Levels after this one keep tanks on the map after collisions (chapter 5: a
+ * young tree's push or a bump could shove a tank past the map edge, where it
+ * stuck for good). Chapters 1–4 keep the old rule they were tuned on.
+ */
+export const EDGE_CLAMP_FROM = 40;
 
-function groundMult(m: Match, t: Tank): number {
-  const g = groundAt(m.land, t.x, t.y);
-  const base = g === 'sand' ? t.stats.sand : g === 'mud' ? t.stats.mud : 1;
+/**
+ * Ice (chapter 4): the tank slides with its iceGrip, and it gets up to speed,
+ * brakes and turns this much more weakly (momentum carries).
+ */
+export const ICE = { accel: 0.45, turn: 0.75 } as const;
+
+function groundMult(m: Match, t: Tank, g: Ground): number {
+  const base = g === 'sand' ? t.stats.sand : isMuddy(g) ? t.stats.mud : g === 'snow' ? t.stats.snow : g === 'forestFloor' ? t.stats.forest : 1;
   return base * (t.carrying ? CARRY_SLOW : 1);
+}
+
+/** How well a tank grips this ground: Wheels on sand, every drive on ice, Hover everywhere. */
+function gripOn(t: Tank, g: Ground): number {
+  return g === 'sand' ? t.stats.sandGrip : isIcy(g) && !t.stats.floats ? t.stats.iceGrip : t.stats.grip;
+}
+
+/**
+ * Where a tank can be: dry land for ground drives; any ground for Hover
+ * (`stats.floats`); deep water only for a `keel` (the barge, the Ironclad).
+ */
+export function canStand(m: Match, t: Tank, x: number, y: number): boolean {
+  return t.keel ? isWaterAt(m.land, x, y) : isDrivable(m.land, x, y, t.stats.floats);
 }
 
 /** Turns and throttles a tank from its input, then moves it and resolves collisions. */
 export function driveTank(m: Match, t: Tank, input: TankInput, dt: number): void {
   if (t.role === 'bossTurret') return;
+  if (t.rail) return driveRail(t, input, dt);
   const s = t.stats;
+  const g = groundAt(m.land, t.x, t.y);
+  const ice = isIcy(g) && !s.floats;
   // Someone else's oil slick: slide slowly and turn badly. A mine-broken track: half speed.
   const oil = oilUnder(m.gadgets, t.team, t.x, t.y, m.t) ? GADGET.oil : null;
   const broken = m.t < t.trackBrokenUntil ? GADGET.mine.slow : 1;
-  const top = s.speed * groundMult(m, t) * broken * (oil ? oil.speed : 1);
+  const top = s.speed * groundMult(m, t, g) * broken * (oil ? oil.speed : 1);
   // Wheels and half-tracks need some roll to turn; tracks pivot.
-  const roll = (s.pivots ? 1 : clamp(0.35 + Math.abs(t.speed) / Math.max(1, s.speed), 0.35, 1)) * (oil ? oil.turn : 1);
+  const roll = (s.pivots ? 1 : clamp(0.35 + Math.abs(t.speed) / Math.max(1, s.speed), 0.35, 1)) * (oil ? oil.turn : 1) * (ice ? ICE.turn : 1);
   let throttle = 0;
   const mv = input.move;
   if (mv?.kind === 'tank') {
@@ -47,19 +81,49 @@ export function driveTank(m: Match, t: Tank, input: TankInput, dt: number): void
     }
   }
   const want = throttle >= 0 ? throttle * top : throttle * top * REVERSE;
-  const accel = ACCEL * s.engineFactor * dt;
+  const accel = ACCEL * s.engineFactor * dt * (ice ? ICE.accel : 1);
   t.speed = t.speed < want ? Math.min(want, t.speed + accel) : Math.max(want, t.speed - accel * 1.6);
   if (Math.abs(t.speed) < 0.5 && want === 0) t.speed = 0;
   const step = t.speed * dt;
-  moveBy(m, t, Math.cos(t.heading) * step, Math.sin(t.heading) * step);
+  // Low grip slides: Wheels on sand (chapter 2), Hover everywhere (chapter 3), every drive on ice (chapter 4).
+  const grip = gripOn(t, g);
+  if (grip >= 1) {
+    // Firm grip: it goes where it points (and any slide ends at once).
+    t.slide = null;
+    moveBy(m, t, Math.cos(t.heading) * step, Math.sin(t.heading) * step);
+  } else slideBy(m, t, grip, dt);
   t.rolled += Math.abs(step);
+}
+
+/** How fast a sliding tank's path swings round to its heading, per second at grip 1. */
+export const SLIDE_RATE = 6;
+
+/**
+ * Low grip on sand (Wheels, chapter 2): the tank moves with a velocity that
+ * swings towards its heading at SLIDE_RATE × grip per second, so a hard turn
+ * slides out wide before it bites. A collision slows the slide with the tank.
+ */
+function slideBy(m: Match, t: Tank, grip: number, dt: number): void {
+  const vx = Math.cos(t.heading) * t.speed;
+  const vy = Math.sin(t.heading) * t.speed;
+  const v = (t.slide ??= { vx, vy });
+  const k = 1 - Math.exp(-SLIDE_RATE * grip * dt);
+  v.vx += (vx - v.vx) * k;
+  v.vy += (vy - v.vy) * k;
+  const before = Math.abs(t.speed);
+  moveBy(m, t, v.vx * dt, v.vy * dt);
+  if (before > 1 && Math.abs(t.speed) < before) {
+    const keep = Math.abs(t.speed) / before;
+    v.vx *= keep;
+    v.vy *= keep;
+  }
 }
 
 /** Moves with sliding along water and closed land, then pushes out of solids and other tanks. */
 export function moveBy(m: Match, t: Tank, dx: number, dy: number): void {
   const r = t.stats.radius * 0.6;
   const ok = (x: number, y: number): boolean =>
-    isDrivable(m.land, x, y) && isDrivable(m.land, x + r, y) && isDrivable(m.land, x - r, y) && isDrivable(m.land, x, y + r) && isDrivable(m.land, x, y - r);
+    canStand(m, t, x, y) && canStand(m, t, x + r, y) && canStand(m, t, x - r, y) && canStand(m, t, x, y + r) && canStand(m, t, x, y - r);
   if (ok(t.x + dx, t.y + dy)) {
     t.x += dx;
     t.y += dy;
@@ -69,11 +133,20 @@ export function moveBy(m: Match, t: Tank, dx: number, dy: number): void {
   } else if (ok(t.x, t.y + dy)) {
     t.y += dy;
     t.speed *= 0.7;
+  } else if (m.level.def.number > WEDGE_FIX_FROM && !ok(t.x, t.y) && canStand(m, t, t.x + dx, t.y + dy)) {
+    // Wedged half over water (another tank's bump pushed it there): from chapter 3 it may drive out, not stick for good.
+    t.x += dx;
+    t.y += dy;
   } else {
     t.speed *= 0.3;
   }
   collideStructures(m, t);
   if (t.role !== 'boss') collideTanks(m, t);
+  if (m.level.def.number > EDGE_CLAMP_FROM) {
+    const k = t.stats.radius * 0.6 + 1;
+    t.x = Math.min(m.land.width - k, Math.max(k, t.x));
+    t.y = Math.min(m.land.height - k, Math.max(k, t.y));
+  }
 }
 
 function crushes(t: Tank): boolean {
@@ -85,7 +158,7 @@ function collideStructures(m: Match, t: Tank): void {
   const ids = m.grid.query({ x0: t.x - r, y0: t.y - r, x1: t.x + r, y1: t.y + r });
   for (const i of ids) {
     const s = m.structs[i]!;
-    if (s.state === 0 || s.def.cover) continue;
+    if (s.state === 0 || s.def.cover || s.def.crest || s.def.deck || s.def.span) continue;
     const p = pushOut(s.def.shape, s.def.x, s.def.y, t.x, t.y, r * 0.85);
     if (!p) continue;
     if (s.def.flattenable) {
@@ -103,8 +176,10 @@ function collideStructures(m: Match, t: Tank): void {
 function collideTanks(m: Match, t: Tank): void {
   for (const o of m.tanks) {
     if (o === t || !o.alive || o.role === 'bossTurret') continue;
-    const dx = t.x - o.x;
-    const dy = t.y - o.y;
+    // A long body (the train) pushes from the nearest point of its spine.
+    const c = spinePoint(o, t.x, t.y);
+    const dx = t.x - c.x;
+    const dy = t.y - c.y;
     const need = (t.stats.radius + o.stats.radius) * 0.8;
     const d2 = dx * dx + dy * dy;
     if (d2 >= need * need) continue;
@@ -126,8 +201,9 @@ export function breakStructure(m: Match, i: number): void {
   if (s.state === 0) return;
   s.hp = 0;
   s.state = 0;
-  unblock(m.nav, m.land, s.def.id);
+  m.unblockNav(s.def.id);
   m.emit({ kind: 'struct', id: s.def.id, state: 0 });
+  m.structBroke(s);
 }
 
 /** Boss turrets ride on their body. */

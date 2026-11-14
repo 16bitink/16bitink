@@ -47,6 +47,8 @@ export const HUD_CSS = `
 .ikt-hud .gadgetbtn img { width: 44px; height: 44px; image-rendering: pixelated; display: block; margin: 0 auto; }
 .ikt-hud .gadgetbtn b { position: absolute; right: 8px; bottom: 6px; font-size: 15px; color: #f0c040; }
 .ikt-hud .gadgetbtn.off { opacity: 0.4; }
+.ikt-hud .gadget.found img, .ikt-hud .gadgetbtn.found img { filter: drop-shadow(0 0 3px #f0c040) drop-shadow(0 0 1px #f0c040); }
+.ikt-hud .gadgetbtn.found { border-color: #f0c040; }
 .ikt-hud .pops { position: absolute; inset: 0; overflow: hidden; }
 .ikt-hud .pop { position: absolute; left: 0; top: 0; font: 700 18px ui-monospace, Menlo, monospace; color: #f0c040; text-shadow: 0 2px 0 #14110c, 0 0 4px #14110c; white-space: nowrap; }
 .ikt-hud .swap { right: 150px; bottom: 150px; } .ikt-hud .repair { right: 40px; bottom: 210px; width: 64px; height: 64px; font-size: 12px; }

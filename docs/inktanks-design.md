@@ -119,6 +119,8 @@ These are starting numbers. Balance them with a whole-chapter bot-vs-bot simulat
 | Rockets | 0.7 | 1.1 | 1.3 | 0.6 |
 | Mortar | 0.9 | 1.0 | 0.8 | 1.2 |
 | Flamer | 1.1 | 1.0 | 0.9 | 1.3 |
+| Laser (ch4) | 1.0 | 0.95 | 0.85 | 1.2 |
+| Rail (ch5) | 0.9 | 1.0 | 1.15 | 0.85 |
 
 **Tiers:** five, Mk I to Mk V, each +20% on the part's main stat (Mk V is +80%). Main stats: gun damage, hull HP, drive speed. Art shows the tier through plating, rivets, extras and wear; Mk IV and V wear Mk III's art until their own is made.
 
@@ -198,7 +200,13 @@ Code: `src/logic/bots/perception.ts` (sight, hiding, the shot line), `bots/aware
 - **Low cover:** a `low` structure flag. Sandbags (H and V, 120 HP, any gun breaks them), hay bales (60 HP), crates (40 HP, flattenable) and fences. A shot passes over low cover for its first 50 px of flight (about 70 px from the tank's centre); high cover blocks both ways. Levels 1 and 4 have sandbag lines near their objectives.
 - **Bots shoot cover:** one bot per target (COVER_SHOOTERS = 1) shoots breakable cover in the way, aimed where it last saw you, for up to 6 s; the others flank. A bot that loses you behind a wall drives to where it last saw you; it never shoots at where it can't see.
 - **Telegraph:** Cannon and Rockets bots lock their turret and show a thin red aim line for **0.4 s**, then fire along it (it doesn't track you during the hold). This cuts their fire rate a little (a tuning pass follows). Machineguns and the player don't telegraph.
-- **Gadgets:** 2 charges a level, up to 4 from crates (12% of rolled crates that aren't kits hold a charge), one use per 0.6 s, key G or the big phone button. The pick is saved (`SaveData.gadget`, default mines). Mines: arm 1 s, 28 px trigger for enemies only, 90 damage (raw, not through armour), 40 px splash at half to other enemies, broken track ×0.5 for 3 s; only bots that saw it laid steer round it. Oil: 60 px, 8 s, enemies at ×0.4 speed and ×0.35 turning; the player is safe in it. Smoke: 90 px, 6 s, blocks sight both ways and hides a tank inside.
+- **Gadgets:** 2 charges a level (Mk I; tiers below), up to 2 more from crates (12% of rolled crates that aren't kits hold a gadget), one use per 0.6 s, key G or the big phone button. The pick is saved (`SaveData.gadget`, default mines). Mines: arm 1 s, 28 px trigger for enemies only, 90 damage (raw, not through armour), 40 px splash at half to other enemies, broken track ×0.5 for 3 s; only bots that saw it laid steer round it. Oil: 60 px, 8 s, enemies at ×0.4 speed and ×0.35 turning; the player is safe in it. Smoke: 90 px, 6 s, blocks sight both ways and hides a tank inside.
+
+- **Gadget tiers (Nov 14):** every gadget has Mk I–V in the tier colours, opened at the same ranks as part tiers (Sergeant II, Lieutenant III, Major IV, Brigadier V). They're paid for with the gadget's own blueprints (3 / 6 / 10 / 15), earned by using it: 1 per enemy a mine or a burning slick hits (2 if it dies), 1 per enemy that slides into your slick, 1 per enemy that had you in sight when you pop smoke (up to 3), and 1 for a crate charge picked up while full. Kept win or lose. Workshop tab "Gadgets"; the briefing picker shows each gadget's Mk and its rule at that Mk. Numbers in `src/logic/gadgetTiers.ts`:
+  - **Mines:** 90 damage +15 a Mk; one more charge at Mk II and Mk IV (2, 3, 3, 4, 4). Mk III: 36 px trigger (was 28), broken track 5 s. Mk V: each press scatters 3 smaller mines across your track, each at 60% damage.
+  - **Oil:** 60 → 88 px, 8 → 12 s. Mk III: an enemy firing from inside it gets +0.3 rad spread. Mk V: a shot of yours over it sets it alight (a faint orange rim shows it can be lit): it burns 4 s, 16 damage every 0.5 s to enemies in it, then it's gone. Flame art: PixelLab effect "InkTanks burning oil flame" (`world/fx/flame.png`).
+  - **Smoke:** 90 → 125 px, 6 → 10 s. Mk III: you repair 3% of max HP a second inside your own cloud. Mk V: every enemy hunting you loses track when it pops (forgets where it saw you; alert ones go back to ?).
+- **Found gadgets:** half of rolled gadget crates hold a set kind. Your own kind is a charge; another kind is a one-use "found" gadget that takes the button (gold-lit, count 1) until used, then the button is yours again. One found at a time: a second stays on the ground. Found gadgets use your workshop Mk for that kind. Levels can fix a crate to a gadget (`content: { gadget: 'smoke' }`) for a planned moment.
 
 ## Bots
 
@@ -257,6 +265,12 @@ Every level has a short briefing, one **main objective** and two **bonus objecti
 | **Capture** | Take 3 flags and hold them all at once | Enemies try to retake them, so you keep moving |
 | **Chase** | Catch a fleeing courier before it reaches its base | A faster enemy; cut corners, use shortcuts |
 | **Fortress** | Destroy the chapter's boss | Level 10 of every chapter. A huge multi-part tank with breakable turrets; its hull is shielded while any stand. Phase 2 (owner, 2026-11-14: "once you destroy all towers the boss is useless"): the bare hull is enraged and charges you down a telegraphed red lane (1.3 s warning, 70 ramming damage); a charge into a wall dazes it for 3 s and it takes ×1.5 damage. The fight becomes baiting charges into walls |
+
+**Levels mean something end to end** (owner, Nov 14). A finish line is never a bare circle: something in the world acts when you get there.
+- **Salvage:** a cargo helicopter flies in from the nearest map edge once you pick the cargo up, lands on the pad and waits. Drive the cargo under it: it loads (1.5 s), lifts and flies off, and the mission passes when it's away (`objectives/heli.ts`, `render/heliView.ts`, PixelLab body and rotor in `world/fx/heli-*.png`).
+- **Rescue:** a pick-up truck waits at home; the crews climb aboard and it drives off the map with them.
+- **Escort and Breakout:** they end at our base: white cement walls and square cement gun towers with one of our turrets on the roof (Warzone 2100's hardpoints were the owner's reference; our side looks modern, the stone fort reads as ancient). A tower (`LevelDef.allies`, `{ kind: 'tower', at, gun, wake }`) holds fire until you come within `wake` px (650), then shoots enemies in sight with good aim and no warning line. Enemies don't target it and shots fly past it; its base blocks driving only. Cement pieces: `dev/pixel/concrete/build.py` (one wall piece is 64 px: lay runs 63 px apart).
+- New mission types get the same treatment when they're built: a flag is a real flagpole, a recon spot a camp you photograph, a chase ends at the courier's base gate.
 
 Bonus objectives are written per level and shown in the briefing. Examples: destroy 5 tanks, win without a repair kit, finish under 3 minutes, never set off the alarm, keep the truck above half HP, destroy a Heavy with Rockets.
 
@@ -336,9 +350,24 @@ A farm valley. Rival: the Boars. Families in chapter 1: Machinegun, Cannon, Rock
 | 9 | Through the Pass | Breakout | Reach the fort gate in 3 minutes through the guarded pass | Artillery marks, pace |
 | 10 | The Old Fort | Fortress | Destroy the Boar land fortress | The chapter boss, Staff Sergeant |
 
+### Chapters 2–5: biomes, terrain rules and new guns (owner, Nov 14)
+
+Each paid chapter is its own biome with a terrain rule that changes how you drive and fight, a new gun to unlock (and one new drive), a rival clan, and a boss. The biomes are the owner's: desert, swamp, snow, forest. Levels are data (served to owners from `content/paid.ts`), so every rule below lives in the engine and the levels only use it.
+
+| Chapter | Biome | Terrain rule | Weather | New part | Rival | Boss |
+|---|---|---|---|---|---|---|
+| 2 Dust Flats | Desert, canyons, an oil town | Sand: Wheels ×0.7 speed and slide on turns; dunes block sight but not shots over their crest | Sandstorms: every ~40 s a storm rolls over for ~12 s; sight drops to ~180 px for everyone | Mortar: lobbed over walls, 200–520 px, a minimum range | Crows | The Sand Crawler |
+| 3 Mirefen | Swamp, stilt villages | Deep water stops every drive but Hover; mud ×0.8 (Tracks ignore it); reeds hide like bushes | Fog banks: patches that hide tanks inside | Hover drive (crosses water, drifts), Flamer: heat, ignores kinetic armour, sets reeds alight | Weasels | The Ironclad |
+| 4 Frostridge | Snow, a frozen lake | Ice: low grip, tanks keep sliding; deep snow ×0.75 for Wheels; thin ice breaks under Heavy hulls | Blizzards: sight ~200 px and a drift wind | Laser: instant beam, heat | All three clans | The Rail-Gun Train |
+| 5 Deepwood | An old forest and the Hive's logging works | Dense trees block sight and shots; Tracks and Heavies flatten young trees; trails are the fast lanes | Forest fire in some levels: fire spreads tree to tree | Rail: pierces walls, trees and tanks; charge-up shows an aim line | The Iron Hive | The Harvester |
+
+Every chapter keeps the "levels mean something" rule: our depots and forts are white cement with gun towers, cargo goes by helicopter, crews by truck, and each new mission type gets its own set piece (a capture flag is a flagpole that raises our flag, a recon target a camp you photograph, a chase ends at the courier's base gate).
+
+Build order per chapter (docs/agent-orchestration.md): engine and terrain rule, art (ground, structures, the new part's art in Mk I–III, the boss) through the world pipeline, then levels from a kit with the lab, then review and the paid content list.
+
 ### Chapter 2: Dust Flats (paid, draft)
 
-Desert, canyons and an oil town. Rival: the Crows. New: Mortar, the Kit slot, Recon intel. Twist: sandstorms cut vision, dunes slow Wheels.
+Desert, canyons and an oil town. Rival: the Crows. New: Mortar. Twist: sandstorms cut vision, sand slows and slides Wheels.
 
 | Level | Name | Mission | Main objective | Twist |
 |---|---|---|---|---|
@@ -352,6 +381,18 @@ Desert, canyons and an oil town. Rival: the Crows. New: Mortar, the Kit slot, Re
 | 18 | Oil Town Siege | Hold | Defend the town square through 4 waves | Mortar waves |
 | 19 | Crow Prison | Rescue | Free the Ink scouts from the Crow prison | The alarm |
 | 20 | The Sand Crawler | Fortress | Destroy the sand crawler | Boss |
+
+#### As built: the chapter 2 engine (Nov 14)
+
+The engine pass for Dust Flats is done; levels 11 and 14 are built as the worked examples for 12, 13 and 15–20. How to write a chapter 2 level, with measured numbers: [inktanks-level-kit.md](inktanks-level-kit.md), "Chapter 2: Dust Flats".
+- **Mortar** (`match/lob.ts`): the design's numbers (45 every 2.8 s, 200–520 px, 40 px blast). A lob flies over walls, cover and tanks and the whole blast hurts, structures too. The landing spot is a red ring that fills as the shell falls; your own Mortar shows a reticle where it will land (the mouse sets the range, a thumbstick ranges on the enemy it points at). Mortar bots keep about 375 px off, never fire under 200 px, and with no one in sight shell where they last saw you or where a friend sees you (spotters). A stand-in with a Mortar passes 11 and 14 only 2–3 times in 10, because enemies close under its minimum range; it's a support gun, and levels are tuned for the Cannon.
+- **Sand:** Wheels ×0.7 and they slide on turns (grip 0.35 on sand; Half-tracks 0.75, Tracks 1; Grip research raises it).
+- **Sandstorms:** `LevelDef.weather` (`match/weather.ts`): every bot's sight is capped to the storm's (180 px), the player's view is cut by a drifting sand veil (`render/stormView.ts`), the HUD warns 5 s ahead.
+- **Dune crests** (`dune`, `duneV`): block sight, not shots or driving.
+- **Set pieces:** capture flags are flagpoles that run our flag up (theirs when retaken); recon spots are camps photographed with a viewfinder and a flash; a chase can name its base `gate`, which opens as the courier comes.
+- **Bosses:** `BossDef` carries `body` (art), `clan`, `radius` and `armour`, so level 20's Sand Crawler is data; level 10 is unchanged.
+- **Content plumbing:** desert kinds in `src/content/ch2/kinds.ts` (one placeholder art table, `CH2_ART_NAME`), a chapter 2 map (`src/content/ch2/chapterLand.ts`, the map screen switches chapters), levels in `content/ch2/levels/` served by `content/paid.ts`, the lab runs them (`--level 11`, `--all --ch 2`). Chapter 2 bots aim a little better (`CH2_BOTS`). The campaign's chapter names and rivals now match this doc (Dust Flats against the Crows, Mirefen the Weasels, Frostridge all three, Deepwood the Iron Hive). `READY_CHAPTERS` stays 1 until all of 11–20 are built.
+- **Still placeholder art:** the Mortar turret (wears the Cannon's), its icon and blueprint, the desert structures (chapter 1 art), dunes and wells (boxes), the flagpole and flags (code-drawn), the drifting sand (generated), the Crow base gate's open state (shows breached), the Sand Crawler (wears the fortress).
 
 ### Chapter 3: Mirefen (paid, draft)
 
@@ -370,6 +411,20 @@ Swamp and stilt villages. Rival: the Weasels. New: Hover, Flamer. Twist: water e
 | 29 | Last Lock | Ambush | Sink the barge convoy before the lock | Timing on water |
 | 30 | The Ironclad | Fortress | Destroy the paddle-wheel ironclad | Boss |
 
+#### As built: the chapter 3 engine (Nov 14)
+
+The engine pass for Mirefen is done; levels 21 and 23 are built as the worked examples for 22 and 24–30. How to write a chapter 3 level, with measured numbers: [inktanks-level-kit.md](inktanks-level-kit.md), "Chapter 3: Mirefen".
+- **Heat armour:** every hull has heat armour below its kinetic (Light 0, Medium 1, Heavy 2; kinetic unchanged at 3 / 7 / 12). Heat guns meet heat armour, the rest kinetic; chapters 1–2 numbers are unchanged.
+- **Flamer** (`match/flame.ts`): the design's 5 heat a tick, a tick every 0.1 s, a 150 px cone (0.7 rad); 3 s of fuel then 1 s to refill. Each tick burns every tank in the cone that no wall shields, scorches wood, and lights reeds; burning reeds spread to clumps within 85 px, hurt tanks on them and burn out after 5 s. About a Cannon I's killing speed at a third of its range, better against light hulls and Hover. Flamer bots close to about 85 px. The jet and burning reeds are the PixelLab strips in `manifest.effects` (`render/flameView.ts`).
+- **Hover:** the design's 220 / ×0.9 / 3; floats over deep water, ignores mud and shallows, drifts everywhere (grip 0.45). Hover bots steer by their own nav grid (water open), built only when a Hover tank needs it. A level can **issue** parts for itself (level 21 lends you a Hover Mk I for the trial).
+- **Swamp ground:** `swampWater` (deep, like water), `shallows` (like mud), `marsh` (like grass); reeds hide like bushes; boardwalks and jetties are decks over a bridge strip.
+- **Fog banks:** `weather: { kind: 'fog', banks }`, static or drifting to and fro; inside one you're hidden, and no sight line crosses one (`match/fog.ts`, drawn by `render/fogView.ts` from `manifest.overlays.fog`).
+- **Dams and tides:** `LevelDef.floods`: when a structure (a sluice dam) breaks, or at a time (a tide), ground patches are repainted (flood or drain), both nav grids follow, ground tanks in new deep water are washed ashore and the view repaints (`match/flood.ts`).
+- **Water vehicles:** escort `vessel: 'barge'` (our supply barge up a river road), enemy `vessel: 'barge'` (level 29's convoy), and `BossDef.afloat` (level 30's Ironclad: deep water only, so the bank stops its charge like a wall). The Ironclad's art mounts match the fortress's, so level 10's turret offsets fit it.
+- **Content plumbing:** swamp kinds in `src/content/ch3/kinds.ts` (real art; `CH3_ART_NAME`), the chapter 3 map (`src/content/ch3/chapterLand.ts`, a placeholder composed from the swamp kinds), levels in `content/ch3/levels/` served by `content/paid.ts`, the lab runs them (`--level 21`, `--all --ch 3`), chapter 3 bots aim a little better again (`CH3_BOTS`). Capture flags fly the Weasel flag on Weasel levels.
+- **Engine fixes kept out of chapters 1–2:** a tank pushed half over water used to stick for good; from level 21 it drives out (`WEDGE_FIX_FROM`), since level 14 was tuned with storm raiders stuck at the map edge. A ground bot whose goal is out on deep water heads for the nearest bank.
+- **Still placeholder art:** the chapter 3 map (composed, not painted). (Since Nov 14 the barge draws with its own art and a wake, the Ironclad churns a wake under its paddle wheels, bp-flamer and bp-hover are in, and level 29's lock has its gates: `lockGate`, indestructible, across the channel the river leaves by.)
+
 ### Chapter 4: Frostridge (paid, draft)
 
 Snow and a frozen lake. Rival: all three clans, pushed north. New: Laser. Twist: ice skids every drive, blizzards.
@@ -387,22 +442,51 @@ Snow and a frozen lake. Rival: all three clans, pushed north. New: Laser. Twist:
 | 39 | Tracking the Train | Recon | Mark the rail-gun train's 3 depots | Sets up level 40 |
 | 40 | The Rail-Gun Train | Fortress | Destroy the rail-gun train | Boss |
 
-### Chapter 5: Ashfall (paid, draft)
+#### As built: the chapter 4 engine (Nov 14)
 
-Volcanic land and a ruined city. Rival: the Iron Hive, the clans' old masters. New: Rail. Twist: lava vents, collapsing buildings.
+The engine pass for Frostridge is done; levels 31 and 34 are built as the worked examples for 32, 33 and 35–40. How to write a chapter 4 level, with measured numbers: [inktanks-level-kit.md](inktanks-level-kit.md), "Chapter 4: Frostridge".
+- **Ice:** every drive slides on `ice` (grip: Wheels 0.15, Half-tracks 0.22, Tracks 0.3; Hover keeps its drift) and gets up to speed, brakes and turns weakly there (×0.45 acceleration and braking, ×0.75 turning). Deep `snow` slows Wheels ×0.75 and Half-tracks ×0.9; the packed-snow tracks and frozen dirt drive like dirt.
+- **Thin ice** (`match/ice.ts`): a Heavy hull cracks it at once (a warning pop and a crack decal) and goes through after 1.4 s on it. The rule (decided Nov 14): not lost, but 45% of its HP gone and hauled back to firm ground, and the hole stays open water for good. So a Heavy player can blunder once and live, and the hole changes the routes. Heavy hulls steer by their own nav grid with thin ice closed (built only on lands with thin ice); a fall from a recent enemy hit is that enemy's kill.
+- **Laser** (`match/beam.ts`): the design's 35 heat every 0.9 s, 480 px, an instant beam stopped by the first tank or wall on its line (low cover passed close up, as shots); heat against heat armour. Counters: Wheels 1.0, Half-tracks 0.95, Tracks 0.85, Hover 1.2. Laser bots keep about 375 px off and show a 0.4 s aim line before every beam (the only warning an instant gun can give). Mk I–V through parts, save, workshop and blueprints like any family. About a Cannon I's killing speed with no travel time, better against Heavies.
+- **Blizzards:** `weather: { kind: 'blizzard', every, last, sight, wind }` (defaults 45 s, 14 s, 200 px, 30 px/s): sight capped as in a sandstorm, and the wind pushes every moving tank (a parked one holds) and every shell in flight a little sideways (`match/wind.ts`). White veil and the painted driving snow in two layers; HUD warning as for sandstorms.
+- **Set pieces:** snowdrift rescues (the rescue objective on drifts tagged 'drift': "dig out the crews"); avalanches (`LevelDef.avalanches`: a cornice that, shot down, drops dormant snowdrifts across a pass, burying whoever is under them, `match/avalanche.ts`); high ground (`LevelDef.heights`: from a ridge top you see and shoot 1.2× as far, `match/heights.ts`).
+- **The Rail-Gun Train:** `BossDef.rail` (with `length`): the boss moves only along its road, its rail line, end to end and back; shots and bumps meet a capsule as long as the train; in phase 2 it charges down its line at a player by the track, and the buffers at the line's end daze it. Turrets can wear any art (`art: 'fortressRail'`). The train's art (384 frame) mounts on its centre line at body-frame dx 76, 21, −24 and −78.
+- **All three clans:** `LevelDef.mixedClans: true` lets a chapter 4 level (31–40 only) mix Boars, Weasels and Crows; everywhere else the one-faction rule holds.
+- **Content plumbing:** snow kinds in `src/content/ch4/kinds.ts` (real art; `CH4_ART_NAME`), the chapter 4 map (`src/content/ch4/chapterLand.ts`, composed), levels in `content/ch4/levels/` served by `content/paid.ts`, the lab runs them (`--level 31`, `--all --ch 4`), chapter 4 bots aim a little better again (`CH4_BOTS`). Chapters 1–3 measure the same as before (the lab's `--all` lines are unchanged but level 29's, whose lock was rebuilt round the gate art: 7/10 before and after).
+- **Still placeholder art:** the cornice (drawn as a snowdrift), the chapter 4 map (composed, not painted). The thin ice's hole repaints as the plain `water` ground.
+
+### Chapter 5: Deepwood (paid, draft)
+
+An old forest where the Iron Hive, the clans' old masters, is logging the land bare. Rival: the Iron Hive. New: Rail. Twist: dense trees block sight and shots, Tracks and Heavies flatten young trees, and in some levels a forest fire spreads. (Was Ashfall, a volcanic land; the owner's biomes are desert, swamp, snow and forest.)
 
 | Level | Name | Mission | Main objective | Twist |
 |---|---|---|---|---|
-| 41 | Ash Rain | Assault | Clear the city gate | Rail guns pierce walls |
-| 42 | Lava Fields | Breakout | Cross the vents | Vents erupt on a rhythm |
-| 43 | Hive Scouts | Recon | Scout 3 Hive works | Collapsing cover |
-| 44 | Bridges of Fire | Raid | Blow 3 bridges before the column crosses | Timer |
-| 45 | The Last Convoy | Escort | Get the Ink Brigade's convoy into the city | Buildings fall on the road |
-| 46 | Three Clans | Capture | Hold the city's 3 squares | The clans fight each other too |
+| 41 | Into the Pines | Assault | Clear the Hive's logging camp | Rail guns shoot through trees |
+| 42 | Wildfire | Breakout | Get out before the fire closes the trail | The fire spreads tree to tree |
+| 43 | Hive Scouts | Recon | Photograph 3 Hive works | Collapsing timber cover |
+| 44 | Timber Bridges | Raid | Blow 3 log bridges before the column crosses | Timer |
+| 45 | The Last Convoy | Escort | Get the Ink Brigade's convoy to the forest fort | Trees felled across the road |
+| 46 | Three Clans | Capture | Raise our flag on 3 clearings | The clans fight each other too |
 | 47 | Old Rivals | Ace | Destroy Sly, Rook and Grim together | Every counter at once |
 | 48 | Hive Cells | Rescue | Free the clan prisoners | The clans join you |
 | 49 | The Long Night | Hold | Hold the Brigade camp for 3 minutes | Every enemy type |
-| 50 | The Iron Hive | Fortress | Destroy the Iron Hive | The final fortress, General |
+| 50 | The Harvester | Fortress | Destroy the Hive's logging fortress | The final boss, General |
+
+#### As built: the chapter 5 engine (Nov 14)
+
+The engine pass for Deepwood is done; levels 41 and 45 are built as the worked examples for 42–44 and 46–50. How to write a chapter 5 level, with measured numbers: [inktanks-level-kit.md](inktanks-level-kit.md), "Chapter 5: Deepwood".
+- **The Iron Hive** (`clan: 'hive'`): the clans' old masters, hornet crews, stripe colour 0xe0661f (blackened iron, hot orange), capture flags fly `flagHive`. Chapter 5 bots are the sharpest (`CH5_BOTS`: aim error 0.19, decide every 0.38 s, hold fire 24%). `mixedClans` is allowed on 31–50, and **`clanWar`** (41–50, with mixedClans) puts each clan on its own side, so they fight each other too (level 46).
+- **Forest ground:** `forestFloor` (Wheels ×0.85, Half-tracks ×0.93, Tracks and Hover ×1, nav cost 3), `forestTrail`/`forestTrailH` (the fast lanes), `clearing` (like dirt). Appended to GROUNDS; chapters 1–4 unchanged.
+- **Trees (the rule, decided Nov 14):** an old tree's trunk blocks driving; its **canopy** (a circle round the trunk, 28 px oldTree, 25 oldFir) blocks sight and shots, and the shot hits the tree (420 HP). The canopy sits just inside where a tank touching the trunk stands, so no tank is ever under one. Young trees are **thickets**: Tracks and Heavies flatten them (chapter 1's flattening rule, unchanged), every other drive goes round (the nav grid closes them), and their small canopy blocks sight and shots. Undergrowth hides like a bush; fallen logs are low cover that any gun saws through. Cheap: a canopy test is a point–segment distance.
+- **Rail** (`match/railgun.ts`): the design's 90 every 3 s, 640 px, weight 6, kinetic. A pull starts a 0.8 s charge, the aim locked and drawn as an aim line (the warning, for every Rail); then the slug goes through every tank on its line (full damage each) and every wall, tree and log (half), stopping only at natural rock. Counters: Wheels 0.9, Half-tracks 1.0, Tracks 1.15, Hover 0.85. Rail bots keep about 450 px off and, alert, fire through the trees at where they last saw you or where a friend sees you; the stand-in steps off a charge line it's on. Mk I–V through parts, save, workshop and blueprints. Rail I kills about as fast as Cannon I, through cover; the stand-in fares badly with Rail I (fighting at sight range), well with Rail III: a player's choice, levels are tuned for the Cannon.
+- **Forest fire** (`LevelDef.fire`, `match/forestFire.ts`): trees and undergrowth burn. A level's fire starts at its places at `at` s and runs tree to tree (a tree burns 14 s, lights everything burnable within 120 px after 3 s, hurts tanks under its canopy, closes the nav grids round itself while it burns, then is a charred snag that blocks nothing). Flamers light trees too; their fires die out after 3 trees. Bounded: every tree burns once, a chain stops after `hops` (60). `effects.treeFire` on the canopy.
+- **Log bridges** (`match/spans.ts`): logBridge/V are spans: driven over, low cover; blown, the bridge strip under them turns to water for good. A raid with `column: true` fails if the convoy-role column reaches its road's end first (level 44).
+- **Convoys and felled trees:** escort `trucks` (a convoy, lose any and it fails) and `clear` (a tag on felled trees across the road: the trucks stop until you saw through; the stand-in shoots the next one ahead) (level 45).
+- **Several aces** (level 47): the ace objective needs every ace. **Friends** (`LevelDef.friends`, level 48 "the clans join you"): clan tanks on your side that follow you and fight; with `join` they drive out when a cage or pen breaks.
+- **The Harvester:** `BossDef.body: 'harvester'` (320 px frame, drawn at the bosses' 0.7 scale; turret offsets cannons (30, ∓34), rail (−28, 0), mg (59, 0)); a `rail` turret wears `fortressRail`.
+- **Engine fixes kept out of chapters 1–4:** from level 41 tanks are kept on the map after collisions (`EDGE_CLAMP_FROM`). Chapters 1–4 measure the same as before (the lab's `--all` lines, 10 seeds, are identical for every level 1–40).
+- **Content plumbing:** forest kinds in `src/content/ch5/kinds.ts` (real art; `CH5_ART_NAME`, now `ALL_KINDS`), the chapter 5 map (`src/content/ch5/chapterLand.ts`, composed), levels in `content/ch5/levels/` served by `content/paid.ts`, the lab runs them (`--level 41`, `--all --ch 5`; typical tank `cannon3/medium3/halftracks2`).
+- **Still placeholder art:** the Rail's slug trail is code-drawn (no effect strip); the chapter 5 map is composed, not painted; the fallen log's sawn state reuses the art's state 0 for every break (shot or sawn).
 
 ## Controls
 

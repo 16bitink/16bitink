@@ -23,10 +23,11 @@ export interface ChapterInfo {
 
 const NAMES: readonly (readonly [string, string])[] = [
   ['Meadowlands', 'the Boars'],
-  ['Dust Flats', 'the Weasels'],
-  ['Mirefen', 'the Crows'],
-  ['Frostridge', 'the Boars'],
-  ['Ashfall', 'every clan'],
+  // The design doc's chapters (owner, Nov 14: desert, swamp, snow, forest).
+  ['Dust Flats', 'the Crows'],
+  ['Mirefen', 'the Weasels'],
+  ['Frostridge', 'all three clans'],
+  ['Deepwood', 'the Iron Hive'],
 ];
 
 export const CHAPTERS: readonly ChapterInfo[] = NAMES.map(([name, rival], index) => ({

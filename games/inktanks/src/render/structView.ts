@@ -1,5 +1,5 @@
 import type Phaser from 'phaser';
-import { KINDS } from '../content/ch1/kinds';
+import { ALL_KINDS as KINDS } from '../content/kinds';
 import type { StructRt } from '../logic/match/types';
 import { footDepth } from './tankView';
 import { artState, piecesFor, WORLD_URLS, worldKey, worldStructure } from './worldArt';
@@ -51,7 +51,8 @@ export class StructLayer {
     const y0 = view.y - NEAR / 2;
     const y1 = view.bottom + NEAR / 2;
     this.structs.forEach((s, i) => {
-      const near = s.def.x > x0 && s.def.x < x1 && s.def.y > y0 && s.def.y < y1;
+      // An avalanche's drifts aren't there until they fall (chapter 4).
+      const near = !s.dormant && s.def.x > x0 && s.def.x < x1 && s.def.y > y0 && s.def.y < y1;
       const v = this.views.get(i);
       if (!near) {
         if (v) this.drop(i, v);

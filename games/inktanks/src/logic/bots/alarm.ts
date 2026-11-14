@@ -6,9 +6,9 @@ import { makeAlert } from './awareness';
 import { ALARM_RADIUS, ALERT_TIME } from './difficulty';
 
 /** Roles that raise the alarm when they see you or are hit: posted and patrolling troops. */
-export const RAISES_ALARM: ReadonlySet<BotRole | 'player'> = new Set<BotRole | 'player'>(['guard', 'patrol', 'turret']);
+export const RAISES_ALARM: ReadonlySet<BotRole | 'player' | 'ally'> = new Set<BotRole | 'player' | 'ally'>(['guard', 'patrol', 'turret']);
 /** Roles that answer it. */
-const ANSWERS: ReadonlySet<BotRole | 'player'> = new Set<BotRole | 'player'>(['guard', 'patrol']);
+const ANSWERS: ReadonlySet<BotRole | 'player' | 'ally'> = new Set<BotRole | 'player' | 'ally'>(['guard', 'patrol']);
 
 export interface AlarmState {
   /** When it first went off (null: never; the "never set off the alarm" bonus). */

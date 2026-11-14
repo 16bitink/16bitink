@@ -1,4 +1,4 @@
-import { CH1_LEVELS, ch1Level } from '../content/ch1/levels';
+import { chapterLevels, labLevel } from './levels';
 import { sumIntel } from '../logic/intel';
 import type { LoadedLevel } from '../logic/level/load';
 import { parseTank } from '../logic/level/load';
@@ -22,6 +22,7 @@ import { runMission, type RunResult } from './runMission';
  *   lab -- --map 3                   only the map
  *   lab -- --all --seeds 10          one summary line per level
  *   lab -- --chapter --seeds 3       the whole-chapter no-grind check
+ *   lab -- --all --ch 2              chapter 2's levels (paid, from content/paid.ts); --chapter --ch 2 too; --ch 3, --ch 4, --ch 5 likewise
  * The player's seat is a bot ("a decent casual player"); its default tank
  * per level is what the chapter run fits by then (TYPICAL_TANK).
  */
@@ -36,6 +37,8 @@ export interface LabArgs {
   mapOnly: boolean;
   all: boolean;
   chapter: boolean;
+  /** Which chapter --all and --chapter run (default 1). */
+  ch: number;
 }
 
 /** The tank the chapter run has fitted when it reaches each level (measured with --chapter, Nov 14; re-measure after big changes). */
@@ -50,12 +53,23 @@ export const TYPICAL_TANK: Readonly<Record<number, string>> = {
   8: 'cannon1/medium1/wheels2',
   9: 'cannon1/medium1/wheels2',
   10: 'cannon1/medium1/wheels2',
+  // Chapter 2: what the chapter 1 run ends on (Staff Sergeant, Nov 14: Medium II and Wheels II, Cannon I).
+  // Wheels are slow on sand: try --tank cannon1/medium2/halftracks1 or tracks2 too.
+  ...Object.fromEntries(Array.from({ length: 10 }, (_, i) => [11 + i, 'cannon1/medium2/wheels2'])),
+  // Chapter 3: a step on from chapter 2's (a Lieutenant by now: Cannon II, Medium II, Half-tracks II). A level's `issue` goes over it (level 21's Hover).
+  ...Object.fromEntries(Array.from({ length: 10 }, (_, i) => [21 + i, 'cannon2/medium2/halftracks2'])),
+  // Chapter 4: a step on again (a Captain: Cannon III, Medium II, Half-tracks II). Also try a Laser (laser1/medium2/halftracks2)
+  // and a Heavy (cannon2/heavy1/tracks2: thin ice won't carry it).
+  ...Object.fromEntries(Array.from({ length: 10 }, (_, i) => [31 + i, 'cannon3/medium2/halftracks2'])),
+  // Chapter 5: a step on again (a Major: Medium III over Captain's Medium II). Also try a Rail (rail1/medium3/halftracks2)
+  // and Tracks (cannon3/medium3/tracks2: they plough through young thickets and don't mind the forest floor).
+  ...Object.fromEntries(Array.from({ length: 10 }, (_, i) => [41 + i, 'cannon3/medium3/halftracks2'])),
 };
 /** Repair kits the chapter run carries by then (a Corporal carries 2). */
 const TYPICAL_KITS = (level: number): number => (level >= 3 ? 2 : 1);
 
 export function parseArgs(argv: readonly string[]): LabArgs {
-  const a: LabArgs = { level: null, seeds: 10, seed: 1, tank: null, kits: null, gadget: 'mines', map: true, mapOnly: false, all: false, chapter: false };
+  const a: LabArgs = { level: null, seeds: 10, seed: 1, tank: null, kits: null, gadget: 'mines', map: true, mapOnly: false, all: false, chapter: false, ch: 1 };
   for (let i = 0; i < argv.length; i++) {
     const k = argv[i]!;
     const v = argv[i + 1];
@@ -66,6 +80,7 @@ export function parseArgs(argv: readonly string[]): LabArgs {
     else if (k === '--seed' && Number.isFinite(n)) a.seed = n;
     else if (k === '--kits' && Number.isFinite(n)) a.kits = n;
     else if (k === '--tank' && v) a.tank = v;
+    else if (k === '--ch' && Number.isFinite(n)) a.ch = n;
     else if (k === '--gadget' && v) {
       if (v !== 'none' && !(GADGETS as readonly string[]).includes(v)) throw new Error(`lab: --gadget ${v}: want ${GADGETS.join(', ')} or none`);
       a.gadget = v === 'none' ? null : (v as GadgetKind);
@@ -77,7 +92,7 @@ export function parseArgs(argv: readonly string[]): LabArgs {
     if (!k.startsWith('--no') && k !== '--all' && k !== '--chapter') i++;
   }
   if (!a.all && !a.chapter && a.level === null) throw new Error('lab: give --level N, --map N, --all or --chapter');
-  if (a.level !== null) ch1Level(a.level);
+  if (a.level !== null) labLevel(a.level);
   if (a.tank) parseTank(a.tank);
   return a;
 }
@@ -122,7 +137,7 @@ export function summaryLine(level: LoadedLevel, results: readonly RunResult[]): 
 }
 
 export function levelReport(a: LabArgs): string {
-  const level = ch1Level(a.level!);
+  const level = labLevel(a.level!);
   const d = level.def;
   const lines: string[] = [];
   if (a.map || a.mapOnly) lines.push(`Level ${d.number} ${d.name}: ${d.map.cols}×${d.map.rows} screens, ${d.type}`, asciiMap(level), MAP_LEGEND, '');
@@ -141,9 +156,9 @@ export function chapterReport(a: LabArgs): string {
   const lines: string[] = [];
   let ok = 0;
   for (let s = 0; s < a.seeds; s++) {
-    const r = runChapter(CH1_LEVELS, a.seed + s);
+    const r = runChapter(chapterLevels(a.ch), a.seed + s);
     if (r.verdict.ok) ok++;
-    lines.push(`Chapter 1, seed ${a.seed + s}`);
+    lines.push(`Chapter ${a.ch}, seed ${a.seed + s}`);
     lines.push('  lv name                 tries  medals  XP    rank            intel  tank at start                   ends');
     for (const row of r.rows) {
       const medals = row.outcome.done.map((x) => (x ? 'x' : '.')).join('');
@@ -159,7 +174,7 @@ export function chapterReport(a: LabArgs): string {
 }
 
 export function allReport(a: LabArgs): string {
-  return CH1_LEVELS.map((level) => summaryLine(level, runs(level, a).results)).join('\n');
+  return chapterLevels(a.ch).map((level) => summaryLine(level, runs(level, a).results)).join('\n');
 }
 
 export function main(argv: readonly string[]): string {

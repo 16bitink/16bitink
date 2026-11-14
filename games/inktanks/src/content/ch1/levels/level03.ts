@@ -11,7 +11,7 @@ const ROAD = [at(0.2, 1.5), at(0.9, 1.45), at(1.4, 1.1), at(2.0, 1.0), at(2.6, 1
 
 export const LEVEL_03: LevelDef = {
   id: 'ch1-03', number: 3, name: 'Milk Run', type: 'escort',
-  briefing: 'The village needs supplies. Bring the truck down the road; it only drives while you stay close. Boars hide under the roofs.',
+  briefing: 'Our depot past the village needs supplies. Bring the truck down the road; it only drives while you stay close. Boars hide under the roofs; the depot’s gun towers cover you once you’re in sight.',
   teaches: 'Protecting, roofs, close fights',
   map: {
     cols: 4, rows: 2, base: 'grass',
@@ -23,7 +23,11 @@ export const LEVEL_03: LevelDef = {
       ...each('oak', [[1500, 200], [1650, 160], [1850, 220], [2050, 180], [2800, 160], [2950, 220]]),
       { kind: 'crops', x: 2400, y: 420 }, { kind: 'crops', x: 2650, y: 640 },
       { kind: 'houseA', x: 3250, y: 560 }, { kind: 'houseB', x: 3450, y: 470 }, { kind: 'houseA', x: 3600, y: 880 }, { kind: 'houseB', x: 3320, y: 920 },
-      { kind: 'shed', x: 3700, y: 560 }, ...row('wallBrick', 3050, 760, 2, 130), { kind: 'wallBrickV', x: 3780, y: 300 },
+      { kind: 'shed', x: 3700, y: 560 }, ...row('wallBrick', 3050, 760, 2, 130),
+      // Our depot at the end of the road: a cement compound, its two gun towers either side of the gate.
+      // (one wall piece is 64 px: runs are laid 63 px apart)
+      ...row('cementWall', 3280, 300, 3, 63), ...row('cementWall', 3480, 110, 5, 63),
+      ...row('cementWallV', 3470, 245, 2, 0, -63), ...row('cementWallV', 3740, 272, 3, 0, -63),
       ...each('rockA', [[2900, 1000], [700, 900], [2200, 1000 + 20]]),
     ],
     points: { house1: { x: 3250, y: 650 }, house2: { x: 3450, y: 560 }, house3: { x: 3560, y: 980 }, yard: { x: 3700, y: 700 }, hillW: { x: 1500, y: 60 }, hillE: { x: 2700, y: 60 }, mid: { x: 2200, y: 600 } },
@@ -40,6 +44,7 @@ export const LEVEL_03: LevelDef = {
     { role: 'wave', clan: 'boars', tank: TANK.scout, at: 'hillE', when: 75 },
     { role: 'wave', clan: 'boars', tank: TANK.scout, at: 'hillE', when: 80 },
   ],
+  allies: [{ kind: 'tower', at: { x: 3470, y: 300 }, gun: 'cannon' }, { kind: 'tower', at: { x: 3740, y: 330 }, gun: 'machinegun' }],
   crates: [{ at: { x: 1000, y: 1250 - 300 } }, { at: { x: 1650, y: 1000 } }, { at: { x: 2550, y: 200 }, content: 'kit' }, { at: { x: 3100, y: 1000 } }, { at: { x: 600, y: 650 } }],
   objective: { kind: 'escort', road: 'truck', truckHp: 1400, speed: 32 },
   bonus: [{ kind: 'truckHp', min: 0.5 }, { kind: 'kills', n: 6 }],

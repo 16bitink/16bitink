@@ -150,6 +150,7 @@ export class Controls {
     const r = this.pull(this.right);
     const move: TankInput['move'] = l ? { kind: 'point', angle: l.angle, mag: l.mag } : null;
     let aim: number | null = null;
+    let aimDist: number | null = null;
     let fire = false;
     if (r) {
       aim = r.angle;
@@ -157,12 +158,14 @@ export class Controls {
     } else if (this.mouse && !this.touchUsed) {
       const w = this.toWorld(this.mouse.x, this.mouse.y);
       aim = Math.atan2(w.y - tank.y, w.x - tank.x);
+      // A lobbed gun (the Mortar) lands its shell under the cursor.
+      aimDist = Math.hypot(w.y - tank.y, w.x - tank.x);
       fire = this.mouseDown;
     }
     const repair = this.repairPressed;
     const gadget = this.gadgetPressed;
     this.repairPressed = false;
     this.gadgetPressed = false;
-    return { move, aim, fire, swap: this.swapHeld || k.has('e'), repair, gadget };
+    return { move, aim, aimDist, fire, swap: this.swapHeld || k.has('e'), repair, gadget };
   }
 }

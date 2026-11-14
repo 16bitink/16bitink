@@ -1,4 +1,4 @@
-import { KINDS } from './ch1/kinds';
+import { ALL_KINDS as KINDS } from './kinds';
 import { CH1_LEVELS } from './ch1/levels';
 import { FREE_LEVELS, TOTAL_LEVELS } from '../logic/campaign';
 import { loadLevel, type LoadedLevel } from '../logic/level/load';

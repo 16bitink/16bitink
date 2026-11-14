@@ -1,0 +1,22 @@
+{
+ "muzzle": {
+  "turretMortar-mk1": [
+   [
+    0.0,
+    -12.3
+   ]
+  ],
+  "turretMortar-mk2": [
+   [
+    0.0,
+    -12.8
+   ]
+  ],
+  "turretMortar-mk3": [
+   [
+    0.0,
+    -14.0
+   ]
+  ]
+ }
+}

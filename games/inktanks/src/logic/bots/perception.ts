@@ -1,6 +1,8 @@
 import { damageTaken } from '../damage';
 import { pointInShape, segmentHits } from '../geom';
+import { lineCrosses } from '../land';
 import { inSmoke, smokeBlocks } from '../match/gadgets';
+import { fogBlocks, inFog } from '../match/fog';
 import type { Match } from '../match/match';
 import type { StructRt, Tank } from '../match/types';
 import { dps } from '../stats';
@@ -19,14 +21,16 @@ export const LOW_PASS = 50;
 /** From a tank's centre to its muzzle, roughly (shots start there). */
 const MUZZLE = 20;
 
-/** Hidden: in a bush, crops, under a roof or in smoke, and not firing lately. Carrying the prototype never hides. */
+/** Hidden: in a bush, reeds, crops, under a roof, in smoke or fog, and not firing lately. Carrying the prototype never hides. */
 export function hidden(m: Match, t: Tank): boolean {
   if (t.carrying || m.t - t.firedAt < REVEAL) return false;
   if (inSmoke(m.gadgets, t.x, t.y, m.t)) return true;
+  if (m.fogNow.length > 0 && inFog(m.fogNow, t.x, t.y)) return true;
   const ids = m.grid.query({ x0: t.x - 1, y0: t.y - 1, x1: t.x + 1, y1: t.y + 1 });
   for (const i of ids) {
     const s = m.structs[i]!;
-    if (s.state === 0 || !(s.def.cover || s.def.roof)) continue;
+    // Burning reeds hide no one.
+    if (s.state === 0 || !(s.def.cover || s.def.roof) || (s.def.burns && m.fires.burning.has(i))) continue;
     if (pointInShape(s.def.shape, s.def.x, s.def.y, t.x, t.y)) return true;
   }
   return false;
@@ -36,16 +40,17 @@ export function enemies(m: Match, me: Tank): Tank[] {
   return m.tanks.filter((o) => o.alive && o.team !== me.team);
 }
 
-/** Blocks sight: standing structures that aren't cover, low or flattenable (walls, buildings, rocks, gates). */
-const blocksSight = (s: StructRt): boolean => s.state !== 0 && !s.def.cover && !s.def.low && !s.def.flattenable;
+/** Blocks sight: standing structures that aren't cover, low or flattenable (walls, buildings, rocks, gates, dune crests), and trees' canopies (chapter 5). */
+const blocksSight = (s: StructRt): boolean => s.state !== 0 && (s.def.canopy !== undefined || (!s.def.cover && !s.def.low && !s.def.flattenable && !s.def.perch && !s.def.deck));
 
-/** Nothing solid and no smoke between a and b. */
+/** Nothing solid, no smoke and no fog bank between a and b. */
 export function sightClear(m: Match, ax: number, ay: number, bx: number, by: number): boolean {
   if (smokeBlocks(m.gadgets, ax, ay, bx, by, m.t)) return false;
+  if (m.fogNow.length > 0 && fogBlocks(m.fogNow, ax, ay, bx, by)) return false;
   const ids = m.grid.query({ x0: Math.min(ax, bx), y0: Math.min(ay, by), x1: Math.max(ax, bx), y1: Math.max(ay, by) });
   for (const i of ids) {
     const s = m.structs[i]!;
-    if (blocksSight(s) && segmentHits(s.def.shape, s.def.x, s.def.y, ax, ay, bx, by)) return false;
+    if (blocksSight(s) && lineCrosses(s.def, ax, ay, bx, by)) return false;
   }
   return true;
 }
@@ -89,7 +94,8 @@ export function odds(me: Tank, o: Tank): number {
  * The first structure a shot from a (a tank's centre) to b would hit, or
  * null: the shot rule in combat.ts. Cover (bushes) never stops a shot,
  * low cover only past the shot's first LOW_PASS px, and small flattenable
- * trees are shot through (they break). `ignore`: a target structure.
+ * trees are shot through (they break); a tree's canopy (chapter 5) stops it,
+ * young trees' too. `ignore`: a target structure.
  */
 export function shotBlocker(m: Match, ax: number, ay: number, bx: number, by: number, ignore: string | null = null): StructRt | null {
   const len = Math.hypot(bx - ax, by - ay) || 1;
@@ -103,8 +109,10 @@ export function shotBlocker(m: Match, ax: number, ay: number, bx: number, by: nu
   let bestK = Infinity;
   for (const i of ids) {
     const s = m.structs[i]!;
-    if (s.state === 0 || s.def.cover || s.def.id === ignore || (s.def.flattenable && !s.def.low)) continue;
-    const hits = s.def.low ? pass < len && segmentHits(s.def.shape, s.def.x, s.def.y, px, py, bx, by) : segmentHits(s.def.shape, s.def.x, s.def.y, ax, ay, bx, by);
+    if (s.state === 0 || s.def.cover || s.def.perch || s.def.crest || s.def.deck || s.def.id === ignore || (s.def.flattenable && !s.def.low && !s.def.canopy)) continue;
+    // A log bridge (chapter 5) is low cover, but not for a tank standing on it.
+    if (s.def.span && pointInShape(s.def.shape, s.def.x, s.def.y, ax, ay)) continue;
+    const hits = s.def.low ? pass < len && segmentHits(s.def.shape, s.def.x, s.def.y, px, py, bx, by) : lineCrosses(s.def, ax, ay, bx, by);
     if (!hits) continue;
     const k = (s.def.x - ax) * ux + (s.def.y - ay) * uy;
     if (k < bestK) {

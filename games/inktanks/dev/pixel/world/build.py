@@ -22,6 +22,11 @@ from render3d import SUN, ShadowMap, blur, render, shrink  # noqa: E402
 import farm  # noqa: E402,F401
 import props  # noqa: E402,F401
 import cover  # noqa: E402,F401
+import desert  # noqa: E402,F401
+import desert2  # noqa: E402,F401
+import swamp  # noqa: E402,F401
+import snow  # noqa: E402,F401
+import forest  # noqa: E402,F401
 from farm import REGISTRY  # noqa: E402
 
 HERE = Path(__file__).resolve().parent

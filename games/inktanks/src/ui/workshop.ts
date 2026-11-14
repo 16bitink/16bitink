@@ -1,11 +1,15 @@
-import { damageTaken } from '../logic/damage';
-import { DRIVE_FAMILIES, familyName, GUN_FAMILIES, HULL_FAMILIES, MAX_MK, MK_COLOUR, roman, slotOf, withPart, type Family, type Slot } from '../logic/parts';
+import { armourAgainst, damageTaken } from '../logic/damage';
+import { DRIVE_FAMILIES, FAMILY_CHAPTER, familyName, GUN_FAMILIES, HULL_FAMILIES, HULLS, MAX_MK, MK_COLOUR, roman, slotOf, withPart, type Family, type Slot } from '../logic/parts';
 import { perksOf, rankOf, RANKS } from '../logic/rank';
 import { bpAmount } from './blueprint';
 import { fireRate, RESEARCH_MAX, RESEARCH_STEP, researchSteps, tankStats, type ResearchLine } from '../logic/stats';
-import { fit, LINES_BY_SLOT, MK_COST, MK_RANK, ownedPart, type NextMk, raiseMk, research, researchCost, UNLOCK_COST, unlock, type Progress, type Result } from '../logic/workshop';
+import { fit, GADGET_MK_COST, gadgetMkOf, LINES_BY_SLOT, MK_COST, MK_RANK, ownedPart, type NextMk, raiseGadget, raiseMk, research, researchCost, UNLOCK_COST, unlock, type Progress, type Result } from '../logic/workshop';
+import { gadgetText, nextTierText } from '../logic/gadgetTiers';
+import { GADGET_NAME } from '../logic/match/gadgets';
+import { GADGETS, type GadgetKind } from '../logic/match/types';
+import { gadgetIconUrl } from '../scenes/mission/hud';
 import { esc, render } from './dom';
-import { mkChip, partIcon, tankCanvas } from './tankArt';
+import { mkBadge, mkChip, partIcon, tankCanvas } from './tankArt';
 import { rankLine } from './rankArt';
 
 /**
@@ -24,6 +28,11 @@ const rankName = (id: string): string => RANKS.find((r) => r.id === id)?.name ??
 const famName = familyName;
 const PCT = Math.round(RESEARCH_STEP * 100);
 
+type Tab = Slot | 'gadgets';
+
+/** A later chapter's family (the Mortar) shows once you've found its blueprints, not as a locked card from the start. */
+const listed = (p: Progress, f: Family): boolean => !FAMILY_CHAPTER[f] || p.unlocked.includes(f) || (p.intelTotal[f] ?? 0) > 0;
+
 export interface WorkshopActions {
   readonly change: (p: Progress) => void;
   readonly back: () => void;
@@ -32,7 +41,7 @@ export interface WorkshopActions {
 
 export function showWorkshop(root: HTMLElement, start: Progress, a: WorkshopActions): void {
   let p = start;
-  let tab: Slot = 'gun';
+  let tab: Tab = 'gun';
   let note = '';
   // Only the first draw rises in; a redraw after a click (even a refused one) swaps in place, keeping the scroll.
   let first = true;
@@ -51,7 +60,7 @@ export function showWorkshop(root: HTMLElement, start: Progress, a: WorkshopActi
     render(root, 'dark', html(p, tab, note, a.backLabel, first), {
       back: a.back,
       tab: (el) => {
-        tab = el.dataset.slot as Slot;
+        tab = el.dataset.slot as Tab;
         note = '';
         draw();
       },
@@ -67,6 +76,11 @@ export function showWorkshop(root: HTMLElement, start: Progress, a: WorkshopActi
         const f = el.dataset.f as Family;
         apply(fit(p, withPart(p.loadout, ownedPart(p, f) ?? { family: f, mk: 1 })), `${famName(f)} fitted`);
       },
+      gmk: (el) => {
+        const g = el.dataset.g as GadgetKind;
+        const r = raiseGadget(p, g);
+        apply(r, `${GADGET_NAME[g]} raised to Mk ${roman(r.ok ? gadgetMkOf(r.progress, g) : 1)}`);
+      },
       research: (el) => apply(research(p, el.dataset.f as Family, el.dataset.line as ResearchLine), `${LINE_NAMES[el.dataset.line as ResearchLine]} researched`),
     });
     root.querySelector('.pic')!.appendChild(tankCanvas(p.loadout, innerHeight > 560 ? 2 : 1));
@@ -78,19 +92,20 @@ export function showWorkshop(root: HTMLElement, start: Progress, a: WorkshopActi
 
 function statsHtml(p: Progress): string {
   const s = tankStats(p.loadout, p.research);
-  const dps = damageTaken(s.gun.damage, s.gun.family, 'halftracks', 7) * s.gun.shots * fireRate(s.gun);
+  const dps = damageTaken(s.gun.damage, s.gun.family, 'halftracks', armourAgainst(HULLS.medium, s.gun.family)) * s.gun.shots * fireRate(s.gun);
   const rows: [string, number][] = [['HP', s.maxHp], ['Speed', s.speed], ['Damage/s', dps], ['Range', s.gun.range]];
   return rows.map(([k, v]) => `<span class="dimt">${k}</span><span>${Math.round(v)}</span>`).join('');
 }
 
-function html(p: Progress, tab: Slot, note: string, backLabel: string, rise: boolean): string {
+function html(p: Progress, tab: Tab, note: string, backLabel: string, rise: boolean): string {
   const rank = rankOf(p.xp);
-  const tabs = SLOTS.map((s) => `<button class="btn small${s.slot === tab ? ' gold' : ''}" data-act="tab" data-slot="${s.slot}">${s.name}: ${esc(famName(p.loadout[s.slot].family))}</button>`).join('');
-  const cards = SLOTS.find((s) => s.slot === tab)!.families.map((f) => famCard(p, f)).join('');
+  const tabs = SLOTS.map((s) => `<button class="btn small${s.slot === tab ? ' gold' : ''}" data-act="tab" data-slot="${s.slot}">${s.name}: ${esc(famName(p.loadout[s.slot].family))}</button>`).join('')
+    + `<button class="btn small${tab === 'gadgets' ? ' gold' : ''}" data-act="tab" data-slot="gadgets">Gadgets</button>`;
+  const cards = tab === 'gadgets' ? GADGETS.map((g) => gadgetCard(p, g)).join('') : SLOTS.find((s) => s.slot === tab)!.families.filter((f) => listed(p, f)).map((f) => famCard(p, f)).join('');
   return `
     <div class="panel sheet${rise ? ' rise' : ''}">
       <div class="row spread"><span class="t36 gold">Workshop</span>${rankLine(rank, ` <span class="t12 dimt">${p.xp} XP</span>`)}<button class="btn small" data-act="back">${esc(backLabel)}</button></div>
-      <div class="explain">Destroy enemy tanks to collect blueprints of their parts, then spend them here to upgrade yours. Each part has its own blueprints.</div>
+      <div class="explain">${tab === 'gadgets' ? 'Gadgets earn their own blueprints: each enemy you hit with one, and spare charges from crates when you’re full.' : 'Destroy enemy tanks to collect blueprints of their parts, then spend them here to upgrade yours. Each part has its own blueprints.'}</div>
       <div class="cols">
         <div class="col" style="flex:0 0 auto;align-items:center"><div class="pic"></div><div class="intelrow t12">${statsHtml(p)}</div></div>
         <div class="col" style="flex:1 1 auto">
@@ -141,6 +156,42 @@ function famCard(p: Progress, f: Family): string {
     <div class="famhead">${esc(famName(f))}${unlocked ? ` <span class="t12" style="color:${MK_COLOUR[mk].light}">Mk ${roman(mk)}</span>` : ' <span class="t12 dimt">locked</span>'}${fitted ? ' <span class="t12 green">fitted</span>' : ''}</div>
     <div class="bpline"><span class="t12">${esc(famName(f))} blueprints:</span><span class="big">${bpAmount(have, false, f)}</span></div>
     <div class="bar wide"><i style="width:${Math.round(share * 100)}%"></i></div>
+    <div class="acts">${acts.join('')}</div>
+  </div>`;
+}
+
+/** A gadget's blueprints as "[icon] 5": its own icon, since gadgets have no blueprint sheet. */
+const gadgetBp = (g: GadgetKind, n: number): string => {
+  const url = gadgetIconUrl(g);
+  return `<span class="bpn">${url ? `<img class="bp" src="${url}" alt="">` : ''} ${n}</span>`;
+};
+
+function gadgetCard(p: Progress, g: GadgetKind): string {
+  const have = p.gadgetIntel[g] ?? 0;
+  const mk = gadgetMkOf(p, g);
+  const url = gadgetIconUrl(g);
+  const acts: string[] = [];
+  let goal = GADGET_MK_COST[2];
+  let nextLine = '';
+  if (mk < MAX_MK) {
+    const next = (mk + 1) as NextMk;
+    const cost = GADGET_MK_COST[next];
+    goal = cost;
+    nextLine = `<div class="t12 grule">Next: ${mkBadge(next)} ${esc(nextTierText(g, next))}</div>`;
+    const attrs = `data-act="gmk" data-g="${g}"`;
+    const label = `${mkChip(next)} ${gadgetBp(g, cost)}`;
+    if (perksOf(p.xp).maxMk < next) acts.push(`<button class="btn small dim" ${attrs} data-blocked="1"><span>${label}</span><span class="why2"><i class="lock"></i>needs ${esc(rankName(MK_RANK[next]))}</span></button>`);
+    else if (have < cost) acts.push(`<button class="btn small dim" ${attrs}><span>${label}</span><span class="why2">need ${cost - have} more</span></button>`);
+    else acts.push(`<button class="btn small gold" ${attrs}><span>${label}</span></button>`);
+  } else acts.push('<button class="btn small dim" disabled><span>Top tier</span></button>');
+  const share = mk >= MAX_MK ? 1 : Math.min(1, have / goal);
+  return `<div class="fam">
+    <span class="ic">${url ? `<img src="${url}" alt="">` : g.slice(0, 3)}${mkBadge(mk)}</span>
+    <div class="famhead">${esc(GADGET_NAME[g])} <span class="t12" style="color:${MK_COLOUR[mk].light}">Mk ${roman(mk)}</span></div>
+    <div class="t12 dimt grule">${esc(gadgetText(g, mk))}</div>
+    <div class="bpline"><span class="t12">${esc(GADGET_NAME[g])} blueprints:</span><span class="big">${gadgetBp(g, have)}</span></div>
+    <div class="bar wide"><i style="width:${Math.round(share * 100)}%"></i></div>
+    ${nextLine}
     <div class="acts">${acts.join('')}</div>
   </div>`;
 }
