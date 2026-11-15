@@ -49,6 +49,10 @@ const PRESETS = {
   inkgecko: { port: 5177, level: 'orchard-5', zoom: 1, skip: 3, seconds: 14, from: 1, to: 11 },
   // Rat Run on the farm (free), following the snake: mice gulped (and a rat coiled, in some runs).
   inksnake: { port: 5179, level: 'farm-3', zoom: 1.6, skip: 1, seconds: 24, from: 4, to: 14 },
+  // Hold the Bridge (free): the mission page with the sim bot driving (?bot=1)
+  // as a tank crosses the bridge and drops its intel, at the game's own 960×540
+  // view (dpr 1.5 makes it render at ×2). The camera holds still, so it loops clean.
+  inktanks: { port: 5179, path: 'mission.html?level=4&bot=1&mute=1&seed=7&t=15', dpr: 1.5, level: null, zoom: 1, skip: 1, seconds: 22, from: 10.5, to: 20.5 },
 };
 
 const args = process.argv.slice(2).filter((a) => a !== '--');
@@ -73,7 +77,9 @@ const skip = number('--skip', preset.skip);
 const seconds = number('--seconds', preset.seconds);
 const from = number('--from', preset.from);
 const to = number('--to', preset.to);
-const url = option('--url') ?? `http://localhost:${preset.port}/`;
+const url = option('--url') ?? `http://localhost:${preset.port}/${preset.path ?? ''}`;
+/** Device pixels per CSS pixel; a game that sizes its view by it (InkTanks) sets its own. */
+const dpr = preset.dpr ?? zoom;
 if (zoom < 1) throw new Error('--zoom must be at least 1');
 if (to > seconds) throw new Error('--to must be within --seconds');
 
@@ -100,6 +106,7 @@ async function openGame(page) {
     await page.waitForFunction(() => window.__bot.ready(), null, { timeout: 120_000, polling: 250 });
   }
   await page.evaluate(() => {
+    if (!window.__game) return;
     for (const scene of window.__game.scene.getScenes(true)) if (scene.sys.settings.key !== 'Game') scene.sys.setVisible(false);
   });
 }
@@ -117,7 +124,7 @@ async function applyInput(page, aim, held) {
 const frames = await mkdtemp(join(tmpdir(), `${slug}-frames-`));
 const browser = await chromium.launch({ channel: 'chrome' });
 try {
-  const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: zoom });
+  const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: dpr });
   page.on('pageerror', (err) => console.error('[page]', err.message));
   await openGame(page);
   await page.evaluate(() => window.__clock.freeze());

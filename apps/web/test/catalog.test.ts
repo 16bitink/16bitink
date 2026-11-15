@@ -53,9 +53,15 @@ describe('catalog', () => {
   });
 
   it('still calls the newest game the latest once its new week is over', () => {
-    const home = homeListings(new Date('2026-11-16T00:00:00Z'));
+    // InkTanks came out Nov 15; its new week (8 days) is over on Nov 23.
+    const home = homeListings(new Date('2026-11-23T00:00:00Z'));
     expect(home.top[0]).toMatchObject({ label: 'latest' });
-    expect(home.top[0]!.game.slug).toBe('inkheroes');
+    expect(home.top[0]!.game.slug).toBe('inktanks');
+  });
+
+  it('lists InkTanks from Sunday, Nov 15 (UTC), first on the home page', () => {
+    expect(listedGames(new Date('2026-11-14T23:59:59Z')).map((g) => g.slug)).not.toContain('inktanks');
+    expect(homeGames(new Date('2026-11-15T00:00:00Z'))[0]!.slug).toBe('inktanks');
   });
 
   it('shows one top card when the newest game is also the most played', () => {

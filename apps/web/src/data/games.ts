@@ -387,9 +387,9 @@ export const GAMES: readonly CatalogGame[] = [
     status: 'playable',
     icon: 'inktanks',
     cover: '/covers/inktanks.png',
-    // A placeholder date: not on the home page until then, but /play/inktanks answers by link.
-    released: '2026-11-22',
-    updated: '2026-11-22',
+    loop: true,
+    released: '2026-11-15',
+    updated: '2026-11-15',
     size: { chapters: 5, ready: 5, levels: 50 },
     demo: '10 levels free',
     price: '$4.99',

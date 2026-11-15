@@ -473,7 +473,7 @@ export const GAME_ENTRIES: Readonly<Record<string, readonly ChangelogEntry[]>> =
   ],
   inktanks: [
     {
-      date: "2026-11-22",
+      date: "2026-11-15",
       title: "InkTanks launches",
       changes: [
         "Launched InkTanks: a top-down tank war campaign in pixel art, 50 missions in 5 chapters. Chapter 1, the Meadowlands, is ten free missions.",
