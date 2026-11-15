@@ -5,12 +5,14 @@ import { chapterOf, CHAPTERS, FREE_LEVELS, gate, type GateContext } from '../log
 import { Match } from '../logic/match/match';
 import { matchReport, type MatchReport } from '../logic/match/report';
 import { applyOutcome } from '../logic/mission/outcome';
+import { FINAL_LEVEL, wonTheWar } from '../logic/ending';
 import { perksOf } from '../logic/rank';
 import { parseSave, SAVE_KEY, serializeSave, type SaveData } from '../logic/save';
 import type { Progress } from '../logic/workshop';
 import { showBriefing } from '../ui/briefing';
 import { showBoot, showCard } from '../ui/cards';
 import { clear } from '../ui/dom';
+import { showEnding } from '../ui/ending';
 import { showMap } from '../ui/mapScreen';
 import { showMenu } from '../ui/menu';
 import { showResults, type ResultsData } from '../ui/results';
@@ -172,6 +174,7 @@ export class App {
       chapter: (i) => (hasLevel(CHAPTERS[i]!.first) && gate(CHAPTERS[i]!.first, this.gateCtx) !== 'paywall' ? this.map(i) : this.open(CHAPTERS[i]!.first)),
       workshop: () => this.workshop(() => this.map(), 'Map'),
       menu: () => this.menu(),
+      ending: wonTheWar(this.save.progress.medals) ? () => this.ending() : null,
     }));
   }
 
@@ -258,7 +261,8 @@ export class App {
     const n = def.number + 1;
     const g = gate(n, { ...this.gateCtx, medals: progress.medals });
     let next: ResultsData['next'] = { kind: 'none', note: null };
-    if (g === 'play') next = { kind: 'level', n };
+    if (def.number === FINAL_LEVEL && outcome.passed) next = { kind: 'ending' };
+    else if (g === 'play') next = { kind: 'level', n };
     else if (g === 'paywall' && this.host.price) {
       next = { kind: 'offer', label: `Full game · ${this.host.price}` };
       this.offer('free_end');
@@ -267,12 +271,23 @@ export class App {
     this.show(() => showResults(this.screen, { def, title: m.objective.title, report: r, outcome, xpBefore: before.xp, xpAfter: progress.xp, before, after: progress, next }, {
       retry: () => this.play(this.newMatch(def.number)),
       map: () => this.map(),
-      next: () => (next.kind === 'level' ? this.briefing(next.n) : this.host.onBuy('free_end')),
+      next: () => (next.kind === 'level' ? this.briefing(next.n) : next.kind === 'ending' ? this.ending() : this.host.onBuy('free_end')),
       workshop: () => this.workshop(() => this.map(), 'Map'),
     }));
   }
 
-  workshop(back: () => void, backLabel: string): void {
+  /** The end of the war (level 50 won): a fanfare, then the victory screen. From the results, and the map's Victory button after. */
+  ending(): void {
+    this.endRun();
+    this.sound.play({ id: 'win' });
+    this.show(() => showEnding(this.screen, this.save.progress, {
+      map: () => this.map(CHAPTERS.length - 1),
+      workshop: () => this.workshop(() => this.ending(), 'Victory'),
+      menu: () => this.menu(),
+    }));
+  }
+
+    workshop(back: () => void, backLabel: string): void {
     this.endRun();
     this.show(() => showWorkshop(this.screen, this.save.progress, { change: (p) => this.setProgress(p), back, backLabel }));
   }

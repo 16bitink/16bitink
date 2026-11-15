@@ -23,6 +23,8 @@ export interface MapActions {
   readonly chapter: (index: number) => void;
   readonly workshop: () => void;
   readonly menu: () => void;
+  /** Once level 50 is won: back to the victory screen. */
+  readonly ending: (() => void) | null;
 }
 
 /**
@@ -55,7 +57,7 @@ export function showMap(root: HTMLElement, d: MapData, a: MapActions): () => voi
     <svg class="trail" width="100%" height="100%"><polyline points="" /></svg>
     ${spots}
     <div class="panel top"><span class="t12 dimt">Chapter ${ch.index + 1}</span> <span class="gold">${esc(ch.name)}</span> <span class="t12">${rankLine(rank)}</span></div>
-    <div class="corner left"><button class="btn small" data-act="menu">Menu</button></div>
+    <div class="corner left"><button class="btn small" data-act="menu">Menu</button>${a.ending ? '<button class="btn small gold" data-act="ending">Victory</button>' : ''}</div>
     <div class="corner right">${workshopButton(d.progress, 'small')}</div>
     <div class="chapters">${chips}</div>`, {
     level: (el) => a.level(Number(el.dataset.n)),
@@ -65,6 +67,7 @@ export function showMap(root: HTMLElement, d: MapData, a: MapActions): () => voi
     },
     workshop: a.workshop,
     menu: a.menu,
+    ending: () => a.ending?.(),
   });
   const trail = root.querySelector('polyline')!;
   const place = (): void => {

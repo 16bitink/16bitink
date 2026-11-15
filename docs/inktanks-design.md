@@ -277,6 +277,10 @@ Every level has a short briefing, one **main objective** and two **bonus objecti
 
 Bonus objectives are written per level and shown in the briefing. Examples: destroy 5 tanks, win without a repair kit, finish under 3 minutes, never set off the alarm, keep the truck above half HP, destroy a Heavy with Rockets.
 
+### The ending (Nov 15)
+
+Winning level 50 turns the results' next button into a glowing gold **Victory!**, which opens the ending (`src/ui/ending.ts`, numbers in `src/logic/ending.ts`). It has two steps. First, a fanfare and the victory painting fill the screen (`art/pixel/ui/victory.png`, PixelLab, styled after the commander's portrait): the badger salutes from a tank in the Deepwood clearing beside the wrecked Harvester, with Brigade flags and fireworks. "Victory! The war is won" sits over it, with a Continue button. Second, over the dimmed painting: the commander's last words (Tusk, Wisp and Quill take their crews home, the clans lay down their guns), the General's shoulder boards, the war in numbers (missions, medals, blueprints collected, parts unlocked, XP), each chapter's medals, and how many medals are still out there to replay for (never a must). Once the war is won, the map's top-left corner has a gold Victory button that opens the ending again. Dev: `index.html?screen=ending&save=won`.
+
 ## Intel and the workshop
 
 This is the owner's "pick up technology from the enemies and upgrade your own tank".

@@ -127,6 +127,27 @@ export const SCREENS_CSS = `
 .ikt .modal { width: min(520px, 94vw); text-align: center; display: flex; flex-direction: column; gap: 12px; align-items: center; }
 .ikt .boot { flex-direction: column; gap: 16px; }
 .ikt .boot .bar { width: min(360px, 70vw); }
+/* The ending (after level 50): the victory painting full screen under the title, then the war in numbers over it dimmed. */
+.ikt .screen.ending.hero { background: var(--ink); padding: 0; }
+.ikt .endhero { position: absolute; inset: 0; cursor: pointer; animation: ikt-rise 0.6s steps(6) both; }
+.ikt .endart { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; display: block; }
+.ikt .endtitle { position: absolute; left: 0; right: 0; bottom: 0; text-align: center; padding: 40px 0 16px; background: linear-gradient(transparent, rgba(20, 17, 12, 0.8) 45%); text-shadow: 2px 2px 0 var(--ink); }
+.ikt .endsub { font-size: 36px; animation: ikt-rise 0.5s steps(5) 0.9s both; }
+.ikt .endtitle .btn { animation: ikt-rise 0.5s steps(5) 1.6s both, ikt-glow 1.2s steps(2) 2.2s infinite; }
+.ikt .wordmark.victory { font-size: 96px; animation: ikt-pop 0.9s steps(6) 0.3s both; }
+.ikt .screen.ending.record { background: linear-gradient(rgba(20, 17, 12, 0.84), rgba(20, 17, 12, 0.84)), var(--endart, none) center / cover; image-rendering: pixelated; }
+.ikt .ending .sheet { width: min(1000px, 100%); }
+.ikt .endsay { display: flex; gap: 12px; align-items: flex-start; font-size: 20px; } .ikt .endsay p { margin: 0 0 8px; }
+.ikt .endrank { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.ikt .endrank .promo { width: 100%; padding: 4px; } .ikt .endrank .promo img.strap.big { height: 84px; } .ikt .endrank .promo .t36 { font-size: 28px; }
+.ikt .endrank .endbody { display: flex; gap: 12px; align-items: center; width: 100%; }
+.ikt .endtank canvas { image-rendering: pixelated; display: block; width: 112px; height: auto; }
+.ikt .endnums { display: grid; grid-template-columns: 1fr auto; gap: 2px 16px; margin: 0; flex: 1; font-size: 18px; } .ikt .endnums dt { color: var(--dim); } .ikt .endnums dt, .ikt .endnums dd { white-space: nowrap; } .ikt .endnums dd { margin: 0; text-align: right; }
+.ikt .screen .btn.endnext { animation: ikt-glow 1.2s steps(2) infinite; }
+.ikt .endchaps { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+.ikt .endchap { background: var(--panel); box-shadow: 0 0 0 4px var(--ink), inset 0 0 0 2px var(--edge); padding: 6px 8px; text-align: center; }
+@media (max-height: 520px) { .ikt .wordmark.victory { font-size: 48px; } .ikt .endsub { font-size: 20px; } .ikt .endtitle { padding: 16px 0 6px; } .ikt .endsay { font-size: 12px; } .ikt .endsay p { margin-bottom: 4px; } .ikt .endnums { font-size: 12px; } .ikt .endrank .promo .t36 { font-size: 20px; } .ikt .endtank { display: none; } .ikt .endchap { padding: 2px 4px; font-size: 12px; } .ikt .ending .sheet .t36 { font-size: 20px; } }
+@media (max-width: 700px) { .ikt .endchaps { grid-template-columns: repeat(3, 1fr); } .ikt .ending .sheet .cols { flex-direction: column; } }
 @media (max-height: 520px) {
   .ikt .wordmark { font-size: 72px; }
   .ikt .menu { gap: 10px; }

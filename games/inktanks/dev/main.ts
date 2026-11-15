@@ -11,9 +11,10 @@ declare const __DEV_ALL_LEVELS__: boolean;
 /**
  * The whole game, as the website mounts it. `DEV_UNLOCK=true npm run dev`
  * plays as an owner. For snapshots (dev/snap.mjs "index.html?screen=…"):
- *   ?screen=menu|map|briefing|workshop|results|mission   which screen to open
+ *   ?screen=menu|map|briefing|workshop|results|mission|ending   which screen to open
  *   ?level=N        the level for briefing, results and mission
  *   ?save=mid       a mid-chapter save (levels 1–4 passed, intel, Corporal) in memory, not localStorage
+ *   ?save=won       the war won (all 50 passed, General, Mk V tank), for ?screen=ending
  *   ?xp=N           with save=mid: the rank XP (e.g. 380, so results show a promotion)
  */
 function midSave(): Progress {
@@ -46,6 +47,20 @@ function tiersSave(): Progress {
   };
 }
 
+/** The war won (?save=won): all 50 levels passed with most medals, a General on a Mk V tank (for ?screen=ending). */
+function wonSave(): Progress {
+  const t = tiersSave();
+  const medals = Object.fromEntries(Array.from({ length: 50 }, (_, i) => [i + 1, [true, i % 3 !== 0, i % 4 !== 0] as const]));
+  return {
+    ...t,
+    xp: 12900,
+    medals,
+    intelTotal: { machinegun: 520, cannon: 380, medium: 600, halftracks: 450, light: 460, wheels: 300, hover: 260, rail: 90 },
+    unlocked: [...t.unlocked, 'medium', 'halftracks', 'hover', 'rail'],
+    loadout: { gun: { family: 'cannon', mk: 5 }, hull: { family: 'medium', mk: 5 }, drive: { family: 'halftracks', mk: 5 } },
+  };
+}
+
 function memoryStore(seed: string | null): KeyValueStore {
   const m = new Map<string, string>();
   if (seed) m.set(SAVE_KEY, seed);
@@ -53,7 +68,8 @@ function memoryStore(seed: string | null): KeyValueStore {
 }
 
 const preset = query.get('save');
-const storage = preset === 'mid' || preset === 'tiers' ? memoryStore(JSON.stringify({ v: SAVE_VERSION, progress: preset === 'mid' ? midSave() : tiersSave(), sound: true })) : preset === 'new' ? memoryStore(null) : window.localStorage;
+const presetSave = preset === 'mid' ? midSave() : preset === 'tiers' ? tiersSave() : preset === 'won' ? wonSave() : null;
+const storage = presetSave ? memoryStore(JSON.stringify({ v: SAVE_VERSION, progress: presetSave, sound: true })) : preset === 'new' ? memoryStore(null) : window.localStorage;
 const parent = document.getElementById('game')!;
 const handle = mount(parent, {
   unlocked: __DEV_UNLOCK__,
@@ -75,5 +91,6 @@ else if (screen === 'briefing') app.open(level);
 else if (screen === 'workshop') app.workshop(() => app.map(), 'Map');
 else if (screen === 'results') app.devResults(level);
 else if (screen === 'mission') app.devPlay(level);
+else if (screen === 'ending') app.ending();
 (window as unknown as { __app: unknown }).__app = app;
 setTimeout(setReady, screen === 'mission' ? 1000 + qnum('demo', 3) * 1000 : 900);

@@ -38,8 +38,8 @@ export interface ResultsData {
   /** Progress before and after the mission, to show what became affordable. */
   readonly before: Progress;
   readonly after: Progress;
-  /** The next button: a level to play, the full-game offer, or nothing. */
-  readonly next: { readonly kind: 'level'; readonly n: number } | { readonly kind: 'offer'; readonly label: string } | { readonly kind: 'none'; readonly note: string | null };
+  /** The next button: a level to play, the full-game offer, the ending (level 50 won), or nothing. */
+  readonly next: { readonly kind: 'level'; readonly n: number } | { readonly kind: 'offer'; readonly label: string } | { readonly kind: 'ending' } | { readonly kind: 'none'; readonly note: string | null };
 }
 
 export interface ResultsActions {
@@ -74,7 +74,7 @@ export function showResults(root: HTMLElement, d: ResultsData, a: ResultsActions
   const promoted = after.xp > before.xp;
   const up = toNextRank(d.xpAfter);
   const share = up ? (d.xpAfter - after.xp) / (up.next.xp - after.xp) : 1;
-  const nextBtn = d.next.kind === 'level' ? `<button class="btn go" data-act="next">Level ${d.next.n}</button>` : d.next.kind === 'offer' ? `<button class="btn gold" data-act="next">${esc(d.next.label)}</button>` : '';
+  const nextBtn = d.next.kind === 'level' ? `<button class="btn go" data-act="next">Level ${d.next.n}</button>` : d.next.kind === 'offer' ? `<button class="btn gold" data-act="next">${esc(d.next.label)}</button>` : d.next.kind === 'ending' ? '<button class="btn gold endnext" data-act="next">Victory!</button>' : '';
   render(root, 'dark', `
     <div class="panel sheet rise">
       <div class="row spread"><div class="t36 ${o.passed ? 'gold' : 'red'}">${o.passed ? 'Mission passed' : esc(failText(r.reason))}</div>
