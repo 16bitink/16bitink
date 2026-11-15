@@ -18,11 +18,15 @@ import { heroesOfMightAndMagic3 } from './pages/heroes-of-might-and-magic-3';
 import { slitherIo } from './pages/slither-io';
 import { agarIo } from './pages/agar-io';
 import { pullThePin } from './pages/pull-the-pin';
+import { wiiTanks } from './pages/wii-tanks';
+import { battleCity } from './pages/battle-city';
+import { tankTrouble } from './pages/tank-trouble';
+import { diepIo } from './pages/diep-io';
 
 export type * from './types';
 
 /** One file per page in ./pages, in the order they were published. */
-export const GAMES_LIKE: readonly GamesLikePage[] = [motherload, feedingFrenzy, zuma, fishy, snake, heroesOfMightAndMagic3, slitherIo, agarIo, pullThePin];
+export const GAMES_LIKE: readonly GamesLikePage[] = [motherload, feedingFrenzy, zuma, fishy, snake, heroesOfMightAndMagic3, slitherIo, agarIo, pullThePin, wiiTanks, battleCity, tankTrouble, diepIo];
 
 /** Our game's name on the page: from the catalog, or from `coming` while it is still being made. */
 export const ourTitle = (page: GamesLikePage): string => findGame(page.game)?.title ?? page.coming ?? page.game;
