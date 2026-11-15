@@ -22,6 +22,8 @@ import type { GadgetKind, Tank } from './types';
 export function earnGadget(m: Match, team: number, kind: GadgetKind, n = 1): void {
   if (n <= 0 || !m.player || team !== m.player.team) return;
   m.gadgetIntel = { ...m.gadgetIntel, [kind]: (m.gadgetIntel[kind] ?? 0) + n };
+  // Shown as it happens, as part blueprints are (owner, Nov 15: earning them silently read as "no blueprints").
+  m.emit({ kind: 'gadgetIntel', gadget: kind, n });
 }
 
 /** Uses the tank's found gadget, or else a charge of its own. Returns whether it did. */

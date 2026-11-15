@@ -200,6 +200,8 @@ export type MatchEvent =
   | { readonly kind: 'aim'; readonly tank: number; readonly angle: number; readonly len: number; readonly until: number; readonly width?: number; readonly dur?: number }
   | { readonly kind: 'boss'; readonly what: 'enraged' | 'charge' | 'ram' | 'stunned'; readonly x: number; readonly y: number }
   | { readonly kind: 'gadget'; readonly tank: number; readonly gadget: GadgetKind; readonly x: number; readonly y: number }
+  /** Gadget blueprints earned for our side (gadgetUse.ts earnGadget), for the HUD's feed. */
+  | { readonly kind: 'gadgetIntel'; readonly gadget: GadgetKind; readonly n: number }
   | { readonly kind: 'mine'; readonly x: number; readonly y: number; readonly target: number }
   /** A Mk V oil slick set alight. */
   | { readonly kind: 'ignite'; readonly x: number; readonly y: number; readonly r: number }

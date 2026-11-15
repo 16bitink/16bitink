@@ -83,7 +83,7 @@ export function showResults(root: HTMLElement, d: ResultsData, a: ResultsActions
         <div class="col"><div class="dimt t12">Medals</div>${medals}
           ${o.passed ? '' : '<div class="t12 dimt">Blueprints you picked up are yours to keep. Retry from the start.</div>'}</div>
         <div class="col">
-          <div class="dimt t12">Blueprints collected: ${bpAmount(r.intelCount)}</div>
+          <div class="dimt t12">Blueprints collected: ${bpAmount(r.intelCount + Object.values(r.gadgetIntel ?? {}).reduce((a, b) => a + (b ?? 0), 0))}</div>
           <div class="bplist">${intel || '<span class="dimt t12" style="grid-column:1/-1">None this time</span>'}</div>
           ${prizeHtml}${readyHtml}
           <div class="dimt t12">Rank</div>

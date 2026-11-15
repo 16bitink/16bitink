@@ -133,6 +133,7 @@ export class Hud {
     } else if (e.kind === 'pickup' && e.what === 'intel' && m.tank(e.tank)?.team === 0) this.blueprints(m, e.amount, e.family);
     else if (e.kind === 'pickup' && e.what === 'kit' && m.tank(e.tank)?.isPlayer) this.showTip(m, `Repair kit! ${this.useKey()} to fix your tank`);
     else if (e.kind === 'pickup' && e.what === 'gadget' && m.tank(e.tank)?.isPlayer) this.gadgetPickup(m, e.gadget ?? m.player?.gadget ?? 'mines', e.found === true, e.spare === true);
+    else if (e.kind === 'gadgetIntel') this.gadgetBlueprints(e.gadget, e.n);
     else if (e.kind === 'ambush') this.pop(m, e.x, e.y, 'Ambush ×2');
     else if (e.kind === 'friendly' && m.t - (this.friendlyAt.get(e.target) ?? -9) > FRIENDLY_POP_GAP) {
       // One pop per tank every so often: a machinegun burst through a friend is one "Friendly fire!", not twenty.
@@ -274,6 +275,13 @@ export class Hud {
       this.firstBlueprints.mark();
       this.showTip(m, `${bpIcon()} <b>Blueprints!</b> Spend them in the Workshop to upgrade your tank.`);
     }
+  }
+
+  /** "+1 [mine] Mines blueprint" in the feed: a gadget's own blueprints (it has no blueprint sheet: its icon stands in). */
+  private gadgetBlueprints(g: GadgetKind, n: number): void {
+    const url = gadgetIconUrl(g);
+    const icon = url ? `<img class="bp" src="${url}" alt="">` : '';
+    this.line(`<span class="bpn">+${n} ${icon} ${GADGET_NAME[g]} blueprint${n === 1 ? '' : 's'}</span>`);
   }
 
   /** "Press Q" on a keyboard, "Tap Repair" on a phone; lower case mid-sentence. */

@@ -346,4 +346,11 @@ describe('gadget blueprints', () => {
     expect(p.gadgetCharges).toBe(0);
     expect(m.gadgetIntel.oil).toBe(n);
   });
+
+  it('each one earned is announced, so the HUD can show it', () => {
+    const m = make('mines');
+    m.drainEvents();
+    useGadget(m, m.player!);
+    expect(m.drainEvents().filter((e) => e.kind === 'gadgetIntel')).toEqual([{ kind: 'gadgetIntel', gadget: 'mines', n: 1 }]);
+  });
 });
