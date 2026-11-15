@@ -25,6 +25,10 @@ Never title a page as if our game were the classic ("Play Zuma online"). Name th
 | slither.io (honest that ours is single-player; a different list from Snake's) | InkSnake | Built Nov 12, 2026 |
 | Agar.io (eat-and-grow without other players; a different list from the fish pages) | InkFish | Built Nov 12, 2026 |
 | Pull the Pin ("the pin puzzle from the ads, without the ads"; Popcore's name only as the thing compared) | InkPin | Built Nov 12, 2026 |
+| Wii Tanks (the Tanks! minigame in Wii Play; no re-release, so "where to play it now"; Wii-inspired games under their own names, no fan copies using Nintendo's name) | InkTanks | Built Nov 15, 2026 |
+| Battle City (also "Tank 1990", the multicart hack; official re-releases: Arcade Archives, Namco Museum Archives) | InkTanks | Built Nov 15, 2026 |
+| Tank Trouble (honest that ours is single-player; couch and online tank games for friends) | InkTanks | Built Nov 15, 2026 |
+| diep.io (tank upgrades without other players; .io and online tank games) | InkTanks | Built Nov 15, 2026 |
 
 Each page: an opening answer of 60 words at most naming our game and the classic, ours first with a Play button, 3+ honest alternatives with official links (competitors too), a comparison table with an **Ads** row, the classic's history and where to play it now, an FAQ, and sources. Tests in `apps/web/test/gamesLike.test.ts` hold these rules.
 
