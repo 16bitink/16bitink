@@ -315,6 +315,12 @@ This is the owner's "pick up technology from the enemies and upgrade your own ta
 - Bots in later chapters field higher Mk tiers and their own research levels, so the counter race holds and research never trivialises a chapter.
 - **No-grind check:** the whole-chapter bot sim plays each mission once and completes about half the bonus objectives. It must afford a sensible setup for the next chapter: a Mk II gun with 2 research steps, and its counter family unlocked.
 
+### Account saves (Nov 15)
+
+A signed-in player's save follows them between devices (`src/logic/accountSave.ts`, merge in `src/logic/saveMerge.ts`), as in the other games. On boot the game pulls the account's copy (waiting 4 s at most, alongside the paid levels), merges it with this device's save, stores the result locally, and pushes it back when the account is missing something. Every local save pushes to the account 1.5 s later (a run of workshop buys goes as one), and at once before buying, exiting or unmounting. Offline or failing, it only warns and plays on the local save; a failed boot pull is retried before the next push, so a push never overwrites a copy it never saw. Unreadable account data (garbage, another version) is ignored and overwritten with the local save; it never wipes local progress.
+
+Merge rules (`mergeSave`): medals OR per medal; XP max; unlocked families union; Mk per family, gadget Mk and research steps max; lifetime blueprints (`intelTotal`) max per family; ace prototypes union, best Mk per family; seen-blueprints tip OR. Spendable blueprints (`intel`, `gadgetIntel`), the fitted tank, the picked gadget and the wingmen picks come from the copy further along: more passed levels, then more XP, then more lifetime blueprints, this device on a tie. The fitted tank is then refitted to what the merged progress owns. Sound stays this device's. Dev: `index.html?save=new&account=mid` plays signed in with that save in an in-memory account (`account=empty` for none; `window.__account` shows what was pushed).
+
 ## Military ranks
 
 You start as a Private. **Rank XP:**

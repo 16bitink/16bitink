@@ -9,6 +9,7 @@ import { applyOutcome } from '../logic/mission/outcome';
 import { FINAL_LEVEL, wonTheWar } from '../logic/ending';
 import { perksOf } from '../logic/rank';
 import { wingmanLoadouts } from '../logic/wingmanFit';
+import { AccountSync } from '../logic/accountSave';
 import { parseSave, SAVE_KEY, serializeSave, type SaveData } from '../logic/save';
 import type { Progress } from '../logic/workshop';
 import { showBriefing } from '../ui/briefing';
@@ -25,7 +26,9 @@ import { Stage } from './stage';
 /**
  * The whole game: boot → menu → chapter map → briefing → mission →
  * results → map, with the workshop between missions. Progress is saved
- * through host.storage after every change; paid levels come from the host.
+ * through host.storage after every change, and to the signed-in player's
+ * account (host.progress, merged with saveMerge.ts) soon after; paid levels
+ * come from the host.
  */
 export class App {
   private readonly root: HTMLElement;
@@ -36,6 +39,9 @@ export class App {
   private readonly stage: Stage;
   private readonly sound: SoundBoard;
   private save: SaveData;
+  private readonly account: AccountSync;
+  /** Boot's pull of the account's save: started at once, awaited before the menu. */
+  private readonly pulled: Promise<void>;
   private note: string | null;
   private paidError: string | null = null;
   private run: MissionRun | null = null;
@@ -59,6 +65,14 @@ export class App {
     this.save = loaded.save;
     this.note = loaded.problem ? 'Your saved game could not be read, so it starts fresh.' : null;
     if (loaded.problem) console.warn(`[inktanks] ${loaded.problem}`);
+    this.account = new AccountSync(host.progress, {
+      current: () => this.save,
+      adopt: (s) => {
+        this.save = s;
+        this.store();
+      },
+    });
+    this.pulled = this.account.pull();
     this.sound = new SoundBoard(!this.save.sound);
     // Every button clicks (menus, cards, the workshop, the HUD's buttons).
     this.root.addEventListener('click', (e) => {
@@ -77,7 +91,8 @@ export class App {
   }
 
   private async booted(): Promise<void> {
-    await this.loadPaid();
+    // Never rejects: offline or slow, the account's save is skipped and this device's plays.
+    await Promise.all([this.loadPaid(), this.pulled]);
     this.menu();
     requestAnimationFrame(() => {
       this.host.loading?.ready();
@@ -112,7 +127,14 @@ export class App {
     this.persist();
   }
 
+  /** Saves on this device and, soon after, to the player's account. */
   private persist(): void {
+    this.store();
+    this.account.schedule();
+  }
+
+  /** Saves on this device only. */
+  private store(): void {
     try {
       this.host.storage?.setItem(SAVE_KEY, serializeSave(this.save));
     } catch (e) {
@@ -126,6 +148,12 @@ export class App {
     } catch {
       // A stat must never break the game.
     }
+  }
+
+  /** The purchase leaves the page: the account gets the latest save first. */
+  private buy(where: OfferPlace): void {
+    this.account.flush();
+    this.host.onBuy(where);
   }
 
   private offer(where: OfferPlace): void {
@@ -165,7 +193,10 @@ export class App {
         this.persist();
         this.menu();
       },
-      exit: () => this.host.onExit(),
+      exit: () => {
+        this.account.flush();
+        this.host.onExit();
+      },
     }));
   }
 
@@ -199,7 +230,7 @@ export class App {
       this.offer('locked');
       return showCard(this.card, ch.name, [`Levels ${FREE_LEVELS + 1}–50 are the full game.`, 'One-time purchase, no ads.'], [
         { label: 'Not now', run: close },
-        { label: `Unlock${this.host.price ? ` · ${this.host.price}` : ''}`, run: () => this.host.onBuy('locked'), kind: 'gold' },
+        { label: `Unlock${this.host.price ? ` · ${this.host.price}` : ''}`, run: () => this.buy('locked'), kind: 'gold' },
       ], close);
     }
     if (this.host.unlocked && this.paidError && ch.index > 0) {
@@ -286,7 +317,7 @@ export class App {
     this.show(() => showResults(this.screen, { def, title: m.objective.title, report: r, outcome, xpBefore: before.xp, xpAfter: progress.xp, before, after: progress, next }, {
       retry: () => this.play(this.newMatch(def.number)),
       map: () => this.map(),
-      next: () => (next.kind === 'level' ? this.briefing(next.n) : next.kind === 'ending' ? this.ending() : this.host.onBuy('free_end')),
+      next: () => (next.kind === 'level' ? this.briefing(next.n) : next.kind === 'ending' ? this.ending() : this.buy('free_end')),
       workshop: () => this.workshop(() => this.map(), 'Map'),
     }));
   }
@@ -325,6 +356,7 @@ export class App {
   }
 
   destroy(): void {
+    this.account.flush();
     this.leaveScreen?.();
     this.endRun();
     this.sound.destroy();

@@ -33,8 +33,8 @@ export const LEVEL_26: LevelDef = {
     structures: [
       // West island: a stilt hut by the flag, reeds on the shore.
       { kind: 'stiltHutLarge', x: 760, y: 220 }, ...reedBed(1020, 400, 5), { kind: 'sandbags', x: 1010, y: 250 },
-      // Middle island: a fish rack, a hut, reeds, sandbags toward the causeways.
-      { kind: 'stiltHutSmall', x: 2020, y: 700 }, { kind: 'fishRack', x: 1790, y: 910 }, ...reedBed(2050, 900, 4), { kind: 'sandbagsV', x: 1760, y: 740 },
+      // Middle island: a fish rack, a hut, reeds, sandbags as cover beside the causeway (not across it: at 1760,740 they closed its mouth).
+      { kind: 'stiltHutSmall', x: 2020, y: 700 }, { kind: 'fishRack', x: 1790, y: 910 }, ...reedBed(2050, 900, 4), { kind: 'sandbags', x: 1830, y: 680 },
       // East island: huts, a jetty, reeds.
       { kind: 'stiltHutLarge', x: 3140, y: 250 }, { kind: 'jetty', x: 3000, y: 450 }, ...reedBed(2870, 280, 4), { kind: 'sandbags', x: 3090, y: 420 },
       ...reedBed(1400, 340, 3), ...reedBed(3450, 800, 3), ...each('mooringPost', [[900, 440], [1900, 940], [3100, 440]]),

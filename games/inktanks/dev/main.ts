@@ -1,4 +1,4 @@
-import type { KeyValueStore } from '@16bitink/game-sdk';
+import type { KeyValueStore, ProgressStore } from '@16bitink/game-sdk';
 import { mount } from '../src/index';
 import { SAVE_KEY, SAVE_VERSION } from '../src/logic/save';
 import { newProgress, type Progress } from '../src/logic/workshop';
@@ -17,6 +17,8 @@ declare const __DEV_ALL_LEVELS__: boolean;
  *   ?save=won       the war won (all 50 passed, General, Mk V tank), for ?screen=ending
  *   ?tab=wingmen    with screen=workshop: the tab to open (gun, hull, drive, gadgets, wingmen)
  *   ?xp=N           with save=mid: the rank XP (e.g. 380, so results show a promotion)
+ *   ?account=mid    signed in, with that save (mid, tiers, won) in the account; ?account=empty: none yet.
+ *                   An in-memory host.progress: window.__account holds what was pushed to it.
  */
 function midSave(): Progress {
   const p = newProgress();
@@ -68,14 +70,37 @@ function memoryStore(seed: string | null): KeyValueStore {
   return { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => void m.set(k, v) };
 }
 
+/** A signed-in player's account, in memory: as the website's, load gives the copy and save stores it. */
+function memoryAccount(seed: Progress | null): ProgressStore & { data: unknown; saves: number } {
+  const acct = {
+    data: seed ? JSON.parse(JSON.stringify({ v: SAVE_VERSION, progress: seed, sound: true, seenBlueprints: false, gadget: 'mines' })) as unknown : null,
+    saves: 0,
+    load: () => Promise.resolve(acct.data),
+    save: (data: unknown) => {
+      acct.data = JSON.parse(JSON.stringify(data)) as unknown;
+      acct.saves += 1;
+      console.info('[dev] pushed to the account', acct.data);
+      return Promise.resolve();
+    },
+  };
+  return acct;
+}
+
+const presetOf = (name: string | null): Progress | null => (name === 'mid' ? midSave() : name === 'tiers' ? tiersSave() : name === 'won' ? wonSave() : null);
+const accountPreset = query.get('account');
+const account = accountPreset ? memoryAccount(presetOf(accountPreset)) : undefined;
+(window as unknown as { __account: unknown }).__account = account;
+
 const preset = query.get('save');
-const presetSave = preset === 'mid' ? midSave() : preset === 'tiers' ? tiersSave() : preset === 'won' ? wonSave() : null;
+const presetSave = presetOf(preset);
 const storage = presetSave ? memoryStore(JSON.stringify({ v: SAVE_VERSION, progress: presetSave, sound: true })) : preset === 'new' ? memoryStore(null) : window.localStorage;
 const parent = document.getElementById('game')!;
 const handle = mount(parent, {
   unlocked: __DEV_UNLOCK__,
   allLevelsOpen: __DEV_ALL_LEVELS__,
   storage,
+  progress: account,
+  signedIn: account !== undefined,
   // As the website serves it to owners: JSON over the wire.
   loadContent: async () => JSON.parse(JSON.stringify((await import('../content/paid')).INKTANKS_PAID_LEVELS)) as unknown,
   onBuy: () => alert('Checkout would open here'),
