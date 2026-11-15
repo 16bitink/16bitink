@@ -598,6 +598,11 @@ const SHORTS: Readonly<Record<string, () => Promise<Short>>> = {
     const { createSpermSquid } = await import('./spermsquid/render');
     return withCredit(createSpermSquid(ctx), ctx);
   },
+  penguin: async () => {
+    await loadCaptionFont();
+    const { createPenguin } = await import('./penguin/render');
+    return withCredit(createPenguin(ctx), ctx, PAPER_ON_DARK);
+  },
   orcaflip: async () => {
     await loadCaptionFont();
     if (params.has('kit')) return (await import('./orcaflip/kit')).createOrcaflipKit(ctx);

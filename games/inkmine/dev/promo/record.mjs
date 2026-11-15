@@ -48,6 +48,7 @@ const VARIANTS = [
   { name: 'inkmine-black-plants', query: '&short=plants', start: 0 },
   { name: 'inkmine-heavy-planet', query: '&short=heavy', start: 0 },
   { name: 'inkmine-leviathan', query: '&short=leviathan', start: 0 },
+  { name: 'inkmine-rockslide', query: '&short=rockslide', start: 0 },
 ];
 const chosen = only ? VARIANTS.filter((v) => v.name.includes(only)) : VARIANTS.filter((v) => !v.onlyByName);
 if (chosen.length === 0) throw new Error(`No variant name contains "${only}": ${VARIANTS.map((v) => v.name).join(', ')}`);

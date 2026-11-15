@@ -129,6 +129,16 @@ const SHORTS: Readonly<Record<string, () => Promise<Short>>> = {
     await loadCaptionFont();
     return withCredit(createBoaBats(ctx), ctx, PAPER_ON_DARK, BOA_BATS_CREDIT);
   },
+  hognose: async () => {
+    await loadCaptionFont();
+    const { createHognose, HOGNOSE_CREDIT } = await import('./hognose/render');
+    return withCredit(createHognose(ctx), ctx, PAPER_ON_DARK, HOGNOSE_CREDIT);
+  },
+  badger: async () => {
+    await loadCaptionFont();
+    const { createBadger, BADGER_CREDIT } = await import('./badger/render');
+    return withCredit(createBadger(ctx), ctx, PAPER_ON_DARK, BADGER_CREDIT);
+  },
 };
 
 const name = params.get('short') ?? 'kit';

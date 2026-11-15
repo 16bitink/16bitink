@@ -55,6 +55,8 @@ const VARIANTS = [
   { name: 'inksnake-king-cobra-python', query: '&short=cobra', start: 0 },
   { name: 'inksnake-python-deer', query: '&short=deer', start: 0 },
   { name: 'inksnake-boa-bats', query: '&short=boabats', start: 0 },
+  { name: 'inksnake-hognose-plays-dead', query: '&short=hognose', start: 0 },
+  { name: 'inksnake-honey-badger', query: '&short=badger', start: 0 },
   // Long-form (16:9, not looping): only when named, e.g. --only long. Loudness to YouTube's -14 LUFS.
   { name: 'inksnake-long-swallow', page: 'longform.html', query: '&video=swallow', start: 0, audioFilter: 'loudnorm=I=-14:TP=-1.5:LRA=11', onlyByName: true },
 ];

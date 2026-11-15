@@ -67,6 +67,11 @@ const SHORTS: Readonly<Record<string, () => Promise<Short>>> = {
   plants: narrated(createPlants, true),
   heavy: narrated(createHeavy, true),
   leviathan: narrated(createLeviathan, true, LEVIATHAN_CREDIT),
+  rockslide: async () => {
+    await loadCaptionFont();
+    const { createRockslide, ROCKSLIDE_CREDIT } = await import('./rockslide/render');
+    return withCredit(createRockslide(ctx), ctx, PAPER_ON_DARK, ROCKSLIDE_CREDIT);
+  },
 };
 
 const name = params.get('short') ?? 'kit';
