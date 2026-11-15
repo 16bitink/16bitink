@@ -89,7 +89,7 @@ export function showBriefing(root: HTMLElement, m: Match, p: Progress, a: Briefi
         </div>
         <div class="col">
           <div class="mapbox"></div>
-          <div class="row"><div class="pic"></div><div class="col"><div class="row">${partIcon(l.gun)}${partIcon(l.hull)}${partIcon(l.drive)}</div>
+          <div class="row"><div class="pic"></div><div class="col loadout"><div class="row">${partIcon(l.gun)}${partIcon(l.hull)}${partIcon(l.drive)}</div>
             <div class="t12 hide-short">${[l.gun, l.hull, l.drive].map(partName).join(' · ')}</div><div class="t12 dimt">Repair kits: ${perksOf(p.xp).repairKits}</div>${rankPerksLine(m, p)}</div></div>
           <div class="gadgets">${gadgetPicker(p, picked)}</div>
         </div>
@@ -165,6 +165,6 @@ function rankPerksLine(m: Match, p: Progress): string {
   const calls = [m.callIns.supply.has ? 'supply drop (R)' : '', m.callIns.strike.has ? 'artillery strike (F)' : ''].filter(Boolean);
   const wingHtml = !ranked ? ''
     : `<div class="row wingline" style="align-items:center;gap:6px;justify-content:flex-start"><span class="wingpics">${wing.map((t, i) => `<span class="wbpic" data-i="${i}" title="${esc(t.name)}"></span>`).join('')}</span>`
-      + `<span class="t12 dimt">${wing.length ? esc(wing.map((t) => t.name).join(', ')) : 'Wingmen sit out Recon'}</span><button class="btn small" data-act="wingmen">Wingmen</button></div>`;
+      + `<span class="t12 dimt${wing.length ? ' wnames' : ''}">${wing.length ? esc(wing.map((t) => t.name).join(', ')) : 'Wingmen sit out Recon'}</span><button class="btn small" data-act="wingmen">Wingmen</button></div>`;
   return wingHtml + (calls.length ? `<div class="t12 dimt hide-short">${esc(`Call-ins: ${calls.join(', ')}`)}</div>` : '');
 }

@@ -17,6 +17,9 @@ import { fixture, load } from './fixtures/levels';
 import { loadLevel } from '../src/logic/level/load';
 import { TYPICAL_TANK } from '../src/sim/lab';
 
+/** A whole-level stand-in run is a heavy sim: 5 s timed out under machine load. */
+const SIM_TIMEOUT = 20_000;
+
 describe('chapter 2 content', () => {
   it('paid content lists the built chapter 2 levels, numbered 11–20, and they install from JSON', () => {
     const all = INKTANKS_PAID_LEVELS.map((d) => d.number);
@@ -54,6 +57,9 @@ describe('chapter 2 content', () => {
     expect(chapterMap(9)).toBe(CHAPTER_MAPS[0]);
   });
   it('every chapter map keeps its spots inside the box, apart, on the painting', () => {
+    // On a 844 × 390 phone a world px is ~0.61 CSS px: a 56 px spot is ~92 world px wide and its
+    // medals (34–48 px below, 46 px wide) reach ~55–78 world px under it, ±38 across.
+    const SPOT = 92, MEDAL_DX = 84, MEDAL_Y0 = 55, MEDAL_Y1 = 78;
     for (const c of CHAPTER_MAPS) {
       expect(c.box.x).toBeGreaterThanOrEqual(0);
       expect(c.box.y).toBeGreaterThanOrEqual(0);
@@ -64,7 +70,15 @@ describe('chapter 2 content', () => {
         expect(s.x).toBeLessThanOrEqual(c.box.x + c.box.w);
         expect(s.y).toBeGreaterThanOrEqual(c.box.y);
         expect(s.y).toBeLessThanOrEqual(c.box.y + c.box.h);
-        for (const t of c.spots.slice(i + 1)) expect(Math.hypot(s.x - t.x, s.y - t.y)).toBeGreaterThan(95);
+        c.spots.forEach((t, j) => {
+          if (j === i) return;
+          const dx = Math.abs(s.x - t.x);
+          const dy = t.y - s.y;
+          if (j > i) expect(Math.max(dx, Math.abs(dy)), `spots ${i + 1} and ${j + 1}`).toBeGreaterThanOrEqual(SPOT);
+          // t's medals stay off spot s.
+          const medalsHit = dx < MEDAL_DX && t.y + MEDAL_Y0 < s.y + SPOT / 2 && t.y + MEDAL_Y1 > s.y - SPOT / 2;
+          expect(medalsHit, `medals of ${j + 1} on spot ${i + 1}`).toBe(false);
+        });
       });
     }
   });
@@ -74,7 +88,7 @@ describe('chapter 2 content', () => {
       const wins = [1, 2, 3].filter((seed) => runMission({ level: labLevel(n), seed, player: { loadout: parseTank(TYPICAL_TANK[n]!), kits: 2 } }).passed).length;
       expect(wins, `level ${n}`).toBeGreaterThan(0);
     }
-  });
+  }, SIM_TIMEOUT);
 });
 
 describe('dune crests', () => {

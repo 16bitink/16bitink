@@ -19,6 +19,9 @@ import { runMission } from '../src/sim/runMission';
 import { fixture, POINTS } from './fixtures/levels';
 import { TYPICAL_TANK } from '../src/sim/lab';
 
+/** A whole-level stand-in run is a heavy sim: 5 s timed out under machine load. */
+const SIM_TIMEOUT = 20_000;
+
 /** A river of deep water along y 450–650 across a 2 × 2 marsh. */
 const RIVER = { ground: 'swampWater' as const, shape: { kind: 'rect' as const, x: 0, y: 450, w: 1920, h: 200 } };
 const onRiver = (d: LevelDef): Match => new Match({ level: loadLevel({ ...d, start: { x: 200, y: 760 }, map: { ...d.map, base: 'marsh', terrain: [RIVER] } }, CH3_KINDS), seed: 1, player: { loadout: STARTER_LOADOUT } });
@@ -70,7 +73,7 @@ describe('chapter 3 content', () => {
       const wins = [1, 2, 3].filter((seed) => runMission({ level: labLevel(n), seed, player: { loadout: parseTank(TYPICAL_TANK[n]!), kits: 2 } }).passed).length;
       expect(wins, `level ${n}`).toBeGreaterThan(0);
     }
-  });
+  }, SIM_TIMEOUT);
 });
 
 describe('the barge', () => {

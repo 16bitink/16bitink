@@ -36,19 +36,19 @@ const pts = (list: readonly (readonly [number, number])[]): Pt[] => list.map(([x
 export const CHAPTER_MAPS: readonly ChapterMap[] = [
   // Meadowlands: the farm, the barn, the village lane, the covered bridge, the woods, the old mill, the
   // valley road, the rail yard's hangar, the rocky pass and the hilltop fort.
-  { art: ch1Art, box: SPOT_BOX, spots: pts([[240, 545], [398, 440], [405, 335], [490, 278], [790, 410], [850, 495], [975, 548], [1075, 450], [1030, 315], [1110, 228]]) },
+  { art: ch1Art, box: SPOT_BOX, spots: pts([[240, 545], [390, 458], [398, 330], [490, 278], [790, 410], [876, 507], [975, 548], [1075, 450], [1030, 315], [1125, 216]]) },
   // Dust Flats: the oil town, the canyon, the pipeline, the water depot, the wells, the dunes, Rook's mesa,
   // the town square, the prison road and the crawler's gate.
-  { art: ch2Art, box: SPOT_BOX, spots: pts([[200, 535], [280, 430], [400, 385], [520, 465], [630, 345], [772, 475], [870, 420], [968, 420], [1095, 480], [1145, 385]]) },
+  { art: ch2Art, box: SPOT_BOX, spots: pts([[192, 540], [280, 430], [418, 392], [520, 465], [630, 345], [772, 475], [870, 420], [968, 420], [1140, 430], [1118, 205]]) },
   // Mirefen: the causeway past the hover dock, the stilt village, the barge, the reed watch, the sluice,
   // the islands, Grim's channel, the lock, the far bank and the Ironclad's lagoon.
-  { art: ch3Art, box: SPOT_BOX, spots: pts([[230, 535], [345, 410], [455, 462], [590, 420], [700, 430], [930, 375], [1050, 520], [1150, 430], [1105, 325], [1075, 212]]) },
+  { art: ch3Art, box: SPOT_BOX, spots: pts([[230, 535], [345, 410], [455, 462], [590, 420], [700, 430], [930, 375], [1050, 520], [1150, 440], [1100, 315], [1110, 190]]) },
   // Frostridge: the frozen lake, the cabins, the pass below the cliffs, the laser lab, the ridges, the
   // generator, the avalanche slope, the signal mast, the depots and the rail-gun train's line.
   { art: ch4Art, box: SPOT_BOX, spots: pts([[215, 520], [345, 398], [500, 520], [640, 358], [790, 485], [880, 368], [1000, 475], [1100, 495], [1160, 360], [1035, 235]]) },
   // Deepwood: the sawmill, the burnt trees, the Hive works, the log bridge, the felled road, the forest
   // fort, the clearing, the Hive cells, the Brigade camp and the Harvester's logging front.
-  { art: ch5Art, box: SPOT_BOX, spots: pts([[215, 470], [345, 400], [460, 452], [560, 376], [830, 383], [975, 470], [1065, 565], [1158, 465], [1150, 320], [1060, 238]]) },
+  { art: ch5Art, box: SPOT_BOX, spots: pts([[215, 470], [345, 400], [460, 452], [560, 376], [830, 383], [975, 470], [1065, 565], [1158, 465], [1150, 320], [1050, 242]]) },
 ];
 
 export const chapterMap = (index: number): ChapterMap => CHAPTER_MAPS[index] ?? CHAPTER_MAPS[0]!;

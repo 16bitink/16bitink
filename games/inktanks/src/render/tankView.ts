@@ -25,8 +25,8 @@ const BARGE = (WORLD.vehicles as unknown as Readonly<Record<string, { readonly f
 /** Fortress body drawn at this scale of its 288 px art: the level's turret mounts are sized to it. */
 const FORT_SCALE = 0.7;
 const TURRET_SCALE: Readonly<Record<string, number>> = { fortressCannon: 0.5, fortressMG: 0.7, fortressRockets: 0.7, fortressMortar: 0.5, fortressRail: 0.5 };
-/** Where an allied gun tower's turret sits, from the tower's ground origin (the cement tower art’s roof hatch). */
-const TOWER_TOP = { dx: 2, dy: -46, scale: 1 } as const;
+/** Where an allied gun tower’s turret sits, from the tower’s ground origin: the middle of the cement tower’s flat roof (its hatch ring). */
+const TOWER_TOP = { dx: 0, dy: -35, scale: 1 } as const;
 /** A boss turret's art by its gun. */
 const TURRET_OF: Readonly<Record<string, string>> = { cannon: 'fortressCannon', machinegun: 'fortressMG', rockets: 'fortressRockets', mortar: 'fortressMortar', laser: 'fortressRail', rail: 'fortressRail' };
 

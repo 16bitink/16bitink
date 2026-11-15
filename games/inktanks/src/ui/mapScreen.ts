@@ -69,11 +69,15 @@ export function showMap(root: HTMLElement, d: MapData, a: MapActions): () => voi
     ending: () => a.ending?.(),
   });
   const place = (): void => {
+    // Spots are smaller on a phone (screensCss): medals and the name keep to the spot's own size.
+    const size = root.querySelector<HTMLElement>('.spot')?.offsetWidth || 56;
     for (const el of root.querySelectorAll<HTMLElement>('[data-n]')) {
       const s = SPOTS[Number(el.dataset.n) - ch.first]!;
       const p = d.project(s.x, s.y);
-      const dy = el.classList.contains('spotmedals') ? 34 : el.classList.contains('spotname') ? -62 : 0;
-      el.style.left = `${Math.round(p.x)}px`;
+      const dy = el.classList.contains('spotmedals') ? Math.round(size * 0.61) : el.classList.contains('spotname') ? -Math.round(size * 1.1) : 0;
+      // A narrow screen (a 4:3 iPad) can crop the painting's edge: keep the spot whole on screen.
+      const half = size / 2 + 4;
+      el.style.left = `${Math.round(Math.min(Math.max(p.x, half), root.clientWidth - half))}px`;
       el.style.top = `${Math.round(p.y + dy)}px`;
     }
   };

@@ -11,6 +11,9 @@ import { showCard } from '../ui/cards';
 import { clear } from '../ui/dom';
 import type { Stage } from './stage';
 
+/** A touch screen held upright: the game asks to be turned (the same query as screensCss's .turn). */
+export const PORTRAIT_PHONE = '(orientation: portrait) and (pointer: coarse)';
+
 /** Seconds of the last moment (the wreck burning, the truck arriving) before the results. */
 const OUTRO_MS = 1200;
 
@@ -57,6 +60,8 @@ export class MissionRun {
     }, { signal: this.off.signal });
     // Leaving the tab pauses, so a phone call doesn't lose the mission.
     document.addEventListener('visibilitychange', () => document.hidden && this.pause(), { signal: this.off.signal });
+    // A phone turned upright covers the game with "Turn your phone sideways" (screensCss .turn): pause under it.
+    matchMedia(PORTRAIT_PHONE).addEventListener('change', (e) => e.matches && this.pause(), { signal: this.off.signal });
     this.scene = stage.startMission((key) => new MissionScene(match, {
       input: (p) => this.controls.read(p),
       onEvents: (events) => {

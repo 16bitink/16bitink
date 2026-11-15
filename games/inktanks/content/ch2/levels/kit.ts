@@ -15,6 +15,28 @@ export { at, blob, each, H, patch, path, row, W } from '../../../src/content/ch1
 export const CEMENT_STEP = 63;
 
 /**
+ * A gun tower's ground footprint is 44 × 35 px and a cement wall is 14 px thick.
+ * A tower beside a wall stands flush against it (half a wall + half a tower off
+ * the wall's line), never on it: the face-on art of a tower and a wall that
+ * overlap draws one through the other (owner, Nov 15).
+ */
+const TOWER_OFF = { wall: 7 + 22, end: 18 } as const;
+
+/**
+ * The two gun towers of a gate in a north-south wall at `x`: each stands
+ * outside the wall (`out` -1 = west, 1 = east), flush against it, its gate-side
+ * face level with the wall run's end, so the gate stays as wide as the walls
+ * leave it. `top` and `bottom` are the yard's; `side` the pieces in each run.
+ */
+export function gateTowers(x: number, top: number, bottom: number, side: number, out: -1 | 1, guns: readonly [AllyDef['gun'], AllyDef['gun']]): AllyDef[] {
+  const tx = x + out * TOWER_OFF.wall;
+  return [
+    { kind: 'tower', at: { x: tx, y: top + side * CEMENT_STEP - TOWER_OFF.end }, gun: guns[0] },
+    { kind: 'tower', at: { x: tx, y: bottom - side * CEMENT_STEP + TOWER_OFF.end }, gun: guns[1] },
+  ];
+}
+
+/**
  * Our depot: a white cement compound with two gun towers either side of its
  * open gate, which faces west (the road comes in from the west). `x, y` is
  * the gate's centre; the yard runs east of it, `w` × `h` px.
@@ -31,7 +53,7 @@ export function depot(x: number, y: number, w = 320, h = 260, guns: readonly [Al
       ...row('cementWallV', x + w, top + 32, Math.round(h / CEMENT_STEP), 0, CEMENT_STEP),
       ...row('cementWallV', x, top + 32, side, 0, CEMENT_STEP), ...row('cementWallV', x, bottom - 32, side, 0, -CEMENT_STEP),
     ],
-    allies: [{ kind: 'tower', at: { x: x - 10, y: y - gap / 2 - 50 }, gun: guns[0] }, { kind: 'tower', at: { x: x - 10, y: y + gap / 2 + 50 }, gun: guns[1] }],
+    allies: gateTowers(x, top, bottom, side, -1, guns),
   };
 }
 

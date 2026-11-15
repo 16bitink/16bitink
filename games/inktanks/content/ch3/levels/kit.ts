@@ -3,7 +3,7 @@ import type { TerrainPatch } from '../../../src/logic/land';
 import type { LootTable } from '../../../src/logic/loot';
 import type { Pt } from '../../../src/logic/vec';
 import { path, row } from '../../../src/content/ch1/levels/kit';
-import { CEMENT_STEP } from '../../ch2/levels/kit';
+import { CEMENT_STEP, gateTowers } from '../../ch2/levels/kit';
 
 /**
  * Helpers for chapter 3 (Mirefen) layouts, on top of chapters 1 and 2's kits
@@ -86,7 +86,7 @@ export function depotEast(x: number, y: number, w = 300, h = 260, guns: readonly
       ...row('cementWallV', x - w, top + 32, Math.round(h / CEMENT_STEP), 0, CEMENT_STEP),
       ...row('cementWallV', x, top + 32, side, 0, CEMENT_STEP), ...row('cementWallV', x, bottom - 32, side, 0, -CEMENT_STEP),
     ],
-    allies: [{ kind: 'tower', at: { x: x + 10, y: y - gap / 2 - 50 }, gun: guns[0] }, { kind: 'tower', at: { x: x + 10, y: y + gap / 2 + 50 }, gun: guns[1] }],
+    allies: gateTowers(x, top, bottom, side, 1, guns),
   };
 }
 

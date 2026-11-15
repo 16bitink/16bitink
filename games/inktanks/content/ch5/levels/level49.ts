@@ -55,7 +55,8 @@ export const LEVEL_49: LevelDef = {
   },
   start: { x: CX - 120, y: CY }, startHeading: 0,
   mixedClans: true,
-  allies: [...FORT.allies, { kind: 'tower', at: { x: CX + 90, y: CY - 90 }, gun: 'cannon' }, { kind: 'tower', at: { x: CX + 90, y: CY + 90 }, gun: 'machinegun' }],
+  // The inner pair stand flush against the east wall's inner face (x 1620 - 29), clear of the top and bottom walls.
+  allies: [...FORT.allies, { kind: 'tower', at: { x: CX + 91, y: CY - 66 }, gun: 'cannon' }, { kind: 'tower', at: { x: CX + 91, y: CY + 66 }, gun: 'machinegun' }],
   friends: [{ at: { x: CX - 60, y: CY + 70 }, tank: TANK.boarHeavy, clan: 'boars', name: 'Tusk' }],
   enemies: [
     // Dusk: drone raiders from both trails.

@@ -52,7 +52,7 @@ export class App {
   constructor(parent: HTMLElement, private readonly host: GameHost) {
     this.root = document.createElement('div');
     this.root.className = 'ikt';
-    this.root.innerHTML = '<div class="stage"></div><div class="ikt-hud" hidden></div><div class="screen"></div><div class="screen" hidden></div>';
+    this.root.innerHTML = '<div class="stage"></div><div class="ikt-hud" hidden></div><div class="screen"></div><div class="screen" hidden></div><div class="turn"><div class="t36 gold">Turn your phone sideways</div><div class="t12 dimt">InkTanks plays in landscape</div></div>';
     parent.appendChild(this.root);
     [this.surface, this.hud, this.screen, this.card] = Array.from(this.root.children) as HTMLElement[] as [HTMLElement, HTMLElement, HTMLElement, HTMLElement];
     const loaded = parseSave(this.read());

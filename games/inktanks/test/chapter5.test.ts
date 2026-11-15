@@ -21,6 +21,9 @@ import { runMission } from '../src/sim/runMission';
 import { fixture } from './fixtures/levels';
 import { TYPICAL_TANK } from '../src/sim/lab';
 
+/** A whole-level stand-in run is a heavy sim: 5 s timed out under machine load. */
+const SIM_TIMEOUT = 20_000;
+
 const build = (d: LevelDef, tank = 'cannon1/medium1/halftracks1'): Match => new Match({ level: loadLevel({ ...d, number: d.number === 99 ? 41 : d.number }, CH5_KINDS), seed: 1, player: { loadout: parseTank(tank) } });
 const steps = (m: Match, s: number): MatchEvent[] => {
   const ev: MatchEvent[] = [];
@@ -76,7 +79,7 @@ describe('chapter 5 content', () => {
       const wins = [1, 2, 3].filter((seed) => runMission({ level: labLevel(n), seed, player: { loadout: parseTank(TYPICAL_TANK[n]!), kits: 2 } }).passed).length;
       expect(wins, `level ${n}`).toBeGreaterThan(0);
     }
-  });
+  }, SIM_TIMEOUT);
 });
 
 describe('the clans fight each other too (clanWar)', () => {

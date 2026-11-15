@@ -3,7 +3,7 @@
  * and dev/mission.html: the HUD root has class ikt-hud. Injected once.
  */
 export const HUD_CSS = `
-.ikt-hud { position: fixed; inset: 0; pointer-events: none; z-index: 2; }
+.ikt-hud { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
 .ikt-hud .feed { position: absolute; left: 12px; top: 10px; display: flex; flex-direction: column; gap: 3px; }
 .ikt-hud .feed div { background: rgba(20, 18, 14, 0.62); padding: 3px 8px; border-radius: 4px; }
 .ikt-hud .feed i { color: #e0b040; font-style: normal; }
@@ -63,6 +63,18 @@ export const HUD_CSS = `
 .ikt-hud .pop { position: absolute; left: 0; top: 0; font: 700 18px ui-monospace, Menlo, monospace; color: #f0c040; text-shadow: 0 2px 0 #14110c, 0 0 4px #14110c; white-space: nowrap; }
 .ikt-hud .swap { right: 150px; bottom: 150px; } .ikt-hud .repair { right: 40px; bottom: 210px; width: 64px; height: 64px; font-size: 12px; }
 @media (pointer: coarse) { .ikt-hud .bottom { bottom: 8px; transform: translateX(-50%) scale(1.1); } .ikt-hud .mini { width: 150px; height: auto; } }
+/* A short phone (under 420 px tall): the touch buttons in two tidy columns under the minimap, clear of it and of the bottom bar. */
+@media (pointer: coarse) and (max-height: 420px) {
+  .ikt-hud .gadgetbtn { right: 12px; bottom: auto; top: 70px; width: 64px; height: 64px; }
+  .ikt-hud .gadgetbtn img { width: 38px; height: 38px; }
+  .ikt-hud .repair { right: 16px; bottom: auto; top: 142px; width: 56px; height: 56px; }
+  .ikt-hud .callbtn { width: 56px; height: 56px; }
+  .ikt-hud .callbtn img { width: 34px; height: 34px; }
+  .ikt-hud .callbtn.supply { right: 88px; bottom: auto; top: 74px; }
+  .ikt-hud .callbtn.strike { right: 88px; bottom: auto; top: 138px; }
+  .ikt-hud .swap { right: 160px; bottom: auto; top: 110px; }
+  .ikt-hud .tip { white-space: normal; width: max-content; max-width: 86vw; text-align: center; bottom: 64px; }
+}
 .stick { position: fixed; width: 136px; height: 136px; margin: -68px 0 0 -68px; border-radius: 50%; background: rgba(244, 236, 216, 0.18); border: 2px solid rgba(244, 236, 216, 0.5); z-index: 3; pointer-events: none; }
 .stick i { position: absolute; left: 46px; top: 46px; width: 44px; height: 44px; border-radius: 50%; background: rgba(244, 236, 216, 0.85); }
 `;

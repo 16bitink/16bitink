@@ -66,7 +66,7 @@ export const SCREENS_CSS = `
 .ikt .spotmedals .medal { width: 14px; height: 14px; margin: 0; }
 .ikt .spotname { position: absolute; transform: translate(-50%, 0); font-size: 12px; pointer-events: none; white-space: nowrap; background: rgba(20,17,12,0.75); padding: 1px 5px; }
 .ikt .chapters { position: absolute; left: 50%; bottom: max(8px, env(safe-area-inset-bottom)); transform: translateX(-50%); display: flex; gap: 8px; }
-.ikt .chip { font: inherit; font-size: 12px; padding: 6px 10px; min-width: 96px; text-align: center; border: 0; color: #f4ecd8; background: #3a3226; box-shadow: 0 0 0 3px var(--ink), inset 0 -3px 0 #221c14; cursor: pointer; }
+.ikt .chip { font: inherit; font-size: 12px; padding: 6px 10px; min-width: 96px; white-space: nowrap; text-align: center; border: 0; color: #f4ecd8; background: #3a3226; box-shadow: 0 0 0 3px var(--ink), inset 0 -3px 0 #221c14; cursor: pointer; }
 .ikt .chip.here { background: #6b5434; color: var(--gold); } .ikt .chip b { display: block; font-weight: normal; font-size: 12px; color: var(--dim); }
 /* Blueprints: the icon next to every amount and cost, the Workshop badge */
 .ikt .bp { display: inline-block; width: 1.75em; height: 1.75em; vertical-align: -0.5em; image-rendering: auto; }
@@ -155,7 +155,15 @@ export const SCREENS_CSS = `
 .ikt .endchap { background: var(--panel); box-shadow: 0 0 0 4px var(--ink), inset 0 0 0 2px var(--edge); padding: 6px 8px; text-align: center; }
 @media (max-height: 520px) { .ikt .wordmark.victory { font-size: 48px; } .ikt .endsub { font-size: 20px; } .ikt .endtitle { padding: 16px 0 6px; } .ikt .endsay { font-size: 12px; } .ikt .endsay p { margin-bottom: 4px; } .ikt .endnums { font-size: 12px; } .ikt .endrank .promo .t36 { font-size: 20px; } .ikt .endtank { display: none; } .ikt .endchap { padding: 2px 4px; font-size: 12px; } .ikt .ending .sheet .t36 { font-size: 20px; } }
 @media (max-width: 700px) { .ikt .endchaps { grid-template-columns: repeat(3, 1fr); } .ikt .ending .sheet .cols { flex-direction: column; } }
+/* Small phones (an iPhone SE on its side): the briefing's objectives in smaller type, so the gadget picker stays in sight. */
+@media (max-height: 520px) { .ikt .spot { width: 46px; height: 46px; font-size: 20px; } }
+@media (max-height: 520px) and (max-width: 760px) { .ikt .spot { width: 40px; height: 40px; font-size: 18px; } .ikt .chapters .chip b { display: none; } .ikt .briefing, .ikt .briefing .objective { font-size: 18px; } .ikt .briefing .loadout > .row:first-child { display: none; } }
+/* A phone held upright: ask for landscape over everything (missionRun pauses under it). */
+.ikt .turn { display: none; position: absolute; inset: 0; z-index: 50; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 24px; text-align: center; background: #1b1a16; }
+@media (orientation: portrait) and (pointer: coarse) { .ikt .turn { display: flex; } }
 @media (max-height: 520px) {
+  /* The buttons stay in sight on a short screen: the last button row sticks to the panel's foot (room above for the Workshop badge). */
+  .ikt .sheet > .row.center:last-child { position: sticky; bottom: -8px; margin: 0 -12px -8px; padding: 14px 12px 8px; background: var(--panel); z-index: 2; box-shadow: 0 -8px 10px -8px rgba(0, 0, 0, 0.6); }
   .ikt .wordmark { font-size: 72px; }
   .ikt .menu { gap: 10px; }
   .ikt .panel { padding: 8px 12px; }
@@ -174,7 +182,11 @@ export const SCREENS_CSS = `
   .ikt .wrow { grid-template-columns: 40px 1fr; }
   .ikt .gpick { flex-direction: row; justify-content: center; padding: 2px 4px; font-size: 12px; min-height: 36px; }
   .ikt .gpick img { width: 26px; height: 26px; }
-  .ikt .briefing .minimap { max-height: 30vh; }
+  .ikt .briefing .minimap { max-height: 22vh; }
+  /* Your tank, kits and wingmen on one wrapped line, so the gadget picker stays above the buttons. */
+  .ikt .briefing .loadout { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 2px 12px; }
+  .ikt .briefing .wingpics, .ikt .briefing .wnames { display: none; }
+  .ikt .briefing .wingline .btn { min-height: 32px; padding: 2px 10px 4px; }
 }
 @media (min-height: 900px) and (min-width: 1400px) {
   .ikt { font-size: 36px; } .ikt .screen .btn { font-size: 36px; } .ikt .objective { font-size: 36px; }
