@@ -57,12 +57,19 @@ export function preloadParts(scene: Phaser.Scene): void {
   for (const [key, url] of WORLD_URLS) if ((key.startsWith('world:vehicles/') || key.startsWith('world:crew/')) && !scene.textures.exists(key)) scene.load.image(key, url);
 }
 
+/**
+ * A vehicle's stripe or tarp colour: its side's. Everything on our side (team 0) wears Brigade blue, freed
+ * clan crews too (owner, Nov 15: level 49's red-striped Boar ally beside red Boar enemies was confusing);
+ * enemies wear their clan's colour.
+ */
+const sideColour = (t: Pick<Tank, 'team' | 'clan'>): number => CLAN_COLOUR[t.team === 0 ? 'ink' : t.clan];
+
 /** The keys a tank's current parts draw with. */
 export function tankKeys(t: Tank, bank: RotBank): { drive: readonly string[]; hull: string; turret: string; ring: readonly [number, number] } {
   const art = partsArt();
   const hullKey = art.hull(t.loadout.hull);
   const drive = art.frames(art.drive(t.loadout.drive, t.loadout.hull.family as HullFamily));
-  const hull = bank.tinted(hullKey, art.stripe(hullKey), CLAN_COLOUR[t.clan]);
+  const hull = bank.tinted(hullKey, art.stripe(hullKey), sideColour(t));
   return { drive, hull, turret: art.turret(t.loadout.gun), ring: art.ring(hullKey) };
 }
 
@@ -200,8 +207,8 @@ export class TankView {
       return;
     }
     const boss = t.role === 'boss';
-    // A truck's tarp takes its side's colour (Ink blue for yours, the clan's for a convoy), as a tank's stripe does.
-    const truckKey = (frame: string): string => this.bank.tinted(worldKey(`vehicles/${frame}`), worldKey('vehicles/truck-1-stripe'), shade(CLAN_COLOUR[t.clan], TARP_SHADE));
+    // A truck's tarp takes its side's colour (sideColour: Ink blue for ours, the clan's for a convoy), as a tank's stripe does.
+    const truckKey = (frame: string): string => this.bank.tinted(worldKey(`vehicles/${frame}`), worldKey('vehicles/truck-1-stripe'), shade(sideColour(t), TARP_SHADE));
     const art = boss ? bossArt(t.body) : FORT;
     const body = boss ? worldKey(`vehicles/${art.body}`) : truckKey('truck-1');
     const sc = boss ? FORT_SCALE : 1;

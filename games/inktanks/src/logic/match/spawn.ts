@@ -103,7 +103,7 @@ export function spawnEnemy(m: Match, e: ResolvedEnemy): Tank {
 
 /**
  * A tank on your side (chapter 5, LevelDef.friends: a freed clan crew): team 0,
- * its clan's colours, a brain that follows you and fights what it sees.
+ * its clan's names but our Brigade blue (render/tankView.ts sideColour), a brain that follows you and fights what it sees.
  */
 export function spawnFriend(m: Match, f: ResolvedFriend): Tank {
   const clan = f.clan ?? 'ink';
