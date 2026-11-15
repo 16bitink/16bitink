@@ -1,0 +1,47 @@
+{
+ "flamer": {
+  "file": "fx/flamer.png",
+  "frame": [
+   128,
+   50
+  ],
+  "frames": 8,
+  "fps": 12,
+  "anchor": [
+   9,
+   29
+  ],
+  "loop": true,
+  "note": "a jet pointing right (+x), nozzle at the anchor; rotate it to the gun, stretch along x to the range"
+ },
+ "burningReeds": {
+  "file": "fx/burningReeds.png",
+  "frame": [
+   42,
+   31
+  ],
+  "frames": 8,
+  "fps": 12,
+  "anchor": [
+   21,
+   26
+  ],
+  "loop": true,
+  "note": "flames standing on the ground; anchor = their foot; play over a burning reeds clump"
+ },
+ "wake": {
+  "file": "fx/wake.png",
+  "frame": [
+   132,
+   59
+  ],
+  "frames": 12,
+  "fps": 12,
+  "anchor": [
+   104,
+   30
+  ],
+  "loop": true,
+  "note": "foam churn at the anchor, wake streaks trailing to -x; anchor at the stern or a paddle wheel, rotate so -x points astern"
+ }
+}

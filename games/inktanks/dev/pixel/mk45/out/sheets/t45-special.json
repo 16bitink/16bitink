@@ -1,0 +1,34 @@
+{
+ "turretRail-mk4": {
+  "x": -36,
+  "y": -5
+ },
+ "turretRail-mk5": {
+  "x": 8,
+  "y": -5
+ },
+ "turretLaser-mk4": {
+  "x": 52,
+  "y": -9
+ },
+ "turretLaser-mk5": {
+  "x": 99,
+  "y": -9
+ },
+ "turretFlamer-mk4": {
+  "x": 146,
+  "y": -17
+ },
+ "turretFlamer-mk5": {
+  "x": -36,
+  "y": 64
+ },
+ "turretMortar-mk4": {
+  "x": 8,
+  "y": 48
+ },
+ "turretMortar-mk5": {
+  "x": 52,
+  "y": 48
+ }
+}

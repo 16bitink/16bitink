@@ -1,0 +1,26 @@
+{
+ "hullHeavy-mk5": {
+  "x": -27,
+  "y": -13
+ },
+ "hullHeavy-mk4": {
+  "x": 35,
+  "y": -13
+ },
+ "hullMedium-mk5": {
+  "x": 93,
+  "y": -21
+ },
+ "hullMedium-mk4": {
+  "x": 147,
+  "y": -21
+ },
+ "hullLight-mk5": {
+  "x": -35,
+  "y": 64
+ },
+ "hullLight-mk4": {
+  "x": 11,
+  "y": 64
+ }
+}

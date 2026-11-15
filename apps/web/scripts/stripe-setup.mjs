@@ -59,6 +59,13 @@ const PRODUCTS = [
     unitAmount: 499,
     currency: 'usd',
   },
+  {
+    lookupKey: 'inktanks_full',
+    name: 'InkTanks: Full Game',
+    description: 'The full InkTanks game on 16bit.ink: all 50 missions, with the Dust Flats, Mirefen, Frostridge and Deepwood after the free Meadowlands, from Private to General. One-time purchase, no subscription.',
+    unitAmount: 499,
+    currency: 'usd',
+  },
 ];
 
 const key = process.env.STRIPE_SECRET_KEY;

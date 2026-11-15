@@ -1,0 +1,235 @@
+{
+ "frames": [
+  {
+   "filename": "inktanks-burning-reeds 0.png",
+   "frame": {
+    "x": 0,
+    "y": 0,
+    "w": 42,
+    "h": 31
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 42,
+    "h": 31
+   },
+   "sourceSize": {
+    "w": 42,
+    "h": 31
+   },
+   "pivot": {
+    "x": 0.5,
+    "y": 0.8387096774193549
+   },
+   "duration": 83
+  },
+  {
+   "filename": "inktanks-burning-reeds 1.png",
+   "frame": {
+    "x": 42,
+    "y": 0,
+    "w": 42,
+    "h": 31
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 42,
+    "h": 31
+   },
+   "sourceSize": {
+    "w": 42,
+    "h": 31
+   },
+   "pivot": {
+    "x": 0.5,
+    "y": 0.8387096774193549
+   },
+   "duration": 83
+  },
+  {
+   "filename": "inktanks-burning-reeds 2.png",
+   "frame": {
+    "x": 84,
+    "y": 0,
+    "w": 42,
+    "h": 31
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 42,
+    "h": 31
+   },
+   "sourceSize": {
+    "w": 42,
+    "h": 31
+   },
+   "pivot": {
+    "x": 0.5,
+    "y": 0.8387096774193549
+   },
+   "duration": 83
+  },
+  {
+   "filename": "inktanks-burning-reeds 3.png",
+   "frame": {
+    "x": 0,
+    "y": 31,
+    "w": 42,
+    "h": 31
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 42,
+    "h": 31
+   },
+   "sourceSize": {
+    "w": 42,
+    "h": 31
+   },
+   "pivot": {
+    "x": 0.5,
+    "y": 0.8387096774193549
+   },
+   "duration": 83
+  },
+  {
+   "filename": "inktanks-burning-reeds 4.png",
+   "frame": {
+    "x": 42,
+    "y": 31,
+    "w": 42,
+    "h": 31
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 42,
+    "h": 31
+   },
+   "sourceSize": {
+    "w": 42,
+    "h": 31
+   },
+   "pivot": {
+    "x": 0.5,
+    "y": 0.8387096774193549
+   },
+   "duration": 83
+  },
+  {
+   "filename": "inktanks-burning-reeds 5.png",
+   "frame": {
+    "x": 84,
+    "y": 31,
+    "w": 42,
+    "h": 31
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 42,
+    "h": 31
+   },
+   "sourceSize": {
+    "w": 42,
+    "h": 31
+   },
+   "pivot": {
+    "x": 0.5,
+    "y": 0.8387096774193549
+   },
+   "duration": 83
+  },
+  {
+   "filename": "inktanks-burning-reeds 6.png",
+   "frame": {
+    "x": 0,
+    "y": 62,
+    "w": 42,
+    "h": 31
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 42,
+    "h": 31
+   },
+   "sourceSize": {
+    "w": 42,
+    "h": 31
+   },
+   "pivot": {
+    "x": 0.5,
+    "y": 0.8387096774193549
+   },
+   "duration": 83
+  },
+  {
+   "filename": "inktanks-burning-reeds 7.png",
+   "frame": {
+    "x": 42,
+    "y": 62,
+    "w": 42,
+    "h": 31
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 42,
+    "h": 31
+   },
+   "sourceSize": {
+    "w": 42,
+    "h": 31
+   },
+   "pivot": {
+    "x": 0.5,
+    "y": 0.8387096774193549
+   },
+   "duration": 83
+  }
+ ],
+ "meta": {
+  "app": "PixelLab VFX Creator",
+  "image": "inktanks-burning-reeds.png",
+  "format": "RGBA8888",
+  "size": {
+   "w": 126,
+   "h": 93
+  },
+  "scale": "1",
+  "anchor": {
+   "kind": "origin",
+   "x": 21,
+   "y": 26
+  },
+  "frameTags": [
+   {
+    "name": "inktanks-burning-reeds",
+    "from": 0,
+    "to": 7,
+    "direction": "forward"
+   }
+  ]
+ }
+}

@@ -1,0 +1,14 @@
+{
+ "turretFlamer-mk3": {
+  "x": -36,
+  "y": -17
+ },
+ "turretFlamer-mk2": {
+  "x": 4,
+  "y": -22
+ },
+ "turretFlamer-mk1": {
+  "x": 40,
+  "y": -24
+ }
+}

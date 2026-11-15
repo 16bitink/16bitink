@@ -1,0 +1,22 @@
+{
+ "muzzle": {
+  "turretLaser-mk1": [
+   [
+    0.0,
+    -35.4
+   ]
+  ],
+  "turretLaser-mk2": [
+   [
+    0.0,
+    -38.2
+   ]
+  ],
+  "turretLaser-mk3": [
+   [
+    0.0,
+    -43.0
+   ]
+  ]
+ }
+}

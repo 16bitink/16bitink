@@ -1,0 +1,17 @@
+{
+ "treeFire": {
+  "file": "fx/treeFire.png",
+  "frame": [
+   84,
+   152
+  ],
+  "frames": 16,
+  "fps": 12,
+  "anchor": [
+   42,
+   118
+  ],
+  "loop": true,
+  "note": "a blazing tree canopy: a heap of flame tongues, embers and dark smoke rising (84 x 152). Loop it over a burning tree; anchor = the middle of the blaze, so put it on the canopy centre (about the tree's anchor minus 0.55 of its height in y); scale ~0.6 for young trees. When it burns out, switch the tree to its state 0 (oldTree / oldFir: a charred snag with embers)"
+ }
+}

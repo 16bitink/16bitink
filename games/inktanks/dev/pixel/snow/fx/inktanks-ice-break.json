@@ -1,0 +1,287 @@
+{
+ "frames": [
+  {
+   "filename": "inktanks-ice-break 0.png",
+   "frame": {
+    "x": 0,
+    "y": 0,
+    "w": 91,
+    "h": 70
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 91,
+    "h": 70
+   },
+   "sourceSize": {
+    "w": 91,
+    "h": 70
+   },
+   "pivot": {
+    "x": 0.4945054945054945,
+    "y": 0.35714285714285715
+   },
+   "duration": 83
+  },
+  {
+   "filename": "inktanks-ice-break 1.png",
+   "frame": {
+    "x": 91,
+    "y": 0,
+    "w": 91,
+    "h": 70
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 91,
+    "h": 70
+   },
+   "sourceSize": {
+    "w": 91,
+    "h": 70
+   },
+   "pivot": {
+    "x": 0.4945054945054945,
+    "y": 0.35714285714285715
+   },
+   "duration": 83
+  },
+  {
+   "filename": "inktanks-ice-break 2.png",
+   "frame": {
+    "x": 182,
+    "y": 0,
+    "w": 91,
+    "h": 70
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 91,
+    "h": 70
+   },
+   "sourceSize": {
+    "w": 91,
+    "h": 70
+   },
+   "pivot": {
+    "x": 0.4945054945054945,
+    "y": 0.35714285714285715
+   },
+   "duration": 83
+  },
+  {
+   "filename": "inktanks-ice-break 3.png",
+   "frame": {
+    "x": 273,
+    "y": 0,
+    "w": 91,
+    "h": 70
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 91,
+    "h": 70
+   },
+   "sourceSize": {
+    "w": 91,
+    "h": 70
+   },
+   "pivot": {
+    "x": 0.4945054945054945,
+    "y": 0.35714285714285715
+   },
+   "duration": 83
+  },
+  {
+   "filename": "inktanks-ice-break 4.png",
+   "frame": {
+    "x": 0,
+    "y": 70,
+    "w": 91,
+    "h": 70
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 91,
+    "h": 70
+   },
+   "sourceSize": {
+    "w": 91,
+    "h": 70
+   },
+   "pivot": {
+    "x": 0.4945054945054945,
+    "y": 0.35714285714285715
+   },
+   "duration": 83
+  },
+  {
+   "filename": "inktanks-ice-break 5.png",
+   "frame": {
+    "x": 91,
+    "y": 70,
+    "w": 91,
+    "h": 70
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 91,
+    "h": 70
+   },
+   "sourceSize": {
+    "w": 91,
+    "h": 70
+   },
+   "pivot": {
+    "x": 0.4945054945054945,
+    "y": 0.35714285714285715
+   },
+   "duration": 83
+  },
+  {
+   "filename": "inktanks-ice-break 6.png",
+   "frame": {
+    "x": 182,
+    "y": 70,
+    "w": 91,
+    "h": 70
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 91,
+    "h": 70
+   },
+   "sourceSize": {
+    "w": 91,
+    "h": 70
+   },
+   "pivot": {
+    "x": 0.4945054945054945,
+    "y": 0.35714285714285715
+   },
+   "duration": 83
+  },
+  {
+   "filename": "inktanks-ice-break 7.png",
+   "frame": {
+    "x": 273,
+    "y": 70,
+    "w": 91,
+    "h": 70
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 91,
+    "h": 70
+   },
+   "sourceSize": {
+    "w": 91,
+    "h": 70
+   },
+   "pivot": {
+    "x": 0.4945054945054945,
+    "y": 0.35714285714285715
+   },
+   "duration": 83
+  },
+  {
+   "filename": "inktanks-ice-break 8.png",
+   "frame": {
+    "x": 0,
+    "y": 140,
+    "w": 91,
+    "h": 70
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 91,
+    "h": 70
+   },
+   "sourceSize": {
+    "w": 91,
+    "h": 70
+   },
+   "pivot": {
+    "x": 0.4945054945054945,
+    "y": 0.35714285714285715
+   },
+   "duration": 83
+  },
+  {
+   "filename": "inktanks-ice-break 9.png",
+   "frame": {
+    "x": 91,
+    "y": 140,
+    "w": 91,
+    "h": 70
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 91,
+    "h": 70
+   },
+   "sourceSize": {
+    "w": 91,
+    "h": 70
+   },
+   "pivot": {
+    "x": 0.4945054945054945,
+    "y": 0.35714285714285715
+   },
+   "duration": 83
+  }
+ ],
+ "meta": {
+  "app": "PixelLab VFX Creator",
+  "image": "inktanks-ice-break.png",
+  "format": "RGBA8888",
+  "size": {
+   "w": 364,
+   "h": 210
+  },
+  "scale": "1",
+  "anchor": {
+   "kind": "origin",
+   "x": 45,
+   "y": 25
+  },
+  "frameTags": [
+   {
+    "name": "inktanks-ice-break",
+    "from": 0,
+    "to": 9,
+    "direction": "forward"
+   }
+  ]
+ }
+}
