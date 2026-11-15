@@ -2,6 +2,7 @@ import { slotOf, withPart, type Family, type HullFamily } from '../parts';
 import { tankStats } from '../stats';
 import { mergeIntel, sumIntel } from '../intel';
 import { takeGadget } from './gadgetUse';
+import { isDrivable } from '../land';
 import type { Match } from './match';
 import type { Tank, TankInput } from './types';
 
@@ -47,16 +48,32 @@ export function swapIn(m: Match, t: Tank, pickupId: number): void {
   if (slot === 'hull' && !t.hullsUsed.includes(p.part.family as HullFamily)) t.hullsUsed.push(p.part.family as HullFamily);
   t.picks.push(p.part);
   p.taken = true;
-  // The old part drops out of reach behind, so holding swap doesn't swap it straight back.
+  // The old part drops out of reach behind, so holding swap doesn't swap it straight back;
+  // onto dry ground (behind, else to a side, else ahead), never into the swamp where no one can reach it.
   const back = t.stats.radius + REACH + 12;
-  m.addPickup({ kind: 'part', part: old }, t.x - Math.cos(t.heading) * back, t.y - Math.sin(t.heading) * back);
+  const spot = dropSpot(m, t, back);
+  m.addPickup({ kind: 'part', part: old }, spot.x, spot.y);
   m.emit({ kind: 'swap', tank: t.id, part: p.part, dropped: old });
+}
+
+/** Where a swapped-out part lands: `back` px behind the tank, or the first of its sides and its front on dry land. */
+function dropSpot(m: Match, t: Tank, back: number): { x: number; y: number } {
+  for (const turn of [Math.PI, Math.PI / 2, -Math.PI / 2, 0]) {
+    const a = t.heading + turn;
+    const x = t.x + Math.cos(a) * back;
+    const y = t.y + Math.sin(a) * back;
+    if (isDrivable(m.land, x, y)) return { x, y };
+  }
+  return { x: t.x - Math.cos(t.heading) * back, y: t.y - Math.sin(t.heading) * back };
 }
 
 export function touchPickups(m: Match, t: Tank, input: TankInput, dt: number, wantsSwap: boolean): void {
   if (t.role !== 'tank') return;
   const reach = t.stats.radius + REACH;
   let onPart: number | null = null;
+  // The part underneath is the nearest one in reach (or the one a bot is driving for): with a pile, not whichever came first.
+  let onPartD = Infinity;
+  let chosen = false;
   let onFullKit = false;
   for (const p of m.pickups) {
     if (p.taken) continue;
@@ -72,6 +89,8 @@ export function touchPickups(m: Match, t: Tank, input: TankInput, dt: number, wa
         else m.addPickup({ kind: 'part', part: p.content.part }, p.x, p.y);
         break;
       case 'kit':
+        // On our side only you take kits off the ground: wingmen and freed allies bring their own.
+        if (t.team === 0 && !t.isPlayer) break;
         if (t.kits < t.maxKits) {
           p.taken = true;
           t.kits++;
@@ -110,9 +129,12 @@ export function touchPickups(m: Match, t: Tank, input: TankInput, dt: number, wa
           m.emit({ kind: 'pickup', tank: t.id, what: 'proto', amount: 1 });
         }
         break;
-      case 'part':
-        if (onPart === null) onPart = p.id;
+      case 'part': {
+        const d2 = dx * dx + dy * dy;
+        if (p.id === input.swapPart) [onPart, onPartD, chosen] = [p.id, d2, true];
+        else if (!chosen && d2 < onPartD) [onPart, onPartD] = [p.id, d2];
         break;
+      }
     }
   }
   t.onPart = onPart;

@@ -119,11 +119,19 @@ function slideBy(m: Match, t: Tank, grip: number, dt: number): void {
   }
 }
 
+/**
+ * Whether a tank wedged half over water (or off the map) may drive out. Chapters 1–2 keep the
+ * old rule for enemies (they stick: their levels were tuned on it); our own side (the player,
+ * wingmen, freed crews) always may: a bump at the shore must never trap the player.
+ */
+function wedgeOut(m: Match, t: Tank): boolean {
+  return m.level.def.number > WEDGE_FIX_FROM || t.team === 0;
+}
+
 /** Moves with sliding along water and closed land, then pushes out of solids and other tanks. */
 export function moveBy(m: Match, t: Tank, dx: number, dy: number): void {
-  const r = t.stats.radius * 0.6;
-  const ok = (x: number, y: number): boolean =>
-    canStand(m, t, x, y) && canStand(m, t, x + r, y) && canStand(m, t, x - r, y) && canStand(m, t, x, y + r) && canStand(m, t, x, y - r);
+  const bad = (x: number, y: number): number => offGround(m, t, x, y);
+  const ok = (x: number, y: number): boolean => bad(x, y) === 0;
   if (ok(t.x + dx, t.y + dy)) {
     t.x += dx;
     t.y += dy;
@@ -133,8 +141,8 @@ export function moveBy(m: Match, t: Tank, dx: number, dy: number): void {
   } else if (ok(t.x, t.y + dy)) {
     t.y += dy;
     t.speed *= 0.7;
-  } else if (m.level.def.number > WEDGE_FIX_FROM && !ok(t.x, t.y) && canStand(m, t, t.x + dx, t.y + dy)) {
-    // Wedged half over water (another tank's bump pushed it there): from chapter 3 it may drive out, not stick for good.
+  } else if (wedgeOut(m, t) && unwedgesBy(m, t, dx, dy)) {
+    // Wedged half over water (a bump pushed it there, even its centre): it may drive out, not stick for good.
     t.x += dx;
     t.y += dy;
   } else {
@@ -142,11 +150,63 @@ export function moveBy(m: Match, t: Tank, dx: number, dy: number): void {
   }
   collideStructures(m, t);
   if (t.role !== 'boss') collideTanks(m, t);
-  if (m.level.def.number > EDGE_CLAMP_FROM) {
+  if (m.level.def.number > EDGE_CLAMP_FROM || t.team === 0) {
     const k = t.stats.radius * 0.6 + 1;
     t.x = Math.min(m.land.width - k, Math.max(k, t.x));
     t.y = Math.min(m.land.height - k, Math.max(k, t.y));
   }
+}
+
+/** How many of a tank's five ground points (its centre, and 0.6 × its radius each way) are off its ground (water, or dry land for a keel) at (x, y). */
+export function offGround(m: Match, t: Tank, x: number, y: number): number {
+  const r = t.stats.radius * 0.6;
+  return (canStand(m, t, x, y) ? 0 : 1) + (canStand(m, t, x + r, y) ? 0 : 1) + (canStand(m, t, x - r, y) ? 0 : 1) + (canStand(m, t, x, y + r) ? 0 : 1) + (canStand(m, t, x, y - r) ? 0 : 1);
+}
+
+/**
+ * A wedged tank (`now` of its five points off its ground) may make a move that ends with its centre
+ * on its ground (the chapter 3 rule), that takes more of it back onto its ground, or that keeps as
+ * much on it while heading for ground close ahead (`landAhead`): it drives out, never further in,
+ * and never rides along in the water.
+ */
+export function unwedges(now: number, next: number, centreOk: boolean, landAhead = false): boolean {
+  return now > 0 && (centreOk || next < now || (next === now && landAhead));
+}
+
+function unwedgesBy(m: Match, t: Tank, dx: number, dy: number): boolean {
+  const now = offGround(m, t, t.x, t.y);
+  const next = offGround(m, t, t.x + dx, t.y + dy);
+  const centreOk = canStand(m, t, t.x + dx, t.y + dy);
+  return unwedges(now, next, centreOk, !centreOk && next === now && groundAhead(m, t, dx, dy));
+}
+
+/** Ground it can stand on within two radii along (dx, dy). */
+function groundAhead(m: Match, t: Tank, dx: number, dy: number): boolean {
+  const d = Math.hypot(dx, dy);
+  if (d < 1e-6) return false;
+  for (let k = 5; k <= t.stats.radius * 2; k += 5) if (canStand(m, t, t.x + (dx / d) * k, t.y + (dy / d) * k)) return true;
+  return false;
+}
+
+/**
+ * Moves `t` by (dx, dy), or by the part of it along one axis, so that no more of it ends off its
+ * ground: a bump never shoves a tank into the water (chapter 3 on, and our side), it slides it
+ * along the bank or a boardwalk instead. A tank shoved in used to stick there for good (level 22).
+ */
+function shove(m: Match, t: Tank, dx: number, dy: number): void {
+  if (wedgeOut(m, t) && !t.rail) {
+    const now = offGround(m, t, t.x, t.y);
+    const fits = (x: number, y: number): boolean => offGround(m, t, t.x + x, t.y + y) <= now;
+    if (!fits(dx, dy)) {
+      // The larger part of the push first.
+      const tries: readonly (readonly [number, number])[] = Math.abs(dx) >= Math.abs(dy) ? [[dx, 0], [0, dy]] : [[0, dy], [dx, 0]];
+      const ok = tries.find(([x, y]) => fits(x, y));
+      if (!ok) return;
+      [dx, dy] = ok;
+    }
+  }
+  t.x += dx;
+  t.y += dy;
 }
 
 function crushes(t: Tank): boolean {
@@ -187,12 +247,8 @@ function collideTanks(m: Match, t: Tank): void {
     const push = need - d;
     // The boss doesn't budge; two tanks share the push.
     const share = o.role === 'boss' ? 1 : 0.5;
-    t.x += (dx / d) * push * share;
-    t.y += (dy / d) * push * share;
-    if (o.role !== 'boss') {
-      o.x -= (dx / d) * push * 0.5;
-      o.y -= (dy / d) * push * 0.5;
-    }
+    shove(m, t, (dx / d) * push * share, (dy / d) * push * share);
+    if (o.role !== 'boss') shove(m, o, -(dx / d) * push * 0.5, -(dy / d) * push * 0.5);
   }
 }
 
@@ -215,5 +271,7 @@ export function placeMounted(m: Match, t: Tank): void {
   const s = Math.sin(body.heading);
   t.x = body.x + t.mount.dx * c - t.mount.dy * s;
   t.y = body.y + t.mount.dx * s + t.mount.dy * c;
+  // A wrecked turret can't aim: it turns with the hull, keeping the angle it died at.
+  if (!t.alive) t.turret += body.heading - t.heading;
   t.heading = body.heading;
 }

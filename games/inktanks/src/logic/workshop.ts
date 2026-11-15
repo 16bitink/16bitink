@@ -2,6 +2,7 @@ import { GADGET_NAME } from './match/gadgets';
 import type { GadgetKind } from './match/types';
 import { familyName, FAMILIES, MAX_MK, roman, slotOf, type Family, type Loadout, type Mk, type Part } from './parts';
 import { perksOf, rankOf, RANKS, type RankId } from './rank';
+import type { WingmanFit } from './wingmanFit';
 import { RESEARCH_MAX, researchSteps, type Research, type ResearchLine } from './stats';
 
 /**
@@ -31,6 +32,8 @@ export interface Progress {
   readonly gadgetMk: Readonly<Partial<Record<GadgetKind, Mk>>>;
   /** Ace prototypes you've fitted in the field, the best per family: a Brigadier can fit them for any mission. */
   readonly protos: readonly Part[];
+  /** Each wingman's picked families (wingmanFit.ts); null or missing: it mirrors your starting tank. */
+  readonly wingmen: readonly (WingmanFit | null)[];
 }
 
 export const UNLOCK_COST = 3;
@@ -62,6 +65,7 @@ export function newProgress(): Progress {
     gadgetIntel: {},
     gadgetMk: {},
     protos: [],
+    wingmen: [],
   };
 }
 

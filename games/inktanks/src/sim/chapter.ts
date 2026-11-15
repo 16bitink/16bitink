@@ -2,6 +2,7 @@ import type { LoadedLevel } from '../logic/level/load';
 import { applyOutcome, type Outcome } from '../logic/mission/outcome';
 import { sumIntel } from '../logic/intel';
 import { perksOf, rankOf } from '../logic/rank';
+import { wingmanLoadouts } from '../logic/wingmanFit';
 import { newProgress, type IntelBag, type Progress } from '../logic/workshop';
 import { fitBest, noGrindCheck, spendIntel, type NoGrindVerdict } from './policy';
 import { runMission } from './runMission';
@@ -52,7 +53,7 @@ export function runChapter(levels: readonly LoadedLevel[], seed: number, maxAtte
     while (attempts < maxAttempts) {
       attempts++;
       const perks = perksOf(p.xp);
-      const r = runMission({ level, seed: seed * 1000 + def.number * 37 + attempts, player: { loadout: p.loadout, research: p.research, kits: perks.repairKits, ...(rankPerks ? { wingmen: perks.wingmen, supplyDrop: perks.supplyDrop, strike: perks.strike } : {}) } });
+      const r = runMission({ level, seed: seed * 1000 + def.number * 37 + attempts, player: { loadout: p.loadout, research: p.research, kits: perks.repairKits, ...(rankPerks ? { wingmen: perks.wingmen, wingmanLoadouts: wingmanLoadouts(p), supplyDrop: perks.supplyDrop, strike: perks.strike } : {}) } });
       if (!r.report) break;
       const applied = applyOutcome(p, def, r.report);
       p = applied.progress;

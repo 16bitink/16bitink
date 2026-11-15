@@ -28,7 +28,7 @@ export interface MapActions {
 }
 
 /**
- * The level select over the chapter's painted land: the ten spots on the road
+ * The level select over the chapter's painting: the ten spots on its road
  * with their medals, locked ones dimmed, the next one bobbing; chips for
  * the five chapters along the bottom (2–5 "coming" or locked).
  */
@@ -54,7 +54,6 @@ export function showMap(root: HTMLElement, d: MapData, a: MapActions): () => voi
     return `<button class="chip${here ? ' here' : ''}" data-act="chapter" data-i="${c.index}">${c.index + 1}. ${esc(c.name)}<b>${sub}</b></button>`;
   }).join('');
   render(root, 'map', `
-    <svg class="trail" width="100%" height="100%"><polyline points="" /></svg>
     ${spots}
     <div class="panel top"><span class="t12 dimt">Chapter ${ch.index + 1}</span> <span class="gold">${esc(ch.name)}</span> <span class="t12">${rankLine(rank)}</span></div>
     <div class="corner left"><button class="btn small" data-act="menu">Menu</button>${a.ending ? '<button class="btn small gold" data-act="ending">Victory</button>' : ''}</div>
@@ -69,9 +68,7 @@ export function showMap(root: HTMLElement, d: MapData, a: MapActions): () => voi
     menu: a.menu,
     ending: () => a.ending?.(),
   });
-  const trail = root.querySelector('polyline')!;
   const place = (): void => {
-    trail.setAttribute('points', SPOTS.map((s) => d.project(s.x, s.y)).map((p) => `${Math.round(p.x)},${Math.round(p.y)}`).join(' '));
     for (const el of root.querySelectorAll<HTMLElement>('[data-n]')) {
       const s = SPOTS[Number(el.dataset.n) - ch.first]!;
       const p = d.project(s.x, s.y);

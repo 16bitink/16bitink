@@ -8,6 +8,7 @@ import { matchReport, type MatchReport } from '../logic/match/report';
 import { applyOutcome } from '../logic/mission/outcome';
 import { FINAL_LEVEL, wonTheWar } from '../logic/ending';
 import { perksOf } from '../logic/rank';
+import { wingmanLoadouts } from '../logic/wingmanFit';
 import { parseSave, SAVE_KEY, serializeSave, type SaveData } from '../logic/save';
 import type { Progress } from '../logic/workshop';
 import { showBriefing } from '../ui/briefing';
@@ -17,7 +18,7 @@ import { showEnding } from '../ui/ending';
 import { showMap } from '../ui/mapScreen';
 import { showMenu } from '../ui/menu';
 import { showResults, type ResultsData } from '../ui/results';
-import { showWorkshop } from '../ui/workshop';
+import { showWorkshop, type WorkshopTab } from '../ui/workshop';
 import { MissionRun } from './missionRun';
 import { Stage } from './stage';
 
@@ -211,7 +212,7 @@ export class App {
     const level = levelFor(n)!;
     const p = this.save.progress;
     const perks = perksOf(p.xp);
-    return new Match({ level, seed: (Date.now() + ++this.seq * 7919) % 1_000_000, player: { loadout: p.loadout, research: p.research, kits: perks.repairKits, gadget: this.save.gadget, gadgetMk: p.gadgetMk, wingmen: perks.wingmen, supplyDrop: perks.supplyDrop, strike: perks.strike }, playerBot });
+    return new Match({ level, seed: (Date.now() + ++this.seq * 7919) % 1_000_000, player: { loadout: p.loadout, research: p.research, kits: perks.repairKits, gadget: this.save.gadget, gadgetMk: p.gadgetMk, wingmen: perks.wingmen, wingmanLoadouts: wingmanLoadouts(p), supplyDrop: perks.supplyDrop, strike: perks.strike }, playerBot });
   }
 
   briefing(n: number): void {
@@ -228,6 +229,7 @@ export class App {
         m.setPlayerGadget(g);
       },
       workshop: () => this.workshop(() => this.briefing(n), 'Briefing'),
+      wingmen: () => this.workshop(() => this.briefing(n), 'Briefing', 'wingmen'),
       back: () => this.map(),
     }));
   }
@@ -301,10 +303,10 @@ export class App {
     }));
   }
 
-    workshop(back: () => void, backLabel: string): void {
+    workshop(back: () => void, backLabel: string, tab?: WorkshopTab): void {
     this.endRun();
     this.music('workshop');
-    this.show(() => showWorkshop(this.screen, this.save.progress, { change: (p) => this.setProgress(p), back, backLabel }));
+    this.show(() => showWorkshop(this.screen, this.save.progress, { change: (p) => this.setProgress(p), back, backLabel, tab }));
   }
 
   /** Dev pages and snapshots: plays level `n` to the end with the bot driving, headless, then shows the results. */

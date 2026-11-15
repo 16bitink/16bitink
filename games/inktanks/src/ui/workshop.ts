@@ -1,5 +1,5 @@
 import { armourAgainst, damageTaken } from '../logic/damage';
-import { DRIVE_FAMILIES, FAMILY_CHAPTER, familyName, GUN_FAMILIES, HULL_FAMILIES, HULLS, MAX_MK, MK_COLOUR, roman, slotOf, withPart, type Family, type Slot } from '../logic/parts';
+import { DRIVE_FAMILIES, FAMILY_CHAPTER, familyName, GUN_FAMILIES, HULL_FAMILIES, HULLS, MAX_MK, MK_COLOUR, partLabel, roman, slotOf, withPart, type Family, type Slot } from '../logic/parts';
 import { perksOf, rankOf, RANKS } from '../logic/rank';
 import { bpAmount } from './blueprint';
 import { fireRate, RESEARCH_MAX, RESEARCH_STEP, researchSteps, tankStats, type ResearchLine } from '../logic/stats';
@@ -9,7 +9,9 @@ import { GADGET_NAME } from '../logic/match/gadgets';
 import { GADGETS, type GadgetKind } from '../logic/match/types';
 import { gadgetIconUrl } from '../scenes/mission/hud';
 import { esc, render } from './dom';
-import { mkBadge, mkChip, partIcon, tankCanvas } from './tankArt';
+import { mkBadge, mkChip, partIcon, partName, tankCanvas } from './tankArt';
+import { fitValid, setWingman, wingmanLoadoutFor, wingmanLock, wingmanPart, withFamily } from '../logic/wingmanFit';
+import { WINGMAN_NAMES } from '../logic/match/wingmen';
 import { rankLine } from './rankArt';
 
 /**
@@ -28,7 +30,9 @@ const rankName = (id: string): string => RANKS.find((r) => r.id === id)?.name ??
 const famName = familyName;
 const PCT = Math.round(RESEARCH_STEP * 100);
 
-type Tab = Slot | 'gadgets';
+/** The workshop's tabs: a slot's families, the gadgets, or the wingmen's tanks. */
+export type WorkshopTab = Slot | 'gadgets' | 'wingmen';
+type Tab = WorkshopTab;
 
 /** A later chapter's family (the Mortar) shows once you've found its blueprints, not as a locked card from the start. */
 const listed = (p: Progress, f: Family): boolean => !FAMILY_CHAPTER[f] || p.unlocked.includes(f) || (p.intelTotal[f] ?? 0) > 0 || protoOf(p, f) !== null;
@@ -37,11 +41,13 @@ export interface WorkshopActions {
   readonly change: (p: Progress) => void;
   readonly back: () => void;
   readonly backLabel: string;
+  /** The tab to open on (default the gun). */
+  readonly tab?: WorkshopTab;
 }
 
 export function showWorkshop(root: HTMLElement, start: Progress, a: WorkshopActions): void {
   let p = start;
-  let tab: Tab = 'gun';
+  let tab: Tab = a.tab ?? 'gun';
   let note = '';
   // Only the first draw rises in; a redraw after a click (even a refused one) swaps in place, keeping the scroll.
   let first = true;
@@ -85,9 +91,19 @@ export function showWorkshop(root: HTMLElement, start: Progress, a: WorkshopActi
         const q = protoOf(p, el.dataset.f as Family);
         if (q) apply(fit(p, withPart(p.loadout, q)), `Prototype ${famName(q.family)} Mk ${roman(q.mk)} fitted`);
       },
+      wfam: (el) => {
+        const i = Number(el.dataset.i);
+        const f = el.dataset.f as Family;
+        apply(setWingman(p, i, withFamily(p, i, f)), `${WINGMAN_NAMES[i]}: ${famName(f)} fitted`);
+      },
+      wmirror: (el) => {
+        const i = Number(el.dataset.i);
+        apply(setWingman(p, i, null), `${WINGMAN_NAMES[i]} matches your tank again`);
+      },
       research: (el) => apply(research(p, el.dataset.f as Family, el.dataset.line as ResearchLine), `${LINE_NAMES[el.dataset.line as ResearchLine]} researched`),
     });
     root.querySelector('.pic')!.appendChild(tankCanvas(p.loadout, innerHeight > 560 ? 2 : 1));
+    for (const el of root.querySelectorAll<HTMLElement>('.wpic')) el.appendChild(tankCanvas(wingmanLoadoutFor(p, Number(el.dataset.i)), innerHeight > 560 ? 1.5 : 1));
     root.scrollTop = scroll;
     first = false;
   };
@@ -104,17 +120,18 @@ function statsHtml(p: Progress): string {
 function html(p: Progress, tab: Tab, note: string, backLabel: string, rise: boolean): string {
   const rank = rankOf(p.xp);
   const tabs = SLOTS.map((s) => `<button class="btn small${s.slot === tab ? ' gold' : ''}" data-act="tab" data-slot="${s.slot}">${s.name}: ${esc(famName(p.loadout[s.slot].family))}</button>`).join('')
-    + `<button class="btn small${tab === 'gadgets' ? ' gold' : ''}" data-act="tab" data-slot="gadgets">Gadgets</button>`;
-  const cards = tab === 'gadgets' ? GADGETS.map((g) => gadgetCard(p, g)).join('') : SLOTS.find((s) => s.slot === tab)!.families.filter((f) => listed(p, f)).map((f) => famCard(p, f)).join('');
+    + `<button class="btn small${tab === 'gadgets' ? ' gold' : ''}" data-act="tab" data-slot="gadgets">Gadgets</button>`
+    + `<button class="btn small${tab === 'wingmen' ? ' gold' : ''}" data-act="tab" data-slot="wingmen">Wingmen</button>`;
+  const cards = tab === 'wingmen' ? WINGMAN_NAMES.map((_, i) => wingmanCard(p, i)).join('') : tab === 'gadgets' ? GADGETS.map((g) => gadgetCard(p, g)).join('') : SLOTS.find((s) => s.slot === tab)!.families.filter((f) => listed(p, f)).map((f) => famCard(p, f)).join('');
   return `
     <div class="panel sheet${rise ? ' rise' : ''}">
       <div class="row spread"><span class="t36 gold">Workshop</span>${rankLine(rank, ` <span class="t12 dimt">${p.xp} XP</span>`)}<button class="btn small" data-act="back">${esc(backLabel)}</button></div>
-      <div class="explain">${tab === 'gadgets' ? 'Gadgets earn their own blueprints: each enemy you hit with one, and spare charges from crates when you’re full.' : 'Destroy enemy tanks to collect blueprints of their parts, then spend them here to upgrade yours. Each part has its own blueprints.'}</div>
+      <div class="explain">${tab === 'wingmen' ? 'Your wingmen fit your parts one Mk below yours. Pick a gun, hull and drive for each from the families you’ve unlocked.' : tab === 'gadgets' ? 'Gadgets earn their own blueprints: one each time you use it, more for each enemy it hits, and spare charges from crates when you’re full.' : 'Destroy enemy tanks to collect blueprints of their parts, then spend them here to upgrade yours. Each part has its own blueprints.'}</div>
       <div class="cols">
         <div class="col" style="flex:0 0 auto;align-items:center"><div class="pic"></div><div class="intelrow t12">${statsHtml(p)}</div></div>
         <div class="col" style="flex:1 1 auto">
           <div class="row">${tabs}</div>
-          <div class="slots">${cards}</div>
+          <div class="slots${tab === 'wingmen' ? ' wings' : ''}">${cards}</div>
           <div class="t12 ${note.startsWith('needs') || note.includes('not') ? 'red' : 'green'}">${esc(note) || '&nbsp;'}</div>
         </div>
       </div>
@@ -177,6 +194,35 @@ function protoRow(p: Progress, f: Family): string {
     : ok ? `<button class="btn small go" data-act="fitproto" data-f="${f}">Fit</button>`
       : `<button class="btn small dim" data-act="fitproto" data-f="${f}" data-blocked="1"><span>Fit</span><span class="why2"><i class="lock"></i>needs ${esc(rankName('brigadier'))}</span></button>`;
   return `<div class="row" style="align-items:center;gap:8px">${partIcon(q)}<span class="t12">Ace prototype <span style="color:${MK_COLOUR[q.mk].light}">Mk ${roman(q.mk)}</span></span>${btn}</div>`;
+}
+
+/** A wingman's card: name, tank, and a gun / hull / drive picker from your unlocked families at a Mk below yours. */
+function wingmanCard(p: Progress, i: number): string {
+  const name = WINGMAN_NAMES[i]!;
+  const lock = wingmanLock(p, i);
+  if (lock) {
+    // No name until the rank brings them (owner, Nov 15): a locked card is just "Wingman 2".
+    return `<div class="fam wing locked"><div class="famhead">Wingman ${i + 1}</div>
+      <div class="t12 why2"><i class="lock"></i>needs ${esc(lock)}</div></div>`;
+  }
+  const picked = fitValid(p, p.wingmen?.[i]);
+  const l = wingmanLoadoutFor(p, i);
+  const rows = SLOTS.map(({ slot, name: slotName, families }) => {
+    const opts = families.filter((f) => p.unlocked.includes(f)).map((f) => {
+      const part = wingmanPart(p, f);
+      const on = l[slot].family === f;
+      return `<button class="wopt${on ? ' on' : ''}" data-act="wfam" data-i="${i}" data-f="${f}" title="${esc(partLabel(part))}">${partIcon(part)}</button>`;
+    }).join('');
+    return `<div class="wrow"><span class="t12 dimt">${slotName}</span><div class="wopts">${opts}</div></div>`;
+  }).join('');
+  const parts = [l.gun, l.hull, l.drive].map(partName).join(' · ');
+  return `<div class="fam wing">
+    <div class="famhead">${esc(name)} <span class="t12 dimt">${picked ? 'your pick' : 'matches your tank'}</span></div>
+    <div class="wpic" data-i="${i}"></div>
+    <div class="t12 wparts">${parts}</div>
+    ${rows}
+    ${picked ? `<div class="acts"><button class="btn small" data-act="wmirror" data-i="${i}">Match my tank</button></div>` : ''}
+  </div>`;
 }
 
 /** A gadget's blueprints as "[icon] 5": its own icon, since gadgets have no blueprint sheet. */

@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { CANOPY, CH5_KINDS } from '../src/content/ch5/kinds';
 import { losClear, sightClear } from '../src/logic/bots/perception';
-import { GROUNDS, type TerrainPatch } from '../src/logic/land';
+import { CELL, GROUNDS, type TerrainPatch } from '../src/logic/land';
 import { loadLevel, parseTank } from '../src/logic/level/load';
 import type { EnemyDef, LevelDef, StructPlace } from '../src/logic/level/types';
 import { TREE_FIRE } from '../src/logic/match/forestFire';
 import { Match } from '../src/logic/match/match';
 import { breakStructure } from '../src/logic/match/movement';
 import { IDLE, type MatchEvent } from '../src/logic/match/types';
-import { passable } from '../src/logic/nav/grid';
+import { passable, SOFT_COST } from '../src/logic/nav/grid';
 import { fixture } from './fixtures/levels';
 
 const build = (d: LevelDef, tank = 'cannon1/medium1/halftracks1'): Match => new Match({ level: loadLevel({ ...d, number: 41 }, CH5_KINDS), seed: 1, player: { loadout: parseTank(tank) } });
@@ -100,8 +100,9 @@ describe('forest fire', () => {
     const ev = steps(m, 0.1);
     expect(ev.some((e) => e.kind === 'burn' && e.what === 'alight' && e.tree)).toBe(true);
     expect(m.fires.burning.size).toBe(1);
-    // It closes the nav grid round itself while it burns.
-    expect(passable(m.nav, 600, 540 + 40)).toBe(false);
+    // It makes the nav grid round itself dear while it burns (bots go round; through only when it's the only way).
+    const blazeCell = Math.floor((540 + 40) / CELL) * m.nav.cols + Math.floor(600 / CELL);
+    expect(m.nav.cost[blazeCell]).toBe(SOFT_COST);
     steps(m, 2.1);
     expect(m.fires.burning.size).toBe(2);
     expect(foe.hp).toBeLessThan(hp);
@@ -109,6 +110,7 @@ describe('forest fire', () => {
     const [a, b, far] = m.structs;
     expect([a!.state, b!.state, far!.state]).toEqual([0, 0, 2]);
     expect(passable(m.nav, 600, 540 + 40)).toBe(true);
+    expect(m.nav.cost[blazeCell]).toBeLessThan(SOFT_COST);
   });
   it('a Flamer lights a tree, and a Flamer’s fire dies out after a few trees', () => {
     const line: StructPlace[] = Array.from({ length: 10 }, (_, i) => ({ kind: 'oldTree', x: 400 + i * 100, y: 300 }));

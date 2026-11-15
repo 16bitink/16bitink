@@ -55,6 +55,8 @@ export interface PlayerSetup {
   readonly gadgetMk?: Readonly<Partial<Record<GadgetKind, Mk>>>;
   /** Rank perks (rank.ts perksOf): allied tanks beside you (Captain 1, Colonel 2), and the call-ins. */
   readonly wingmen?: number;
+  /** Each wingman's tank, as fitted in the workshop's Wingmen tab (wingmanFit.ts); missing: your tank one Mk lower. */
+  readonly wingmanLoadouts?: readonly Loadout[];
   readonly supplyDrop?: boolean;
   readonly strike?: boolean;
 }
@@ -173,7 +175,7 @@ export class Match {
     this.callIns = newCallIns(cfg.player?.supplyDrop === true, cfg.player?.strike === true);
     if (cfg.player) this.player = this.spawnPlayer(cfg.player);
     // Wingmen ride your starting tank (not a part the level issues you).
-    if (cfg.player) spawnWingmen(this, cfg.player.wingmen ?? 0, cfg.player.loadout);
+    if (cfg.player) spawnWingmen(this, cfg.player.wingmen ?? 0, cfg.player.loadout, cfg.player.wingmanLoadouts);
     for (const a of cfg.level.allies) this.spawnTower(a);
     this.objective = createObjective(this, cfg.level.def.objective);
     this.waves = cfg.level.enemies.filter((e) => e.role === 'wave');
@@ -273,7 +275,9 @@ export class Match {
 
   /** The nav grid and flow fields a tank steers by: Hover's (deep water open) for a floating drive, a Heavy's (thin ice closed). */
   navFor(t: Tank): NavPair {
-    return this.navs.for(t.stats.floats, t.stats.hull === 'heavy');
+    const heavy = t.stats.hull === 'heavy';
+    // A drive that can't crush fences (movement.ts crushes) steers by the grid with fences in it.
+    return this.navs.for(t.stats.floats, heavy, !heavy && t.stats.drive !== 'tracks' && t.role !== 'boss');
   }
 
   /** A structure's cells reopen in every nav grid. */
@@ -329,7 +333,11 @@ export class Match {
     this.t += dt;
     this.stepWaves();
     for (const t of this.tanks) {
-      if (!t.alive) continue;
+      // A boss turret's wreck stays on its mount and rides with the hull (it used to stay where it died).
+      if (!t.alive) {
+        if (t.parent !== null) placeMounted(this, t);
+        continue;
+      }
       const input = this.inputFor(t, playerInput);
       if (!t.alive) continue;
       driveTank(this, t, input, dt);

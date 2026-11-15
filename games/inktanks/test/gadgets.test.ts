@@ -92,8 +92,8 @@ describe('mines', () => {
     expect(hpA - a!.hp).toBeCloseTo(mineTier(1).damage);
     expect(hpB - b!.hp).toBeCloseTo(mineTier(1).damage / 2);
     expect(a!.trackBrokenUntil).toBeGreaterThan(m.t + mineTier(1).slowFor - 0.6);
-    // Two enemies hit: 2 mine blueprints.
-    expect(m.gadgetIntel.mines).toBe(2);
+    // One for laying it, one per enemy hit: 3 mine blueprints.
+    expect(m.gadgetIntel.mines).toBe(3);
   });
   it('a broken track halves speed; your own mines never go off under you', () => {
     const m = make('mines', [dummy(1500, 300)]);
@@ -288,7 +288,8 @@ describe('gadget tiers', () => {
     useGadget(m, p);
     expect(m.brains.get(g!.id)!.lastSeen).toBeNull();
     expect(m.brains.get(g!.id)!.aware).toBe('suspicious');
-    expect(m.gadgetIntel.smoke).toBe(1);
+    // One for using it, one for the enemy that had us in sight.
+    expect(m.gadgetIntel.smoke).toBe(2);
     const before = p.hp;
     for (let i = 0; i < 60; i++) m.step(1 / 60, IDLE);
     expect(p.hp).toBeGreaterThan(before + p.stats.maxHp * 0.02);
@@ -330,5 +331,19 @@ describe('found gadgets', () => {
     const m = new Match({ level: { ...lv, crates: [{ at: { x: 700, y: 540 }, content: { gadget: 'smoke' } }] }, seed: 1, player: { loadout: STARTER_LOADOUT, gadget: 'mines' } });
     const c = m.pickups.find((x) => x.kind === 'crate');
     expect(c?.kind === 'crate' && c.content).toEqual({ kind: 'gadget', gadget: 'smoke' });
+  });
+});
+
+describe('gadget blueprints', () => {
+  it('every use earns one, even with no enemy near; empty presses earn none', () => {
+    const m = make('oil');
+    const p = m.player!;
+    const n = p.gadgetCharges;
+    for (let i = 0; i < n + 2; i++) {
+      useGadget(m, p);
+      m.step(1, IDLE);
+    }
+    expect(p.gadgetCharges).toBe(0);
+    expect(m.gadgetIntel.oil).toBe(n);
   });
 });

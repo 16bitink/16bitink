@@ -57,20 +57,38 @@ export function escort(m: Match, def: Extract<ObjectiveDef, { kind: 'escort' }>)
   };
   const end = road[road.length - 1]!;
   const blockers = def.clear ? m.structs.filter((st) => st.def.tag === def.clear) : [];
-  /** The next felled tree across the road ahead of the lead truck, if one stands within CLEAR_LOOK. */
-  const nextBlocker = () => {
+  /** The next felled tree across the road ahead of truck `k`, if one stands within CLEAR_LOOK. */
+  const blockerAhead = (k: number) => {
+    const tr = trucks[k]!;
     let best: { x: number; y: number; id: string } | null = null;
     let bd = CLEAR_LOOK;
     for (const st of blockers) {
       if (st.state === 0) continue;
-      const d = dist(st.def, truck);
-      const ahead = (st.def.x - truck.x) * Math.cos(truck.heading) + (st.def.y - truck.y) * Math.sin(truck.heading) > -20;
+      const d = dist(st.def, tr);
+      const ahead = (st.def.x - tr.x) * Math.cos(tr.heading) + (st.def.y - tr.y) * Math.sin(tr.heading) > -20;
       if (ahead && d < bd) {
         bd = d;
         best = { x: st.def.x, y: st.def.y, id: st.def.id };
       }
     }
     return best;
+  };
+  /**
+   * The felled tree holding the convoy up: the one ahead of the lead, else one ahead of a
+   * follower (a bump can shove the lead round a log's end, and the rest would wait behind
+   * it for good, level 45, Nov 15), with the truck it holds up.
+   */
+  const holdUp = () => {
+    for (let k = 0; k < trucks.length; k++) {
+      if (!trucks[k]!.alive || arrivedAt[k]) continue;
+      const b = blockerAhead(k);
+      if (b) return { ...b, truck: trucks[k]! };
+    }
+    return null;
+  };
+  const nextBlocker = () => {
+    const h = holdUp();
+    return h ? { x: h.x, y: h.y, id: h.id } : null;
   };
   const lost = () => trucks.find((t) => !t.alive);
   return {
@@ -89,8 +107,11 @@ export function escort(m: Match, def: Extract<ObjectiveDef, { kind: 'escort' }>)
     },
     playerHint: (t) => {
       if (!truck.alive) return null;
-      const goal = barge ? bankBeside(m, t, truck) : { x: truck.x + Math.cos(truck.heading) * 110, y: truck.y + Math.sin(truck.heading) * 110 };
-      return { goal, goalRadius: 120, stay: true, urgent: true, shootAt: blockers.length > 0 ? nextBlocker() : undefined };
+      // Stay with the lead, or with a follower a felled tree holds up behind it.
+      const held = blockers.length > 0 ? holdUp() : null;
+      const by = held?.truck ?? truck;
+      const goal = barge ? bankBeside(m, t, truck) : { x: by.x + Math.cos(by.heading) * 110, y: by.y + Math.sin(by.heading) * 110 };
+      return { goal, goalRadius: 120, stay: true, urgent: true, shootAt: held ? { x: held.x, y: held.y, id: held.id } : blockers.length > 0 ? null : undefined };
     },
     foeHint: (t) => {
       const near = nearest(t, trucks.filter((x) => x.alive));

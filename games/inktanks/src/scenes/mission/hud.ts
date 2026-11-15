@@ -214,6 +214,9 @@ export class Hud {
   }
 
   private drawPops(m: Match, project: Project): void {
+    // Pops stay under the goal line and inside the screen (a boss near the top edge used to push its pop into the goal).
+    const top = this.goal.offsetTop + this.goal.offsetHeight + 18;
+    const width = this.root.clientWidth;
     this.popList = this.popList.filter((p) => {
       const k = (m.t - p.at) / POP_S;
       if (k >= 1) {
@@ -221,7 +224,10 @@ export class Hud {
         return false;
       }
       const s = project(p.x, p.y);
-      p.el.style.transform = `translate(${s.x}px, ${s.y - 78 - k * 36}px) translate(-50%, -50%)`;
+      const half = p.el.offsetWidth / 2 + 8;
+      const x = width > half * 2 ? Math.min(width - half, Math.max(half, s.x)) : s.x;
+      const y = Math.max(top, s.y - 78 - k * 36);
+      p.el.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%)`;
       p.el.style.opacity = String(Math.min(1, (1 - k) * 2.5));
       return true;
     });

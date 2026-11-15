@@ -29,6 +29,8 @@ export interface TankInput {
   readonly fire: boolean;
   /** Held to swap onto the part underneath. */
   readonly swap: boolean;
+  /** A bot's pick when several parts lie in reach: the one it drove for (the nearest otherwise). */
+  readonly swapPart?: number | null;
   /** Pressed to start a repair kit. */
   readonly repair: boolean;
   /** Pressed to use the gadget (lay a mine, spill oil, pop smoke). */

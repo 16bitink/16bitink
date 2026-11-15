@@ -55,8 +55,6 @@ export const SCREENS_CSS = `
 .ikt .corner { position: absolute; top: max(10px, env(safe-area-inset-top)); display: flex; gap: 6px; z-index: 6; }
 .ikt .corner.left { left: max(12px, env(safe-area-inset-left)); } .ikt .corner.right { right: max(12px, env(safe-area-inset-right)); }
 /* Chapter map */
-.ikt .trail { position: absolute; inset: 0; pointer-events: none; }
-.ikt .trail polyline { fill: none; stroke: #f4ecd8; stroke-width: 4; stroke-dasharray: 8 10; opacity: 0.85; filter: drop-shadow(2px 2px 0 #14110c); }
 .ikt .map { align-items: stretch; justify-content: stretch; padding: 0; }
 .ikt .map .top { position: absolute; left: 50%; top: max(8px, env(safe-area-inset-top)); transform: translateX(-50%); text-align: center; padding: 6px 18px; white-space: nowrap; }
 .ikt .spot { position: absolute; transform: translate(-50%, -50%); width: 56px; height: 56px; border: 0; padding: 0; cursor: pointer; font: inherit; font-size: 24px; color: #2a2116; background: #e8dcbc;
@@ -123,6 +121,15 @@ export const SCREENS_CSS = `
 .ikt .fam .acts { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 0 2px; }
 .ikt .fam .grule { grid-column: 1 / -1; line-height: 1.35; } .ikt .fam .grule em { font-style: normal; }
 .ikt .why { font-size: 12px; color: var(--dim); }
+/* The workshop's Wingmen tab: a card per wingman, its tank, and a row of family icons per slot. */
+.ikt .slots.wings { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.ikt .fam.wing { grid-template-columns: 1fr; justify-items: start; }
+.ikt .fam.wing .wpic { justify-self: center; }
+.ikt .wrow { display: grid; grid-template-columns: 44px 1fr; align-items: center; gap: 6px; width: 100%; }
+.ikt .wopts { display: flex; flex-wrap: wrap; gap: 4px; }
+.ikt .wopt { padding: 2px; border: 0; background: #2e281d; box-shadow: inset 0 0 0 2px #3a3020; cursor: pointer; line-height: 0; }
+.ikt .wopt.on { box-shadow: inset 0 0 0 3px var(--gold); background: #3a2c14; }
+.ikt .briefing .wingpics { display: flex; gap: 4px; align-items: center; }
 .ikt .promo { text-align: center; padding: 10px; background: #3a2c14; box-shadow: inset 0 0 0 2px var(--gold); animation: ikt-pop 0.8s steps(6) both; }
 .ikt .modal { width: min(520px, 94vw); text-align: center; display: flex; flex-direction: column; gap: 12px; align-items: center; }
 .ikt .boot { flex-direction: column; gap: 16px; }
@@ -161,6 +168,10 @@ export const SCREENS_CSS = `
   .ikt .chip b { display: inline; margin-left: 6px; }
   .ikt .minimap { max-height: 36vh; width: auto; max-width: 100%; }
   .ikt .briefing .pic { display: none; }
+  .ikt .fam.wing { position: relative; }
+  .ikt .fam.wing .wpic { position: absolute; right: 4px; top: 0; }
+  .ikt .fam.wing .wpic canvas { width: 56px !important; height: 56px !important; }
+  .ikt .wrow { grid-template-columns: 40px 1fr; }
   .ikt .gpick { flex-direction: row; justify-content: center; padding: 2px 4px; font-size: 12px; min-height: 36px; }
   .ikt .gpick img { width: 26px; height: 26px; }
   .ikt .briefing .minimap { max-height: 30vh; }

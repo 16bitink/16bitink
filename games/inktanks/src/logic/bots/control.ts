@@ -1,14 +1,19 @@
 import { heightMult } from '../match/heights';
 import type { Match } from '../match/match';
 import { IDLE, type Tank, type TankInput } from '../match/types';
-import { clearLine } from '../nav/grid';
-import { flowDir } from '../nav/flow';
+import { clearLine, type NavGrid } from '../nav/grid';
+import { flowDir, type FlowField } from '../nav/flow';
+import { CELL, cellIndex } from '../land';
+import { canStand } from '../match/movement';
 import { angleTo, wrapAngle, type Pt } from '../vec';
 import { think, type Brain } from './brain';
 import { isLobbed } from '../match/lob';
 
 const STUCK_MOVE = 10;
 const STUCK_TIME = 1.0;
+/** Stuck again this soon and this near where the last detour began: the next detour backs out first. */
+const STUCK_AGAIN_TIME = 6;
+const STUCK_AGAIN_NEAR = 40;
 const DETOUR = 0.9;
 const SEPARATION = 85;
 /** Cannon and Rockets bots hold their aim line this long before they fire (Tactics §4). */
@@ -25,8 +30,51 @@ export const FLAME_KEEP = 0.55;
 export const LASER_KEEP = 0.78;
 /** A Rail bot fights from this share of its range (about 450 px: far back, shooting through the trees). */
 export const RAIL_KEEP = 0.7;
+/** A looting bot stops this far inside a pickup's reach (pickups.ts REACH is 14). */
+const LOOT_STOP = 10;
 /** Bots steer this far round mines they watched being laid. */
 const MINE_AVOID = 70;
+
+/** How many cell rings round a tank `rejoin` searches for a way back onto the field. */
+const REJOIN_RING = 3;
+
+/** Whether a tank can drive straight from where it is to (x, y): no solid in the way, its ground all along (every 10 px). */
+function driveClear(m: Match, t: Tank, x: number, y: number): boolean {
+  if (m.lineBlocker(t.x, t.y, x, y, null)) return false;
+  const n = Math.max(1, Math.ceil(Math.hypot(x - t.x, y - t.y) / 10));
+  for (let i = 1; i <= n; i++) if (!canStand(m, t, t.x + ((x - t.x) * i) / n, t.y + ((y - t.y) * i) / n)) return false;
+  return true;
+}
+
+/**
+ * Off the field: the tank's cell is closed (a bump or a strafe put it in a wall's margin) or
+ * cut off from the goal. The best nearby cell that is on the field and that it can drive
+ * straight to, by its distance there plus the field's from there; null when there is none.
+ * (The field's own pick from a closed cell can be the neighbour through the wall: a tank
+ * pressed against a wall pushed into it for the rest of the level, level 19, Nov 15.)
+ */
+function rejoin(m: Match, t: Tank, nav: NavGrid, f: FlowField): number | null {
+  const gx0 = Math.floor(t.x / CELL);
+  const gy0 = Math.floor(t.y / CELL);
+  let best: Pt | null = null;
+  let bestScore = Infinity;
+  for (let dy = -REJOIN_RING; dy <= REJOIN_RING; dy++) {
+    for (let dx = -REJOIN_RING; dx <= REJOIN_RING; dx++) {
+      const gx = gx0 + dx;
+      const gy = gy0 + dy;
+      if ((dx === 0 && dy === 0) || gx < 0 || gy < 0 || gx >= nav.cols || gy >= nav.rows) continue;
+      const i = gy * nav.cols + gx;
+      const left = f.dist[i]!;
+      if (nav.cost[i] === 0 || !Number.isFinite(left)) continue;
+      const p = { x: (gx + 0.5) * CELL, y: (gy + 0.5) * CELL };
+      const score = left + (2 * Math.hypot(p.x - t.x, p.y - t.y)) / CELL;
+      if (score >= bestScore || !driveClear(m, t, p.x, p.y)) continue;
+      bestScore = score;
+      best = p;
+    }
+  }
+  return best ? angleTo(t, best) : null;
+}
 
 /** The way to drive towards `goal`: straight when the line is clear, else down the flow field. */
 export function navAngle(m: Match, t: Tank, goal: Pt): number {
@@ -36,7 +84,10 @@ export function navAngle(m: Match, t: Tank, goal: Pt): number {
   const { nav, flow } = m.navFor(t);
   if (clearLine(nav, t.x, t.y, goal.x, goal.y)) return angleTo(t, goal);
   const f = flow.get(goal.x, goal.y);
-  const a = f ? flowDir(nav, f, t.x, t.y) : null;
+  if (!f) return angleTo(t, goal);
+  const i = cellIndex(m.land, t.x, t.y);
+  const off = i >= 0 && (nav.cost[i] === 0 || !Number.isFinite(f.dist[i]!)) && i !== f.goal;
+  const a = (off ? rejoin(m, t, nav, f) : null) ?? flowDir(nav, f, t.x, t.y);
   return a ?? angleTo(t, goal);
 }
 
@@ -77,7 +128,7 @@ function lead(m: Match, b: Brain, t: Tank, o: Tank, shotSpeed: number): Pt {
   return { x: s.x + s.vx * time, y: s.y + s.vy * time };
 }
 
-function trackStuck(b: Brain, t: Tank, moving: boolean, dt: number): void {
+function trackStuck(m: Match, b: Brain, t: Tank, moving: boolean, dt: number): void {
   if (b.detourT > 0) {
     b.detourT -= dt;
     return;
@@ -92,7 +143,15 @@ function trackStuck(b: Brain, t: Tank, moving: boolean, dt: number): void {
   if (b.stuckT > STUCK_TIME) {
     b.stuckT = 0;
     b.detourT = DETOUR;
-    b.detourAngle = wrapAngle(t.heading + Math.PI + b.rng.range(-0.9, 0.9));
+    const swing = b.rng.range(-0.9, 0.9);
+    b.detourAngle = wrapAngle(t.heading + Math.PI + swing);
+    b.detourTurn = swing < 0 ? -1 : 1;
+    // Stuck again where the last detour began: this time back out first (see botInput).
+    const again = b.lastStuck !== null && m.t - b.lastStuck.t < STUCK_AGAIN_TIME && Math.hypot(t.x - b.lastStuck.x, t.y - b.lastStuck.y) < STUCK_AGAIN_NEAR;
+    b.detourBack = again;
+    // ...then off to the side, along whatever it ran into (a fence's end, a gap in the trees), not back the same way.
+    if (again) b.detourAngle = wrapAngle(t.heading + b.detourTurn * (Math.PI / 2 + Math.abs(swing) * 0.5));
+    b.lastStuck = { x: t.x, y: t.y, t: m.t };
     b.lastPos = { x: t.x, y: t.y };
   }
 }
@@ -315,7 +374,8 @@ export function botInput(m: Match, b: Brain, t: Tank, dt: number): TankInput {
       const d = Math.hypot(b.goal.x - t.x, b.goal.y - t.y);
       // Something to shoot there (a cage, a target) but no clear shot yet: keep closing in.
       const blocked = b.shootAt !== null && !b.los;
-      const stopAt = b.state === 'loot' ? 6 : b.state === 'goal' ? (b.role === 'guard' || blocked ? 40 : (b.hint?.goalRadius ?? 40)) : 30;
+      // Loot: stop once it's in reach (a part at the edge of a deck or by a wall may lie where the tank's centre can't get).
+      const stopAt = b.state === 'loot' ? t.stats.radius + LOOT_STOP : b.state === 'goal' ? (b.role === 'guard' || blocked ? 40 : (b.hint?.goalRadius ?? 40)) : 30;
       if (d < stopAt) mag = 0;
       else {
         angle = navAngle(m, t, b.goal);
@@ -329,13 +389,21 @@ export function botInput(m: Match, b: Brain, t: Tank, dt: number): TankInput {
   const throttle = b.role === 'player' ? lobDodge(m, t) || railDodge(m, t) : 0;
   if (throttle !== 0) return { move: { kind: 'tank', throttle, turn: 0 }, aim, aimDist, fire, swap: false, repair: b.useKit, gadget, callIn };
   const moving = angle !== null && mag > 0;
-  trackStuck(b, t, moving, dt);
+  trackStuck(m, b, t, moving, dt);
+  if (b.detourBack && b.detourT > DETOUR / 2) {
+    // Stuck twice in one spot: first back out, swinging the tail. Only steering for the way behind
+    // kept Wheels and Half-tracks (they need roll to turn) nosed into the trees or a corner,
+    // turning with the nose still pressed in (level 42, Nov 15).
+    return { move: { kind: 'tank', throttle: -1, turn: b.detourTurn }, aim: aim ?? b.detourAngle, aimDist, fire, swap: false, repair: b.useKit, gadget, callIn };
+  }
   if (b.detourT > 0) {
+    // Then off the way it came, on a new line (round a fence's end, say).
     angle = b.detourAngle;
     mag = 1;
   }
   if (angle !== null && b.state !== 'loot') angle = separate(m, t, angle, b.target);
   if (aim === null && angle !== null) aim = angle;
   const wantSwap = b.state === 'loot' && t.onPart !== null && t.onPart === b.goalPickup;
-  return { move: angle === null ? null : { kind: 'point', angle, mag }, aim, aimDist, fire, swap: wantSwap, repair: b.useKit, gadget, callIn };
+  const swapPart = b.state === 'loot' ? b.goalPickup : null;
+  return { move: angle === null ? null : { kind: 'point', angle, mag }, aim, aimDist, fire, swap: wantSwap, swapPart, repair: b.useKit, gadget, callIn };
 }

@@ -26,6 +26,8 @@ export interface BriefingActions {
   /** The gadget picker: saves the pick and fits it to this match. */
   readonly gadget: (g: GadgetKind) => void;
   readonly workshop: () => void;
+  /** The workshop on its Wingmen tab, back to this briefing. */
+  readonly wingmen?: () => void;
   readonly back: () => void;
 }
 
@@ -88,13 +90,13 @@ export function showBriefing(root: HTMLElement, m: Match, p: Progress, a: Briefi
         <div class="col">
           <div class="mapbox"></div>
           <div class="row"><div class="pic"></div><div class="col"><div class="row">${partIcon(l.gun)}${partIcon(l.hull)}${partIcon(l.drive)}</div>
-            <div class="t12 hide-short">${[l.gun, l.hull, l.drive].map(partName).join(' · ')}</div><div class="t12 dimt">Repair kits: ${perksOf(p.xp).repairKits}</div>${rankPerksLine(m)}</div></div>
+            <div class="t12 hide-short">${[l.gun, l.hull, l.drive].map(partName).join(' · ')}</div><div class="t12 dimt">Repair kits: ${perksOf(p.xp).repairKits}</div>${rankPerksLine(m, p)}</div></div>
           <div class="gadgets">${gadgetPicker(p, picked)}</div>
         </div>
       </div>
       <div class="row center"><button class="btn" data-act="back">Map</button>${workshopButton(p)}<button class="btn go" data-act="start">Start</button></div>
     </div>`, {
-    start: a.start, workshop: a.workshop, back: a.back,
+    start: a.start, workshop: a.workshop, back: a.back, wingmen: a.wingmen ?? a.workshop,
     pick: (el) => {
       const g = el.dataset.g as GadgetKind;
       if (!GADGETS.includes(g) || g === picked) return;
@@ -107,6 +109,11 @@ export function showBriefing(root: HTMLElement, m: Match, p: Progress, a: Briefi
     },
   });
   root.querySelector('.pic')!.appendChild(tankCanvas(l, 1));
+  const wing = wingmenOf(m);
+  for (const el of root.querySelectorAll<HTMLElement>('.wbpic')) {
+    const t = wing[Number(el.dataset.i)];
+    if (t) el.appendChild(tankCanvas(t.loadout, 0.5));
+  }
   root.querySelector('.mapbox')!.appendChild(briefingMap(m));
 }
 
@@ -151,10 +158,13 @@ function tideLine(floods: LevelDef['floods']): string {
   return at === undefined ? '' : `<div class="t12 gold">The tide comes in at ${Math.floor(at / 60)}:${String(Math.round(at % 60)).padStart(2, '0')}: the shallows go under</div>`;
 }
 
-/** The rank's wingmen and call-ins on this mission (what the Match really fields), or nothing. */
-function rankPerksLine(m: Match): string {
-  const wing = wingmenOf(m).map((t) => t.name);
+/** The rank's wingmen (small tank pictures, a button to fit them) and call-ins on this mission (what the Match really fields), or nothing. */
+function rankPerksLine(m: Match, p: Progress): string {
+  const wing = wingmenOf(m);
+  const ranked = perksOf(p.xp).wingmen > 0;
   const calls = [m.callIns.supply.has ? 'supply drop (R)' : '', m.callIns.strike.has ? 'artillery strike (F)' : ''].filter(Boolean);
-  const parts = [wing.length ? `Wingm${wing.length > 1 ? 'en' : 'an'}: ${wing.join(', ')}` : '', calls.length ? `Call-ins: ${calls.join(', ')}` : ''].filter(Boolean);
-  return parts.length ? `<div class="t12 dimt">${esc(parts.join(' · '))}</div>` : '';
+  const wingHtml = !ranked ? ''
+    : `<div class="row wingline" style="align-items:center;gap:6px;justify-content:flex-start"><span class="wingpics">${wing.map((t, i) => `<span class="wbpic" data-i="${i}" title="${esc(t.name)}"></span>`).join('')}</span>`
+      + `<span class="t12 dimt">${wing.length ? esc(wing.map((t) => t.name).join(', ')) : 'Wingmen sit out Recon'}</span><button class="btn small" data-act="wingmen">Wingmen</button></div>`;
+  return wingHtml + (calls.length ? `<div class="t12 dimt hide-short">${esc(`Call-ins: ${calls.join(', ')}`)}</div>` : '');
 }

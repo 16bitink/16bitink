@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { INKTANKS_PAID_LEVELS } from '../content/paid';
 import { CH2_LEVEL_DEFS } from '../content/ch2/levels';
-import { CHAPTER_MAPS, chapterMap } from '../src/content/chapterMaps';
+import { CHAPTER_MAPS, chapterMap, MAP_H, MAP_W } from '../src/content/chapterMaps';
 import { CH2_ART_NAME, CH2_KINDS } from '../src/content/ch2/kinds';
 import { ART_NAME, KINDS } from '../src/content/ch1/kinds';
 import { hasLevel, installPaidLevels, levelFor } from '../src/content/levels';
@@ -50,8 +50,23 @@ describe('chapter 2 content', () => {
   it('a chapter map per built chapter, ten spots each', () => {
     expect(CHAPTER_MAPS.length).toBeGreaterThanOrEqual(2);
     for (const c of CHAPTER_MAPS) expect(c.spots).toHaveLength(10);
-    expect(chapterMap(1).land().def.base).toBe('sand');
+    expect(chapterMap(1).art).toMatch(/ch2\.png/);
     expect(chapterMap(9)).toBe(CHAPTER_MAPS[0]);
+  });
+  it('every chapter map keeps its spots inside the box, apart, on the painting', () => {
+    for (const c of CHAPTER_MAPS) {
+      expect(c.box.x).toBeGreaterThanOrEqual(0);
+      expect(c.box.y).toBeGreaterThanOrEqual(0);
+      expect(c.box.x + c.box.w).toBeLessThanOrEqual(MAP_W);
+      expect(c.box.y + c.box.h).toBeLessThanOrEqual(MAP_H);
+      c.spots.forEach((s, i) => {
+        expect(s.x).toBeGreaterThanOrEqual(c.box.x);
+        expect(s.x).toBeLessThanOrEqual(c.box.x + c.box.w);
+        expect(s.y).toBeGreaterThanOrEqual(c.box.y);
+        expect(s.y).toBeLessThanOrEqual(c.box.y + c.box.h);
+        for (const t of c.spots.slice(i + 1)) expect(Math.hypot(s.x - t.x, s.y - t.y)).toBeGreaterThan(95);
+      });
+    }
   });
   it('levels 11 and 14 are winnable by the stand-in', () => {
     // The tank the campaign run brings to each level (lab's TYPICAL_TANK).

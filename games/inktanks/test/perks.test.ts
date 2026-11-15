@@ -7,7 +7,7 @@ import { acePrototype } from '../src/logic/match/combat';
 import { Match, type PlayerSetup } from '../src/logic/match/match';
 import { matchReport } from '../src/logic/match/report';
 import { IDLE, type Tank, type TankInput } from '../src/logic/match/types';
-import { WINGMAN_NAMES, wingmanLoadout, wingmenAllowed, wingmenOf } from '../src/logic/match/wingmen';
+import { WINGMAN_KITS, WINGMAN_NAMES, wingmanLoadout, wingmenAllowed, wingmenOf } from '../src/logic/match/wingmen';
 import { applyOutcome } from '../src/logic/mission/outcome';
 import { STARTER_LOADOUT, withPart, type Part } from '../src/logic/parts';
 import { perksOf, RANKS } from '../src/logic/rank';
@@ -48,7 +48,7 @@ describe('wingmen', () => {
     const w = wingmenOf(m);
     expect(w.map((t) => t.name)).toEqual(['Thistle', 'Rowan']);
     for (const t of w) {
-      expect(t).toMatchObject({ clan: 'ink', team: 0, crew: 'Badger', isPlayer: false, kits: 0, maxKits: 0 });
+      expect(t).toMatchObject({ clan: 'ink', team: 0, crew: 'Badger', isPlayer: false, kits: WINGMAN_KITS, maxKits: WINGMAN_KITS });
       expect(t.loadout).toEqual(parseTank('cannon2/medium1/halftracks1'));
       expect(Math.hypot(t.x - m.player!.x, t.y - m.player!.y)).toBeLessThan(120);
     }
@@ -109,11 +109,24 @@ describe('wingmen', () => {
     const m = make([FAR], { wingmen: 1, supplyDrop: true });
     const [w] = wingmenOf(m);
     put(m.player!, 200, 1000);
+    w!.kits = 0; // room in its bag: it still leaves yours on the ground
     const kit = m.addPickup({ kind: 'kit' }, w!.x, w!.y);
     const drop = m.addPickup({ kind: 'supply', contents: [{ kind: 'kit' }] }, w!.x, w!.y);
     steps(m, 0.2);
     expect(kit.taken).toBe(false);
     expect(drop.taken).toBe(false);
+  });
+});
+
+describe('wingman repairs', () => {
+  it('a badly hurt wingman uses its own kit and heals', () => {
+    const m = make([FAR], { wingmen: 1 });
+    const [w] = wingmenOf(m);
+    w!.hp = w!.stats.maxHp * 0.2;
+    const before = w!.hp;
+    steps(m, 3);
+    expect(w!.kits).toBe(WINGMAN_KITS - 1);
+    expect(w!.hp).toBeGreaterThan(before + w!.stats.maxHp * 0.3);
   });
 });
 
@@ -244,5 +257,6 @@ describe('promotion text', () => {
       expect(RANK_UNLOCKS[r.id]).toBeTruthy();
       expect(RANK_UNLOCKS[r.id]).not.toMatch(/coming soon|kit slot/i);
     }
-  });
+    // The results screen pulls in the UI art: slow to import when the whole suite runs at once.
+  }, 30000);
 });

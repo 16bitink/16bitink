@@ -68,7 +68,7 @@ describe('chapter 5 content', () => {
   });
   it('a chapter 5 map with ten spots', () => {
     expect(chapterMap(4).spots).toHaveLength(10);
-    expect(chapterMap(4).land().def.base).toBe('forestFloor');
+    expect(chapterMap(4).art).toMatch(/ch5\.png/);
   });
   it('levels 41 and 45 are winnable by the stand-in', () => {
     // The tank the campaign run brings to each level (lab's TYPICAL_TANK).

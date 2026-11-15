@@ -29,12 +29,15 @@ function partValue(m: Match, t: Tank, part: Part): number {
   return wantsSwap(t.loadout, part, t.lastHitDrive) ? part.mk * 5 : 0;
 }
 
-/** Crates, kits, intel and better parts close by. */
-function lootPick(m: Match, t: Tank, range: number): { id: number; x: number; y: number } | null {
+/** Seconds the stand-in drives for one pickup before it gives up on it (it lies out of reach: in the swamp, past a wall). */
+export const LOOT_GIVE_UP = 15;
+
+/** Crates, kits, intel and better parts close by (not ones it gave up on). */
+function lootPick(m: Match, b: Brain, t: Tank, range: number): { id: number; x: number; y: number } | null {
   let best: { id: number; x: number; y: number } | null = null;
   let bestScore = 0;
   for (const p of m.pickups) {
-    if (p.taken) continue;
+    if (p.taken || b.lootSkip.has(p.id)) continue;
     const d = Math.hypot(p.x - t.x, p.y - t.y);
     if (d > range) continue;
     let v = 0;
@@ -162,8 +165,17 @@ export function thinkPlayer(m: Match, b: Brain, t: Tank, target: Tank | null, wi
     if (!h?.stay && target.role === 'tank') b.coverSpot = coverSpotNear(m, t, target);
     return set(b, 'fight', null);
   }
-  const loot = h?.urgent ? null : lootPick(m, t, target ? LOOT_RANGE * 0.5 : LOOT_RANGE);
+  const loot = h?.urgent ? null : lootPick(m, b, t, target ? LOOT_RANGE * 0.5 : LOOT_RANGE);
+  // Time spent driving for each pickup adds up across decisions (gaps over a second, a fight say, don't
+  // count): a bot that swung between a pickup and its goal at the edge of LOOT_RANGE never gave up (level 22).
   if (loot) {
+    const last = b.lootFor;
+    const spent = (b.lootSpent.get(loot.id) ?? 0) + (last?.id === loot.id ? Math.min(1, m.t - last.at) : 0);
+    b.lootSpent.set(loot.id, spent);
+    b.lootFor = { id: loot.id, at: m.t };
+    if (spent > LOOT_GIVE_UP) b.lootSkip.add(loot.id);
+  }
+  if (loot && !b.lootSkip.has(loot.id)) {
     b.goalPickup = loot.id;
     b.wantSwap = Math.hypot(loot.x - t.x, loot.y - t.y) < t.stats.radius + 14;
     return set(b, 'loot', loot);

@@ -13,6 +13,8 @@ export interface NavGrid {
   readonly cost: Uint8Array;
   /** Cells each structure blocks, to reopen them when it breaks. */
   readonly blocks: Map<string, number[]>;
+  /** Cells a passing hazard makes dear but not closed (a burning tree's blaze, chapter 5), to reopen them when it ends. */
+  readonly soft: Map<string, number[]>;
   /** A Hover grid: deep water is open (match.ts builds one only when a Hover tank needs it). */
   readonly floats: boolean;
   /** A Heavy hull's grid (chapter 4): thin ice is closed, it would give way. */
@@ -49,18 +51,37 @@ export function solid(s: StructureDef): boolean {
   return !s.cover && (!s.flattenable || s.thicket === true) && !s.crest && !s.deck && !s.span && !s.dormant;
 }
 
-export function buildNav(l: Land, floats = false, heavy = false): NavGrid {
+/** A fence (flattenable, not a young tree): Tracks and Heavies crush it, every other drive is stopped by it. */
+export function fence(s: StructureDef): boolean {
+  return s.flattenable === true && s.thicket !== true && !s.cover && !s.crest && !s.deck && !s.span && !s.dormant;
+}
+
+/**
+ * `fenced`: the grid of a drive that can't crush fences (Wheels, Half-tracks on a light or
+ * medium hull): fences are soft (SOFT_COST), so it goes round by the gap rather than pressing
+ * into one for good (level 4's fence line by the start, Nov 15), and still pushes at one that
+ * is the only way.
+ */
+export function buildNav(l: Land, floats = false, heavy = false, fenced = false): NavGrid {
   const cols = l.gridCols;
   const rows = l.gridRows;
   const cost = new Uint8Array(cols * rows);
   for (let i = 0; i < cost.length; i++) cost[i] = groundCost({ floats, heavy }, l.ground[i]!);
-  const nav: NavGrid = { cols, rows, cost, blocks: new Map(), floats, heavy, version: 0 };
+  const nav: NavGrid = { cols, rows, cost, blocks: new Map(), soft: new Map(), floats, heavy, version: 0 };
   for (const s of l.structures) {
+    if (fenced && fence(s)) {
+      const cells = cellsOf(nav, s);
+      for (const i of cells) if (cost[i]! > 0) cost[i] = Math.max(cost[i]!, SOFT_COST);
+      nav.soft.set(s.id, cells);
+      continue;
+    }
     if (!solid(s)) continue;
     const cells = cellsOf(nav, s);
     for (const i of cells) cost[i] = 0;
     nav.blocks.set(s.id, cells);
   }
+  // A solid over a fence's cells still closes them.
+  if (fenced) for (const cells of nav.blocks.values()) for (const i of cells) cost[i] = 0;
   return nav;
 }
 
@@ -78,22 +99,42 @@ function cellsOf(nav: NavGrid, s: StructureDef): number[] {
   return cells;
 }
 
-/** A structure appears (an avalanche's drifts, chapter 4): its cells close. */
-export function block(nav: NavGrid, s: StructureDef): void {
+/**
+ * A soft cell's cost (a blaze): bots go a long way round one, but when it is the only way
+ * (a fire across the trail) they drive through rather than lose the way altogether. A cut
+ * way used to leave the goal unreachable, and a bot with no field drove straight at its goal
+ * into the trees (level 42 with a fast drive, Nov 15).
+ */
+export const SOFT_COST = 40;
+
+/** A structure appears (an avalanche's drifts, chapter 4): its cells close. `soft`: a blaze, its cells only cost SOFT_COST. */
+export function block(nav: NavGrid, s: StructureDef, soft = false): void {
   const cells = cellsOf(nav, s);
-  for (const i of cells) nav.cost[i] = 0;
-  nav.blocks.set(s.id, cells);
+  if (soft) {
+    for (const i of cells) if (nav.cost[i]! > 0) nav.cost[i] = Math.max(nav.cost[i]!, SOFT_COST);
+    nav.soft.set(s.id, cells);
+  } else {
+    for (const i of cells) nav.cost[i] = 0;
+    nav.blocks.set(s.id, cells);
+  }
   nav.version++;
 }
 
-/** Reopens a broken structure's cells to the ground under them. */
+/** Soft hazards and solids still over cells just reset to their ground. */
+function reapply(nav: NavGrid): void {
+  for (const other of nav.soft.values()) for (const i of other) if (nav.cost[i]! > 0) nav.cost[i] = Math.max(nav.cost[i]!, SOFT_COST);
+  for (const other of nav.blocks.values()) for (const i of other) nav.cost[i] = 0;
+}
+
+/** Reopens a broken structure's (or an ended blaze's) cells to the ground under them. */
 export function unblock(nav: NavGrid, l: Land, id: string): void {
-  const cells = nav.blocks.get(id);
+  const cells = nav.blocks.get(id) ?? nav.soft.get(id);
   if (!cells) return;
   for (const i of cells) nav.cost[i] = groundCost(nav, l.ground[i]!);
   nav.blocks.delete(id);
+  nav.soft.delete(id);
   // Another solid may still cover some of those cells.
-  for (const other of nav.blocks.values()) for (const i of other) nav.cost[i] = 0;
+  reapply(nav);
   nav.version++;
 }
 
@@ -101,7 +142,7 @@ export function unblock(nav: NavGrid, l: Land, id: string): void {
 export function regrade(nav: NavGrid, l: Land, cells: readonly number[]): void {
   if (cells.length === 0) return;
   for (const i of cells) nav.cost[i] = groundCost(nav, l.ground[i]!);
-  for (const other of nav.blocks.values()) for (const i of other) nav.cost[i] = 0;
+  reapply(nav);
   nav.version++;
 }
 
@@ -112,13 +153,15 @@ export function passable(nav: NavGrid, x: number, y: number): boolean {
   return nav.cost[gy * nav.cols + gx]! > 0;
 }
 
-/** Whether a straight drive from a to b stays on passable cells (sampled every half cell). */
+/** Whether a straight drive from a to b stays on passable cells, and off soft ones (sampled every half cell). */
 export function clearLine(nav: NavGrid, ax: number, ay: number, bx: number, by: number): boolean {
   const d = Math.hypot(bx - ax, by - ay);
   const n = Math.max(1, Math.ceil(d / (CELL / 2)));
   for (let i = 1; i <= n; i++) {
     const t = i / n;
-    if (!passable(nav, ax + (bx - ax) * t, ay + (by - ay) * t)) return false;
+    const x = ax + (bx - ax) * t;
+    const y = ay + (by - ay) * t;
+    if (!passable(nav, x, y) || nav.cost[Math.floor(y / CELL) * nav.cols + Math.floor(x / CELL)]! >= SOFT_COST) return false;
   }
   return true;
 }

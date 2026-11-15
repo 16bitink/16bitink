@@ -1,30 +1,25 @@
 import { describe, expect, it } from 'vitest';
-import { part } from '../src/logic/parts';
-import { isTagged, planTags, TAG, type TagSubject } from '../src/render/tagLogic';
+import { isTagged, planTags, type TagSubject } from '../src/render/tagLogic';
 
-const loadout = { gun: part('cannon', 1), hull: part('light', 1), drive: part('wheels', 1) };
-const mk = (id: number, o: Partial<TagSubject> = {}): TagSubject => ({ id, team: 1, role: 'tank', ace: false, name: 'X', alive: true, x: 100, y: 0, loadout, ...o });
-const me = { x: 0, y: 0, team: 2 };
+const mk = (id: number, o: Partial<TagSubject> = {}): TagSubject => ({ id, team: 1, role: 'tank', ace: false, name: 'X', alive: true, isPlayer: false, ...o });
 
-describe('tag plan', () => {
-  it('skips allies, towers, trucks, the dead and hidden tanks', () => {
-    expect(isTagged(mk(1, { team: 0 }), 2)).toBe(false);
+describe('name plates', () => {
+  it('ordinary enemies, towers, trucks and the dead get none', () => {
+    expect(isTagged(mk(1), 2)).toBe(false);
     expect(isTagged(mk(1, { role: 'bossTurret' }), 2)).toBe(false);
-    expect(isTagged(mk(1, { role: 'truck' }), 2)).toBe(false);
-    expect(isTagged(mk(1, { alive: false }), 2)).toBe(false);
-    const plans = planTags([mk(1), mk(2)], me, (t) => t.id === 1);
-    expect(plans.map((p) => p.id)).toEqual([1]);
+    expect(isTagged(mk(1, { role: 'truck', ace: true }), 2)).toBe(false);
+    expect(isTagged(mk(1, { ace: true, alive: false }), 2)).toBe(false);
   });
-  it('gives aces a name plate and emblem, bosses a plate only', () => {
-    const [ace, boss] = planTags([mk(1, { ace: true, name: 'Sly' }), mk(2, { role: 'boss', name: 'Ironclad' })], me, () => true);
-    expect(ace).toMatchObject({ plate: 'Sly', emblem: true, icons: ['gun', 'hull', 'drive'] });
-    expect(boss).toMatchObject({ plate: 'Ironclad', emblem: false, icons: [] });
+
+  it('aces get a plate and the emblem, bosses a plate only, and hidden ones nothing', () => {
+    const tanks = [mk(1, { ace: true, name: 'Sly' }), mk(2, { role: 'boss', name: 'Ironclad' }), mk(3), mk(4, { ace: true, name: 'Ghost' })];
+    const plans = planTags(tanks, 2, (t) => t.id !== 4);
+    expect(plans).toEqual([{ id: 1, plate: 'Sly', emblem: true, ally: false }, { id: 2, plate: 'Ironclad', emblem: false, ally: false }]);
+    expect(planTags(tanks, null, () => true)).toEqual([]);
   });
-  it('fades far enemies and keeps the gun only in a crowd', () => {
-    const far = planTags([mk(1, { x: TAG.far + 50 })], me, () => true)[0]!;
-    expect(far.alpha).toBeCloseTo(TAG.fadeMin);
-    const crowd = Array.from({ length: TAG.crowd + 1 }, (_, i) => mk(i + 1, { x: 80 + i }));
-    expect(planTags(crowd, me, () => true).every((p) => p.icons.length === 1)).toBe(true);
-    expect(planTags(crowd.slice(0, 2), me, () => true)[0]!.icons).toHaveLength(3);
+
+  it('allies (wingmen, freed clan crews) get a blue plate; you and our towers none', () => {
+    const tanks = [mk(1, { team: 0, clan: 'boars', name: 'Tusk' } as Partial<TagSubject>), mk(2, { team: 0, isPlayer: true, name: 'You' }), mk(3, { team: 0, role: 'tower', name: 'T' })];
+    expect(planTags(tanks, 0, () => true)).toEqual([{ id: 1, plate: 'Tusk', emblem: false, ally: true }]);
   });
 });

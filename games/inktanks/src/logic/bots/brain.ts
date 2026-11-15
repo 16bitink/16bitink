@@ -51,6 +51,10 @@ export interface Brain {
   stuckT: number;
   detourT: number;
   detourAngle: number;
+  /** Which way a stuck bot swings its tail while it backs out, whether this detour backs out first, where and when the last began (control.ts trackStuck). */
+  detourTurn: 1 | -1;
+  detourBack: boolean;
+  lastStuck: { readonly x: number; readonly y: number; readonly t: number } | null;
   /** Holding fire this decision (Difficulty.hesitate). */
   holdFire: boolean;
   /** Enemies in sight at the last decision. */
@@ -84,6 +88,10 @@ export interface Brain {
   lead?: boolean;
   /** The player stand-in: call in a supply drop or a strike now (match/callIns.ts). */
   callIn: CallInKind | null;
+  /** The player stand-in: the pickup it last drove for and when; seconds spent driving for each; pickups it gave up on (out of reach). */
+  lootFor: { readonly id: number; readonly at: number } | null;
+  readonly lootSpent: Map<number, number>;
+  readonly lootSkip: Set<number>;
 }
 
 /** A tank on your side (role 'ally') fights within about this of you, and keeps up when further. */
@@ -101,9 +109,9 @@ export function createBrain(t: Tank, e: ResolvedEnemy | null, diff: Difficulty, 
     sight: e?.sight ?? (role === 'player' ? VISION : ROLE_SIGHT[role]), route, routeI: 1, routeDir: 1,
     state: 'idle', target: null, goal: null, goalPickup: null, shootAt: null, los: false, allyBlocked: false,
     thinkT: rng.range(0, diff.reaction), aimNoise: 0, strafe: rng.chance(0.5) ? 1 : -1, strafeT: 0,
-    lastPos: { x: t.x, y: t.y }, stuckT: 0, detourT: 0, detourAngle: 0, holdFire: false, seenCount: 0, alert: null, wantSwap: false, useKit: false, hint: null, snap: null,
+    lastPos: { x: t.x, y: t.y }, stuckT: 0, detourT: 0, detourAngle: 0, detourTurn: 1, detourBack: false, lastStuck: null, holdFire: false, seenCount: 0, alert: null, wantSwap: false, useKit: false, hint: null, snap: null,
     aware: alwaysAlert({ role }, t) ? 'alert' : 'calm', awareSince: 0, awareSpot: null, alertUntil: 0, lastSeen: null, coverShot: null, telegraph: null,
-    useGadget: false, coverSpot: null, lookBase: t.turret, lobAt: null, callIn: null,
+    useGadget: false, coverSpot: null, lookBase: t.turret, lobAt: null, callIn: null, lootFor: null, lootSpent: new Map(), lootSkip: new Set(),
   };
 }
 

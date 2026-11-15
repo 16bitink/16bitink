@@ -14,8 +14,8 @@ import type { GadgetKind, Tank } from './types';
  * track); only bots that watched one laid steer round it. Oil: enemies in it
  * slide (movement.ts), shoot wide from Mk III (combat.ts), and from Mk V a
  * shot of yours sets it alight. Smoke blocks sight (perception.ts), repairs
- * you from Mk III and makes the hunters lose you at Mk V. Using a gadget on
- * enemies earns its blueprints (m.gadgetIntel).
+ * you from Mk III and makes the hunters lose you at Mk V. Each use earns one
+ * of its blueprints (m.gadgetIntel), and each enemy it catches more.
  */
 
 /** Gadget blueprints for the player's side. */
@@ -33,6 +33,8 @@ export function useGadget(m: Match, t: Tank): boolean {
   else t.gadgetCharges--;
   t.gadgetT = m.t + GADGET.cooldown;
   t.gadgetsUsed++;
+  // Every use earns one (owner, Nov 15: hits alone left upgrades out of reach).
+  earnGadget(m, t.team, kind);
   const mk = t.gadgetMk[kind];
   const at = dropPoint(kind, t);
   if (kind === 'mines') layMines(m, t, mk, at);

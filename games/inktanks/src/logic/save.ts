@@ -2,6 +2,7 @@ import { TOTAL_LEVELS } from './campaign';
 import { GADGETS, type GadgetKind } from './match/types';
 import type { Medals } from './mission/outcome';
 import { FAMILIES, slotOf, type Family, type Loadout, type Mk, type Part } from './parts';
+import { WINGMAN_RANKS, type WingmanFit } from './wingmanFit';
 import { RESEARCH_MAX, type Research, type ResearchLine } from './stats';
 import { canFit, LINES_BY_SLOT, newProgress, STARTER_FAMILIES, type GadgetBag, type IntelBag, type Progress } from './workshop';
 
@@ -117,6 +118,19 @@ function part(x: unknown, slot: 'gun' | 'hull' | 'drive'): Part {
   return x.proto === true ? { family: x.family, mk: x.mk, proto: true } : { family: x.family, mk: x.mk };
 }
 
+/**
+ * Wingman picks: absent in saves from before the Wingmen tab (none: they mirror your tank). A malformed entry
+ * becomes null rather than failing the save; a family later locked is handled where it's used (wingmanFit.ts).
+ */
+function wingmenPicks(x: unknown): (WingmanFit | null)[] {
+  if (!Array.isArray(x)) return [];
+  return x.slice(0, WINGMAN_RANKS.length).map((w): WingmanFit | null => {
+    if (!isObj(w)) return null;
+    const ok = (['gun', 'hull', 'drive'] as const).every((slot) => isFamily(w[slot]) && slotOf(w[slot] as Family) === slot);
+    return ok ? { gun: w.gun, hull: w.hull, drive: w.drive } as WingmanFit : null;
+  });
+}
+
 /** Kept ace prototypes: absent in saves from before them (none); one per family, the best Mk. */
 function protos(x: unknown): Part[] {
   if (x === undefined) return [];
@@ -161,6 +175,7 @@ function progress(x: unknown): Progress {
     gadgetIntel: gadgetBag(x.gadgetIntel),
     gadgetMk: gadgetMkBook(x.gadgetMk),
     protos: protos(x.protos),
+    wingmen: wingmenPicks(x.wingmen),
   };
   // A fitting you no longer own (or never did) swaps for the starter's families rather than failing the save.
   const fits = [loadout.gun, loadout.hull, loadout.drive].every((q) => canFit(p, q));

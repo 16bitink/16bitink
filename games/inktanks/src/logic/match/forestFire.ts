@@ -31,11 +31,11 @@ export function treeFireRule(m: Match): { readonly burn: number; readonly spread
 /** The id of a burning tree's blaze in the nav grids. */
 const blazeId = (s: StructRt): string => `${s.def.id}#fire`;
 
-/** A burning tree closes the cells round its canopy in every nav grid. */
+/** A burning tree makes the cells round its canopy dear in every nav grid (bots go round, or through when it's the only way). */
 export function blockFire(m: Match, s: StructRt): void {
   const r = s.def.canopy ?? 20;
   const blaze: StructureDef = { ...s.def, id: blazeId(s), shape: { kind: 'circle', r } };
-  m.navs.block(blaze);
+  m.navs.block(blaze, true);
 }
 
 export function unblockFire(m: Match, s: StructRt): void {

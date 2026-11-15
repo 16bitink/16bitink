@@ -98,10 +98,13 @@ export function flowDir(nav: NavGrid, f: FlowField, x: number, y: number): numbe
   let best = f.dist[i]!;
   let bx = 0;
   let by = 0;
+  const open = nav.cost[i]! > 0;
   for (const [dx, dy] of NB) {
     const nx = gx + dx;
     const ny = gy + dy;
     if (nx < 0 || ny < 0 || nx >= nav.cols || ny >= nav.rows) continue;
+    // As the field was built: no diagonal past a closed corner (a fast tank aimed there clips the wall's end and wedges).
+    if (open && dx !== 0 && dy !== 0 && (nav.cost[gy * nav.cols + nx] === 0 || nav.cost[ny * nav.cols + gx] === 0)) continue;
     const d = f.dist[ny * nav.cols + nx]!;
     if (d < best) {
       best = d;

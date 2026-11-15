@@ -15,6 +15,7 @@ declare const __DEV_ALL_LEVELS__: boolean;
  *   ?level=N        the level for briefing, results and mission
  *   ?save=mid       a mid-chapter save (levels 1–4 passed, intel, Corporal) in memory, not localStorage
  *   ?save=won       the war won (all 50 passed, General, Mk V tank), for ?screen=ending
+ *   ?tab=wingmen    with screen=workshop: the tab to open (gun, hull, drive, gadgets, wingmen)
  *   ?xp=N           with save=mid: the rank XP (e.g. 380, so results show a promotion)
  */
 function midSave(): Progress {
@@ -88,7 +89,7 @@ const level = qnum('level', 1);
 const screen = query.get('screen') ?? 'menu';
 if (screen === 'map') app.map();
 else if (screen === 'briefing') app.open(level);
-else if (screen === 'workshop') app.workshop(() => app.map(), 'Map');
+else if (screen === 'workshop') app.workshop(() => app.map(), 'Map', (query.get('tab') ?? undefined) as Parameters<typeof app.workshop>[2]);
 else if (screen === 'results') app.devResults(level);
 else if (screen === 'mission') app.devPlay(level);
 else if (screen === 'ending') app.ending();

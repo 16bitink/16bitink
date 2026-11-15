@@ -67,7 +67,7 @@ describe('chapter 4 content', () => {
   });
   it('a chapter 4 map with ten spots, and sharper bots from level 31', () => {
     expect(chapterMap(3).spots).toHaveLength(10);
-    expect(chapterMap(3).land().def.base).toBe('snow');
+    expect(chapterMap(3).art).toMatch(/ch4\.png/);
     expect(botsFor(31)).toBe(CH4_BOTS);
     expect(botsFor(30)).toBe(CH3_BOTS);
     expect(CH4_BOTS.aimError).toBeLessThan(CH3_BOTS.aimError);

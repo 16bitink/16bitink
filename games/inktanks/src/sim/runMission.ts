@@ -33,7 +33,7 @@ export interface RunOptions {
   readonly level: LoadedLevel;
   readonly seed: number;
   /** null: no player. */
-  readonly player: { readonly loadout: Loadout; readonly research?: Research; readonly kits?: number; readonly gadget?: GadgetKind | null; readonly wingmen?: number; readonly supplyDrop?: boolean; readonly strike?: boolean } | null;
+  readonly player: { readonly loadout: Loadout; readonly research?: Research; readonly kits?: number; readonly gadget?: GadgetKind | null; readonly wingmen?: number; readonly wingmanLoadouts?: readonly Loadout[]; readonly supplyDrop?: boolean; readonly strike?: boolean } | null;
   readonly dt?: number;
 }
 
