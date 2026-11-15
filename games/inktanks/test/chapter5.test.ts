@@ -19,6 +19,7 @@ import { passable } from '../src/logic/nav/grid';
 import { labLevel } from '../src/sim/levels';
 import { runMission } from '../src/sim/runMission';
 import { fixture } from './fixtures/levels';
+import { TYPICAL_TANK } from '../src/sim/lab';
 
 const build = (d: LevelDef, tank = 'cannon1/medium1/halftracks1'): Match => new Match({ level: loadLevel({ ...d, number: d.number === 99 ? 41 : d.number }, CH5_KINDS), seed: 1, player: { loadout: parseTank(tank) } });
 const steps = (m: Match, s: number): MatchEvent[] => {
@@ -70,9 +71,9 @@ describe('chapter 5 content', () => {
     expect(chapterMap(4).land().def.base).toBe('forestFloor');
   });
   it('levels 41 and 45 are winnable by the stand-in', () => {
-    const tank = parseTank('cannon3/medium3/halftracks2');
+    // The tank the campaign run brings to each level (lab's TYPICAL_TANK).
     for (const n of [41, 45]) {
-      const wins = [1, 2, 3].filter((seed) => runMission({ level: labLevel(n), seed, player: { loadout: tank, kits: 2 } }).passed).length;
+      const wins = [1, 2, 3].filter((seed) => runMission({ level: labLevel(n), seed, player: { loadout: parseTank(TYPICAL_TANK[n]!), kits: 2 } }).passed).length;
       expect(wins, `level ${n}`).toBeGreaterThan(0);
     }
   });

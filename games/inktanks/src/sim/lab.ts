@@ -22,6 +22,7 @@ import { runMission, type RunResult } from './runMission';
  *   lab -- --map 3                   only the map
  *   lab -- --all --seeds 10          one summary line per level
  *   lab -- --chapter --seeds 3       the whole-chapter no-grind check
+ *   lab -- --campaign --seeds 2      all 50 levels in one run, workshop progress carried
  *   lab -- --all --ch 2              chapter 2's levels (paid, from content/paid.ts); --chapter --ch 2 too; --ch 3, --ch 4, --ch 5 likewise
  * The player's seat is a bot ("a decent casual player"); its default tank
  * per level is what the chapter run fits by then (TYPICAL_TANK).
@@ -37,39 +38,29 @@ export interface LabArgs {
   mapOnly: boolean;
   all: boolean;
   chapter: boolean;
+  /** --campaign: all 50 levels in one run, progress carried (the chapter run across chapters). */
+  campaign: boolean;
   /** Which chapter --all and --chapter run (default 1). */
   ch: number;
 }
 
-/** The tank the chapter run has fitted when it reaches each level (measured with --chapter, Nov 14; re-measure after big changes). */
+/**
+ * The tank the campaign run (lab --campaign, seed 1) has fitted when it reaches
+ * each level: measured Nov 15 after chapter gear grades (chapter 2 enemies Mk
+ * II–III, 3 III–IV, 4 and 5 IV–V) and the rank pace fix. Re-measure after big changes.
+ */
 export const TYPICAL_TANK: Readonly<Record<number, string>> = {
-  1: 'machinegun1/light1/wheels1',
-  2: 'machinegun1/light1/wheels1',
-  3: 'cannon1/medium1/halftracks1',
-  4: 'cannon1/medium1/halftracks1',
-  5: 'cannon1/medium1/halftracks1',
-  6: 'cannon1/medium1/wheels2',
-  7: 'cannon1/medium1/wheels2',
-  8: 'cannon1/medium1/wheels2',
-  9: 'cannon1/medium1/wheels2',
-  10: 'cannon1/medium1/wheels2',
-  // Chapter 2: what the chapter 1 run ends on (Staff Sergeant, Nov 14: Medium II and Wheels II, Cannon I).
-  // Wheels are slow on sand: try --tank cannon1/medium2/halftracks1 or tracks2 too.
-  ...Object.fromEntries(Array.from({ length: 10 }, (_, i) => [11 + i, 'cannon1/medium2/wheels2'])),
-  // Chapter 3: a step on from chapter 2's (a Lieutenant by now: Cannon II, Medium II, Half-tracks II). A level's `issue` goes over it (level 21's Hover).
-  ...Object.fromEntries(Array.from({ length: 10 }, (_, i) => [21 + i, 'cannon2/medium2/halftracks2'])),
-  // Chapter 4: a step on again (a Captain: Cannon III, Medium II, Half-tracks II). Also try a Laser (laser1/medium2/halftracks2)
-  // and a Heavy (cannon2/heavy1/tracks2: thin ice won't carry it).
-  ...Object.fromEntries(Array.from({ length: 10 }, (_, i) => [31 + i, 'cannon3/medium2/halftracks2'])),
-  // Chapter 5: a step on again (a Major: Medium III over Captain's Medium II). Also try a Rail (rail1/medium3/halftracks2)
-  // and Tracks (cannon3/medium3/tracks2: they plough through young thickets and don't mind the forest floor).
-  ...Object.fromEntries(Array.from({ length: 10 }, (_, i) => [41 + i, 'cannon3/medium3/halftracks2'])),
+  1: 'machinegun1/light1/wheels1', 2: 'machinegun1/light1/wheels1', 3: 'cannon1/medium1/halftracks1', 4: 'cannon1/medium1/halftracks1', 5: 'cannon1/medium1/halftracks1', 6: 'cannon1/medium1/wheels2', 7: 'cannon1/medium1/wheels2', 8: 'cannon1/medium1/wheels2', 9: 'cannon1/medium1/wheels2', 10: 'cannon1/medium1/wheels2',
+  11: 'cannon1/medium2/tracks2', 12: 'cannon1/medium2/tracks2', 13: 'cannon1/medium2/halftracks2', 14: 'cannon1/medium2/halftracks2', 15: 'cannon1/medium2/halftracks2', 16: 'cannon2/medium2/halftracks2', 17: 'cannon2/medium2/halftracks2', 18: 'cannon2/medium3/halftracks3', 19: 'cannon2/medium3/halftracks3', 20: 'cannon2/medium3/halftracks3',
+  21: 'cannon2/medium3/halftracks3', 22: 'cannon2/medium3/halftracks3', 23: 'cannon3/medium3/halftracks3', 24: 'cannon3/medium3/halftracks3', 25: 'cannon3/medium3/halftracks3', 26: 'cannon3/medium4/halftracks4', 27: 'cannon3/medium4/halftracks4', 28: 'cannon3/medium4/halftracks4', 29: 'cannon3/medium4/halftracks4', 30: 'cannon3/medium4/halftracks4',
+  31: 'cannon3/medium4/halftracks4', 32: 'cannon3/medium4/halftracks4', 33: 'cannon4/medium4/halftracks4', 34: 'cannon4/medium4/halftracks4', 35: 'cannon4/medium4/halftracks4', 36: 'cannon4/medium4/halftracks4', 37: 'cannon4/medium4/halftracks4', 38: 'cannon4/medium4/halftracks4', 39: 'cannon4/medium4/halftracks4', 40: 'cannon4/medium4/halftracks4',
+  41: 'cannon4/medium4/halftracks4', 42: 'cannon4/medium4/halftracks4', 43: 'cannon4/medium4/halftracks4', 44: 'cannon4/medium4/halftracks4', 45: 'cannon4/medium4/halftracks4', 46: 'cannon5/medium5/halftracks5', 47: 'cannon5/medium5/halftracks5', 48: 'cannon5/medium5/halftracks5', 49: 'cannon5/medium5/halftracks5', 50: 'cannon5/medium5/halftracks5',
 };
 /** Repair kits the chapter run carries by then (a Corporal carries 2). */
 const TYPICAL_KITS = (level: number): number => (level >= 3 ? 2 : 1);
 
 export function parseArgs(argv: readonly string[]): LabArgs {
-  const a: LabArgs = { level: null, seeds: 10, seed: 1, tank: null, kits: null, gadget: 'mines', map: true, mapOnly: false, all: false, chapter: false, ch: 1 };
+  const a: LabArgs = { level: null, seeds: 10, seed: 1, tank: null, kits: null, gadget: 'mines', map: true, mapOnly: false, all: false, chapter: false, campaign: false, ch: 1 };
   for (let i = 0; i < argv.length; i++) {
     const k = argv[i]!;
     const v = argv[i + 1];
@@ -88,10 +79,11 @@ export function parseArgs(argv: readonly string[]): LabArgs {
     else if (k === '--no-map') a.map = false;
     else if (k === '--all') a.all = true;
     else if (k === '--chapter') a.chapter = true;
+    else if (k === '--campaign') a.campaign = true;
     else continue;
-    if (!k.startsWith('--no') && k !== '--all' && k !== '--chapter') i++;
+    if (!k.startsWith('--no') && k !== '--all' && k !== '--chapter' && k !== '--campaign') i++;
   }
-  if (!a.all && !a.chapter && a.level === null) throw new Error('lab: give --level N, --map N, --all or --chapter');
+  if (!a.all && !a.chapter && !a.campaign && a.level === null) throw new Error('lab: give --level N, --map N, --all or --chapter');
   if (a.level !== null) labLevel(a.level);
   if (a.tank) parseTank(a.tank);
   return a;
@@ -155,14 +147,15 @@ export function levelReport(a: LabArgs): string {
 export function chapterReport(a: LabArgs): string {
   const lines: string[] = [];
   let ok = 0;
+  const levels = a.campaign ? [1, 2, 3, 4, 5].flatMap((c) => chapterLevels(c)) : chapterLevels(a.ch);
   for (let s = 0; s < a.seeds; s++) {
-    const r = runChapter(chapterLevels(a.ch), a.seed + s);
+    const r = runChapter(levels, a.seed + s);
     if (r.verdict.ok) ok++;
-    lines.push(`Chapter ${a.ch}, seed ${a.seed + s}`);
-    lines.push('  lv name                 tries  medals  XP    rank            intel  tank at start                   ends');
+    lines.push(`${a.campaign ? 'Campaign' : `Chapter ${a.ch}`}, seed ${a.seed + s}`);
+    lines.push('  lv name                 tries  medals  XP    rank            intel  tank at start                   ends  | parts fitted from the ground');
     for (const row of r.rows) {
       const medals = row.outcome.done.map((x) => (x ? 'x' : '.')).join('');
-      lines.push(`  ${String(row.level).padStart(2)} ${row.name.padEnd(20)} ${String(row.attempts).padStart(5)}  ${medals.padEnd(6)} ${String(row.xp).padStart(5)}  ${row.rank.padEnd(15)} ${String(sumIntel(row.intel)).padStart(5)}  ${row.loadout.padEnd(31)} ${row.ends.join(', ')}`);
+      lines.push(`  ${String(row.level).padStart(2)} ${row.name.padEnd(20)} ${String(row.attempts).padStart(5)}  ${medals.padEnd(6)} ${String(row.xp).padStart(5)}  ${row.rank.padEnd(15)} ${String(sumIntel(row.intel)).padStart(5)}  ${row.loadout.padEnd(31)} ${row.ends.join(', ')}  | ${row.picks}`);
     }
     const p = r.progress;
     lines.push(`  end: ${rankOf(p.xp).name} (${p.xp} XP), bonus medals ${pct(r.bonusShare)}, total intel ${intelLine(p.intelTotal)}`);
@@ -179,7 +172,7 @@ export function allReport(a: LabArgs): string {
 
 export function main(argv: readonly string[]): string {
   const a = parseArgs(argv);
-  if (a.chapter) return chapterReport(a);
+  if (a.chapter || a.campaign) return chapterReport(a);
   if (a.all) return allReport(a);
   return levelReport(a);
 }

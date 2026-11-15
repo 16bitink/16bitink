@@ -56,24 +56,24 @@ export const LEVEL_45: LevelDef = {
   start: at(0.25, 1.7), startHeading: 0,
   enemies: [
     // A drone at the glade by the start, to warm up.
-    { role: 'guard', clan: 'hive', tank: TANK.drone, at: 'glade', hpMult: 0.5, sight: 360 },
+    { role: 'guard', clan: 'hive', tank: TANK.drone, at: 'glade', hpMult: 0.37, sight: 360 },
     // Loggers in the undergrowth by each felled tree.
-    { role: 'guard', clan: 'hive', tank: TANK.gunner, at: 'log1n', hpMult: 0.4, sight: 380, leash: 260 },
-    { role: 'guard', clan: 'hive', tank: TANK.drone, at: 'log1s', hpMult: 0.5, sight: 380, leash: 260 },
-    { role: 'guard', clan: 'hive', tank: TANK.drone, at: 'log2n', hpMult: 0.5, sight: 380, leash: 260 },
-    { role: 'guard', clan: 'hive', tank: TANK.gunner, at: 'log2s', hpMult: 0.4, sight: 380, leash: 260 },
-    { role: 'guard', clan: 'hive', tank: TANK.heavy, at: 'log3n', hpMult: 0.25, sight: 380, leash: 240 },
-    { role: 'guard', clan: 'hive', tank: TANK.drone, at: 'log3s', hpMult: 0.5, sight: 380, leash: 260 },
+    { role: 'guard', clan: 'hive', tank: TANK.gunner, at: 'log1n', hpMult: 0.3, sight: 380, leash: 260 },
+    { role: 'guard', clan: 'hive', tank: TANK.drone, at: 'log1s', hpMult: 0.37, sight: 380, leash: 260 },
+    { role: 'guard', clan: 'hive', tank: TANK.drone, at: 'log2n', hpMult: 0.37, sight: 380, leash: 260 },
+    { role: 'guard', clan: 'hive', tank: TANK.gunner, at: 'log2s', hpMult: 0.3, sight: 380, leash: 260 },
+    { role: 'guard', clan: 'hive', tank: TANK.heavy, at: 'log3n', hpMult: 0.19, sight: 380, leash: 240 },
+    { role: 'guard', clan: 'hive', tank: TANK.drone, at: 'log3s', hpMult: 0.37, sight: 380, leash: 260 },
     // The Rail north of the trail, shooting through the trees.
-    { role: 'turret', clan: 'hive', tank: TANK.rail, at: 'railNest', hpMult: 0.35, sight: 420 },
+    { role: 'turret', clan: 'hive', tank: TANK.rail, at: 'railNest', hpMult: 0.26, sight: 420 },
     // Raiders for the trucks.
-    { role: 'wave', clan: 'hive', tank: TANK.drone, at: 'raidS', when: 50, hpMult: 0.5 },
-    { role: 'wave', clan: 'hive', tank: TANK.drone, at: 'raidN', when: 95, hpMult: 0.5 },
-    { role: 'wave', clan: 'hive', tank: TANK.gunner, at: 'raidNE', when: 125, hpMult: 0.4 },
+    { role: 'wave', clan: 'hive', tank: TANK.drone, at: 'raidS', when: 50, hpMult: 0.37 },
+    { role: 'wave', clan: 'hive', tank: TANK.drone, at: 'raidN', when: 95, hpMult: 0.37 },
+    { role: 'wave', clan: 'hive', tank: TANK.gunner, at: 'raidNE', when: 125, hpMult: 0.3 },
   ],
   allies: FORT.allies,
   crates: [{ at: { x: 700, y: 330 }, content: 'kit' }, { at: { x: 1750, y: 980 } }, { at: { x: 2500, y: 380 }, content: 'kit' }, { at: { x: 3300, y: 1000 } }],
-  objective: { kind: 'escort', road: 'convoy', truckHp: 1650, speed: 32, trucks: 2, clear: 'felled' },
+  objective: { kind: 'escort', road: 'convoy', truckHp: 2150, speed: 32, trucks: 2, clear: 'felled' },
   bonus: [{ kind: 'truckHp', min: 0.25 }, { kind: 'kills', n: 9 }],
   loot: LOOT_FOREST,
 };

@@ -1,6 +1,7 @@
 import type { MatchReport } from '../match/report';
 import { XP } from '../rank';
-import { addGadgetIntel, addIntel, type Progress } from '../workshop';
+import type { Family } from '../parts';
+import { addGadgetIntel, addIntel, grantFamily, type Progress } from '../workshop';
 import type { LevelDef } from '../level/types';
 import { bonusMet } from './bonus';
 
@@ -16,6 +17,8 @@ export interface Outcome {
   readonly fresh: Medals;
   readonly firstWin: boolean;
   readonly xp: number;
+  /** The level's prize family, when this run fitted it (unlocked in the workshop from now on). */
+  readonly prize: Family | null;
 }
 
 export function outcome(def: LevelDef, r: MatchReport, prev: Medals | undefined): Outcome {
@@ -27,12 +30,15 @@ export function outcome(def: LevelDef, r: MatchReport, prev: Medals | undefined)
   const firstWin = fresh[0];
   // Objective XP once per medal; kills pay every time.
   const xp = (fresh[0] ? XP.main : 0) + (fresh[1] ? XP.bonus : 0) + (fresh[2] ? XP.bonus : 0) + r.kills * XP.kill + (firstWin ? XP.firstWin : 0);
-  return { passed, done, medals, fresh, firstWin, xp };
+  const prize = def.prize !== undefined && r.picks.some((p) => p.family === def.prize) ? def.prize : null;
+  return { passed, done, medals, fresh, firstWin, xp, prize };
 }
 
 /** Applies a played mission to progress: intel is kept win or lose, XP and medals only go up. */
 export function applyOutcome(p: Progress, def: LevelDef, r: MatchReport): { progress: Progress; outcome: Outcome } {
   const o = outcome(def, r, p.medals[def.number]);
-  const withIntel = addGadgetIntel(addIntel(p, r.intel), r.gadgetIntel ?? {});
+  const gained = addGadgetIntel(addIntel(p, r.intel), r.gadgetIntel ?? {});
+  // A prize taken in the field is kept win or lose, like blueprints.
+  const withIntel = o.prize ? grantFamily(gained, o.prize) : gained;
   return { progress: { ...withIntel, xp: withIntel.xp + o.xp, medals: { ...withIntel.medals, [def.number]: o.medals } }, outcome: o };
 }

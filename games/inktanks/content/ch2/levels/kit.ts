@@ -46,16 +46,16 @@ export function camp(c: Pt, open: 'n' | 's' | 'e' | 'w' = 'w'): StructPlace[] {
   return [{ kind: 'tent', x: c.x - 30, y: c.y - 20 }, { kind: 'tent', x: c.x + 40, y: c.y + 30 }, { kind: 'crate', x: c.x + 50, y: c.y - 40 }, ...bags];
 }
 
-/** Loot for chapter 2's rolled crates: chapter 1's families and the Mortar, more Mk II. */
-export const LOOT_DESERT: LootTable = { families: ['machinegun', 'cannon', 'rockets', 'mortar', 'light', 'medium', 'heavy', 'wheels', 'halftracks', 'tracks'], crateMk: [0.45, 0.5, 0.05], kitShare: 0.3 };
+/** Loot for chapter 2's rolled crates: chapter 1's families and the Mortar; Mk II–III, the chapter's gear grade. */
+export const LOOT_DESERT: LootTable = { families: ['machinegun', 'cannon', 'rockets', 'mortar', 'light', 'medium', 'heavy', 'wheels', 'halftracks', 'tracks'], crateMk: [0, 0.45, 0.5, 0.05], kitShare: 0.3 };
 
-/** Common chapter 2 tanks (the Crows field Mk I–II, mortars from level 11). */
+/** Common chapter 2 tanks (the Crows field Mk II–III, a tier above chapter 1's best, so their wrecks are worth looting; mortars from level 11). */
 export const TANK = {
-  scout: 'machinegun2/light1/wheels2',
-  gunner: 'cannon1/medium1/halftracks1',
-  gunner2: 'cannon2/medium1/halftracks2',
-  mortar: 'mortar1/medium1/halftracks1',
-  mortar2: 'mortar2/medium1/tracks1',
-  rocket: 'rockets1/medium1/tracks1',
-  heavy: 'cannon2/heavy1/tracks1',
+  scout: 'machinegun3/light2/wheels3',
+  gunner: 'cannon2/medium2/halftracks2',
+  gunner2: 'cannon3/medium2/halftracks3',
+  mortar: 'mortar2/medium2/halftracks2',
+  mortar2: 'mortar3/medium2/tracks2',
+  rocket: 'rockets2/medium2/tracks2',
+  heavy: 'cannon3/heavy2/tracks2',
 } as const;

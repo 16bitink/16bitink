@@ -59,20 +59,20 @@ export const LEVEL_41: LevelDef = {
   start: at(0.12, 1.42), startHeading: 0,
   enemies: [
     // The forest: a drone in the undergrowth, a gunner up and down the trail.
-    { role: 'guard', clan: 'hive', tank: TANK.drone, at: 'thicket', hpMult: 0.5, sight: 360 },
-    { role: 'patrol', clan: 'hive', tank: TANK.gunner, at: at(0.75, 1.38), route: 'trail', hpMult: 0.4 },
-    { role: 'patrol', clan: 'hive', tank: TANK.drone, at: SIDE[0]!, route: 'side', hpMult: 0.5 },
+    { role: 'guard', clan: 'hive', tank: TANK.drone, at: 'thicket', hpMult: 0.37, sight: 360 },
+    { role: 'patrol', clan: 'hive', tank: TANK.gunner, at: at(0.75, 1.38), route: 'trail', hpMult: 0.3 },
+    { role: 'patrol', clan: 'hive', tank: TANK.drone, at: SIDE[0]!, route: 'side', hpMult: 0.37 },
     // The camp.
-    { role: 'guard', clan: 'hive', tank: TANK.gunner, at: 'camp', hpMult: 0.4, leash: 300 },
-    { role: 'guard', clan: 'hive', tank: TANK.heavy, at: 'mill', hpMult: 0.25, leash: 260 },
-    { role: 'guard', clan: 'hive', tank: TANK.logger, at: 'piles', hpMult: 0.4, leash: 260 },
+    { role: 'guard', clan: 'hive', tank: TANK.gunner, at: 'camp', hpMult: 0.3, leash: 300 },
+    { role: 'guard', clan: 'hive', tank: TANK.heavy, at: 'mill', hpMult: 0.19, leash: 260 },
+    { role: 'guard', clan: 'hive', tank: TANK.logger, at: 'piles', hpMult: 0.3, leash: 260 },
     // The Rails in the trees beyond: they shoot through the forest.
-    { role: 'guard', clan: 'hive', tank: TANK.rail, at: 'railN', hpMult: 0.45, sight: 420, leash: 200 },
-    { role: 'guard', clan: 'hive', tank: TANK.rail, at: 'railS', hpMult: 0.45, sight: 420, leash: 200 },
+    { role: 'guard', clan: 'hive', tank: TANK.rail, at: 'railN', hpMult: 0.34, sight: 420, leash: 200 },
+    { role: 'guard', clan: 'hive', tank: TANK.rail, at: 'railS', hpMult: 0.34, sight: 420, leash: 200 },
     // The alarm brings drones from the east.
-    { role: 'wave', clan: 'hive', tank: TANK.drone, at: 'east', when: 'alarm', hpMult: 0.5 },
+    { role: 'wave', clan: 'hive', tank: TANK.drone, at: 'east', when: 'alarm', hpMult: 0.37 },
   ],
-  crates: [{ at: { x: 470, y: 960 }, content: { family: 'rail', mk: 1 } }, { at: { x: 900, y: 470 }, content: 'kit' }, { at: { x: 1640, y: 880 } }, { at: { x: 2480, y: 520 } }],
+  crates: [{ at: { x: 470, y: 960 }, content: { family: 'rail', mk: 3 } }, { at: { x: 900, y: 470 }, content: 'kit' }, { at: { x: 1640, y: 880 } }, { at: { x: 2480, y: 520 } }],
   objective: { kind: 'assault' },
   bonus: [{ kind: 'time', under: 125 }, { kind: 'kills', n: 9 }],
   loot: LOOT_FOREST,

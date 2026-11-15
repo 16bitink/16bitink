@@ -21,9 +21,20 @@ const BAR = { w: 30, h: 4, dy: 12 } as const;
 const DEPTH = { finder: 8100, flash: 8200 } as const;
 const FLASH_S = 0.45;
 
+/** Who flies a flag: it changes only when a side has taken it all the way (hold reaches ±1), as the objective counts it. */
+type FlagOwner = 'bare' | 'ours' | 'theirs';
+
 interface FlagView {
   readonly shadow: Phaser.GameObjects.Image;
   readonly pole: Phaser.GameObjects.Image;
+  owner: FlagOwner;
+}
+
+/** The owner after this frame: a side's flag stays up until the other side has fully taken the pole. */
+export function flagOwner(was: FlagOwner, hold: number): FlagOwner {
+  if (hold >= 1) return 'ours';
+  if (hold <= -1) return 'theirs';
+  return was;
 }
 
 export class SetPieceLayer {
@@ -63,7 +74,7 @@ export class SetPieceLayer {
   private flagView(i: number): FlagView {
     let v = this.flagViews[i];
     if (!v) {
-      v = { shadow: this.scene.add.image(0, 0, worldKey('structures/flagBare-1')).setDepth(15), pole: this.scene.add.image(0, 0, worldKey('structures/flagBare-1')) };
+      v = { shadow: this.scene.add.image(0, 0, worldKey('structures/flagBare-1')).setDepth(15), pole: this.scene.add.image(0, 0, worldKey('structures/flagBare-1')), owner: 'bare' };
       this.flagViews.push(v);
     }
     return v;
@@ -72,9 +83,10 @@ export class SetPieceLayer {
   /** Theirs: the Weasels' flag on their levels (chapter 3), else the Crows'. */
   private theirFlag: string = FLAG.theirs;
 
-  /** The pole's art by owner: bare until someone holds it, then ours (Ink) or theirs (Crow). */
+  /** The pole's art by owner: bare until someone holds it, then ours (Ink) or theirs (Crow); it swaps only on a full capture. */
   private showFlag(v: FlagView, f: FlagProp): void {
-    const name = Math.abs(f.hold) < 0.02 ? FLAG.bare : f.hold > 0 ? FLAG.ours : this.theirFlag;
+    v.owner = flagOwner(v.owner, f.hold);
+    const name = v.owner === 'bare' ? FLAG.bare : v.owner === 'ours' ? FLAG.ours : this.theirFlag;
     const art = WORLD.structures[name];
     const key = worldKey(`structures/${name}-1`);
     if (!art || !this.scene.textures.exists(key)) return;
@@ -87,14 +99,15 @@ export class SetPieceLayer {
     else v.shadow.setVisible(false);
   }
 
-  /** The capture progress: a small bar under the pole in the holder's colour (UI mark, not the flag). */
+  /** The capture progress, a tug of war under the pole: our colour fills from the left as the ring's arc does (UI mark, not the flag). */
   private drawHold(g: Phaser.GameObjects.Graphics, f: FlagProp, ours: number, theirs: number): void {
-    const k = Math.abs(f.hold);
-    if (k < 0.02 || k >= 0.999) return;
+    const k = (f.hold + 1) / 2;
+    if (k <= 0.001 || k >= 0.999) return;
     const x = f.x - BAR.w / 2;
     const y = f.y + BAR.dy;
     g.fillStyle(0x000000, 0.45).fillRect(x - 1, y - 1, BAR.w + 2, BAR.h + 2);
-    g.fillStyle(f.hold > 0 ? ours : theirs, 0.95).fillRect(x, y, BAR.w * k, BAR.h);
+    g.fillStyle(theirs, 0.95).fillRect(x, y, BAR.w, BAR.h);
+    g.fillStyle(ours, 0.95).fillRect(x, y, BAR.w * k, BAR.h);
   }
 
   /** Four corner brackets closing in on the camp as the photo develops; the flash when it's taken. */

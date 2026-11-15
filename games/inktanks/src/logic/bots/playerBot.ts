@@ -1,4 +1,6 @@
 import { wantsSwap } from '../loot';
+import { slotOf, type Part } from '../parts';
+import { prizePickup } from '../match/prize';
 import type { Match } from '../match/match';
 import type { Tank } from '../match/types';
 import type { Pt } from '../vec';
@@ -17,6 +19,14 @@ const COVER_SEEK = 200;
 /** No second gadget within this many seconds. */
 const GADGET_GAP = 3;
 
+/** A part's pull: never one that would swap the level's prize off, else a better part (the prize itself: prizePick). */
+function partValue(m: Match, t: Tank, part: Part): number {
+  const prize = m.level.def.prize;
+  const fitted = t.loadout[slotOf(part.family)];
+  if (prize && fitted.family === prize) return 0;
+  return wantsSwap(t.loadout, part, t.lastHitDrive) ? part.mk * 5 : 0;
+}
+
 /** Crates, kits, intel and better parts close by. */
 function lootPick(m: Match, t: Tank, range: number): { id: number; x: number; y: number } | null {
   let best: { id: number; x: number; y: number } | null = null;
@@ -30,7 +40,7 @@ function lootPick(m: Match, t: Tank, range: number): { id: number; x: number; y:
     else if (p.kind === 'kit') v = t.kits < t.maxKits ? 7 : 0;
     else if (p.kind === 'gadget') v = p.gadget && p.gadget !== t.gadget ? (t.found ? 0 : 5) : t.gadget ? 4 : 0;
     else if (p.kind === 'intel') v = 6 + Object.values(p.bag).reduce((s: number, n) => s + (n ?? 0), 0);
-    else if (p.kind === 'part') v = wantsSwap(t.loadout, p.part, t.lastHitDrive) ? p.part.mk * 5 : 0;
+    else if (p.kind === 'part') v = partValue(m, t, p.part);
     const score = v / (1 + d / 220);
     if (score > bestScore) {
       bestScore = score;
@@ -102,6 +112,13 @@ export function thinkPlayer(m: Match, b: Brain, t: Tank, target: Tank | null, wi
     b.target = null;
     b.snap = null;
     b.los = b.shootAt ? losClear(m, t.x, t.y, b.shootAt.x, b.shootAt.y, b.shootAt.id) : false;
+  }
+  // The level's prize first (it's what lets you cross): drive to it, shooting on the way.
+  const prize = prizePickup(m, t);
+  if (prize) {
+    b.goalPickup = prize.id;
+    b.wantSwap = Math.hypot(prize.x - t.x, prize.y - t.y) < t.stats.radius + 14;
+    return set(b, 'loot', prize);
   }
   // Running: shoot what's in sight on the way, but keep driving.
   if (target && engage && h?.run && h.goal) return set(b, 'goal', { x: h.goal.x, y: h.goal.y });

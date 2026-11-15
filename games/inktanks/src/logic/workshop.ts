@@ -106,6 +106,12 @@ export function unlock(p: Progress, f: Family): Result {
   return { ok: true, progress: { ...p, intel: spend(p.intel, f, UNLOCK_COST), unlocked: [...p.unlocked, f], mk: { ...p.mk, [f]: 1 } } };
 }
 
+/** A family taken from the enemy in the field (a level's prize): unlocked free, at Mk I. */
+export function grantFamily(p: Progress, f: Family): Progress {
+  if (p.unlocked.includes(f)) return p;
+  return { ...p, unlocked: [...p.unlocked, f], mk: { ...p.mk, [f]: p.mk[f] ?? 1 } };
+}
+
 export function raiseMk(p: Progress, f: Family): Result {
   if (!p.unlocked.includes(f)) return fail('not unlocked');
   const cur = p.mk[f] ?? 1;

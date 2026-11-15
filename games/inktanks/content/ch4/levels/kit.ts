@@ -60,10 +60,10 @@ export function railLine(pts: readonly Pt[]): StructPlace[] {
   return out;
 }
 
-/** Loot for chapter 4's rolled crates: every family so far, the Laser too, more Mk II and III. */
+/** Loot for chapter 4's rolled crates: every family so far, the Laser too; Mk IV–V, the chapter's gear grade. */
 export const LOOT_SNOW: LootTable = {
   families: ['machinegun', 'cannon', 'rockets', 'mortar', 'flamer', 'laser', 'light', 'medium', 'heavy', 'wheels', 'halftracks', 'tracks', 'hover'],
-  crateMk: [0.25, 0.55, 0.2],
+  crateMk: [0, 0, 0, 0.3, 0.7],
   kitShare: 0.3,
 };
 
@@ -74,17 +74,17 @@ export const LOOT_SNOW: LootTable = {
  */
 export const TANK = {
   // Boars.
-  boarHeavy: 'cannon2/heavy1/tracks2',
-  boarRocket: 'rockets2/heavy1/tracks1',
-  boarGunner: 'cannon2/medium2/tracks1',
+  boarHeavy: 'cannon5/heavy4/tracks5',
+  boarRocket: 'rockets5/heavy4/tracks4',
+  boarGunner: 'cannon5/medium5/tracks4',
   // Weasels.
-  skimmer: 'machinegun2/light1/hover2',
-  flamer: 'flamer2/medium1/halftracks2',
+  skimmer: 'machinegun5/light4/hover5',
+  flamer: 'flamer5/medium4/halftracks5',
   // Crows.
-  scout: 'machinegun2/light1/wheels2',
-  mortar: 'mortar2/medium1/tracks1',
-  gunner: 'cannon2/medium1/halftracks2',
+  scout: 'machinegun5/light4/wheels5',
+  mortar: 'mortar5/medium4/tracks4',
+  gunner: 'cannon5/medium4/halftracks5',
   // Lasers: long, instant, telegraphed.
-  laser: 'laser1/medium1/halftracks1',
-  laser2: 'laser2/medium2/halftracks2',
+  laser: 'laser4/medium4/halftracks4',
+  laser2: 'laser5/medium5/halftracks5',
 } as const;

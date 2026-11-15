@@ -58,22 +58,22 @@ export const LEVEL_29: LevelDef = {
   start: { x: 1100, y: 940 }, startHeading: 0,
   enemies: [
     // The convoy: four unarmed barges and an armed one at the back.
-    { role: 'convoy', clan: 'weasels', tank: TANK.gunner, at: 'b1', route: 'river', truck: true, vessel: 'barge', hpMult: 0.6, speedMult: 0.2 },
-    { role: 'convoy', clan: 'weasels', tank: TANK.gunner, at: 'b2', route: 'river', truck: true, vessel: 'barge', hpMult: 0.6, speedMult: 0.2 },
-    { role: 'convoy', clan: 'weasels', tank: TANK.gunner, at: 'b3', route: 'river', truck: true, vessel: 'barge', hpMult: 0.6, speedMult: 0.2 },
-    { role: 'convoy', clan: 'weasels', tank: TANK.gunner, at: 'b4', route: 'river', truck: true, vessel: 'barge', hpMult: 0.6, speedMult: 0.2 },
-    { role: 'convoy', clan: 'weasels', tank: TANK.gunner2, at: 'b5', route: 'river', vessel: 'barge', hpMult: 0.7, speedMult: 0.2 },
+    { role: 'convoy', clan: 'weasels', tank: TANK.gunner, at: 'b1', route: 'river', truck: true, vessel: 'barge', hpMult: 0.34, speedMult: 0.2 },
+    { role: 'convoy', clan: 'weasels', tank: TANK.gunner, at: 'b2', route: 'river', truck: true, vessel: 'barge', hpMult: 0.34, speedMult: 0.2 },
+    { role: 'convoy', clan: 'weasels', tank: TANK.gunner, at: 'b3', route: 'river', truck: true, vessel: 'barge', hpMult: 0.34, speedMult: 0.2 },
+    { role: 'convoy', clan: 'weasels', tank: TANK.gunner, at: 'b4', route: 'river', truck: true, vessel: 'barge', hpMult: 0.34, speedMult: 0.2 },
+    { role: 'convoy', clan: 'weasels', tank: TANK.gunner2, at: 'b5', route: 'river', vessel: 'barge', hpMult: 0.4, speedMult: 0.2 },
     // Far bank, shelling across the river.
-    { role: 'guard', clan: 'weasels', tank: TANK.gunner, at: 'gunN', hpMult: 0.6, sight: 440, leash: 120 },
-    { role: 'guard', clan: 'weasels', tank: 'machinegun2/light1/halftracks1', at: 'gunN2', hpMult: 0.7, sight: 440, leash: 120 },
-    { role: 'turret', clan: 'weasels', tank: TANK.mortar, at: 'mortarN', hpMult: 0.5, sight: 480 },
+    { role: 'guard', clan: 'weasels', tank: TANK.gunner, at: 'gunN', hpMult: 0.34, sight: 440, leash: 120 },
+    { role: 'guard', clan: 'weasels', tank: 'machinegun4/light3/halftracks3', at: 'gunN2', hpMult: 0.4, sight: 440, leash: 120 },
+    { role: 'turret', clan: 'weasels', tank: TANK.mortar, at: 'mortarN', hpMult: 0.29, sight: 480 },
     // South bank: a Flamer in the reeds at the bend.
-    { role: 'guard', clan: 'weasels', tank: TANK.flamer, at: 'flamerS', hpMult: 0.6, sight: 260, leash: 260 },
+    { role: 'guard', clan: 'weasels', tank: TANK.flamer, at: 'flamerS', hpMult: 0.34, sight: 260, leash: 260 },
     // The lock's guards.
-    { role: 'guard', clan: 'weasels', tank: TANK.gunner, at: 'lockN', hpMult: 0.6, sight: 420, leash: 100 },
-    { role: 'guard', clan: 'weasels', tank: TANK.gunner, at: 'lockS', hpMult: 0.6, sight: 420, leash: 200 },
+    { role: 'guard', clan: 'weasels', tank: TANK.gunner, at: 'lockN', hpMult: 0.34, sight: 420, leash: 100 },
+    { role: 'guard', clan: 'weasels', tank: TANK.gunner, at: 'lockS', hpMult: 0.34, sight: 420, leash: 200 },
     // Skimmers come for you when the alarm goes.
-    { role: 'wave', clan: 'weasels', tank: TANK.skimmer, at: 'riverE', when: 'alarm', hpMult: 0.7 },
+    { role: 'wave', clan: 'weasels', tank: TANK.skimmer, at: 'riverE', when: 'alarm', hpMult: 0.4 },
   ],
   crates: [{ at: { x: 700, y: 940 }, content: 'kit' }, { at: { x: 1800, y: 960 } }, { at: { x: 2500, y: 900 }, content: 'kit' }, { at: { x: 3300, y: 960 } }],
   objective: { kind: 'ambush' },

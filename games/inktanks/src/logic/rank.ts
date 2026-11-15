@@ -15,15 +15,15 @@ export interface RankDef {
 
 export const RANKS: readonly RankDef[] = [
   { id: 'private', name: 'Private', xp: 0 },
-  { id: 'corporal', name: 'Corporal', xp: 400 },
-  { id: 'sergeant', name: 'Sergeant', xp: 850 },
-  { id: 'staffSergeant', name: 'Staff Sergeant', xp: 1450 },
-  { id: 'lieutenant', name: 'Lieutenant', xp: 2300 },
-  { id: 'captain', name: 'Captain', xp: 3400 },
-  { id: 'major', name: 'Major', xp: 4800 },
-  { id: 'colonel', name: 'Colonel', xp: 6500 },
-  { id: 'brigadier', name: 'Brigadier', xp: 8500 },
-  { id: 'general', name: 'General', xp: 10500 },
+  { id: 'corporal', name: 'Corporal', xp: 480 },
+  { id: 'sergeant', name: 'Sergeant', xp: 1100 },
+  { id: 'staffSergeant', name: 'Staff Sergeant', xp: 2000 },
+  { id: 'lieutenant', name: 'Lieutenant', xp: 3200 },
+  { id: 'captain', name: 'Captain', xp: 4500 },
+  { id: 'major', name: 'Major', xp: 5900 },
+  { id: 'colonel', name: 'Colonel', xp: 8900 },
+  { id: 'brigadier', name: 'Brigadier', xp: 11300 },
+  { id: 'general', name: 'General', xp: 12500 },
 ];
 
 export const XP = {

@@ -55,15 +55,15 @@ export const LEVEL_44: LevelDef = {
   start: { x: 250, y: 1000 }, startHeading: 0,
   enemies: [
     // The column: one armed tank down each trail.
-    { role: 'convoy', clan: 'hive', tank: TANK.gunner, at: 'c1', route: 'col1', hpMult: 0.4, speedMult: 0.22 },
-    { role: 'convoy', clan: 'hive', tank: TANK.gunner, at: 'c2', route: 'col2', hpMult: 0.4, speedMult: 0.22 },
-    { role: 'convoy', clan: 'hive', tank: TANK.gunner, at: 'c3', route: 'col3', hpMult: 0.4, speedMult: 0.22 },
+    { role: 'convoy', clan: 'hive', tank: TANK.gunner, at: 'c1', route: 'col1', hpMult: 0.3, speedMult: 0.22 },
+    { role: 'convoy', clan: 'hive', tank: TANK.gunner, at: 'c2', route: 'col2', hpMult: 0.3, speedMult: 0.22 },
+    { role: 'convoy', clan: 'hive', tank: TANK.gunner, at: 'c3', route: 'col3', hpMult: 0.3, speedMult: 0.22 },
     // The bridge guards on the east bank.
-    { role: 'guard', clan: 'hive', tank: TANK.gunner, at: 'gN', hpMult: 0.4, sight: 400, leash: 240 },
-    { role: 'guard', clan: 'hive', tank: TANK.drone, at: 'gM', hpMult: 0.5, sight: 400, leash: 240 },
-    { role: 'guard', clan: 'hive', tank: TANK.gunner, at: 'gS', hpMult: 0.4, sight: 400, leash: 240 },
-    { role: 'turret', clan: 'hive', tank: TANK.rail, at: 'railM', hpMult: 0.4, sight: 420 },
-    { role: 'wave', clan: 'hive', tank: TANK.drone, at: 'eastN', when: 70, hpMult: 0.5 },
+    { role: 'guard', clan: 'hive', tank: TANK.gunner, at: 'gN', hpMult: 0.3, sight: 400, leash: 240 },
+    { role: 'guard', clan: 'hive', tank: TANK.drone, at: 'gM', hpMult: 0.37, sight: 400, leash: 240 },
+    { role: 'guard', clan: 'hive', tank: TANK.gunner, at: 'gS', hpMult: 0.3, sight: 400, leash: 240 },
+    { role: 'turret', clan: 'hive', tank: TANK.rail, at: 'railM', hpMult: 0.3, sight: 420 },
+    { role: 'wave', clan: 'hive', tank: TANK.drone, at: 'eastN', when: 70, hpMult: 0.37 },
   ],
   crates: [{ at: { x: 400, y: 930 }, content: 'kit' }, { at: { x: 1600, y: 560 } }, { at: { x: 2400, y: 400 }, content: 'kit' }, { at: { x: 1400, y: 960 } }],
   objective: { kind: 'raid', tag: 'target', label: 'Log bridges', column: true },

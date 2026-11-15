@@ -47,12 +47,12 @@ export const LEVEL_42: LevelDef = {
   fire: { start: ['fire0', 'fireN', 'fireS'], at: 0, every: 1.5, spread: 170, burn: 24, damage: 29, text: 'The forest is on fire! Get out along the trail.' },
   enemies: [
     // The Hive's gunners hold the trail's bends: they have to be got past, or through.
-    { role: 'guard', clan: 'hive', tank: TANK.drone, at: { x: TRAIL[2]!.x + 150, y: TRAIL[2]!.y }, hpMult: 0.5, sight: 440, leash: 300 },
-    { role: 'guard', clan: 'hive', tank: TANK.gunner, at: { x: TRAIL[3]!.x + 120, y: TRAIL[3]!.y }, hpMult: 0.4, sight: 440, leash: 300 },
-    { role: 'guard', clan: 'hive', tank: TANK.gunner, at: { x: TRAIL[6]!.x - 40, y: TRAIL[6]!.y }, hpMult: 0.4, sight: 440, leash: 300 },
-    { role: 'guard', clan: 'hive', tank: TANK.heavy, at: { x: TRAIL[7]!.x + 120, y: TRAIL[7]!.y }, hpMult: 0.25, sight: 440, leash: 300 },
-    { role: 'patrol', clan: 'hive', tank: TANK.drone, at: TRAIL[5]!, route: 'trail2', hpMult: 0.5 },
-    { role: 'turret', clan: 'hive', tank: TANK.rail, at: 'railNest', hpMult: 0.35, sight: 420 },
+    { role: 'guard', clan: 'hive', tank: TANK.drone, at: { x: TRAIL[2]!.x + 150, y: TRAIL[2]!.y }, hpMult: 0.38, sight: 440, leash: 300 },
+    { role: 'guard', clan: 'hive', tank: TANK.gunner, at: { x: TRAIL[3]!.x + 120, y: TRAIL[3]!.y }, hpMult: 0.3, sight: 440, leash: 300 },
+    { role: 'guard', clan: 'hive', tank: TANK.gunner, at: { x: TRAIL[6]!.x - 40, y: TRAIL[6]!.y }, hpMult: 0.3, sight: 440, leash: 300 },
+    { role: 'guard', clan: 'hive', tank: TANK.heavy, at: { x: TRAIL[7]!.x + 120, y: TRAIL[7]!.y }, hpMult: 0.19, sight: 440, leash: 300 },
+    { role: 'patrol', clan: 'hive', tank: TANK.drone, at: TRAIL[5]!, route: 'trail2', hpMult: 0.38 },
+    { role: 'turret', clan: 'hive', tank: TANK.rail, at: 'railNest', hpMult: 0.26, sight: 420 },
   ],
   allies: FORT.allies,
   crates: [{ at: { x: 700, y: 640 }, content: 'kit' }, { at: { x: 1700, y: 760 } }, { at: { x: 2500, y: 520 }, content: 'kit' }, { at: { x: 3200, y: 820 } }],

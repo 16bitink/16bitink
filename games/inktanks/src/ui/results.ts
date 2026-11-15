@@ -66,6 +66,9 @@ export function showResults(root: HTMLElement, d: ResultsData, a: ResultsActions
   const readyHtml = ready.length > 0
     ? `<div class="ready-line">Upgrade ready: ${esc(ready.slice(0, 2).map((u) => u.label).join(', '))}${ready.length > 2 ? ` +${ready.length - 2} more` : ''}</div>`
     : '';
+  // A family taken from the enemy (a level's prize) is now in the workshop.
+  const won = o.prize && !d.before.unlocked.includes(o.prize) && d.after.unlocked.includes(o.prize) ? o.prize : null;
+  const prizeHtml = won ? `<div class="ready-line">${partIcon({ family: won, mk: 1 })} ${esc(familyName(won))} unlocked: fit it in the workshop for any mission</div>` : '';
   const before = rankOf(d.xpBefore);
   const after = rankOf(d.xpAfter);
   const promoted = after.xp > before.xp;
@@ -82,7 +85,7 @@ export function showResults(root: HTMLElement, d: ResultsData, a: ResultsActions
         <div class="col">
           <div class="dimt t12">Blueprints collected: ${bpAmount(r.intelCount)}</div>
           <div class="bplist">${intel || '<span class="dimt t12" style="grid-column:1/-1">None this time</span>'}</div>
-          ${readyHtml}
+          ${prizeHtml}${readyHtml}
           <div class="dimt t12">Rank</div>
           <div class="row spread">${rankLine(after)}<span class="green">+${o.xp} XP</span></div>
           <div class="bar"><i class="xp" style="width:${Math.round(share * 100)}%"></i></div>

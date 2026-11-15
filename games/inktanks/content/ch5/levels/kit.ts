@@ -75,31 +75,31 @@ export function logBridge(x: number, y: number, across: 'x' | 'y', id: string, t
   return { deck: path('bridge', ends, 56), span: { kind: across === 'x' ? 'logBridge' : 'logBridgeV', x, y, id, ...(tag ? { tag } : {}) } };
 }
 
-/** Loot for chapter 5's rolled crates: every family, the Rail too; mostly Mk II and III. */
+/** Loot for chapter 5's rolled crates: every family, the Rail too; Mk IV–V, the chapter's gear grade. */
 export const LOOT_FOREST: LootTable = {
   families: ['machinegun', 'cannon', 'rockets', 'mortar', 'flamer', 'laser', 'rail', 'light', 'medium', 'heavy', 'wheels', 'halftracks', 'tracks', 'hover'],
-  crateMk: [0.15, 0.55, 0.3],
+  crateMk: [0, 0, 0, 0.4, 0.6],
   kitShare: 0.3,
 };
 
 /**
  * Common chapter 5 tanks. The Iron Hive (clan 'hive', the clans' old masters)
- * fields iron: Mk II–III Cannons and Heavies, and the Rail, which shoots
+ * fields iron: Mk IV–V Cannons and Heavies, and the Rail, which shoots
  * through the trees (its charge line is the only warning). The clans' veterans
  * come back too (`mixedClans: true`).
  */
 export const TANK = {
   // The Iron Hive.
-  drone: 'machinegun3/light2/wheels2',
-  gunner: 'cannon2/medium2/halftracks2',
-  gunner3: 'cannon3/medium2/halftracks2',
-  heavy: 'cannon3/heavy2/tracks2',
-  rail: 'rail1/medium2/halftracks2',
-  rail2: 'rail2/heavy1/tracks2',
-  logger: 'flamer2/medium2/tracks2',
-  mortar: 'mortar2/medium2/tracks1',
+  drone: 'machinegun5/light4/wheels4',
+  gunner: 'cannon4/medium4/halftracks4',
+  gunner3: 'cannon5/medium4/halftracks4',
+  heavy: 'cannon5/heavy4/tracks4',
+  rail: 'rail3/medium4/halftracks4',
+  rail2: 'rail4/heavy3/tracks4',
+  logger: 'flamer4/medium4/tracks4',
+  mortar: 'mortar4/medium4/tracks3',
   // The clans' veterans.
-  boarHeavy: 'cannon3/heavy2/tracks2',
-  skimmer: 'machinegun3/light2/hover2',
-  crowMortar: 'mortar3/medium2/tracks2',
+  boarHeavy: 'cannon5/heavy4/tracks4',
+  skimmer: 'machinegun5/light4/hover4',
+  crowMortar: 'mortar5/medium4/tracks4',
 } as const;

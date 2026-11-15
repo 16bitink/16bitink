@@ -55,12 +55,12 @@ export const MIXED_CLANS = { from: 31, to: 50 } as const;
 /** The levels where the clans may fight each other (chapter 5, Deepwood). */
 export const CLAN_WAR = { from: 41, to: 50 } as const;
 
-/** Parses "cannon2/medium1/halftracks1" (Mk 1–3 after each family). */
+/** Parses "cannon2/medium1/halftracks1" (Mk 1–5 after each family). */
 export function parseTank(spec: string): Loadout {
   const parts = spec.split('/').map((s) => s.trim());
   const one = (s: string | undefined, fams: readonly Family[], slot: string): Part => {
-    const m = /^([a-z]+)([123])$/.exec(s ?? '');
-    if (!m || !fams.includes(m[1] as Family)) throw new Error(`bad ${slot} "${s}" in tank "${spec}" (want one of ${fams.join(', ')} + Mk 1–3)`);
+    const m = /^([a-z]+)([1-5])$/.exec(s ?? '');
+    if (!m || !fams.includes(m[1] as Family)) throw new Error(`bad ${slot} "${s}" in tank "${spec}" (want one of ${fams.join(', ')} + Mk 1–5)`);
     return { family: m[1] as Family, mk: Number(m[2]) as Mk };
   };
   if (parts.length !== 3) throw new Error(`tank "${spec}" must be gun/hull/drive`);
@@ -130,6 +130,7 @@ export function loadLevel(def: LevelDef, kinds: Readonly<Record<string, StructKi
     if ((f.by === undefined) === (f.at === undefined)) soft('flood: give it either "by" (a structure id) or "at" (seconds, a tide)', null);
     else if (f.by !== undefined && !ids.has(f.by)) soft(`flood: no structure with id "${f.by}" to hold it back`, null);
   }
+  if (def.prize !== undefined && !(FAMILIES as readonly string[]).includes(def.prize)) soft(`prize: "${def.prize}" is not a part family`, null);
   for (const [i, p] of (def.issue ?? []).entries()) if (!(FAMILIES as readonly string[]).includes(p?.family) || ![1, 2, 3, 4, 5].includes(p?.mk)) soft(`issue ${i}: not a part`, null);
   const land: LandDef = { id: def.id, name: def.name, cols: map.cols, rows: map.rows, base: map.base, terrain: map.terrain, structures, roads: map.roads, points: map.points };
   const built = buildLand(land);

@@ -74,22 +74,22 @@ export const LEVEL_31: LevelDef = {
   mixedClans: true,
   enemies: [
     // Weasel skimmers up and down the open leads (Hover crosses water).
-    { role: 'patrol', clan: 'weasels', tank: TANK.skimmer, at: { x: LEAD.a + 70, y: 60 }, route: 'leadA', hpMult: 0.6 },
-    { role: 'patrol', clan: 'weasels', tank: TANK.skimmer, at: { x: LEAD.b + 70, y: 1020 }, route: 'leadB', hpMult: 0.6 },
-    { role: 'patrol', clan: 'weasels', tank: TANK.skimmer, at: { x: LEAD.c + 70, y: 60 }, route: 'leadC', hpMult: 0.6 },
+    { role: 'patrol', clan: 'weasels', tank: TANK.skimmer, at: { x: LEAD.a + 70, y: 60 }, route: 'leadA', hpMult: 0.38 },
+    { role: 'patrol', clan: 'weasels', tank: TANK.skimmer, at: { x: LEAD.b + 70, y: 1020 }, route: 'leadB', hpMult: 0.38 },
+    { role: 'patrol', clan: 'weasels', tank: TANK.skimmer, at: { x: LEAD.c + 70, y: 60 }, route: 'leadC', hpMult: 0.38 },
     // Boar Heavies by the bridges and on the shore ice.
-    { role: 'guard', clan: 'boars', tank: TANK.boarHeavy, at: 'aWest', hpMult: 0.4, sight: 400, leash: 260 },
-    { role: 'guard', clan: 'boars', tank: TANK.boarHeavy, at: 'cEast', hpMult: 0.4, sight: 400, leash: 260 },
+    { role: 'guard', clan: 'boars', tank: TANK.boarHeavy, at: 'aWest', hpMult: 0.25, sight: 400, leash: 260 },
+    { role: 'guard', clan: 'boars', tank: TANK.boarHeavy, at: 'cEast', hpMult: 0.25, sight: 400, leash: 260 },
     // The Crow mortar covers bridge A; the Laser covers bridge B.
-    { role: 'turret', clan: 'crows', tank: TANK.mortar, at: 'mortarIsle', hpMult: 0.45, sight: 480 },
-    { role: 'guard', clan: 'crows', tank: TANK.laser, at: 'laserIsle', hpMult: 0.55, sight: 460, leash: 160 },
-    { role: 'guard', clan: 'crows', tank: TANK.scout, at: 'eastShore', hpMult: 0.7, sight: 400, leash: 300 },
+    { role: 'turret', clan: 'crows', tank: TANK.mortar, at: 'mortarIsle', hpMult: 0.28, sight: 480 },
+    { role: 'guard', clan: 'crows', tank: TANK.laser, at: 'laserIsle', hpMult: 0.34, sight: 460, leash: 160 },
+    { role: 'guard', clan: 'crows', tank: TANK.scout, at: 'eastShore', hpMult: 0.44, sight: 400, leash: 300 },
     // The alarm brings a Weasel skimmer down the east shore; a Boar Heavy comes round the south strip at 0:30.
-    { role: 'wave', clan: 'weasels', tank: TANK.skimmer, at: 'waveNE', when: 'alarm', hpMult: 0.6 },
-    { role: 'wave', clan: 'boars', tank: TANK.boarHeavy, at: 'waveSE', when: 30, hpMult: 0.45 },
+    { role: 'wave', clan: 'weasels', tank: TANK.skimmer, at: 'waveNE', when: 'alarm', hpMult: 0.38 },
+    { role: 'wave', clan: 'boars', tank: TANK.boarHeavy, at: 'waveSE', when: 30, hpMult: 0.28 },
   ],
   allies: DEPOT.allies,
-  crates: [{ at: { x: 1680, y: 520 }, content: 'kit' }, { at: { x: 2520, y: 380 }, content: { family: 'laser', mk: 1 } }, { at: { x: 2470, y: 760 } }, { at: { x: 900, y: 420 } }],
+  crates: [{ at: { x: 1680, y: 520 }, content: 'kit' }, { at: { x: 2520, y: 380 }, content: { family: 'laser', mk: 4 } }, { at: { x: 2470, y: 760 } }, { at: { x: 900, y: 420 } }],
   objective: { kind: 'breakout', exit: 'exit', radius: 110, to: 'our depot' },
   bonus: [{ kind: 'time', under: 50 }, { kind: 'kills', n: 3 }],
   timeLimit: 75,

@@ -1,4 +1,5 @@
 import { Loops } from './loops';
+import { loadSamples, SAMPLE_GAIN } from './samples';
 import { canPlay, spatial, type Cue, type SfxId, type View } from './sfx';
 import { synthesize } from './synth';
 
@@ -25,6 +26,8 @@ export class SoundBoard {
   private loopsNow: Loops | null = null;
   private loopsWanted = false;
   private readonly last = new Map<string, number>();
+  /** The recordings, once fetched (see samples.ts). */
+  private samples: ReadonlyMap<SfxId, readonly AudioBuffer[]> = new Map();
   private mutedNow: boolean;
   private readonly unlock = (): void => this.start();
   private readonly onVisibility = (): void => {
@@ -60,9 +63,26 @@ export class SoundBoard {
     panner.pan.value = place.pan;
     level.connect(panner).connect(this.master);
     const jitter = TUNED.has(cue.id) ? 1 : 1 + (Math.random() * 2 - 1) * JITTER;
-    synthesize(cue.id, { ctx, out: level, t: ctx.currentTime + 0.005, pitch: (cue.pitch ?? 1) * jitter });
+    const pitch = (cue.pitch ?? 1) * jitter;
+    const takes = this.samples.get(cue.id);
+    if (takes && takes.length > 0) this.playSample(ctx, takes[Math.floor(Math.random() * takes.length)]!, level, cue.id, pitch, place.gain);
+    else synthesize(cue.id, { ctx, out: level, t: ctx.currentTime + 0.005, pitch });
     // Let the graph go once the sound has surely finished (the longest runs under 3 s).
     setTimeout(() => panner.disconnect(), 3500);
+  }
+
+  /** A recording: farther off sounds duller (a low-pass closes as it fades), and pitch shifts by playback rate. */
+  private playSample(ctx: AudioContext, buf: AudioBuffer, out: AudioNode, id: SfxId, pitch: number, near: number): void {
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.playbackRate.value = pitch;
+    const trim = ctx.createGain();
+    trim.gain.value = SAMPLE_GAIN[id] ?? 1;
+    const dull = ctx.createBiquadFilter();
+    dull.type = 'lowpass';
+    dull.frequency.value = 1200 + near * near * 18000;
+    src.connect(dull).connect(trim).connect(out);
+    src.start(ctx.currentTime + 0.005);
   }
 
   /** A button's click. */
@@ -105,6 +125,9 @@ export class SoundBoard {
     this.master.connect(this.ctx.destination);
     this.loopsNow = new Loops(this.ctx, this.master);
     this.loopsNow.setActive(this.loopsWanted);
+    void loadSamples(this.ctx).then((m) => {
+      if (this.ctx) this.samples = m;
+    });
     if (this.ctx.state !== 'running') void this.ctx.resume().catch(() => undefined);
   }
 }

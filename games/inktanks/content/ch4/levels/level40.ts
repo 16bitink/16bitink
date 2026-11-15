@@ -47,10 +47,10 @@ export const LEVEL_40: LevelDef = {
   mixedClans: true,
   weather: { kind: 'blizzard', first: 50, every: 60, last: 14, sight: 220, wind: 30 },
   enemies: [
-    { role: 'wave', clan: 'weasels', tank: TANK.skimmer, at: 'reinfE', when: 120, hpMult: 0.5 },
-    { role: 'wave', clan: 'crows', tank: TANK.scout, at: 'reinfW', when: 150, hpMult: 0.5 },
+    { role: 'wave', clan: 'weasels', tank: TANK.skimmer, at: 'reinfE', when: 120, hpMult: 0.31 },
+    { role: 'wave', clan: 'crows', tank: TANK.scout, at: 'reinfW', when: 150, hpMult: 0.31 },
   ],
-  crates: [{ at: { x: 400, y: 800 }, content: { family: 'cannon', mk: 3 } }, { at: { x: 600, y: 880 }, content: 'kit' }, { at: { x: 1200, y: 900 } }, { at: { x: 2300, y: 250 }, content: 'kit' }, { at: { x: 3000, y: 900 }, content: 'kit' }, { at: { x: 1700, y: 160 } }],
+  crates: [{ at: { x: 400, y: 800 }, content: { family: 'cannon', mk: 5 } }, { at: { x: 600, y: 880 }, content: 'kit' }, { at: { x: 1200, y: 900 } }, { at: { x: 2300, y: 250 }, content: 'kit' }, { at: { x: 3000, y: 900 }, content: 'kit' }, { at: { x: 1700, y: 160 } }],
   objective: {
     kind: 'fortress',
     boss: {

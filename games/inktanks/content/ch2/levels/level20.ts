@@ -41,11 +41,11 @@ export const LEVEL_20: LevelDef = {
   start: at(1.5, 2.85), startHeading: -Math.PI / 2,
   weather: { kind: 'sandstorm', first: 70, every: 80, last: 14 },
   enemies: [
-    { role: 'wave', clan: 'crows', tank: TANK.scout, at: 'stormE', when: 73, hpMult: 0.5 },
-    { role: 'wave', clan: 'crows', tank: TANK.gunner, at: 'stormN', when: 76, hpMult: 0.5 },
-    { role: 'wave', clan: 'crows', tank: TANK.scout, at: 'stormE', when: 80, hpMult: 0.5 },
+    { role: 'wave', clan: 'crows', tank: TANK.scout, at: 'stormE', when: 73, hpMult: 0.42 },
+    { role: 'wave', clan: 'crows', tank: TANK.gunner, at: 'stormN', when: 76, hpMult: 0.42 },
+    { role: 'wave', clan: 'crows', tank: TANK.scout, at: 'stormE', when: 80, hpMult: 0.42 },
   ],
-  crates: [{ at: at(1.2, 2.6), content: { family: 'mortar', mk: 1 } }, { at: at(1.8, 2.6), content: 'kit' }, { at: at(0.4, 2.2) }, { at: at(2.6, 2.2) }, { at: at(0.3, 0.5), content: 'kit' }, { at: at(1.0, 1.9), content: 'kit' }, { at: at(2.0, 1.9), content: 'kit' }],
+  crates: [{ at: at(1.2, 2.6), content: { family: 'mortar', mk: 2 } }, { at: at(1.8, 2.6), content: 'kit' }, { at: at(0.4, 2.2) }, { at: at(2.6, 2.2) }, { at: at(0.3, 0.5), content: 'kit' }, { at: at(1.0, 1.9), content: 'kit' }, { at: at(2.0, 1.9), content: 'kit' }],
   objective: {
     kind: 'fortress',
     boss: {

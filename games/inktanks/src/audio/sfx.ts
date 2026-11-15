@@ -27,7 +27,7 @@ export type SfxId = (typeof SFX_IDS)[number];
 
 /** Shortest gap between two plays of the same sound, ms (a battle fires many at once). */
 export const MIN_GAP_MS: Readonly<Record<SfxId, number>> = {
-  mg: 55, cannon: 70, rocket: 90, mortar: 120, flame: 110, laser: 90, rail: 150, charge: 400,
+  mg: 55, cannon: 70, rocket: 90, mortar: 120, flame: 220, laser: 90, rail: 150, charge: 400,
   clang: 50, thud: 50, hurt: 120, boom: 90, wreck: 150,
   crack: 80, crumble: 200, crate: 100, whoomp: 250, rush: 1500, rumble: 1500, ice: 300, splash: 200, snap: 400,
   pickup: 80, intel: 120, repair: 400, swap: 200, drop: 150, hiss: 300,

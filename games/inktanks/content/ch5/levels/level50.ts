@@ -53,13 +53,13 @@ export const LEVEL_50: LevelDef = {
   friends: [{ at: at(0.1, 0.45), tank: TANK.boarHeavy, clan: 'boars', name: 'Tusk' }],
   enemies: [
     // The Hive's guard of the fortress arrives on the alarm and with the fire.
-    { role: 'wave', clan: 'hive', tank: TANK.drone, at: 'east', when: 'alarm', hpMult: 0.5 },
-    { role: 'wave', clan: 'hive', tank: TANK.gunner, at: 'north', when: 70, hpMult: 0.4 },
-    { role: 'wave', clan: 'hive', tank: TANK.drone, at: 'south', when: 80, hpMult: 0.5 },
-    { role: 'wave', clan: 'hive', tank: TANK.logger, at: 'east', when: 100, hpMult: 0.3 },
+    { role: 'wave', clan: 'hive', tank: TANK.drone, at: 'east', when: 'alarm', hpMult: 0.37 },
+    { role: 'wave', clan: 'hive', tank: TANK.gunner, at: 'north', when: 70, hpMult: 0.3 },
+    { role: 'wave', clan: 'hive', tank: TANK.drone, at: 'south', when: 80, hpMult: 0.37 },
+    { role: 'wave', clan: 'hive', tank: TANK.logger, at: 'east', when: 100, hpMult: 0.22 },
   ],
   crates: [
-    { at: at(0.15, 0.55), content: { family: 'rail', mk: 2 } }, { at: at(0.2, 0.4), content: 'kit' }, { at: { x: 700, y: 640 }, content: 'kit' },
+    { at: at(0.15, 0.55), content: { family: 'rail', mk: 4 } }, { at: at(0.2, 0.4), content: 'kit' }, { at: { x: 700, y: 640 }, content: 'kit' },
     { at: { x: FX - 480, y: FY + 40 }, content: 'kit' }, { at: { x: FX + 480, y: FY - 40 }, content: 'kit' }, { at: { x: FX, y: FY + 330 } },
   ],
   objective: {

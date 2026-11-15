@@ -60,19 +60,19 @@ export const LEVEL_28: LevelDef = {
   start: { x: 220, y: 240 }, startHeading: 0,
   enemies: [
     // The dry road's guards.
-    { role: 'guard', clan: 'weasels', tank: TANK.gunner, at: 'hutG', hpMult: 0.6, sight: 400, leash: 260 },
-    { role: 'guard', clan: 'weasels', tank: TANK.flamer, at: 'flamerN', hpMult: 0.6, sight: 300, leash: 260 },
+    { role: 'guard', clan: 'weasels', tank: TANK.gunner, at: 'hutG', hpMult: 0.34, sight: 400, leash: 260 },
+    { role: 'guard', clan: 'weasels', tank: TANK.flamer, at: 'flamerN', hpMult: 0.34, sight: 300, leash: 260 },
     // The bog's guards, and a mortar on the island over the shallows.
-    { role: 'guard', clan: 'weasels', tank: TANK.gunner, at: 'bogG1', hpMult: 0.6, sight: 400, leash: 240 },
-    { role: 'guard', clan: 'weasels', tank: TANK.gunner, at: 'bogG2', hpMult: 0.6, sight: 400, leash: 240 },
-    { role: 'guard', clan: 'weasels', tank: TANK.gunner, at: 'midG', hpMult: 0.6, sight: 400, leash: 260 },
-    { role: 'turret', clan: 'weasels', tank: TANK.mortar, at: 'mortarIsle', hpMult: 0.5, sight: 480 },
+    { role: 'guard', clan: 'weasels', tank: TANK.gunner, at: 'bogG1', hpMult: 0.34, sight: 400, leash: 240 },
+    { role: 'guard', clan: 'weasels', tank: TANK.gunner, at: 'bogG2', hpMult: 0.34, sight: 400, leash: 240 },
+    { role: 'guard', clan: 'weasels', tank: TANK.gunner, at: 'midG', hpMult: 0.34, sight: 400, leash: 260 },
+    { role: 'turret', clan: 'weasels', tank: TANK.mortar, at: 'mortarIsle', hpMult: 0.29, sight: 480 },
     // A skimmer in the channel all the time.
-    { role: 'patrol', clan: 'weasels', tank: TANK.skimmer2, at: { x: 2900, y: 905 }, route: 'channel', hpMult: 0.8 },
+    { role: 'patrol', clan: 'weasels', tank: TANK.skimmer2, at: { x: 2900, y: 905 }, route: 'channel', hpMult: 0.46 },
     // They converge once you lift it.
-    { role: 'wave', clan: 'weasels', tank: TANK.skimmer, at: 'eastW', when: 'stage', hpMult: 0.7 },
-    { role: 'wave', clan: 'weasels', tank: TANK.flamerHover, at: 'southW', when: 'stage', hpMult: 0.9 },
-    { role: 'wave', clan: 'weasels', tank: TANK.gunner, at: 'northW', when: 'stage', hpMult: 0.6 },
+    { role: 'wave', clan: 'weasels', tank: TANK.skimmer, at: 'eastW', when: 'stage', hpMult: 0.4 },
+    { role: 'wave', clan: 'weasels', tank: TANK.flamerHover, at: 'southW', when: 'stage', hpMult: 0.54 },
+    { role: 'wave', clan: 'weasels', tank: TANK.gunner, at: 'northW', when: 'stage', hpMult: 0.34 },
   ],
   crates: [
     { at: { x: 700, y: 400 }, content: 'kit' }, { at: { x: 2000, y: 130 } }, { at: { x: 2700, y: 600 }, content: 'kit' }, { at: { x: 1500, y: 500 } },

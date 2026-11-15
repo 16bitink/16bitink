@@ -19,6 +19,8 @@ export interface MissionRow {
   readonly rank: string;
   readonly loadout: string;
   readonly time: number;
+  /** Parts the stand-in fitted from the ground in its last attempt ("cannon3 hover1"). */
+  readonly picks: string;
 }
 
 export interface ChapterResult {
@@ -44,6 +46,7 @@ export function runChapter(levels: readonly LoadedLevel[], seed: number, maxAtte
     let intel: IntelBag = {};
     let xp = 0;
     let time = 0;
+    let picks = '';
     const loadout = `${p.loadout.gun.family}${p.loadout.gun.mk}/${p.loadout.hull.family}${p.loadout.hull.mk}/${p.loadout.drive.family}${p.loadout.drive.mk}`;
     while (attempts < maxAttempts) {
       attempts++;
@@ -56,10 +59,11 @@ export function runChapter(levels: readonly LoadedLevel[], seed: number, maxAtte
       xp += applied.outcome.xp;
       time += r.time;
       ends.push(r.reason);
+      picks = r.report.picks.map((x) => `${x.family}${x.mk}`).join(' ');
       if (r.passed) break;
     }
     p = fitBest(spendIntel(p));
-    rows.push({ level: def.number, name: def.name, attempts, ends, passed: last?.passed ?? false, outcome: last!, intel, xp, rank: rankOf(p.xp).name, loadout, time });
+    rows.push({ level: def.number, name: def.name, attempts, ends, passed: last?.passed ?? false, outcome: last!, intel, xp, rank: rankOf(p.xp).name, loadout, time, picks });
   }
   const medals = Object.values(p.medals);
   const bonusShare = medals.reduce((s, m) => s + (m[1] ? 1 : 0) + (m[2] ? 1 : 0), 0) / (2 * levels.length);

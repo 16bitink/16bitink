@@ -49,15 +49,15 @@ export const LEVEL_12: LevelDef = {
   start: at(0.2, 1.6), startHeading: 0,
   weather: { kind: 'sandstorm', first: 35, every: 60, last: 18 },
   enemies: [
-    { role: 'guard', clan: 'crows', tank: TANK.gunner, at: 'gA', hpMult: 0.55, sight: 340, leash: 200 },
-    { role: 'guard', clan: 'crows', tank: 'machinegun1/light1/wheels2', at: 'gB', hpMult: 0.55, sight: 340, leash: 200 },
-    { role: 'guard', clan: 'crows', tank: TANK.gunner, at: 'gC', hpMult: 0.55, sight: 340, leash: 200 },
-    { role: 'patrol', clan: 'crows', tank: 'machinegun1/light1/wheels2', at: { x: 1000, y: 260 }, route: 'rimA', hpMult: 0.6 },
-    { role: 'patrol', clan: 'crows', tank: 'machinegun1/light1/halftracks1', at: { x: 2000, y: 880 }, route: 'rimB', hpMult: 0.6 },
-    { role: 'patrol', clan: 'crows', tank: 'machinegun1/light1/wheels2', at: { x: 3000, y: 400 }, route: 'rimC', hpMult: 0.6 },
+    { role: 'guard', clan: 'crows', tank: TANK.gunner, at: 'gA', hpMult: 0.46, sight: 340, leash: 200 },
+    { role: 'guard', clan: 'crows', tank: 'machinegun2/light2/wheels3', at: 'gB', hpMult: 0.46, sight: 340, leash: 200 },
+    { role: 'guard', clan: 'crows', tank: TANK.gunner, at: 'gC', hpMult: 0.46, sight: 340, leash: 200 },
+    { role: 'patrol', clan: 'crows', tank: 'machinegun2/light2/wheels3', at: { x: 1000, y: 260 }, route: 'rimA', hpMult: 0.5 },
+    { role: 'patrol', clan: 'crows', tank: 'machinegun2/light2/halftracks2', at: { x: 2000, y: 880 }, route: 'rimB', hpMult: 0.5 },
+    { role: 'patrol', clan: 'crows', tank: 'machinegun2/light2/wheels3', at: { x: 3000, y: 400 }, route: 'rimC', hpMult: 0.5 },
     // Reinforcements: the alarm calls them.
-    { role: 'wave', clan: 'crows', tank: TANK.gunner, at: 'reinf', when: 'alarm', hpMult: 0.6 },
-    { role: 'wave', clan: 'crows', tank: 'machinegun1/light1/wheels2', at: 'reinf', when: 'alarm', hpMult: 0.6 },
+    { role: 'wave', clan: 'crows', tank: TANK.gunner, at: 'reinf', when: 'alarm', hpMult: 0.5 },
+    { role: 'wave', clan: 'crows', tank: 'machinegun2/light2/wheels3', at: 'reinf', when: 'alarm', hpMult: 0.5 },
   ],
   crates: [
     { at: { x: 700, y: 760 }, content: 'kit' }, { at: { x: 1800, y: 700 } }, { at: { x: 2600, y: 300 }, content: 'kit' }, { at: { x: 1500, y: 150 } }, { at: { x: 3500, y: 960 } },

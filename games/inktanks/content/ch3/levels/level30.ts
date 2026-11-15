@@ -48,14 +48,14 @@ export const LEVEL_30: LevelDef = {
   start: at(1.5, 2.85), startHeading: -Math.PI / 2,
   weather: { kind: 'fog', banks: [{ x: FX, y: FY - 100, r: 170, dx: 300, period: 45 }, { x: FX, y: FY + 120, r: 170, dx: 300, period: 55 }] },
   enemies: [
-    { role: 'guard', clan: 'weasels', tank: TANK.flamer, at: 'flamerW', hpMult: 0.6, sight: 300, leash: 260 },
-    { role: 'guard', clan: 'weasels', tank: TANK.flamer, at: 'flamerE', hpMult: 0.6, sight: 300, leash: 260 },
-    { role: 'turret', clan: 'weasels', tank: TANK.mortar, at: 'mortarN', hpMult: 0.5, sight: 480 },
-    { role: 'wave', clan: 'weasels', tank: TANK.skimmer2, at: 'waveW', when: 'alarm', hpMult: 0.8 },
-    { role: 'wave', clan: 'weasels', tank: TANK.flamerHover, at: 'waveE', when: 70, hpMult: 0.8 },
-    { role: 'wave', clan: 'weasels', tank: TANK.skimmer2, at: 'waveE', when: 'alarm', hpMult: 0.8 },
+    { role: 'guard', clan: 'weasels', tank: TANK.flamer, at: 'flamerW', hpMult: 0.43, sight: 300, leash: 260 },
+    { role: 'guard', clan: 'weasels', tank: TANK.flamer, at: 'flamerE', hpMult: 0.43, sight: 300, leash: 260 },
+    { role: 'turret', clan: 'weasels', tank: TANK.mortar, at: 'mortarN', hpMult: 0.36, sight: 480 },
+    { role: 'wave', clan: 'weasels', tank: TANK.skimmer2, at: 'waveW', when: 'alarm', hpMult: 0.57 },
+    { role: 'wave', clan: 'weasels', tank: TANK.flamerHover, at: 'waveE', when: 70, hpMult: 0.6 },
+    { role: 'wave', clan: 'weasels', tank: TANK.skimmer2, at: 'waveE', when: 'alarm', hpMult: 0.57 },
   ],
-  crates: [{ at: at(1.2, 2.6), content: { family: 'cannon', mk: 2 } }, { at: at(1.8, 2.6), content: 'kit' }, { at: at(0.4, 2.2) }, { at: at(2.6, 2.2) }, { at: at(0.3, 0.5), content: 'kit' }, { at: at(1.0, 1.9), content: 'kit' }, { at: at(2.0, 1.9), content: 'kit' }],
+  crates: [{ at: at(1.2, 2.6), content: { family: 'cannon', mk: 4 } }, { at: at(1.8, 2.6), content: 'kit' }, { at: at(0.4, 2.2) }, { at: at(2.6, 2.2) }, { at: at(0.3, 0.5), content: 'kit' }, { at: at(1.0, 1.9), content: 'kit' }, { at: at(2.0, 1.9), content: 'kit' }],
   objective: {
     kind: 'fortress',
     boss: {

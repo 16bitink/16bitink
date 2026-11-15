@@ -38,6 +38,9 @@ interface View {
   state: number;
 }
 
+/** Dev builds name each structure kind drawn as a placeholder, once. */
+const warned = new Set<string>();
+
 export class StructLayer {
   private readonly views = new Map<number, View>();
   /** World rects that fade a structure's roof when the player is in them. */
@@ -96,6 +99,10 @@ export class StructLayer {
         if (p.over) v.over.push(img);
       }
       return v;
+    }
+    if (import.meta.env.DEV && !warned.has(s.def.kind)) {
+      warned.add(s.def.kind);
+      console.warn(`[inktanks] no art for structure "${s.def.kind}" (state ${s.state}): drawing a placeholder`);
     }
     v.objs.push(this.box(s, k?.colour ?? 0x888070, k?.height ?? 30, depth, v));
     return v;

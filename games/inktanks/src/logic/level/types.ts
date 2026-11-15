@@ -1,7 +1,7 @@
 import type { GadgetKind } from '../match/types';
 import type { Ground, TerrainPatch } from '../land';
 import type { LootTable } from '../loot';
-import type { GunFamily, Mk, Part } from '../parts';
+import type { Family, GunFamily, Mk, Part } from '../parts';
 import type { Clan } from '../match/types';
 import type { Pt } from '../vec';
 
@@ -349,6 +349,12 @@ export interface LevelDef {
    * the start (level 21's Hover for the trials). Your workshop tank is back after.
    */
   readonly issue?: readonly Part[];
+  /**
+   * A family this level lets you take from the enemy for good (level 21: the
+   * Weasels' Hover at their dock). Fitting one in the field unlocks it in the
+   * workshop, win or lose, as blueprints are kept; the stand-in always takes it.
+   */
+  readonly prize?: Family;
   /** For rolled crates. */
   readonly loot: LootTable;
 }

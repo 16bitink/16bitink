@@ -17,6 +17,7 @@ import { STARTER_LOADOUT } from '../src/logic/parts';
 import { labLevel } from '../src/sim/levels';
 import { runMission } from '../src/sim/runMission';
 import { fixture, POINTS } from './fixtures/levels';
+import { TYPICAL_TANK } from '../src/sim/lab';
 
 /** A river of deep water along y 450–650 across a 2 × 2 marsh. */
 const RIVER = { ground: 'swampWater' as const, shape: { kind: 'rect' as const, x: 0, y: 450, w: 1920, h: 200 } };
@@ -57,15 +58,16 @@ describe('chapter 3 content', () => {
     expect(botsFor(20)).toBe(CH2_BOTS);
     expect(CH3_BOTS.aimError).toBeLessThan(CH2_BOTS.aimError);
   });
-  it('level 21 issues a Hover for the trial, over your own drive', () => {
+  it('level 21 makes you take the Hover from the Weasels: you start on your own drive', () => {
     const m = new Match({ level: labLevel(21), seed: 1, player: { loadout: parseTank('cannon2/medium2/halftracks2') } });
-    expect(m.player!.loadout.drive.family).toBe('hover');
-    expect(m.player!.loadout.gun).toEqual({ family: 'cannon', mk: 2 });
+    expect(m.level.def.issue).toBeUndefined();
+    expect(m.level.def.prize).toBe('hover');
+    expect(m.player!.loadout.drive.family).toBe('halftracks');
   });
   it('levels 21 and 23 are winnable by the stand-in', () => {
-    const tank = parseTank('cannon2/medium2/halftracks2');
+    // The tank the campaign run brings to each level (lab's TYPICAL_TANK).
     for (const n of [21, 23]) {
-      const wins = [1, 2, 3].filter((seed) => runMission({ level: labLevel(n), seed, player: { loadout: tank, kits: 2 } }).passed).length;
+      const wins = [1, 2, 3].filter((seed) => runMission({ level: labLevel(n), seed, player: { loadout: parseTank(TYPICAL_TANK[n]!), kits: 2 } }).passed).length;
       expect(wins, `level ${n}`).toBeGreaterThan(0);
     }
   });

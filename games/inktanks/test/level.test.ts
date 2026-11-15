@@ -21,7 +21,8 @@ describe('level layouts', () => {
     expect(parseTank('cannon2/medium1/halftracks1')).toEqual({ gun: { family: 'cannon', mk: 2 }, hull: { family: 'medium', mk: 1 }, drive: { family: 'halftracks', mk: 1 } });
     expect(() => parseTank('cannon2/medium1')).toThrow(/gun\/hull\/drive/);
     expect(() => parseTank('plasma1/medium1/wheels1')).toThrow(/bad gun/);
-    expect(() => parseTank('cannon4/medium1/wheels1')).toThrow(/bad gun/);
+    expect(parseTank('cannon5/heavy4/tracks4').gun).toEqual({ family: 'cannon', mk: 5 });
+    expect(() => parseTank('cannon6/medium1/wheels1')).toThrow(/bad gun/);
   });
   it('rejects bad layouts with every problem named', () => {
     const base = CH1_LEVEL_DEFS[0]!;

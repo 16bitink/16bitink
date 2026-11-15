@@ -15,6 +15,7 @@ import { labLevel } from '../src/sim/levels';
 import { runMission } from '../src/sim/runMission';
 import { fixture, load } from './fixtures/levels';
 import { loadLevel } from '../src/logic/level/load';
+import { TYPICAL_TANK } from '../src/sim/lab';
 
 describe('chapter 2 content', () => {
   it('paid content lists the built chapter 2 levels, numbered 11–20, and they install from JSON', () => {
@@ -53,9 +54,9 @@ describe('chapter 2 content', () => {
     expect(chapterMap(9)).toBe(CHAPTER_MAPS[0]);
   });
   it('levels 11 and 14 are winnable by the stand-in', () => {
-    const tank = parseTank('cannon1/medium2/halftracks1');
+    // The tank the campaign run brings to each level (lab's TYPICAL_TANK).
     for (const n of [11, 14]) {
-      const wins = [1, 2, 3].filter((seed) => runMission({ level: labLevel(n), seed, player: { loadout: tank, kits: 2 } }).passed).length;
+      const wins = [1, 2, 3].filter((seed) => runMission({ level: labLevel(n), seed, player: { loadout: parseTank(TYPICAL_TANK[n]!), kits: 2 } }).passed).length;
       expect(wins, `level ${n}`).toBeGreaterThan(0);
     }
   });

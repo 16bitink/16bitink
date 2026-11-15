@@ -53,9 +53,9 @@ export const LEVEL_36: LevelDef = {
   start: 'start', startHeading: 0,
   mixedClans: true,
   enemies: [
-    { role: 'guard', clan: 'weasels', tank: TANK.laser, at: 'ermine', leash: 350, sight: 520, name: 'Ermine', ace: true, hpMult: 1.2, kits: 0 },
-    { role: 'guard', clan: 'crows', tank: TANK.gunner, at: 'escortC', hpMult: 0.4, sight: 420, leash: 200 },
-    { role: 'guard', clan: 'boars', tank: TANK.boarGunner, at: 'escortB', hpMult: 0.4, sight: 420, leash: 200 },
+    { role: 'guard', clan: 'weasels', tank: TANK.laser, at: 'ermine', leash: 350, sight: 520, name: 'Ermine', ace: true, hpMult: 0.75, kits: 0 },
+    { role: 'guard', clan: 'crows', tank: TANK.gunner, at: 'escortC', hpMult: 0.25, sight: 420, leash: 200 },
+    { role: 'guard', clan: 'boars', tank: TANK.boarGunner, at: 'escortB', hpMult: 0.27, sight: 420, leash: 200 },
   ],
   crates: [{ at: { x: 1000, y: 700 }, content: 'kit' }, { at: { x: 1800, y: 500 } }, { at: { x: 2450, y: 880 }, content: 'kit' }, { at: { x: 3500, y: 700 } }],
   objective: { kind: 'ace' },

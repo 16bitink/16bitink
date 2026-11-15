@@ -90,22 +90,22 @@ export function depotEast(x: number, y: number, w = 300, h = 260, guns: readonly
   };
 }
 
-/** Loot for chapter 3's rolled crates: every family so far, the Flamer and Hover too, more Mk II. */
+/** Loot for chapter 3's rolled crates: every family so far, the Flamer and Hover too; Mk III–IV, the chapter's gear grade. */
 export const LOOT_SWAMP: LootTable = {
   families: ['machinegun', 'cannon', 'rockets', 'mortar', 'flamer', 'light', 'medium', 'heavy', 'wheels', 'halftracks', 'tracks', 'hover'],
-  crateMk: [0.35, 0.55, 0.1],
+  crateMk: [0, 0, 0.35, 0.55, 0.1],
   kitShare: 0.3,
 };
 
 /** Common chapter 3 tanks (the Weasels: Hover skimmers and Flamers from level 21). */
 export const TANK = {
-  skimmer: 'machinegun1/light1/hover1',
-  skimmer2: 'machinegun2/light1/hover2',
-  flamer: 'flamer1/medium1/halftracks1',
-  flamerHover: 'flamer1/light2/hover1',
-  gunner: 'cannon1/medium1/halftracks1',
-  gunner2: 'cannon2/medium1/halftracks2',
-  mortar: 'mortar1/medium1/tracks1',
-  rocket: 'rockets2/medium1/tracks1',
-  heavy: 'cannon2/heavy1/tracks2',
+  skimmer: 'machinegun3/light3/hover3',
+  skimmer2: 'machinegun4/light3/hover4',
+  flamer: 'flamer3/medium3/halftracks3',
+  flamerHover: 'flamer3/light4/hover3',
+  gunner: 'cannon3/medium3/halftracks3',
+  gunner2: 'cannon4/medium3/halftracks4',
+  mortar: 'mortar3/medium3/tracks3',
+  rocket: 'rockets4/medium3/tracks3',
+  heavy: 'cannon4/heavy3/tracks4',
 } as const;

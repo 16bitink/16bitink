@@ -12,6 +12,7 @@ import { bpIcon } from '../../ui/blueprint';
 import { SWAP_HOLD } from '../../logic/match/pickups';
 import { GADGET_NAME } from '../../logic/match/gadgets';
 import type { LandMap } from './landMap';
+import { prizeGoal } from '../../logic/match/prize';
 
 /** The gadget's HUD and button icon (UI art); a missing file falls back to text. */
 const gadgetPngs = import.meta.glob<string>('../../art/pixel/ui/gadget-*.png', { eager: true, query: '?url', import: 'default' });
@@ -271,7 +272,8 @@ export class Hud {
     const left = m.timeLeft();
     this.timer.style.display = left === null ? 'none' : '';
     if (left !== null) this.timer.textContent = `${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}`;
-    const status = m.objective.status();
+    // A level's prize comes first: the line and arrow point to it until it's fitted.
+    const status = prizeGoal(m, p) ?? m.objective.status();
     this.goal.textContent = status.text;
     this.drawArrow(status.target, project);
     this.swapBtn.style.display = touch && p.onPart !== null ? 'block' : 'none';

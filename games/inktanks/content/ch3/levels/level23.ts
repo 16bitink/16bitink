@@ -55,22 +55,22 @@ export const LEVEL_23: LevelDef = {
   start: { x: 220, y: 800 }, startHeading: 0,
   enemies: [
     // South bank: in your way.
-    { role: 'guard', clan: 'weasels', tank: TANK.flamer, at: 'flamerS', hpMult: 0.6, sight: 280, leash: 300 },
-    { role: 'guard', clan: 'weasels', tank: TANK.gunner, at: 'gunS', hpMult: 0.6, sight: 400, leash: 320 },
-    { role: 'guard', clan: 'weasels', tank: TANK.gunner, at: 'gunS2', hpMult: 0.6, sight: 400, leash: 320 },
+    { role: 'guard', clan: 'weasels', tank: TANK.flamer, at: 'flamerS', hpMult: 0.43, sight: 280, leash: 300 },
+    { role: 'guard', clan: 'weasels', tank: TANK.gunner, at: 'gunS', hpMult: 0.43, sight: 400, leash: 320 },
+    { role: 'guard', clan: 'weasels', tank: TANK.gunner, at: 'gunS2', hpMult: 0.43, sight: 400, leash: 320 },
     // North bank: shooting across the river.
-    { role: 'guard', clan: 'weasels', tank: TANK.gunner, at: 'gunN', hpMult: 0.6, sight: 440, leash: 120 },
-    { role: 'guard', clan: 'weasels', tank: 'machinegun2/light1/halftracks1', at: 'gunN2', hpMult: 0.7, sight: 440, leash: 120 },
-    { role: 'turret', clan: 'weasels', tank: TANK.mortar, at: 'mortarN', hpMult: 0.5, sight: 480 },
-    { role: 'guard', clan: 'weasels', tank: TANK.gunner, at: 'scoutN', hpMult: 0.6, sight: 440, leash: 120 },
+    { role: 'guard', clan: 'weasels', tank: TANK.gunner, at: 'gunN', hpMult: 0.43, sight: 440, leash: 120 },
+    { role: 'guard', clan: 'weasels', tank: 'machinegun4/light3/halftracks3', at: 'gunN2', hpMult: 0.5, sight: 440, leash: 120 },
+    { role: 'turret', clan: 'weasels', tank: TANK.mortar, at: 'mortarN', hpMult: 0.36, sight: 480 },
+    { role: 'guard', clan: 'weasels', tank: TANK.gunner, at: 'scoutN', hpMult: 0.43, sight: 440, leash: 120 },
     // Skimmers down the river for the barge.
-    { role: 'wave', clan: 'weasels', tank: TANK.skimmer, at: 'riverE', when: 35, hpMult: 0.7 },
-    { role: 'wave', clan: 'weasels', tank: TANK.skimmer, at: 'riverE', when: 75, hpMult: 0.7 },
-    { role: 'wave', clan: 'weasels', tank: TANK.skimmer, at: 'riverW', when: 80, hpMult: 0.7 },
+    { role: 'wave', clan: 'weasels', tank: TANK.skimmer, at: 'riverE', when: 35, hpMult: 0.5 },
+    { role: 'wave', clan: 'weasels', tank: TANK.skimmer, at: 'riverE', when: 75, hpMult: 0.5 },
+    { role: 'wave', clan: 'weasels', tank: TANK.skimmer, at: 'riverW', when: 80, hpMult: 0.5 },
   ],
   allies: QUAY.allies,
   crates: [{ at: { x: 700, y: 900 }, content: 'kit' }, { at: { x: 2100, y: 920 } }, { at: { x: 2700, y: 900 }, content: 'kit' }, { at: { x: 1400, y: 960 } }],
-  objective: { kind: 'escort', road: 'barge', truckHp: 1400, speed: 30, vessel: 'barge' },
+  objective: { kind: 'escort', road: 'barge', truckHp: 1900, speed: 30, vessel: 'barge' },
   bonus: [{ kind: 'truckHp', min: 0.2, vessel: 'barge' }, { kind: 'kills', n: 4 }],
   loot: LOOT_SWAMP,
 };

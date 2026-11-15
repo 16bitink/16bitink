@@ -6,8 +6,8 @@ import { GADGETS, type GadgetKind } from './match/types';
 /** What a level's rolled crates hold. */
 export interface LootTable {
   readonly families: readonly Family[];
-  /** Weights of Mk I, II, III in crates. */
-  readonly crateMk: readonly [number, number, number];
+  /** Weights of Mk I, II, III, IV, V in crates (missing ones are 0): the chapter's gear grade, as its enemies carry. */
+  readonly crateMk: readonly number[];
   /** Share of crates that hold a repair kit instead of a part. */
   readonly kitShare: number;
   /** Share that hold a gadget charge (default GADGET_SHARE). */
@@ -22,10 +22,10 @@ export type CrateContent = { readonly kind: 'part'; readonly part: Part } | { re
 /** Of rolled gadget crates, this share hold a set kind (maybe another than yours: a found one-use); the rest a charge of yours. */
 export const FOUND_SHARE = 0.5;
 
-const MKS: readonly Mk[] = [1, 2, 3];
+const MKS: readonly Mk[] = [1, 2, 3, 4, 5];
 
-export function rollMk(rng: Rng, weights: readonly [number, number, number]): Mk {
-  return rng.weighted(MKS, (m) => weights[m - 1]!);
+export function rollMk(rng: Rng, weights: readonly number[]): Mk {
+  return rng.weighted(MKS, (m) => weights[m - 1] ?? 0);
 }
 
 export function rollCrate(rng: Rng, t: LootTable): CrateContent {
