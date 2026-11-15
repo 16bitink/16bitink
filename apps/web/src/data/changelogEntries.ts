@@ -474,12 +474,13 @@ export const GAME_ENTRIES: Readonly<Record<string, readonly ChangelogEntry[]>> =
   inktanks: [
     {
       date: "2026-11-22",
-      title: "InkTanks launches in early access",
+      title: "InkTanks launches",
       changes: [
-        "Launched InkTanks: a top-down tank war campaign in pixel art. Chapter 1, the Meadowlands, is ten free missions.",
+        "Launched InkTanks: a top-down tank war campaign in pixel art, 50 missions in 5 chapters. Chapter 1, the Meadowlands, is ten free missions.",
+        "The full game adds the Dust Flats desert, the Mirefen swamp, snowy Frostridge and the Deepwood forest, each with its own rival clan, terrain, new gun and boss.",
         "Every level is a different mission: clear the farm, blow up fuel stacks, escort a supply truck, hold a bridge, hunt an enemy ace and more.",
-        "Swap in the guns, hulls and drives enemies drop, and keep the intel they leave to research in the workshop.",
-        "Earn up to three medals per mission and rise through the ranks from Private.",
+        "Swap in the guns, hulls and drives enemies drop, and keep the blueprints they leave to upgrade your tank in the workshop.",
+        "Earn up to three medals per mission and rise through the ranks from Private to General.",
       ],
     },
   ],

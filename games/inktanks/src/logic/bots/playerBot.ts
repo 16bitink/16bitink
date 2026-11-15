@@ -6,6 +6,8 @@ import type { Tank } from '../match/types';
 import type { Pt } from '../vec';
 import { set, type Brain } from './brain';
 import { losClear } from './perception';
+import { CALL_IN, callInReady } from '../match/callIns';
+import type { CallInKind } from '../match/types';
 
 /**
  * The sim's stand-in in the player's seat ("a decent casual player"), with
@@ -41,6 +43,7 @@ function lootPick(m: Match, t: Tank, range: number): { id: number; x: number; y:
     else if (p.kind === 'gadget') v = p.gadget && p.gadget !== t.gadget ? (t.found ? 0 : 5) : t.gadget ? 4 : 0;
     else if (p.kind === 'intel') v = 6 + Object.values(p.bag).reduce((s: number, n) => s + (n ?? 0), 0);
     else if (p.kind === 'part') v = partValue(m, t, p.part);
+    else if (p.kind === 'supply') v = 12;
     const score = v / (1 + d / 220);
     if (score > bestScore) {
       bestScore = score;
@@ -95,6 +98,38 @@ function wantsGadget(m: Match, t: Tank, seen: readonly Tank[]): boolean {
   return !mineNear && (chased || share < 0.6);
 }
 
+/** HP share under which the stand-in calls its supply drop (or this with no kit left). */
+const SUPPLY_HP = 0.45;
+const SUPPLY_HP_NO_KIT = 0.7;
+/** After this long in a level the stand-in strikes even a lone enemy (it would otherwise never use it on quiet levels). */
+const STRIKE_ANY_AFTER = 60;
+
+/**
+ * When the stand-in uses a call-in: a supply drop when hurt; a strike on a
+ * target in sight with others bunched round it (or a boss, an ace, a dug-in
+ * turret), far enough from itself and with none of ours in the ring.
+ */
+export function wantsCallIn(m: Match, t: Tank, target: Tank | null, sneak: boolean): CallInKind | null {
+  const share = t.hp / t.stats.maxHp;
+  if (callInReady(m.callIns.supply) && (share < SUPPLY_HP || (t.kits === 0 && share < SUPPLY_HP_NO_KIT))) return 'supply';
+  if (!callInReady(m.callIns.strike) || !target || sneak) return null;
+  const r = CALL_IN.strike.radius;
+  const d = Math.hypot(target.x - t.x, target.y - t.y);
+  if (d > CALL_IN.range || d < r + 70) return null;
+  let score = 0;
+  for (const o of m.tanks) {
+    if (!o.alive || o.role === 'crew') continue;
+    const near = Math.hypot(o.x - target.x, o.y - target.y) <= r + 20;
+    if (!near) continue;
+    if (o.team === t.team) return null;
+    score += 1;
+  }
+  const brain = m.brains.get(target.id);
+  if (target.role === 'boss' || target.ace) score += 2;
+  if (brain?.role === 'turret' || brain?.role === 'guard' || target.speed < 20) score += 1;
+  return score >= 3 || (score >= 2 && m.t > STRIKE_ANY_AFTER) ? 'strike' : null;
+}
+
 export function thinkPlayer(m: Match, b: Brain, t: Tank, target: Tank | null, winnable: number, attacked: boolean, seen: readonly Tank[]): void {
   const h = b.hint;
   b.useGadget = wantsGadget(m, t, seen);
@@ -113,6 +148,7 @@ export function thinkPlayer(m: Match, b: Brain, t: Tank, target: Tank | null, wi
     b.snap = null;
     b.los = b.shootAt ? losClear(m, t.x, t.y, b.shootAt.x, b.shootAt.y, b.shootAt.id) : false;
   }
+  b.callIn = wantsCallIn(m, t, hiddenCalm || !b.los ? null : target, h?.sneak === true);
   // The level's prize first (it's what lets you cross): drive to it, shooting on the way.
   const prize = prizePickup(m, t);
   if (prize) {

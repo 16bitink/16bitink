@@ -10,6 +10,8 @@ export const SWAP_HOLD = 0.5;
 export const REPAIR_TIME = 2;
 export const REPAIR_SHARE = 0.4;
 const REACH = 14;
+/** A supply drop's contents land this far from it. */
+const SPILL = 18;
 
 export function repair(m: Match, t: Tank, input: TankInput, dt: number): void {
   if (t.repairT > 0) {
@@ -85,6 +87,20 @@ export function touchPickups(m: Match, t: Tank, input: TankInput, dt: number, wa
           p.taken = true;
           m.intel = mergeIntel(m.intel, p.bag);
           m.emit({ kind: 'pickup', tank: t.id, what: 'intel', amount: sumIntel(p.bag), family: (Object.keys(p.bag) as Family[])[0] });
+        }
+        break;
+      case 'supply':
+        // Your supply drop: only you open it, and its kit and part spill out beside it.
+        if (t.isPlayer) {
+          p.taken = true;
+          m.emit({ kind: 'crate', x: p.x, y: p.y });
+          p.contents.forEach((c, i) => {
+            const a = (i / p.contents.length) * Math.PI * 2 + 0.4;
+            const at = { x: p.x + Math.cos(a) * SPILL, y: p.y + Math.sin(a) * SPILL };
+            if (c.kind === 'kit') m.addPickup({ kind: 'kit' }, at.x, at.y);
+            else if (c.kind === 'gadget') m.addPickup({ kind: 'gadget', gadget: c.gadget }, at.x, at.y);
+            else m.addPickup({ kind: 'part', part: c.part }, at.x, at.y);
+          });
         }
         break;
       case 'proto':

@@ -3,6 +3,7 @@ import type { Match } from '../../logic/match/match';
 import type { Tank, TankInput } from '../../logic/match/types';
 import { GroundStream, preloadGround } from '../../render/ground';
 import { AlertLayer, preloadAlerts } from '../../render/alertView';
+import { preloadTags, TagLayer } from '../../render/tagView';
 import { preloadFx, WorldFx } from '../../render/fx';
 import { GadgetLayer, preloadGadgets } from '../../render/gadgetView';
 import { HeliLayer, preloadHeli } from '../../render/heliView';
@@ -39,6 +40,7 @@ export function preloadMission(scene: Phaser.Scene): void {
   preloadGadgets(scene);
   preloadHeli(scene);
   preloadAlerts(scene);
+  preloadTags(scene);
   preloadStorm(scene);
   preloadFlames(scene);
   preloadEffects(scene);
@@ -58,6 +60,7 @@ export class MissionScene extends Phaser.Scene {
   private fog!: FogLayer;
   private setPieces!: SetPieceLayer;
   private alerts!: AlertLayer;
+  private tags!: TagLayer;
   readonly bank: RotBank;
   private readonly views = new Map<number, TankView>();
   private acc = 0;
@@ -88,6 +91,7 @@ export class MissionScene extends Phaser.Scene {
     this.fog = new FogLayer(this);
     this.setPieces = new SetPieceLayer(this);
     this.alerts = new AlertLayer(this);
+    this.tags = new TagLayer(this);
     if (this.bank.mode === 'rot32') this.warmAll();
     this.cameras.main.setBounds(0, 0, m.land.width, m.land.height).setRoundPixels(true);
     this.centre();
@@ -172,6 +176,7 @@ export class MissionScene extends Phaser.Scene {
     this.effects.update(m);
     this.fog.update(m);
     this.alerts.update(m, view);
+    this.tags.update(m, view);
     this.storm.update(m, dt, view);
     this.hooks.onFrame(dt);
     if (m.over && !this.ended) {

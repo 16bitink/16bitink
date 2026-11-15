@@ -240,6 +240,8 @@ export function botInput(m: Match, b: Brain, t: Tank, dt: number): TankInput {
   ({ aim, fire } = telegraph(m, b, t, aim, fire));
   const gadget = b.useGadget;
   b.useGadget = false;
+  const callIn = b.callIn;
+  b.callIn = null;
   if (t.role === 'bossTurret' || b.role === 'turret') return { move: null, aim, aimDist, fire, swap: false, repair: false };
   let angle: number | null = null;
   let mag = 1;
@@ -325,7 +327,7 @@ export function botInput(m: Match, b: Brain, t: Tank, dt: number): TankInput {
   // or in reverse, whichever leaves the ring sooner (a tank on Wheels can't spin round in time).
   // Likewise off a Rail's charge line (chapter 5): the line is the warning.
   const throttle = b.role === 'player' ? lobDodge(m, t) || railDodge(m, t) : 0;
-  if (throttle !== 0) return { move: { kind: 'tank', throttle, turn: 0 }, aim, aimDist, fire, swap: false, repair: b.useKit, gadget };
+  if (throttle !== 0) return { move: { kind: 'tank', throttle, turn: 0 }, aim, aimDist, fire, swap: false, repair: b.useKit, gadget, callIn };
   const moving = angle !== null && mag > 0;
   trackStuck(b, t, moving, dt);
   if (b.detourT > 0) {
@@ -335,5 +337,5 @@ export function botInput(m: Match, b: Brain, t: Tank, dt: number): TankInput {
   if (angle !== null && b.state !== 'loot') angle = separate(m, t, angle, b.target);
   if (aim === null && angle !== null) aim = angle;
   const wantSwap = b.state === 'loot' && t.onPart !== null && t.onPart === b.goalPickup;
-  return { move: angle === null ? null : { kind: 'point', angle, mag }, aim, aimDist, fire, swap: wantSwap, repair: b.useKit, gadget };
+  return { move: angle === null ? null : { kind: 'point', angle, mag }, aim, aimDist, fire, swap: wantSwap, repair: b.useKit, gadget, callIn };
 }

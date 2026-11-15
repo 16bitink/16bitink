@@ -114,7 +114,21 @@ function medals(x: unknown): Readonly<Record<number, Medals>> {
 
 function part(x: unknown, slot: 'gun' | 'hull' | 'drive'): Part {
   if (!isObj(x) || !isFamily(x.family) || !isMk(x.mk) || slotOf(x.family) !== slot) return bad(`loadout.${slot}`);
-  return { family: x.family, mk: x.mk };
+  return x.proto === true ? { family: x.family, mk: x.mk, proto: true } : { family: x.family, mk: x.mk };
+}
+
+/** Kept ace prototypes: absent in saves from before them (none); one per family, the best Mk. */
+function protos(x: unknown): Part[] {
+  if (x === undefined) return [];
+  if (!Array.isArray(x)) return bad('protos');
+  const out: Part[] = [];
+  for (const q of x) {
+    if (!isObj(q) || !isFamily(q.family) || !isMk(q.mk)) return bad('protos');
+    const had = out.find((o) => o.family === q.family);
+    if (had && had.mk >= q.mk) continue;
+    out.splice(had ? out.indexOf(had) : out.length, had ? 1 : 0, { family: q.family, mk: q.mk, proto: true });
+  }
+  return out;
 }
 
 /** The best Mk you own of the starter's families: the tank a broken fitting falls back to. */
@@ -146,6 +160,7 @@ function progress(x: unknown): Progress {
     loadout,
     gadgetIntel: gadgetBag(x.gadgetIntel),
     gadgetMk: gadgetMkBook(x.gadgetMk),
+    protos: protos(x.protos),
   };
   // A fitting you no longer own (or never did) swaps for the starter's families rather than failing the save.
   const fits = [loadout.gun, loadout.hull, loadout.drive].every((q) => canFit(p, q));

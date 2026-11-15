@@ -49,6 +49,16 @@ export const HUD_CSS = `
 .ikt-hud .gadgetbtn.off { opacity: 0.4; }
 .ikt-hud .gadget.found img, .ikt-hud .gadgetbtn.found img { filter: drop-shadow(0 0 3px #f0c040) drop-shadow(0 0 1px #f0c040); }
 .ikt-hud .gadgetbtn.found { border-color: #f0c040; }
+.ikt-hud .callins { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.ikt-hud .callins:empty { display: none; }
+.ikt-hud .call { display: flex; align-items: center; }
+.ikt-hud .call img { width: 32px; height: 32px; object-fit: contain; image-rendering: pixelated; }
+.ikt-hud .call.used img { opacity: 0.25; filter: grayscale(1); }
+.ikt-hud .call.coming img { filter: drop-shadow(0 0 3px #f0c040); }
+.ikt-hud .callbtn { width: 64px; height: 64px; padding: 0; }
+.ikt-hud .callbtn img { width: 40px; height: 40px; object-fit: contain; image-rendering: pixelated; display: block; margin: 0 auto; }
+.ikt-hud .callbtn.off { opacity: 0.35; }
+.ikt-hud .callbtn.supply { right: 200px; bottom: 244px; } .ikt-hud .callbtn.strike { right: 40px; bottom: 290px; }
 .ikt-hud .pops { position: absolute; inset: 0; overflow: hidden; }
 .ikt-hud .pop { position: absolute; left: 0; top: 0; font: 700 18px ui-monospace, Menlo, monospace; color: #f0c040; text-shadow: 0 2px 0 #14110c, 0 0 4px #14110c; white-space: nowrap; }
 .ikt-hud .swap { right: 150px; bottom: 150px; } .ikt-hud .repair { right: 40px; bottom: 210px; width: 64px; height: 64px; font-size: 12px; }

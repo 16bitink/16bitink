@@ -15,6 +15,10 @@ import { worldKey } from './worldArt';
 /** Loot crates drawn larger than the world's crate structure, so they read as loot next to a tank. */
 const CRATE_SCALE = 1.4;
 const CRATE = { key: worldKey('structures/crate-1'), shadow: worldKey('structures/crate-1-shadow'), anchor: [21, 41], size: [49, 60] } as const;
+/** A call-in's supply drop: the world's parachute crate (match/callIns.ts); it falls for the last DROP_FALL s of its warning. */
+const SUPPLY = { key: worldKey('structures/supplyDrop-1'), shadow: worldKey('structures/supplyDrop-1-shadow'), anchor: [16, 59], size: [88, 76], scale: 1.2 } as const;
+const DROP_FALL = 0.9;
+const DROP_H = 380;
 const DEPTH = { pickups: 900, aims: 6900, shots: 7000, fx: 7500, marks: 8000 } as const;
 /** A gadget charge in a crate: drawn with the player's gadget icon (UI art), or a ring and a G. */
 const gadgetIcons = import.meta.glob<string>('../art/pixel/ui/gadget-*.png', { eager: true, query: '?url', import: 'default' });
@@ -48,6 +52,8 @@ export class WorldFx {
   private readonly crateShadows = new Map<number, Phaser.GameObjects.Image>();
   private readonly parts = new Map<number, Phaser.GameObjects.Image>();
   private readonly items = new Map<number, Phaser.GameObjects.Image>();
+  /** The supply drop coming down (one a level). */
+  private falling: Phaser.GameObjects.Image | null = null;
   private puffs: Puff[] = [];
   /** Telegraphed big shots: the aim line held until `until` (match time). */
   private aimLines: { tank: number; angle: number; len: number; until: number; width: number; dur: number }[] = [];
@@ -103,7 +109,8 @@ export class WorldFx {
       f.fillStyle(p.colour, 0.8 * (1 - k)).fillCircle(p.x, p.y, p.r * (0.6 + k * 0.6));
     }
     const rg = this.rings.clear();
-    for (const k of m.objective.marks()) {
+    this.falling?.setVisible(false);
+    for (const k of m.marks()) {
       const p = k.progress ?? 0;
       if (k.kind === 'artillery') {
         // The danger zone: a red ring with four ticks, pulsing faster as the bomb comes down (the bomb is BombLayer's).
@@ -117,10 +124,23 @@ export class WorldFx {
         }
         continue;
       }
-      const colour = k.state === 'ours' || k.state === 'done' ? 0x8cc85a : k.state === 'theirs' ? 0xd85a3a : k.kind === 'exit' || k.kind === 'pickup' ? 0x8cc85a : 0xf4ecd8;
+      if (k.kind === 'drop') this.drawFalling(k.x, k.y, (1 - p) * (k.warn ?? 1));
+      const colour = k.state === 'ours' || k.state === 'done' ? 0x8cc85a : k.state === 'theirs' ? 0xd85a3a : k.kind === 'exit' || k.kind === 'pickup' || k.kind === 'drop' ? 0x8cc85a : 0xf4ecd8;
       rg.lineStyle(3, colour, 0.75).strokeCircle(k.x, k.y, k.r);
       if (p > 0 && p < 1) rg.lineStyle(5, 0xf0c040, 0.9).beginPath().arc(k.x, k.y, k.r + 6, -Math.PI / 2, -Math.PI / 2 + p * Math.PI * 2).strokePath();
     }
+  }
+
+  /** The supply crate dropping onto its ring for its last DROP_FALL s; gone once it lands (it's a pickup then). */
+  private drawFalling(x: number, y: number, left: number): void {
+    if (!this.scene.textures.exists(SUPPLY.key)) return;
+    const img = (this.falling ??= this.scene.add.image(x, y, SUPPLY.key).setOrigin(SUPPLY.anchor[0] / SUPPLY.size[0], SUPPLY.anchor[1] / SUPPLY.size[1]).setScale(SUPPLY.scale).setDepth(DEPTH.fx));
+    const q = 1 - left / DROP_FALL;
+    if (q <= 0 || left <= 0) {
+      img.setVisible(false);
+      return;
+    }
+    img.setVisible(true).setPosition(x, y - DROP_H * (1 - q * q));
   }
 
   /** A thin red line from the muzzle along the held aim, brighter as the shot comes (Tactics §4). */
@@ -174,6 +194,15 @@ export class WorldFx {
       seen.add(p.id);
       if (p.kind === 'crate') {
         if (!this.crates.has(p.id)) this.crates.set(p.id, this.crateImage(p.id, p.x, p.y));
+      } else if (p.kind === 'supply') {
+        // Your supply drop on the ground: the parachute crate, with a green ring so it reads as yours.
+        g.lineStyle(2, 0x8cc85a, 0.55 + 0.35 * Math.sin(m.t * 4)).strokeCircle(p.x, p.y, 30);
+        if (!this.crates.has(p.id) && this.scene.textures.exists(SUPPLY.key)) {
+          const [ax, ay] = SUPPLY.anchor;
+          const [w, h] = SUPPLY.size;
+          if (this.scene.textures.exists(SUPPLY.shadow)) this.crateShadows.set(p.id, this.scene.add.image(p.x, p.y, SUPPLY.shadow).setOrigin(ax / w, ay / h).setScale(SUPPLY.scale).setDepth(DEPTH.pickups));
+          this.crates.set(p.id, this.scene.add.image(p.x, p.y, SUPPLY.key).setOrigin(ax / w, ay / h).setScale(SUPPLY.scale).setDepth(DEPTH.pickups + 1));
+        }
       } else if (p.kind === 'part') {
         if (!this.parts.has(p.id)) {
           const slot = slotOf(p.part.family);

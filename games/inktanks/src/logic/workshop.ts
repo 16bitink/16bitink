@@ -29,6 +29,8 @@ export interface Progress {
   /** Unspent gadget blueprints, and each gadget's Mk (Mk I when absent). */
   readonly gadgetIntel: GadgetBag;
   readonly gadgetMk: Readonly<Partial<Record<GadgetKind, Mk>>>;
+  /** Ace prototypes you've fitted in the field, the best per family: a Brigadier can fit them for any mission. */
+  readonly protos: readonly Part[];
 }
 
 export const UNLOCK_COST = 3;
@@ -59,6 +61,7 @@ export function newProgress(): Progress {
     loadout: { gun: { family: 'machinegun', mk: 1 }, hull: { family: 'light', mk: 1 }, drive: { family: 'wheels', mk: 1 } },
     gadgetIntel: {},
     gadgetMk: {},
+    protos: [],
   };
 }
 
@@ -139,15 +142,32 @@ export function research(p: Progress, f: Family, line: ResearchLine): Result {
   return { ok: true, progress: { ...p, intel: spend(p.intel, f, cost), research: { ...p.research, [f]: { ...prev, [line]: steps } } } };
 }
 
-/** Whether a part can be fitted to the starting tank. */
+/** Whether a part can be fitted to the starting tank: an owned family at an owned Mk, or a kept prototype once a Brigadier. */
 export function canFit(p: Progress, part: Part): boolean {
-  return p.unlocked.includes(part.family) && part.mk <= (p.mk[part.family] ?? 0) && !part.proto;
+  if (part.proto) return perksOf(p.xp).protoParts && p.protos.some((q) => q.family === part.family && q.mk === part.mk);
+  return p.unlocked.includes(part.family) && part.mk <= (p.mk[part.family] ?? 0);
+}
+
+/** The kept prototype of a family, or null. */
+export const protoOf = (p: Progress, f: Family): Part | null => p.protos.find((q) => q.family === f) ?? null;
+
+/** Keeps the ace prototypes among `parts` (what you fitted in a mission): the best Mk per family, kept win or lose. */
+export function keepProtos(p: Progress, parts: readonly Part[]): Progress {
+  let protos = p.protos;
+  for (const part of parts) {
+    if (!part.proto) continue;
+    const had = protos.find((q) => q.family === part.family);
+    if (had && had.mk >= part.mk) continue;
+    protos = [...protos.filter((q) => q.family !== part.family), { family: part.family, mk: part.mk, proto: true }];
+  }
+  return protos === p.protos ? p : { ...p, protos };
 }
 
 export function fit(p: Progress, loadout: Loadout): Result {
   for (const slot of ['gun', 'hull', 'drive'] as const) {
     const part = loadout[slot];
     if (slotOf(part.family) !== slot) return fail(`${part.family} is not a ${slot}`);
+    if (part.proto && !perksOf(p.xp).protoParts) return fail(`needs ${RANKS.find((r) => r.id === 'brigadier')!.name}`);
     if (!canFit(p, part)) return fail(`${part.family} Mk ${part.mk} not owned`);
   }
   return { ok: true, progress: { ...p, loadout } };

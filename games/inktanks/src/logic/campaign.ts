@@ -78,7 +78,7 @@ export interface GateContext {
 }
 
 /** Chapters whose levels exist, shipped or paid (the site's size.ready). Raise it as each chapter lands. */
-export const READY_CHAPTERS = 1;
+export const READY_CHAPTERS = 5;
 
 export function gate(n: number, c: GateContext): Gate {
   if (n < 1 || n > TOTAL_LEVELS) return 'coming';

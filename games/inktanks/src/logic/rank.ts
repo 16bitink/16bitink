@@ -57,11 +57,11 @@ export function toNextRank(xp: number): { next: RankDef; need: number } | null {
 export interface Perks {
   readonly repairKits: number;
   readonly maxMk: Mk;
-  readonly callIn: boolean;
-  readonly kitSlot: boolean;
-  /** Allied bot tanks (Captain one, Colonel two). */
+  /** One supply drop per mission (Staff Sergeant): a repair kit and a gun part a Mk up (match/callIns.ts). */
+  readonly supplyDrop: boolean;
+  /** Allied bot tanks (Captain one, Colonel two; match/wingmen.ts). */
   readonly wingmen: number;
-  /** One artillery strike per mission (Major). */
+  /** One artillery strike per mission (Major; match/callIns.ts). */
   readonly strike: boolean;
   /** Ace prototypes can go in the workshop (Brigadier). */
   readonly protoParts: boolean;
@@ -71,8 +71,7 @@ export function perksOf(xp: number): Perks {
   return {
     repairKits: atLeast(xp, 'corporal') ? 2 : 1,
     maxMk: atLeast(xp, 'brigadier') ? 5 : atLeast(xp, 'major') ? 4 : atLeast(xp, 'lieutenant') ? 3 : atLeast(xp, 'sergeant') ? 2 : 1,
-    callIn: atLeast(xp, 'staffSergeant'),
-    kitSlot: atLeast(xp, 'lieutenant'),
+    supplyDrop: atLeast(xp, 'staffSergeant'),
     wingmen: atLeast(xp, 'colonel') ? 2 : atLeast(xp, 'captain') ? 1 : 0,
     strike: atLeast(xp, 'major'),
     protoParts: atLeast(xp, 'brigadier'),

@@ -170,8 +170,8 @@ export const MK_COLOUR: Readonly<Record<Mk, { readonly light: string; readonly m
   5: { light: '#ffcc78', mid: '#ee8018', hex: 0xee8018 },
 };
 
-/** Mk IV and V have no art of their own yet: they wear Mk III's. */
-export const artMk = (mk: Mk): 1 | 2 | 3 => (mk > 3 ? 3 : mk) as 1 | 2 | 3;
+/** The Mk whose art a part wears: every Mk has its own (Mk IV and V since Nov 15). */
+export const artMk = (mk: Mk): Mk => mk;
 
 export function slotOf(family: Family): Slot {
   if ((GUN_FAMILIES as readonly string[]).includes(family)) return 'gun';

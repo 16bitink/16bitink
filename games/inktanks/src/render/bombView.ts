@@ -115,7 +115,7 @@ export class BombLayer {
   /** Each artillery mark's bomb, falling for the last FALL_T s, and its shadow closing in on the ground. */
   private drawBombs(m: Match): void {
     let i = 0;
-    for (const k of m.objective.marks()) {
+    for (const k of m.marks()) {
       if (k.kind !== 'artillery' || k.progress === undefined || !k.warn) continue;
       const left = (1 - k.progress) * k.warn;
       const q = 1 - left / FALL_T;

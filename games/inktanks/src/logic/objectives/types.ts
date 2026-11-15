@@ -18,9 +18,9 @@ export interface Hint {
   readonly run?: boolean;
 }
 
-/** A ring on the map and minimap: a hold zone, a flag, a recon spot, the exit, an artillery mark. */
+/** A ring on the map and minimap: a hold zone, a flag, a recon spot, the exit, an artillery mark, a supply drop coming down. */
 export interface Mark {
-  readonly kind: 'zone' | 'flag' | 'spot' | 'exit' | 'pickup' | 'artillery';
+  readonly kind: 'zone' | 'flag' | 'spot' | 'exit' | 'pickup' | 'artillery' | 'drop';
   readonly x: number;
   readonly y: number;
   readonly r: number;
@@ -28,7 +28,7 @@ export interface Mark {
   readonly state?: 'ours' | 'theirs' | 'done' | 'neutral';
   /** 0–1: capture or dwell progress. */
   readonly progress?: number;
-  /** An artillery mark's whole warning, s: progress 0 is the drop, 1 the landing. */
+  /** An artillery or drop mark's whole warning, s: progress 0 is the call, 1 the landing. */
   readonly warn?: number;
 }
 

@@ -1,5 +1,6 @@
 import { Match } from '../logic/match/match';
 import { matchReport, type MatchReport } from '../logic/match/report';
+import { wingmenOf } from '../logic/match/wingmen';
 import type { GadgetKind, Tank } from '../logic/match/types';
 import type { LoadedLevel } from '../logic/level/load';
 import type { Loadout } from '../logic/parts';
@@ -20,6 +21,9 @@ export interface RunResult {
   readonly ambushHits: number;
   readonly gadgetsUsed: number;
   readonly spotted: number;
+  /** Rank perks: call-ins used, and wingmen alive at the end of how many. */
+  readonly callIns: number;
+  readonly wingmen: { readonly alive: number; readonly of: number; readonly kills: number };
 }
 
 /** The stand-in's gadget when none is given: mines (a Private's pick for a chase). */
@@ -29,7 +33,7 @@ export interface RunOptions {
   readonly level: LoadedLevel;
   readonly seed: number;
   /** null: no player. */
-  readonly player: { readonly loadout: Loadout; readonly research?: Research; readonly kits?: number; readonly gadget?: GadgetKind | null } | null;
+  readonly player: { readonly loadout: Loadout; readonly research?: Research; readonly kits?: number; readonly gadget?: GadgetKind | null; readonly wingmen?: number; readonly supplyDrop?: boolean; readonly strike?: boolean } | null;
   readonly dt?: number;
 }
 
@@ -54,5 +58,7 @@ export function runMission(o: RunOptions): RunResult {
     ambushHits: m.tactics.ambushHits,
     gadgetsUsed: m.player?.gadgetsUsed ?? 0,
     spotted: m.tactics.spotted,
+    callIns: (m.callIns.supply.used ? 1 : 0) + (m.callIns.strike.used ? 1 : 0),
+    wingmen: { alive: wingmenOf(m).filter((t) => t.alive).length, of: wingmenOf(m).length, kills: wingmenOf(m).reduce((s, t) => s + t.kills, 0) },
   };
 }

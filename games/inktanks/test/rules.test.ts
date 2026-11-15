@@ -95,7 +95,7 @@ describe('ranks', () => {
     expect(rankOf(0).id).toBe('private');
     expect(rankOf(RANKS[2]!.xp).id).toBe('sergeant');
     expect(atLeast(RANKS[3]!.xp, 'sergeant')).toBe(true);
-    expect(perksOf(0)).toEqual({ repairKits: 1, maxMk: 1, callIn: false, kitSlot: false, wingmen: 0, strike: false, protoParts: false });
+    expect(perksOf(0)).toEqual({ repairKits: 1, maxMk: 1, supplyDrop: false, wingmen: 0, strike: false, protoParts: false });
     expect(perksOf(1e9)).toMatchObject({ wingmen: 2, strike: true, protoParts: true });
     expect(perksOf(RANKS[4]!.xp).maxMk).toBe(3);
     expect(toNextRank(0)?.next.id).toBe('corporal');

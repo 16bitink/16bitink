@@ -382,7 +382,7 @@ export const GAMES: readonly CatalogGame[] = [
     description: [
       'A top-down tank war campaign in pixel art. You command a young badger’s tank in the Scrap Wars, and every level is a hand-made mission with one clear goal: blow up the fuel stacks, get the supply truck to the village, hold the bridge, hunt down an enemy ace.',
       'Your tank is a gun, a hull and a drive, and enemies drop their parts when you knock them out: swap a Machinegun for Rockets mid-fight and you play differently. The blueprints they leave behind are yours to keep. Between missions, spend them in the workshop to unlock new parts and upgrade your tank for good, and earn medals and promotions up the ranks.',
-      'Early access: chapter 1, the Meadowlands, is ten free missions. Four more chapters are being made.',
+      'Chapter 1, the Meadowlands, is ten free missions. The full game is all 50: four more chapters across the Dust Flats desert, the Mirefen swamp, snowy Frostridge and the Deepwood forest, each with its own rival clan, terrain, new gun and boss, up to the last battle against the Iron Hive.',
     ],
     status: 'playable',
     icon: 'inktanks',
@@ -390,14 +390,14 @@ export const GAMES: readonly CatalogGame[] = [
     // A placeholder date: not on the home page until then, but /play/inktanks answers by link.
     released: '2026-11-22',
     updated: '2026-11-22',
-    size: { chapters: 5, ready: 1, levels: 50 },
+    size: { chapters: 5, ready: 5, levels: 50 },
     demo: '10 levels free',
     price: '$4.99',
     stripeLookupKey: 'inktanks_full',
     theme: { paper: '#1b1a16', ink: '#f4ecd8', accent: '#f0c040' },
     orientation: 'landscape',
     features: [
-      'Early access: chapter 1 free, 10 missions, no sign-up',
+      '50 missions in 5 chapters: chapter 1 free, 10 missions, no sign-up',
       'Every level a different mission: assault, raid, escort, hold, ace hunt, rescue, ambush and more',
       'Swap in the guns, hulls and drives enemies drop, each with a counter',
       'Keep the blueprints you collect, win or lose, and spend them in the workshop',

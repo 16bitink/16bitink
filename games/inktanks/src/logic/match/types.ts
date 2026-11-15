@@ -14,6 +14,10 @@ export type TankRole = 'tank' | 'truck' | 'boss' | 'bossTurret' | 'crew';
 export type GadgetKind = 'mines' | 'oil' | 'smoke';
 export const GADGETS: readonly GadgetKind[] = ['mines', 'oil', 'smoke'];
 
+/** Rank call-ins (match/callIns.ts): a supply drop (Staff Sergeant) and an artillery strike (Major), once a level each. */
+export type CallInKind = 'supply' | 'strike';
+export const CALL_INS: readonly CallInKind[] = ['supply', 'strike'];
+
 /** What drives a tank this step: the player's controls or a bot's. */
 export interface TankInput {
   /** 'tank': A/D turn, W/S throttle. 'point': steer towards an angle (thumbstick, bots). */
@@ -29,6 +33,8 @@ export interface TankInput {
   readonly repair: boolean;
   /** Pressed to use the gadget (lay a mine, spill oil, pop smoke). */
   readonly gadget?: boolean;
+  /** Pressed to call in a supply drop or an artillery strike at the aim point (the aim, at aimDist). */
+  readonly callIn?: CallInKind | null;
 }
 
 export const IDLE: TankInput = { move: null, aim: null, fire: false, swap: false, repair: false };
@@ -154,7 +160,9 @@ export type PickupKind =
   /** A gadget from a crate: a charge of yours (no `gadget`, or yours), or a one-use other kind. */
   | { readonly kind: 'gadget'; readonly gadget?: GadgetKind }
   | { readonly kind: 'intel'; readonly bag: IntelBag; readonly from: string; readonly ace: boolean }
-  | { readonly kind: 'proto' };
+  | { readonly kind: 'proto' }
+  /** A call-in's supply drop (match/callIns.ts): the player opens it and its contents spill out. */
+  | { readonly kind: 'supply'; readonly contents: readonly CrateContent[] };
 
 export type Pickup = PickupKind & { readonly id: number; readonly x: number; readonly y: number; taken: boolean };
 
@@ -211,6 +219,8 @@ export type MatchEvent =
   | { readonly kind: 'ice'; readonly what: 'crack' | 'break'; readonly x: number; readonly y: number; readonly tank: number; readonly r: number }
   /** A set piece acted: a flag raised or lowered, a camp photographed, the courier's gate opened. */
   | { readonly kind: 'setpiece'; readonly what: 'flagOurs' | 'flagLost' | 'photo' | 'gate' | 'avalanche'; readonly x: number; readonly y: number }
+  /** A rank call-in (match/callIns.ts): `called` when the player calls it (lands at `at`), `landed` when the crate or shells come down. */
+  | { readonly kind: 'callIn'; readonly what: CallInKind; readonly phase: 'called' | 'landed'; readonly x: number; readonly y: number; readonly at: number }
   | { readonly kind: 'over'; readonly passed: boolean; readonly reason: string };
 
 export interface MatchOver {

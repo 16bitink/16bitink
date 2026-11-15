@@ -36,6 +36,7 @@ import type Phaser from 'phaser';
  *   ?kits=N       repair kits
  *   ?gadget=G     mines (default), oil, smoke or none
  *   ?gmk=N        every gadget at Mk N (1–5, default 1)
+ *   ?wingmen=N    rank wingmen (0–2); ?supply=1 and ?strike=1 the rank call-ins (R, F)
  *   ?rot=rot32    RotSprite instead of free rotation
  *   ?bot=1        a bot drives your tank (watch a level)
  *   ?t=N          fast-forward N seconds before showing it
@@ -66,13 +67,13 @@ let sound: MissionSound | null = null;
 function start(): void {
   overlay.innerHTML = '';
   tries++;
-  const match = new Match({ level, seed: qnum('seed', Date.now() % 100000) + tries, player: { loadout: tank, kits: qnum('kits', 1), gadget: gadget === 'none' ? null : (gadget as GadgetKind), gadgetMk: { mines: gmk, oil: gmk, smoke: gmk } }, playerBot: query.get('bot') === '1' });
+  const match = new Match({ level, seed: qnum('seed', Date.now() % 100000) + tries, player: { loadout: tank, kits: qnum('kits', 1), gadget: gadget === 'none' ? null : (gadget as GadgetKind), gadgetMk: { mines: gmk, oil: gmk, smoke: gmk }, wingmen: qnum('wingmen', 0), supplyDrop: query.get('supply') === '1', strike: query.get('strike') === '1' }, playerBot: query.get('bot') === '1' });
   for (let t = qnum('t', 0); t > 0 && !match.over; t -= 1 / 30) match.step(1 / 30);
   match.drainEvents();
   const hudRoot = document.getElementById('hud')!;
   hudRoot.style.display = '';
   const hud = new Hud(hudRoot, map);
-  controls.bindButtons(hud.swapBtn, hud.repairBtn, hud.gadgetBtn);
+  controls.bindButtons(hud.swapBtn, hud.repairBtn, hud.gadgetBtn, hud.callBtns);
   sound?.destroy();
   const ms = new MissionSound(board, match);
   sound = ms;

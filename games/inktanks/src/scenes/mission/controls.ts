@@ -1,12 +1,12 @@
-import type { TankInput } from '../../logic/match/types';
+import type { CallInKind, TankInput } from '../../logic/match/types';
 
 /**
  * Player controls from the DOM. Desktop: WASD or arrows drive in the
  * direction pressed (the hull turns that way, then rolls), the mouse aims, click or hold fires, E (held) swaps, Q
- * repairs. Touch: a floating left stick drives towards where it points; a
+ * repairs, G uses the gadget, R calls a supply drop and F an artillery strike (rank call-ins, at the cursor). Touch: a floating left stick drives towards where it points; a
  * floating right stick aims and fires while pulled past the dead zone
- * (as InkSnake's stick: 56 px pull, 22% dead zone); swap and repair are
- * buttons.
+ * (as InkSnake's stick: 56 px pull, 22% dead zone); swap, repair, the gadget
+ * and the call-ins are buttons (a call-in lands along the turret's aim).
  */
 const STICK = { radius: 56, deadZone: 0.22 };
 
@@ -28,6 +28,7 @@ export class Controls {
   swapHeld = false;
   private repairPressed = false;
   private gadgetPressed = false;
+  private callPressed: CallInKind | null = null;
   touchUsed = matchMedia('(pointer: coarse)').matches;
   enabled = true;
 
@@ -41,6 +42,8 @@ export class Controls {
       this.keys.add(k);
       if (k === 'q') this.repairPressed = true;
       if (k === 'g') this.gadgetPressed = true;
+      if (k === 'r' && !e.repeat) this.callPressed = 'supply';
+      if (k === 'f' && !e.repeat) this.callPressed = 'strike';
     }, o);
     addEventListener('keyup', (e) => this.keys.delete(e.key.toLowerCase()), o);
     addEventListener('blur', () => this.release(), o);
@@ -67,8 +70,14 @@ export class Controls {
     this.off.abort();
   }
 
-  /** Wires a held button (swap) and pressed ones (repair, the gadget). */
-  bindButtons(swap: HTMLElement, repair: HTMLElement, gadget?: HTMLElement): void {
+  /** Wires a held button (swap) and pressed ones (repair, the gadget, the call-ins). */
+  bindButtons(swap: HTMLElement, repair: HTMLElement, gadget?: HTMLElement, calls?: Readonly<Record<CallInKind, HTMLElement>>): void {
+    for (const [kind, el] of Object.entries(calls ?? {}) as [CallInKind, HTMLElement][]) {
+      el.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        this.callPressed = kind;
+      });
+    }
     gadget?.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       this.gadgetPressed = true;
@@ -141,7 +150,7 @@ export class Controls {
   }
 
   read(tank: { x: number; y: number; turret: number }): TankInput {
-    if (!this.enabled) return { move: null, aim: null, fire: false, swap: false, repair: false, gadget: false };
+    if (!this.enabled) return { move: null, aim: null, fire: false, swap: false, repair: false, gadget: false, callIn: null };
     const k = this.keys;
     const kx = (k.has('d') || k.has('arrowright') ? 1 : 0) - (k.has('a') || k.has('arrowleft') ? 1 : 0);
     const ky = (k.has('s') || k.has('arrowdown') ? 1 : 0) - (k.has('w') || k.has('arrowup') ? 1 : 0);
@@ -164,8 +173,10 @@ export class Controls {
     }
     const repair = this.repairPressed;
     const gadget = this.gadgetPressed;
+    const callIn = this.callPressed;
     this.repairPressed = false;
     this.gadgetPressed = false;
-    return { move, aim, aimDist, fire, swap: this.swapHeld || k.has('e'), repair, gadget };
+    this.callPressed = null;
+    return { move, aim, aimDist, fire, swap: this.swapHeld || k.has('e'), repair, gadget, callIn };
   }
 }

@@ -1,0 +1,50 @@
+{
+ "driveWheels-H-mk4|L": {
+  "x": -18,
+  "y": -15
+ },
+ "driveWheels-H-mk4|R": {
+  "x": -40,
+  "y": -15
+ },
+ "driveWheels-H-mk5|L": {
+  "x": 41,
+  "y": -15
+ },
+ "driveWheels-H-mk5|R": {
+  "x": 19,
+  "y": -15
+ },
+ "driveWheels-M-mk4|L": {
+  "x": 94,
+  "y": -21
+ },
+ "driveWheels-M-mk4|R": {
+  "x": 84,
+  "y": -21
+ },
+ "driveWheels-M-mk5|L": {
+  "x": 153,
+  "y": -21
+ },
+ "driveWheels-M-mk5|R": {
+  "x": 143,
+  "y": -21
+ },
+ "driveWheels-L-mk4|L": {
+  "x": -29,
+  "y": 60
+ },
+ "driveWheels-L-mk4|R": {
+  "x": -31,
+  "y": 60
+ },
+ "driveWheels-L-mk5|L": {
+  "x": 28,
+  "y": 60
+ },
+ "driveWheels-L-mk5|R": {
+  "x": 26,
+  "y": 60
+ }
+}

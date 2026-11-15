@@ -32,6 +32,15 @@ describe('the ending', () => {
     expect(warRecord({ ...newProgress(), medals: allLevels([true, true, true]) }).medalsLeft).toBe(0);
   });
 
+  it('winning level 50 makes you a General even a little short of the XP', () => {
+    const def = { number: 50, bonus: [{ kind: 'kills', n: 99 }, { kind: 'kills', n: 99 }] } as never;
+    const report = { passedMain: true, kills: 0, intel: {}, gadgetIntel: {}, picks: [] } as never;
+    const p = applyOutcome({ ...newProgress(), xp: 12000 }, def, report).progress;
+    expect(warRecord(p).rank.id).toBe('general');
+    // Already past it: XP is never lowered.
+    expect(applyOutcome({ ...newProgress(), xp: 20000 }, def, report).progress.xp).toBeGreaterThan(20000);
+  });
+
   it('a loss on level 50 does not win the war', () => {
     const def = { number: 50, bonus: [{ kind: 'kills', n: 1 }, { kind: 'kills', n: 2 }] } as never;
     const report = { passedMain: false, kills: 0, intel: {}, gadgetIntel: {}, picks: [] } as never;

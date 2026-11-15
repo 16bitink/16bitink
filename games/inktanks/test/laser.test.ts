@@ -33,7 +33,7 @@ describe('the Laser', () => {
     expect(Object.keys(COUNTERS.laser).sort()).toEqual(['halftracks', 'hover', 'tracks', 'wheels']);
     expect(COUNTERS.laser.hover).toBeGreaterThan(COUNTERS.laser.tracks);
     expect(partLabel({ family: 'laser', mk: 4 })).toBe('Laser Mk IV');
-    expect(artKey({ family: 'laser', mk: 5 })).toBe('turretLaser-mk3');
+    expect(artKey({ family: 'laser', mk: 5 })).toBe('turretLaser-mk5');
     expect(MK_COLOUR[5]).toBeDefined();
     expect(tankStats(parseTank('laser3/medium1/wheels1')).gun.damage).toBeCloseTo(35 * 1.4, 5);
   });

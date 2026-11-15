@@ -62,19 +62,24 @@ export interface PartsArt {
 function realArt(m: PartsManifest): PartsArt {
   const urls = new Map<string, string>();
   for (const [path, url] of Object.entries(realPngs)) urls.set(relName(path, 'pixel/parts/'), url);
+  /** `<prefix>-mk<n>` for the part's Mk, or the nearest lower Mk the art has (an install that missed a tier). */
+  const tiered = (prefix: string, mk: number): string => {
+    for (let n = artMk(mk as Part['mk']); n > 1; n--) if (urls.has(`${prefix}-mk${n}`)) return `${prefix}-mk${n}`;
+    return `${prefix}-mk1`;
+  };
   return {
     source: 'parts',
     size: m.size,
     urls,
-    hull: (p) => `${ART_FAMILY[p.family]}-mk${artMk(p.mk)}`,
+    hull: (p) => tiered(ART_FAMILY[p.family], p.mk),
     drive: (p, hull) => {
       const fam = ART_FAMILY[p.family];
       const size = m.hullSize?.[ART_FAMILY[hull]] ?? 'L';
-      const key = m.drives?.[fam]?.[size]?.[`mk${artMk(p.mk)}`];
-      return key && urls.has(key) ? key : orStandIn(urls, `${fam}-mk${artMk(p.mk)}`);
+      const sized = tiered(`${fam}-${size}`, p.mk);
+      return urls.has(sized) ? sized : orStandIn(urls, tiered(fam, p.mk));
     },
     frames: (k) => m.frames?.[k] ?? [k, `${k}-f1`, `${k}-f2`].filter((f) => urls.has(f)),
-    turret: (p) => orStandIn(urls, `${ART_FAMILY[p.family]}-mk${artMk(p.mk)}`),
+    turret: (p) => orStandIn(urls, tiered(ART_FAMILY[p.family], p.mk)),
     stripe: (k) => (m.stripe.includes(k) && urls.has(`${k}-stripe`) ? `${k}-stripe` : null),
     ring: (k) => m.ring[k] ?? [0, 2],
     muzzles: (k) => m.muzzle?.[k] ?? [[0, -30]],

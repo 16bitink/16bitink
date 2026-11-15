@@ -37,6 +37,9 @@ import { stepGadgets, useGadget } from './gadgetUse';
 import { driveTank, placeMounted } from './movement';
 import { repair, touchPickups } from './pickups';
 import { addTank, spawnEnemy, spawnFriend } from './spawn';
+import { callIn, callInMarks, newCallIns, stepCallIns, type CallIns } from './callIns';
+import { spawnWingmen } from './wingmen';
+import type { Mark } from '../objectives/types';
 import { StructGrid } from './spatial';
 import { IDLE, type GadgetKind, type MatchEvent, type MatchOver, type Pickup, type PickupKind, type Shot, type StructRt, type Tank, type TankInput } from './types';
 
@@ -50,6 +53,10 @@ export interface PlayerSetup {
   readonly gadgetCharges?: number;
   /** Each gadget's Mk from the workshop (Mk I when absent). */
   readonly gadgetMk?: Readonly<Partial<Record<GadgetKind, Mk>>>;
+  /** Rank perks (rank.ts perksOf): allied tanks beside you (Captain 1, Colonel 2), and the call-ins. */
+  readonly wingmen?: number;
+  readonly supplyDrop?: boolean;
+  readonly strike?: boolean;
 }
 
 /** Tactics counters for the lab and the results. */
@@ -115,6 +122,8 @@ export class Match {
   readonly alarm: AlarmState = { firstAt: null, count: 0 };
   readonly gadgets: Gadgets = newGadgets();
   readonly tactics: TacticsStats = { ambushHits: 0, spotted: 0 };
+  /** The player's rank call-ins this level (callIns.ts). */
+  readonly callIns: CallIns;
   /** Burning reeds (chapter 3, flame.ts). */
   readonly fires: Fires = newFires();
   /** The land has thin ice (chapter 4, ice.ts). */
@@ -161,7 +170,10 @@ export class Match {
     this.grid = new StructGrid(this.structs);
     this.start = cfg.level.start;
     for (const c of cfg.level.crates) this.addPickup({ kind: 'crate', content: crateContent(c.content) ?? rollCrate(this.rng, cfg.level.def.loot) }, c.at.x, c.at.y);
+    this.callIns = newCallIns(cfg.player?.supplyDrop === true, cfg.player?.strike === true);
     if (cfg.player) this.player = this.spawnPlayer(cfg.player);
+    // Wingmen ride your starting tank (not a part the level issues you).
+    if (cfg.player) spawnWingmen(this, cfg.player.wingmen ?? 0, cfg.player.loadout);
     for (const a of cfg.level.allies) this.spawnTower(a);
     this.objective = createObjective(this, cfg.level.def.objective);
     this.waves = cfg.level.enemies.filter((e) => e.role === 'wave');
@@ -325,12 +337,14 @@ export class Match {
       aimAndFire(this, t, input, dt);
       repair(this, t, input, dt);
       if (input.gadget) useGadget(this, t);
+      if (input.callIn && t.isPlayer) callIn(this, t, input.callIn, input);
       touchPickups(this, t, input, dt, input.swap);
     }
     stepIce(this, dt);
     if (this.storm && this.sight < Infinity) blowWind(this, this.storm, dt);
     stepShots(this, dt);
     stepGadgets(this, dt);
+    stepCallIns(this);
     stepFires(this);
     this.objective.step(dt);
     this.checkOver();
@@ -374,6 +388,12 @@ export class Match {
     const limit = this.level.def.timeLimit;
     if (limit !== undefined && this.t >= limit) return this.finish(false, 'time');
     if (this.t >= HARD_CAP) this.finish(false, 'time');
+  }
+
+  /** Every ring on the map now: the objective's, and the call-ins coming down. */
+  marks(): readonly Mark[] {
+    const own = this.objective.marks();
+    return this.callIns.supply.landing || this.callIns.strike.landing ? [...own, ...callInMarks(this)] : own;
   }
 
   /** Seconds left on the level's timer, or null when it has none. */

@@ -7,7 +7,7 @@ import { oilTier } from '../gadgetTiers';
 import { intelOf } from '../intel';
 import { igniteOil, oilUnder } from './gadgets';
 import { wreckPart } from '../loot';
-import type { Family, GunFamily } from '../parts';
+import type { Family, GunFamily, Mk, Part } from '../parts';
 import { nearestPassable, passable } from '../nav/grid';
 import { turnTowards } from '../vec';
 import type { Match } from './match';
@@ -273,6 +273,12 @@ function reachable(m: Match, x: number, y: number): { x: number; y: number } | n
   return passable(m.nav, x, y) ? { x, y } : nearestPassable(m.nav, x, y);
 }
 
+/** An ace's wreck leaves its best part as a prototype, Mk III at least (a Brigadier can keep it in the workshop). */
+export function acePrototype(l: Tank['loadout']): Part {
+  const best = wreckPart(l);
+  return { family: best.family, mk: Math.max(3, best.mk) as Mk, proto: true };
+}
+
 export function killTank(m: Match, t: Tank, killer: Tank | null, by: GunFamily | 'artillery'): void {
   if (!t.alive) return;
   t.alive = false;
@@ -285,7 +291,7 @@ export function killTank(m: Match, t: Tank, killer: Tank | null, by: GunFamily |
   m.emit({ kind: 'kill', killer: killer?.id ?? null, victim: t.id, by });
   if (t.role === 'tank' || t.role === 'bossTurret') {
     // The wreck: its best part to swap in, and intel on all its parts.
-    if (t.role === 'tank') m.addPickup({ kind: 'part', part: t.ace ? { ...wreckPart(t.loadout), mk: 3, proto: true } : wreckPart(t.loadout) }, t.x, t.y);
+    if (t.role === 'tank') m.addPickup({ kind: 'part', part: t.ace ? acePrototype(t.loadout) : wreckPart(t.loadout) }, t.x, t.y);
     // One blueprint sheet per part family, scattered around the wreck (spread from the tank's id, so it is the same every run).
     const bag = intelOf(t.loadout, t.ace);
     const fams = Object.keys(bag) as Family[];

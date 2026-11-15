@@ -34,8 +34,9 @@ export interface ChapterResult {
  * The whole-chapter no-grind check: the stand-in player plays each level
  * (retrying on a fail, as the game does, keeping intel either way), spends
  * intel in the workshop between levels, and refits its starting tank.
+ * `rankPerks` false leaves out wingmen and call-ins (to measure what they add).
  */
-export function runChapter(levels: readonly LoadedLevel[], seed: number, maxAttempts = 6): ChapterResult {
+export function runChapter(levels: readonly LoadedLevel[], seed: number, maxAttempts = 6, rankPerks = true): ChapterResult {
   let p = newProgress();
   const rows: MissionRow[] = [];
   for (const level of levels) {
@@ -50,7 +51,8 @@ export function runChapter(levels: readonly LoadedLevel[], seed: number, maxAtte
     const loadout = `${p.loadout.gun.family}${p.loadout.gun.mk}/${p.loadout.hull.family}${p.loadout.hull.mk}/${p.loadout.drive.family}${p.loadout.drive.mk}`;
     while (attempts < maxAttempts) {
       attempts++;
-      const r = runMission({ level, seed: seed * 1000 + def.number * 37 + attempts, player: { loadout: p.loadout, research: p.research, kits: perksOf(p.xp).repairKits } });
+      const perks = perksOf(p.xp);
+      const r = runMission({ level, seed: seed * 1000 + def.number * 37 + attempts, player: { loadout: p.loadout, research: p.research, kits: perks.repairKits, ...(rankPerks ? { wingmen: perks.wingmen, supplyDrop: perks.supplyDrop, strike: perks.strike } : {}) } });
       if (!r.report) break;
       const applied = applyOutcome(p, def, r.report);
       p = applied.progress;

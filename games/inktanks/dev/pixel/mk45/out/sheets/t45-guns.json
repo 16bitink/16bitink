@@ -1,0 +1,26 @@
+{
+ "turretCannon-mk4": {
+  "x": -36,
+  "y": -3
+ },
+ "turretCannon-mk5": {
+  "x": 8,
+  "y": -3
+ },
+ "turretMG-mk4": {
+  "x": 51,
+  "y": -20
+ },
+ "turretMG-mk5": {
+  "x": 93,
+  "y": -20
+ },
+ "turretRocket-mk5": {
+  "x": 141,
+  "y": -36
+ },
+ "turretRocket-mk4": {
+  "x": -31,
+  "y": 46
+ }
+}

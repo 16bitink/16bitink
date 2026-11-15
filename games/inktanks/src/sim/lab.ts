@@ -19,6 +19,7 @@ import { runMission, type RunResult } from './runMission';
  *   lab -- --level 3 --kits 2        repair kits (Corporal and up carry 2)
  *   lab -- --level 3 --gadget smoke  the stand-in's gadget (mines, oil, smoke, none; default mines)
  *   lab -- --level 3 --no-map        skip the map
+ *   lab -- --level 30 --no-perks     without the rank's wingmen and call-ins (default: TYPICAL_PERKS for the level)
  *   lab -- --map 3                   only the map
  *   lab -- --all --seeds 10          one summary line per level
  *   lab -- --chapter --seeds 3       the whole-chapter no-grind check
@@ -42,6 +43,8 @@ export interface LabArgs {
   campaign: boolean;
   /** Which chapter --all and --chapter run (default 1). */
   ch: number;
+  /** Rank perks (wingmen, call-ins) on: the level's TYPICAL_PERKS, or the campaign's by rank. --no-perks turns them off. */
+  perks: boolean;
 }
 
 /**
@@ -58,9 +61,19 @@ export const TYPICAL_TANK: Readonly<Record<number, string>> = {
 };
 /** Repair kits the chapter run carries by then (a Corporal carries 2). */
 const TYPICAL_KITS = (level: number): number => (level >= 3 ? 2 : 1);
+/**
+ * The rank perks the campaign run holds at each level (Nov 15, 3 seeds): Staff
+ * Sergeant by 10 (supply drop), Captain by 20 (a wingman), Major by 25 (the
+ * strike), Colonel by 36 (a second wingman).
+ */
+export const TYPICAL_PERKS = (level: number): { wingmen: number; supplyDrop: boolean; strike: boolean } => ({
+  wingmen: level >= 36 ? 2 : level >= 20 ? 1 : 0,
+  supplyDrop: level >= 10,
+  strike: level >= 25,
+});
 
 export function parseArgs(argv: readonly string[]): LabArgs {
-  const a: LabArgs = { level: null, seeds: 10, seed: 1, tank: null, kits: null, gadget: 'mines', map: true, mapOnly: false, all: false, chapter: false, campaign: false, ch: 1 };
+  const a: LabArgs = { level: null, seeds: 10, seed: 1, tank: null, kits: null, gadget: 'mines', map: true, mapOnly: false, all: false, chapter: false, campaign: false, ch: 1, perks: true };
   for (let i = 0; i < argv.length; i++) {
     const k = argv[i]!;
     const v = argv[i + 1];
@@ -77,6 +90,7 @@ export function parseArgs(argv: readonly string[]): LabArgs {
       a.gadget = v === 'none' ? null : (v as GadgetKind);
     }
     else if (k === '--no-map') a.map = false;
+    else if (k === '--no-perks') a.perks = false;
     else if (k === '--all') a.all = true;
     else if (k === '--chapter') a.chapter = true;
     else if (k === '--campaign') a.campaign = true;
@@ -100,8 +114,14 @@ function runs(level: LoadedLevel, a: LabArgs): { loadout: Loadout; kits: number;
   const n = level.def.number;
   const loadout = parseTank(a.tank ?? TYPICAL_TANK[n] ?? TYPICAL_TANK[1]!);
   const kits = a.kits ?? TYPICAL_KITS(n);
-  const results = Array.from({ length: a.seeds }, (_, i) => runMission({ level, seed: a.seed + i, player: { loadout, kits, gadget: a.gadget } }));
+  const results = Array.from({ length: a.seeds }, (_, i) => runMission({ level, seed: a.seed + i, player: { loadout, kits, gadget: a.gadget, ...(a.perks ? TYPICAL_PERKS(n) : {}) } }));
   return { loadout, kits, results };
+}
+
+function perksText(p: ReturnType<typeof TYPICAL_PERKS> | null): string {
+  if (!p) return 'no rank perks';
+  const on = [p.wingmen ? `${p.wingmen} wingm${p.wingmen > 1 ? 'en' : 'an'}` : '', p.supplyDrop ? 'supply drop' : '', p.strike ? 'strike' : ''].filter(Boolean);
+  return on.length ? on.join(' + ') : 'no rank perks yet';
 }
 
 function medalsOf(level: LoadedLevel, r: RunResult): string {
@@ -136,7 +156,7 @@ export function levelReport(a: LabArgs): string {
   if (a.mapOnly) return lines.join('\n');
   const { loadout, kits, results } = runs(level, a);
   const tank = `${loadout.gun.family}${loadout.gun.mk}/${loadout.hull.family}${loadout.hull.mk}/${loadout.drive.family}${loadout.drive.mk}`;
-  lines.push(`Level ${d.number} ${d.name}, ${a.seeds} seeds from ${a.seed}, player bot on ${tank} with ${kits} kit(s), gadget ${a.gadget ?? 'none'}${d.timeLimit ? `, timer ${fmt(d.timeLimit)}` : ''}`);
+  lines.push(`Level ${d.number} ${d.name}, ${a.seeds} seeds from ${a.seed}, player bot on ${tank} with ${kits} kit(s), gadget ${a.gadget ?? 'none'}, ${perksText(a.perks ? TYPICAL_PERKS(d.number) : null)}${d.timeLimit ? `, timer ${fmt(d.timeLimit)}` : ''}`);
   lines.push(`  bonus 1: ${bonusText(d.bonus[0])}   bonus 2: ${bonusText(d.bonus[1])}`);
   results.forEach((r, i) => lines.push(seedLine(level, a.seed + i, r)));
   lines.push(summaryLine(level, results));
@@ -149,7 +169,7 @@ export function chapterReport(a: LabArgs): string {
   let ok = 0;
   const levels = a.campaign ? [1, 2, 3, 4, 5].flatMap((c) => chapterLevels(c)) : chapterLevels(a.ch);
   for (let s = 0; s < a.seeds; s++) {
-    const r = runChapter(levels, a.seed + s);
+    const r = runChapter(levels, a.seed + s, 6, a.perks);
     if (r.verdict.ok) ok++;
     lines.push(`${a.campaign ? 'Campaign' : `Chapter ${a.ch}`}, seed ${a.seed + s}`);
     lines.push('  lv name                 tries  medals  XP    rank            intel  tank at start                   ends  | parts fitted from the ground');

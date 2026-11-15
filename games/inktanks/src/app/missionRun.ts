@@ -1,4 +1,5 @@
 import { MissionSound } from '../audio/missionSound';
+import { MUSIC_LEVEL } from '../audio/musicPlan';
 import type { SoundBoard } from '../audio/sound';
 import type { Match } from '../logic/match/match';
 import { matchReport, type MatchReport } from '../logic/match/report';
@@ -34,7 +35,7 @@ export class MissionRun {
   private outro: ReturnType<typeof setTimeout> | null = null;
   private readonly sound: MissionSound | null;
 
-  constructor(private readonly stage: Stage, private readonly hudRoot: HTMLElement, private readonly cardRoot: HTMLElement, surface: HTMLElement, readonly match: Match, private readonly exits: MissionExits, firstBlueprints?: { seen: boolean; mark: () => void }, board?: SoundBoard) {
+  constructor(private readonly stage: Stage, private readonly hudRoot: HTMLElement, private readonly cardRoot: HTMLElement, surface: HTMLElement, readonly match: Match, private readonly exits: MissionExits, firstBlueprints?: { seen: boolean; mark: () => void }, private readonly board?: SoundBoard) {
     this.sound = board ? new MissionSound(board, match) : null;
     const map = paintLandMap(match.land, Math.min(0.25, 200 / match.land.width));
     hudRoot.hidden = false;
@@ -46,7 +47,7 @@ export class MissionRun {
     pause.addEventListener('click', () => this.pause());
     hudRoot.appendChild(pause);
     this.controls = new Controls(surface, (x, y) => this.scene.toWorld(x, y), surface.parentElement ?? document.body);
-    this.controls.bindButtons(this.hud.swapBtn, this.hud.repairBtn, this.hud.gadgetBtn);
+    this.controls.bindButtons(this.hud.swapBtn, this.hud.repairBtn, this.hud.gadgetBtn, this.hud.callBtns);
     addEventListener('keydown', (e) => {
       if (e.key === 'Escape' || e.key === 'p' || e.key === 'P') {
         e.preventDefault();
@@ -85,6 +86,7 @@ export class MissionRun {
     if (this.paused || this.ended) return;
     this.paused = true;
     this.scene.paused = true;
+    this.board?.setMusicLevel(MUSIC_LEVEL.paused);
     this.controls.release();
     this.controls.enabled = false;
     showCard(this.cardRoot, 'Paused', [this.match.objective.title], [
@@ -98,6 +100,7 @@ export class MissionRun {
     if (!this.paused) return;
     this.paused = false;
     this.scene.paused = false;
+    this.board?.setMusicLevel(MUSIC_LEVEL.mission);
     this.controls.enabled = true;
     clear(this.cardRoot);
   }

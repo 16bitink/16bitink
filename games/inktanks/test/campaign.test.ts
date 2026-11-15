@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CH1_LEVELS } from '../src/content/ch1/levels';
 import { hasLevel, installPaidLevels, levelFor } from '../src/content/levels';
-import { chapterOf, CHAPTERS, gate, levelOpen, nextLevel, spotState, type GateContext, type MedalBook } from '../src/logic/campaign';
+import { chapterOf, CHAPTERS, gate, levelOpen, nextLevel, READY_CHAPTERS, spotState, type GateContext, type MedalBook } from '../src/logic/campaign';
 import type { MatchReport } from '../src/logic/match/report';
 import { applyOutcome, outcome } from '../src/logic/mission/outcome';
 import { newProgress } from '../src/logic/workshop';
@@ -52,6 +52,9 @@ describe('campaign', () => {
     expect(gate(15, ctx({}, { readyChapters: 2 }))).toBe('paywall');
     // Not made yet: nobody is offered it.
     expect(gate(11, ctx(all, { readyChapters: 1 }))).toBe('coming');
+    // All five chapters are made (Nov 15): by default every paid level is sold, so the offer after level 10 shows.
+    expect(READY_CHAPTERS).toBe(5);
+    for (const n of [11, 21, 31, 41, 50]) expect(gate(n, ctx(all)), `level ${n}`).toBe('paywall');
     // An owner plays it once loaded and the level before is passed; before it loads it is coming.
     const loaded = (n: number): boolean => n <= 20;
     expect(gate(11, ctx(all, { owned: true, available: loaded }))).toBe('play');

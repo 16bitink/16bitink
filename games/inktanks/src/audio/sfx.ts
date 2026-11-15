@@ -123,6 +123,10 @@ export function cuesFor(e: MatchEvent, tank: (id: number) => Tank | undefined, p
       if (e.what === 'photo') return [{ id: 'shutter' }];
       if (e.what === 'gate') return [at(e.x, e.y, 'gate')];
       return [at(e.x, e.y, 'rumble', 1)];
+    case 'callIn':
+      // Rank call-ins: the radio as you call it; the crate thumps down, or the shells land deep (the blast's own boom plays too).
+      if (e.phase === 'called') return [{ id: 'radio', gain: 0.9 }];
+      return e.what === 'supply' ? [at(e.x, e.y, 'thud', 1, 0.7), at(e.x, e.y, 'drop', 0.9, 0.8)] : [at(e.x, e.y, 'boom', 1, 0.6)];
     case 'over':
       return [{ id: e.passed ? 'win' : 'lose' }];
     default:

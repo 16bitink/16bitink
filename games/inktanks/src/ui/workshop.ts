@@ -3,7 +3,7 @@ import { DRIVE_FAMILIES, FAMILY_CHAPTER, familyName, GUN_FAMILIES, HULL_FAMILIES
 import { perksOf, rankOf, RANKS } from '../logic/rank';
 import { bpAmount } from './blueprint';
 import { fireRate, RESEARCH_MAX, RESEARCH_STEP, researchSteps, tankStats, type ResearchLine } from '../logic/stats';
-import { fit, GADGET_MK_COST, gadgetMkOf, LINES_BY_SLOT, MK_COST, MK_RANK, ownedPart, type NextMk, raiseGadget, raiseMk, research, researchCost, UNLOCK_COST, unlock, type Progress, type Result } from '../logic/workshop';
+import { fit, GADGET_MK_COST, gadgetMkOf, LINES_BY_SLOT, MK_COST, MK_RANK, ownedPart, protoOf, type NextMk, raiseGadget, raiseMk, research, researchCost, UNLOCK_COST, unlock, type Progress, type Result } from '../logic/workshop';
 import { gadgetText, nextTierText } from '../logic/gadgetTiers';
 import { GADGET_NAME } from '../logic/match/gadgets';
 import { GADGETS, type GadgetKind } from '../logic/match/types';
@@ -31,7 +31,7 @@ const PCT = Math.round(RESEARCH_STEP * 100);
 type Tab = Slot | 'gadgets';
 
 /** A later chapter's family (the Mortar) shows once you've found its blueprints, not as a locked card from the start. */
-const listed = (p: Progress, f: Family): boolean => !FAMILY_CHAPTER[f] || p.unlocked.includes(f) || (p.intelTotal[f] ?? 0) > 0;
+const listed = (p: Progress, f: Family): boolean => !FAMILY_CHAPTER[f] || p.unlocked.includes(f) || (p.intelTotal[f] ?? 0) > 0 || protoOf(p, f) !== null;
 
 export interface WorkshopActions {
   readonly change: (p: Progress) => void;
@@ -69,7 +69,7 @@ export function showWorkshop(root: HTMLElement, start: Progress, a: WorkshopActi
         const f = el.dataset.f as Family;
         const r = raiseMk(p, f);
         // The fitted part of that family is raised with it.
-        const fitted = r.ok && p.loadout[slotOf(f)].family === f ? fit(r.progress, withPart(r.progress.loadout, ownedPart(r.progress, f)!)) : r;
+        const fitted = r.ok && p.loadout[slotOf(f)].family === f && !p.loadout[slotOf(f)].proto ? fit(r.progress, withPart(r.progress.loadout, ownedPart(r.progress, f)!)) : r;
         apply(fitted, `${famName(f)} raised to Mk ${roman(r.ok ? r.progress.mk[f] ?? 1 : 1)}`);
       },
       fit: (el) => {
@@ -80,6 +80,10 @@ export function showWorkshop(root: HTMLElement, start: Progress, a: WorkshopActi
         const g = el.dataset.g as GadgetKind;
         const r = raiseGadget(p, g);
         apply(r, `${GADGET_NAME[g]} raised to Mk ${roman(r.ok ? gadgetMkOf(r.progress, g) : 1)}`);
+      },
+      fitproto: (el) => {
+        const q = protoOf(p, el.dataset.f as Family);
+        if (q) apply(fit(p, withPart(p.loadout, q)), `Prototype ${famName(q.family)} Mk ${roman(q.mk)} fitted`);
       },
       research: (el) => apply(research(p, el.dataset.f as Family, el.dataset.line as ResearchLine), `${LINE_NAMES[el.dataset.line as ResearchLine]} researched`),
     });
@@ -128,7 +132,8 @@ function costBtn(f: Family, label: string, cost: number, have: number, attrs: st
 function famCard(p: Progress, f: Family): string {
   const have = p.intel[f] ?? 0;
   const unlocked = p.unlocked.includes(f);
-  const fitted = p.loadout[slotOf(f)].family === f;
+  const onTank = p.loadout[slotOf(f)];
+  const fitted = onTank.family === f && !onTank.proto;
   const mk = p.mk[f] ?? 1;
   const acts: string[] = [];
   let goal = UNLOCK_COST;
@@ -157,7 +162,21 @@ function famCard(p: Progress, f: Family): string {
     <div class="bpline"><span class="t12">${esc(famName(f))} blueprints:</span><span class="big">${bpAmount(have, false, f)}</span></div>
     <div class="bar wide"><i style="width:${Math.round(share * 100)}%"></i></div>
     <div class="acts">${acts.join('')}</div>
+    ${protoRow(p, f)}
   </div>`;
+}
+
+/** An ace's prototype you've kept (Brigadier perk): its Mk in the rarity colour, and a Fit button once you hold the rank. */
+function protoRow(p: Progress, f: Family): string {
+  const q = protoOf(p, f);
+  if (!q) return '';
+  const on = p.loadout[slotOf(f)];
+  const fitted = on.proto === true && on.family === f && on.mk === q.mk;
+  const ok = perksOf(p.xp).protoParts;
+  const btn = fitted ? '<span class="t12 green">fitted</span>'
+    : ok ? `<button class="btn small go" data-act="fitproto" data-f="${f}">Fit</button>`
+      : `<button class="btn small dim" data-act="fitproto" data-f="${f}" data-blocked="1"><span>Fit</span><span class="why2"><i class="lock"></i>needs ${esc(rankName('brigadier'))}</span></button>`;
+  return `<div class="row" style="align-items:center;gap:8px">${partIcon(q)}<span class="t12">Ace prototype <span style="color:${MK_COLOUR[q.mk].light}">Mk ${roman(q.mk)}</span></span>${btn}</div>`;
 }
 
 /** A gadget's blueprints as "[icon] 5": its own icon, since gadgets have no blueprint sheet. */

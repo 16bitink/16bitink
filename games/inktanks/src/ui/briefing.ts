@@ -5,6 +5,7 @@ import { CLAN_COLOUR, CLAN_INFO, rivalOf } from '../logic/match/names';
 import { GADGETS, type Clan, type GadgetKind } from '../logic/match/types';
 import { gadgetIconUrl } from '../scenes/mission/hud';
 import type { Match } from '../logic/match/match';
+import { wingmenOf } from '../logic/match/wingmen';
 import { bonusText } from '../logic/mission/bonus';
 import type { Medals } from '../logic/mission/outcome';
 import { perksOf } from '../logic/rank';
@@ -87,7 +88,7 @@ export function showBriefing(root: HTMLElement, m: Match, p: Progress, a: Briefi
         <div class="col">
           <div class="mapbox"></div>
           <div class="row"><div class="pic"></div><div class="col"><div class="row">${partIcon(l.gun)}${partIcon(l.hull)}${partIcon(l.drive)}</div>
-            <div class="t12 hide-short">${[l.gun, l.hull, l.drive].map(partName).join(' · ')}</div><div class="t12 dimt">Repair kits: ${perksOf(p.xp).repairKits}</div></div></div>
+            <div class="t12 hide-short">${[l.gun, l.hull, l.drive].map(partName).join(' · ')}</div><div class="t12 dimt">Repair kits: ${perksOf(p.xp).repairKits}</div>${rankPerksLine(m)}</div></div>
           <div class="gadgets">${gadgetPicker(p, picked)}</div>
         </div>
       </div>
@@ -148,4 +149,12 @@ function briefingMap(m: Match): HTMLCanvasElement {
 function tideLine(floods: LevelDef['floods']): string {
   const at = (floods ?? []).find((f) => f.at !== undefined)?.at;
   return at === undefined ? '' : `<div class="t12 gold">The tide comes in at ${Math.floor(at / 60)}:${String(Math.round(at % 60)).padStart(2, '0')}: the shallows go under</div>`;
+}
+
+/** The rank's wingmen and call-ins on this mission (what the Match really fields), or nothing. */
+function rankPerksLine(m: Match): string {
+  const wing = wingmenOf(m).map((t) => t.name);
+  const calls = [m.callIns.supply.has ? 'supply drop (R)' : '', m.callIns.strike.has ? 'artillery strike (F)' : ''].filter(Boolean);
+  const parts = [wing.length ? `Wingm${wing.length > 1 ? 'en' : 'an'}: ${wing.join(', ')}` : '', calls.length ? `Call-ins: ${calls.join(', ')}` : ''].filter(Boolean);
+  return parts.length ? `<div class="t12 dimt">${esc(parts.join(' · '))}</div>` : '';
 }

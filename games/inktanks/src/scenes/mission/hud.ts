@@ -13,6 +13,16 @@ import { SWAP_HOLD } from '../../logic/match/pickups';
 import { GADGET_NAME } from '../../logic/match/gadgets';
 import type { LandMap } from './landMap';
 import { prizeGoal } from '../../logic/match/prize';
+import { CALL_IN } from '../../logic/match/callIns';
+import { CALL_INS, type CallInKind } from '../../logic/match/types';
+import { WORLD_URLS } from '../../render/worldArt';
+import bombUrl from '../../art/pixel/world/fx/bomb.png?url';
+
+/** The call-ins' icons (generated art: the supply drop's crate, the artillery bomb), names and keys. */
+const CALL_ART: Readonly<Record<CallInKind, { readonly url: string | null; readonly name: string; readonly key: string }>> = {
+  supply: { url: WORLD_URLS.get('world:structures/supplyDrop-1') ?? null, name: 'Supply drop', key: 'R' },
+  strike: { url: bombUrl, name: 'Artillery strike', key: 'F' },
+};
 
 /** The gadget's HUD and button icon (UI art); a missing file falls back to text. */
 const gadgetPngs = import.meta.glob<string>('../../art/pixel/ui/gadget-*.png', { eager: true, query: '?url', import: 'default' });
@@ -61,6 +71,11 @@ export class Hud {
   readonly swapBtn: HTMLElement;
   readonly repairBtn: HTMLElement;
   readonly gadgetBtn: HTMLElement;
+  /** Touch buttons for the call-ins (keys R and F on a keyboard). */
+  readonly callBtns: Readonly<Record<CallInKind, HTMLElement>>;
+  private readonly calls: HTMLElement;
+  private callsShown = '';
+  private callTipped = false;
   private readonly gadget: HTMLElement;
   private readonly pops: HTMLElement;
   private popList: { el: HTMLElement; x: number; y: number; at: number }[] = [];
@@ -79,9 +94,10 @@ export class Hud {
       <div class="topright"><canvas class="mini"></canvas><div class="row"><span class="timer"></span></div></div>
       <div class="goal"></div><div class="arrow"></div>
       <div class="card"></div>
-      <div class="bottom"><div class="icons"></div><div class="hpbar"><i></i><b></b></div><span class="kits"></span><span class="gadget"></span></div>
+      <div class="bottom"><div class="icons"></div><div class="hpbar"><i></i><b></b></div><span class="kits"></span><span class="gadget"></span><span class="callins"></span></div>
       <div class="tip"></div><div class="pops"></div>
-      <button class="btn swap">Swap</button><button class="btn repair">Repair</button><button class="btn gadgetbtn"></button>`;
+      <button class="btn swap">Swap</button><button class="btn repair">Repair</button><button class="btn gadgetbtn"></button>
+      <button class="btn callbtn supply"></button><button class="btn callbtn strike"></button>`;
     this.feed = $(root, '.feed');
     this.hp = $(root, '.hpbar i');
     this.hpText = $(root, '.hpbar b');
@@ -97,6 +113,8 @@ export class Hud {
     this.repairBtn = $(root, '.repair');
     this.gadgetBtn = $(root, '.gadgetbtn');
     this.gadget = $(root, '.bottom .gadget');
+    this.calls = $(root, '.bottom .callins');
+    this.callBtns = { supply: $(root, '.callbtn.supply'), strike: $(root, '.callbtn.strike') };
     this.pops = $(root, '.pops');
     const w = 200;
     this.mini.width = w;
@@ -112,7 +130,7 @@ export class Hud {
     else if (e.kind === 'escape') {
       const t = m.tank(e.tank);
       if (t) this.line(t.role === 'crew' ? `${t.name} is home` : `<b class="red">${who(t)} got away</b>`);
-    } else if (e.kind === 'pickup' && e.what === 'intel' && m.tank(e.tank)?.isPlayer) this.blueprints(m, e.amount, e.family);
+    } else if (e.kind === 'pickup' && e.what === 'intel' && m.tank(e.tank)?.team === 0) this.blueprints(m, e.amount, e.family);
     else if (e.kind === 'pickup' && e.what === 'kit' && m.tank(e.tank)?.isPlayer) this.showTip(m, `Repair kit! ${this.useKey()} to fix your tank`);
     else if (e.kind === 'pickup' && e.what === 'gadget' && m.tank(e.tank)?.isPlayer) this.gadgetPickup(m, e.gadget ?? m.player?.gadget ?? 'mines', e.found === true, e.spare === true);
     else if (e.kind === 'ambush') this.pop(m, e.x, e.y, 'Ambush ×2');
@@ -133,6 +151,47 @@ export class Hud {
     else if (e.kind === 'weather') this.weather(m, e.what, e.in, e.storm);
     else if (e.kind === 'ice') this.pop(m, e.x, e.y, e.what === 'crack' ? (e.tank === m.player?.id ? 'The ice is cracking: get off!' : 'Ice cracking!') : 'Through the ice!');
     else if (e.kind === 'setpiece') this.pop(m, e.x, e.y, SETPIECE_POP[e.what]);
+    else if (e.kind === 'callIn') this.callInEvent(m, e.what, e.phase, e.x, e.y);
+  }
+
+  /** A call-in on the radio as it's called; the drop pops as it lands. */
+  private callInEvent(m: Match, what: CallInKind, phase: 'called' | 'landed', x: number, y: number): void {
+    if (phase === 'called') this.line(what === 'supply' ? '<b class="gold">Supply drop on the way!</b>' : `<b class="red">Artillery strike: ${CALL_IN.strike.warn} s, clear the ring!</b>`);
+    else if (what === 'supply') this.pop(m, x, y, 'Supply drop!');
+  }
+
+  /** The call-ins the rank brings: icon and key, dimmed once used this level; on a phone, a button each. */
+  private drawCallIns(m: Match): void {
+    const key = CALL_INS.map((k) => `${m.callIns[k].has}${m.callIns[k].used}${m.callIns[k].landing !== null}`).join('/') + this.touch;
+    if (key === this.callsShown) return;
+    this.callsShown = key;
+    const icon = (k: CallInKind) => {
+      const a = CALL_ART[k];
+      return a.url ? `<img src="${a.url}" alt="">` : `<i>${a.name.slice(0, 1)}</i>`;
+    };
+    this.calls.innerHTML = CALL_INS.filter((k) => m.callIns[k].has).map((k) => {
+      const c = m.callIns[k];
+      const state = c.landing ? 'coming' : c.used ? 'used' : 'on';
+      return `<span class="call ${state}" title="${CALL_ART[k].name}${c.used ? ' (used this level)' : ''}">${icon(k)}${this.touch || c.used ? '' : `<kbd>${CALL_ART[k].key}</kbd>`}</span>`;
+    }).join('');
+    for (const k of CALL_INS) {
+      const c = m.callIns[k];
+      const b = this.callBtns[k];
+      b.innerHTML = icon(k);
+      b.title = CALL_ART[k].name;
+      b.style.display = this.touch && c.has ? 'block' : 'none';
+      b.classList.toggle('off', c.used);
+    }
+  }
+
+  /** Once a mission, a word on the call-ins the rank brings. */
+  private callTip(m: Match): void {
+    if (this.callTipped || m.t < 8 || m.t > 40 || m.t < this.tipUntil) return;
+    const has = CALL_INS.filter((k) => m.callIns[k].has && !m.callIns[k].used);
+    if (has.length === 0) return;
+    this.callTipped = true;
+    const how = (k: CallInKind) => (this.touch ? `tap the ${k === 'supply' ? 'crate' : 'bomb'}` : `<kbd>${CALL_ART[k].key}</kbd>`);
+    this.showTip(m, `Call in ${has.map((k) => `${k === 'supply' ? 'a supply drop' : 'artillery'} (${how(k)})`).join(' or ')}: it lands where you aim. Once a level.`);
   }
 
   /** Sandstorms and blizzards: a warning a few seconds ahead, then a line as one rolls in and passes. */
@@ -263,6 +322,8 @@ export class Hud {
     this.drawKits(p);
     if (!this.gadgetTipped && m.t > 1.5) this.gadgetShown = '';
     this.drawGadget(m, p);
+    this.drawCallIns(m);
+    this.callTip(m);
     this.drawTips(m, p);
     this.drawPops(m, project);
     if (this.loadoutRef !== p.loadout) {
@@ -306,8 +367,8 @@ export class Hud {
     c.drawImage(this.lm.canvas, 0, 0, this.mini.width, this.mini.height);
     c.save();
     c.translate(-this.lm.x0 * s, -this.lm.y0 * s);
-    for (const k of m.objective.marks()) {
-      c.strokeStyle = k.kind === 'artillery' ? '#ff7a5a' : k.state === 'ours' || k.state === 'done' || k.kind === 'exit' || k.kind === 'pickup' ? '#8cc85a' : k.state === 'theirs' ? '#d85a3a' : '#f4ecd8';
+    for (const k of m.marks()) {
+      c.strokeStyle = k.kind === 'artillery' ? '#ff7a5a' : k.state === 'ours' || k.state === 'done' || k.kind === 'exit' || k.kind === 'pickup' || k.kind === 'drop' ? '#8cc85a' : k.state === 'theirs' ? '#d85a3a' : '#f4ecd8';
       c.lineWidth = 1.5;
       c.beginPath();
       c.arc(k.x * s, k.y * s, Math.max(3, k.r * s), 0, Math.PI * 2);

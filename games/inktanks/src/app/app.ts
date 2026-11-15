@@ -1,4 +1,5 @@
 import type { GameEvent, GameHost, OfferPlace } from '@16bitink/game-sdk';
+import { MUSIC_LEVEL, trackFor, type MusicScreen } from '../audio/musicPlan';
 import { SoundBoard } from '../audio/sound';
 import { hasLevel, installPaidLevels, levelFor } from '../content/levels';
 import { chapterOf, CHAPTERS, FREE_LEVELS, gate, type GateContext } from '../logic/campaign';
@@ -143,7 +144,14 @@ export class App {
 
   // Screens ------------------------------------------------------------
 
+  /** The music for a screen (a mission's is its chapter's track): the same track carries on across screens. */
+  private music(screen: MusicScreen, chapter = 0): void {
+    this.sound.setMusic(trackFor(screen, chapter));
+    this.sound.setMusicLevel(screen === 'mission' ? MUSIC_LEVEL.mission : MUSIC_LEVEL.screens);
+  }
+
   menu(): void {
+    this.music('menu');
     const p = this.save.progress;
     this.show(() => showMenu(this.screen, { progress: p, sound: this.save.sound, started: Object.keys(p.medals).length > 0 || p.xp > 0, note: this.note }, {
       play: () => {
@@ -162,6 +170,7 @@ export class App {
 
   map(chapter = this.mapChapter): void {
     this.endRun();
+    this.music('map');
     this.mapChapter = chapter;
     this.stage.map.showChapter(chapter);
     this.show(() => showMap(this.screen, {
@@ -201,11 +210,13 @@ export class App {
   private newMatch(n: number, playerBot = false): Match {
     const level = levelFor(n)!;
     const p = this.save.progress;
-    return new Match({ level, seed: (Date.now() + ++this.seq * 7919) % 1_000_000, player: { loadout: p.loadout, research: p.research, kits: perksOf(p.xp).repairKits, gadget: this.save.gadget, gadgetMk: p.gadgetMk }, playerBot });
+    const perks = perksOf(p.xp);
+    return new Match({ level, seed: (Date.now() + ++this.seq * 7919) % 1_000_000, player: { loadout: p.loadout, research: p.research, kits: perks.repairKits, gadget: this.save.gadget, gadgetMk: p.gadgetMk, wingmen: perks.wingmen, supplyDrop: perks.supplyDrop, strike: perks.strike }, playerBot });
   }
 
   briefing(n: number): void {
     this.endRun();
+    this.music('briefing');
     this.mapChapter = chapterOf(n).index;
     // The briefing's match is the one Start plays: its objective gives the title and the map's marks.
     const m = this.newMatch(n);
@@ -225,6 +236,7 @@ export class App {
     this.endRun();
     this.show(() => clear(this.screen));
     const def = m.level.def;
+    this.music('mission', chapterOf(def.number).index);
     const ref = { level: def.id, n: def.number, name: def.name };
     this.track({ ...ref, type: 'level_start' });
     this.run = new MissionRun(this.stage, this.hud, this.card, this.surface, m, {
@@ -268,6 +280,7 @@ export class App {
       this.offer('free_end');
     } else if (g === 'coming' && outcome.passed) next = { kind: 'none', note: `Chapter ${chapterOf(n).index + 1}, ${chapterOf(n).name}, is on its way as a free update.` };
     this.endRun();
+    this.music('results');
     this.show(() => showResults(this.screen, { def, title: m.objective.title, report: r, outcome, xpBefore: before.xp, xpAfter: progress.xp, before, after: progress, next }, {
       retry: () => this.play(this.newMatch(def.number)),
       map: () => this.map(),
@@ -280,6 +293,7 @@ export class App {
   ending(): void {
     this.endRun();
     this.sound.play({ id: 'win' });
+    this.music('ending');
     this.show(() => showEnding(this.screen, this.save.progress, {
       map: () => this.map(CHAPTERS.length - 1),
       workshop: () => this.workshop(() => this.ending(), 'Victory'),
@@ -289,6 +303,7 @@ export class App {
 
     workshop(back: () => void, backLabel: string): void {
     this.endRun();
+    this.music('workshop');
     this.show(() => showWorkshop(this.screen, this.save.progress, { change: (p) => this.setProgress(p), back, backLabel }));
   }
 

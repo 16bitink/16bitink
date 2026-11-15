@@ -3,6 +3,7 @@ import type { HullFamily, Part } from '../parts';
 import type { GadgetBag, IntelBag } from '../workshop';
 import type { Match } from './match';
 import type { Tank } from './types';
+import { wingmenOf } from './wingmen';
 
 /** A finished level, summed up for objectives, medals and the results screen. */
 export interface MatchReport {
@@ -12,6 +13,8 @@ export interface MatchReport {
   readonly reason: string;
   readonly playerAlive: boolean;
   readonly kills: number;
+  /** Tanks your wingmen destroyed: not your kills (bonuses don't count them), but they pay you rank XP. */
+  readonly squadKills?: number;
   readonly victims: Tank['victims'];
   readonly intel: IntelBag;
   readonly intelCount: number;
@@ -35,6 +38,7 @@ export function matchReport(m: Match): MatchReport {
     reason: m.over?.reason ?? 'running',
     playerAlive: p.alive,
     kills: p.kills,
+    squadKills: wingmenOf(m).reduce((n, t) => n + t.kills, 0),
     victims: p.victims,
     intel: m.intel,
     intelCount: sumIntel(m.intel),

@@ -1,4 +1,7 @@
 import { Loops } from './loops';
+import { MusicPlayer } from './music';
+import { MUSIC_LEVEL } from './musicPlan';
+import type { TrackId } from './tracks';
 import { loadSamples, SAMPLE_GAIN } from './samples';
 import { canPlay, spatial, type Cue, type SfxId, type View } from './sfx';
 import { synthesize } from './synth';
@@ -25,6 +28,9 @@ export class SoundBoard {
   private master: GainNode | null = null;
   private loopsNow: Loops | null = null;
   private loopsWanted = false;
+  private musicNow: MusicPlayer | null = null;
+  private musicWanted: TrackId | null = null;
+  private musicLevel: number = MUSIC_LEVEL.screens;
   private readonly last = new Map<string, number>();
   /** The recordings, once fetched (see samples.ts). */
   private samples: ReadonlyMap<SfxId, readonly AudioBuffer[]> = new Map();
@@ -48,6 +54,23 @@ export class SoundBoard {
   setMuted(muted: boolean): void {
     this.mutedNow = muted;
     if (this.ctx && this.master) this.master.gain.setTargetAtTime(muted ? 0 : MASTER, this.ctx.currentTime, 0.03);
+    this.syncMusic();
+  }
+
+  /** The music to play (null: none): it waits for the first gesture and for the sound to be on, and isn't fetched while muted. */
+  setMusic(id: TrackId | null): void {
+    this.musicWanted = id;
+    this.syncMusic();
+  }
+
+  /** How loud the music sits under everything else (see MUSIC_LEVEL): lower in a mission, lower still when paused. */
+  setMusicLevel(level: number): void {
+    this.musicLevel = level;
+    this.musicNow?.setLevel(level);
+  }
+
+  private syncMusic(): void {
+    this.musicNow?.play(this.mutedNow ? null : this.musicWanted);
   }
 
   /** Plays a cue: placed in the world and heard from `view`, or in the player's ear when it has no place. */
@@ -106,6 +129,8 @@ export class SoundBoard {
     document.removeEventListener('visibilitychange', this.onVisibility);
     this.loopsNow?.destroy();
     this.loopsNow = null;
+    this.musicNow?.destroy();
+    this.musicNow = null;
     void this.ctx?.close().catch(() => undefined);
     this.ctx = null;
     this.master = null;
@@ -125,6 +150,8 @@ export class SoundBoard {
     this.master.connect(this.ctx.destination);
     this.loopsNow = new Loops(this.ctx, this.master);
     this.loopsNow.setActive(this.loopsWanted);
+    this.musicNow = new MusicPlayer(this.ctx, this.master, this.musicLevel);
+    this.syncMusic();
     void loadSamples(this.ctx).then((m) => {
       if (this.ctx) this.samples = m;
     });

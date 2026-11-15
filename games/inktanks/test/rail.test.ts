@@ -42,7 +42,7 @@ describe('the Rail', () => {
     expect(Object.keys(COUNTERS.rail).sort()).toEqual(['halftracks', 'hover', 'tracks', 'wheels']);
     expect(COUNTERS.rail.tracks).toBeGreaterThan(COUNTERS.rail.hover);
     expect(partLabel({ family: 'rail', mk: 2 })).toBe('Rail Mk II');
-    expect(artKey({ family: 'rail', mk: 4 })).toBe('turretRail-mk3');
+    expect(artKey({ family: 'rail', mk: 4 })).toBe('turretRail-mk4');
     const heavy = tankStats(parseTank('cannon1/heavy1/tracks1'));
     expect(armourAgainst(heavy, 'rail')).toBe(heavy.armour);
   });

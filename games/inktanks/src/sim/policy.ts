@@ -1,7 +1,8 @@
 import { COUNTERS, counterGun } from '../logic/damage';
 import { FAMILY_VALUE } from '../logic/loot';
-import { DRIVE_FAMILIES, FAMILIES, GUN_FAMILIES, HULL_FAMILIES, TIER_BONUS, slotOf, type DriveFamily, type Family, type GunFamily, type Loadout } from '../logic/parts';
+import { DRIVE_FAMILIES, FAMILIES, GUN_FAMILIES, HULL_FAMILIES, TIER_BONUS, slotOf, type DriveFamily, type Family, type GunFamily, type Loadout, type Part } from '../logic/parts';
 import { RESEARCH_STEP, researchSteps } from '../logic/stats';
+import { perksOf } from '../logic/rank';
 import { LINES_BY_SLOT, fit, ownedPart, raiseMk, research, unlock, type Progress } from '../logic/workshop';
 
 /**
@@ -40,7 +41,11 @@ function spendOnce(p: Progress): Progress | null {
 
 function worth(p: Progress, f: Family): number {
   const part = ownedPart(p, f);
-  if (!part) return -1;
+  return part ? partWorth(p, part) : -1;
+}
+
+function partWorth(p: Progress, part: Part): number {
+  const f = part.family;
   const lines = LINES_BY_SLOT[slotOf(f)];
   const steps = lines.reduce((s, l) => s + researchSteps(p.research, f, l), 0);
   return FAMILY_VALUE[f] * TIER_BONUS[part.mk] * (1 + RESEARCH_STEP * steps);
@@ -50,7 +55,13 @@ const best = <F extends Family>(p: Progress, fams: readonly F[]): F => fams.redu
 
 /** Fits the best owned part per slot. */
 export function fitBest(p: Progress): Progress {
-  const pick = (f: Family) => ownedPart(p, f)!;
+  // A Brigadier fits a kept ace prototype when it beats the slot's best owned part.
+  const protos = perksOf(p.xp).protoParts ? p.protos : [];
+  const pick = (f: Family): Part => {
+    const own = ownedPart(p, f)!;
+    const proto = protos.filter((q) => slotOf(q.family) === slotOf(f)).reduce<Part | null>((a, q) => (!a || partWorth(p, q) > partWorth(p, a) ? q : a), null);
+    return proto && partWorth(p, proto) > partWorth(p, own) ? proto : own;
+  };
   const loadout: Loadout = { gun: pick(best(p, GUN_FAMILIES)), hull: pick(best(p, HULL_FAMILIES)), drive: pick(best(p, DRIVE_FAMILIES)) };
   const r = fit(p, loadout);
   return r.ok ? r.progress : p;

@@ -2,7 +2,7 @@ import { structureDamage } from '../damage';
 import type { ResolvedEnemy } from '../level/load';
 import type { BotRole } from '../level/types';
 import type { Match } from '../match/match';
-import type { Tank } from '../match/types';
+import type { CallInKind, Tank } from '../match/types';
 import type { Hint } from '../objectives/types';
 import type { Rng } from '../rng';
 import type { Pt } from '../vec';
@@ -80,6 +80,10 @@ export interface Brain {
   readonly lookBase: number;
   /** Lobbed guns (the Mortar) with no target in sight: the spot to shell (where it last saw you, or where a friend sees you). */
   lobAt: Pt | null;
+  /** A wingman (match/wingmen.ts): it holds fire on enemies that haven't spotted anyone until you fire or it's hit. */
+  lead?: boolean;
+  /** The player stand-in: call in a supply drop or a strike now (match/callIns.ts). */
+  callIn: CallInKind | null;
 }
 
 /** A tank on your side (role 'ally') fights within about this of you, and keeps up when further. */
@@ -99,7 +103,7 @@ export function createBrain(t: Tank, e: ResolvedEnemy | null, diff: Difficulty, 
     thinkT: rng.range(0, diff.reaction), aimNoise: 0, strafe: rng.chance(0.5) ? 1 : -1, strafeT: 0,
     lastPos: { x: t.x, y: t.y }, stuckT: 0, detourT: 0, detourAngle: 0, holdFire: false, seenCount: 0, alert: null, wantSwap: false, useKit: false, hint: null, snap: null,
     aware: alwaysAlert({ role }, t) ? 'alert' : 'calm', awareSince: 0, awareSpot: null, alertUntil: 0, lastSeen: null, coverShot: null, telegraph: null,
-    useGadget: false, coverSpot: null, lookBase: t.turret, lobAt: null,
+    useGadget: false, coverSpot: null, lookBase: t.turret, lobAt: null, callIn: null,
   };
 }
 
@@ -188,7 +192,9 @@ export function think(m: Match, b: Brain, t: Tank): void {
   b.wantSwap = false;
   b.useGadget = false;
   const shootsBack = b.role === 'convoy' || b.role === 'runner';
-  const target = shootsBack && m.t - t.lastHitAt > SHOOT_BACK ? null : pickTarget(m, b, t, seen);
+  const picked = shootsBack && m.t - t.lastHitAt > SHOOT_BACK ? null : pickTarget(m, b, t, seen);
+  // A wingman follows your lead: no opening shot on an enemy that hasn't made anyone out, until you fire or it's hit.
+  const target = picked && b.lead && !attacked && !leadOpened(m, picked) ? null : picked;
   b.target = target?.id ?? null;
   b.snap = target ? { x: target.x, y: target.y, vx: Math.cos(target.heading) * target.speed, vy: Math.sin(target.heading) * target.speed, t: m.t } : null;
   // A lob flies over walls, cover and friends: a target in sight is a target in reach.
@@ -217,6 +223,17 @@ export function think(m: Match, b: Brain, t: Tank): void {
   if (target && flees && canRepair && t.hp < t.stats.maxHp * b.diff.fleeHp && winnable < 1.2) return set(b, 'flee', null);
   if (b.role === 'player') return thinkPlayer(m, b, t, target, winnable, attacked, seen);
   thinkRole(m, b, t, target, alerted);
+}
+
+/** A wingman joins your fight once you've fired within this many seconds. */
+export const LEAD_FIRE = 4;
+
+/** Whether a wingman may open on `foe`: the player fired lately, or the foe is alert (it has spotted one of us). */
+function leadOpened(m: Match, foe: Tank): boolean {
+  const p = m.player;
+  if (p && m.t - p.firedAt < LEAD_FIRE) return true;
+  const fb = m.brains.get(foe.id);
+  return !fb || fb.aware === 'alert';
 }
 
 function thinkRole(m: Match, b: Brain, t: Tank, target: Tank | null, alerted: boolean): void {
