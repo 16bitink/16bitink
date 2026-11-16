@@ -5,13 +5,14 @@ import { drawFoodchainThumbnail, FOODCHAIN_THUMBNAILS, type FoodchainThumbnail }
 import { drawSeamonstersThumbnail, SEAMONSTERS_THUMBNAILS, type SeamonstersThumbnail } from './seamonsters/thumbnails';
 import { drawSwallowedThumbnail, SWALLOWED_THUMBNAILS, type SwallowedThumbnail } from './swallowed/thumbnails';
 import { drawSurvivalThumbnail, SURVIVAL_THUMBNAILS, type SurvivalThumbnail } from './survival/thumbnails';
+import { drawEverysizeThumbnail, EVERYSIZE_THUMBNAILS, type EverysizeThumbnail } from './everysize/thumbnails';
 import { drawSwallowyouThumbnail, SWALLOWYOU_THUMBNAILS, type SwallowyouThumbnail } from './swallowyou/thumbnails';
 
 /**
  * Dev-only page for the YouTube thumbnails (1280x720). ?set= picks the video:
  * level1 (the default: ?v=hunter|glowup|run) or descent, the first long-form
  * video (?v=split|line|layers), foodchain, the second (?v=split|nest|wrong|lunch), swallowyou, the third
- * (?v=throat|lineup|inside), or seamonsters, the fourth (?v=legend|lineup|eye), or bitecomp, the sixth (?v=split|rex|twist), or swallowed, the seventh (?v=split|balloon|cannibal), or survival, the eighth (?v=crowd|shock|ends|final). ?guides outlines the duration badge's corner.
+ * (?v=throat|lineup|inside), or seamonsters, the fourth (?v=legend|lineup|eye), or bitecomp, the sixth (?v=split|rex|twist), or swallowed, the seventh (?v=split|balloon|cannibal), or survival, the eighth (?v=crowd|shock|ends|final), or everysize, the ninth (?v=ends|you|ladder). ?guides outlines the duration badge's corner.
  * `pnpm thumbnail` saves them all as PNGs.
  */
 const SETS: Readonly<Record<string, { readonly ids: readonly string[]; readonly draw: (ctx: CanvasRenderingContext2D, id: string) => void | Promise<void> }>> = {
@@ -23,6 +24,7 @@ const SETS: Readonly<Record<string, { readonly ids: readonly string[]; readonly 
   bitecomp: { ids: BITECOMP_THUMBNAILS, draw: (c, id) => drawBitecompThumbnail(c, id as BitecompThumbnail) },
   swallowed: { ids: SWALLOWED_THUMBNAILS, draw: (c, id) => drawSwallowedThumbnail(c, id as SwallowedThumbnail) },
   survival: { ids: SURVIVAL_THUMBNAILS, draw: (c, id) => drawSurvivalThumbnail(c, id as SurvivalThumbnail) },
+  everysize: { ids: EVERYSIZE_THUMBNAILS, draw: (c, id) => drawEverysizeThumbnail(c, id as EverysizeThumbnail) },
 };
 const canvas = document.getElementById('thumbnail') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d')!;

@@ -3,6 +3,8 @@ import type { Short } from './short';
 import { createBitecompKit } from './bitecomp/kit';
 import { createBitecomp } from './bitecomp/render';
 import { createDescent } from './descent/render';
+import { createEverysizeKit } from './everysize/kit';
+import { createEverysize } from './everysize/render';
 import { createKit } from './foodchain/kit';
 import { createFoodchain } from './foodchain/render';
 import { createSeamonstersKit } from './seamonsters/kit';
@@ -24,7 +26,7 @@ import { createSurvival } from './survival/render';
  * seamonsters ("sea monsters size comparison… but every one is real") or
  * seamonsters-kit (its new drawings), bitecomp ("bite force comparison… but
  * every number is real") or bitecomp-kit (its heads), swallowed ("swallowed whole
- * size comparison… but every meal is real") or swallowed-kit (its swallows), survival ("100 fish enter a survival tournament… only one can win") or survival-kit (its cast and faces). Plays live; ?t=95 freezes one moment.
+ * size comparison… but every meal is real") or swallowed-kit (its swallows), survival ("100 fish enter a survival tournament… only one can win") or survival-kit (its cast and faces), everysize ("how long you'd last at every size in the ocean") or everysize-kit (its new drawings). Plays live; ?t=95 freezes one moment.
  * `pnpm promo -- --only long` (dev/promo/record.mjs) records it frame by frame.
  */
 const canvas = document.getElementById('promo') as HTMLCanvasElement;
@@ -86,6 +88,14 @@ const VIDEOS: Readonly<Record<string, () => Promise<Short>>> = {
   'survival-kit': async () => {
     await loadCaptionFont();
     return createSurvivalKit(ctx, params.get('only'));
+  },
+  everysize: async () => {
+    await loadCaptionFont();
+    return createEverysize(ctx);
+  },
+  'everysize-kit': async () => {
+    await loadCaptionFont();
+    return createEverysizeKit(ctx, params.get('only'));
   },
 };
 
