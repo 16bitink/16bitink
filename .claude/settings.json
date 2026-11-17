@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__claude_ai_ElevenLabs__creative_get_flow_run_status",
+      "mcp__claude_ai_ElevenLabs__creative_generate_speech"
+    ]
+  }
+}

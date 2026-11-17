@@ -15,7 +15,8 @@
  * src/assets/loops/ with scripts/loops.mjs. Runs differ (levels are seeded by the
  * clock), so check the contact sheet and re-cut with loops.mjs if the preset
  * window isn't the best part. Flags override the preset: --level --zoom
- * --skip --seconds --from --to --url.
+ * --skip --seconds --from --to --url. --out <name> names the take (promo/<name>.mp4);
+ * --no-loop keeps just the take and leaves the site's cover loop alone.
  *
  * Needs Google Chrome and ffmpeg. playwright-core comes from a game package.
  */
@@ -157,11 +158,13 @@ try {
   await browser.close();
 }
 
-const master = join(PROMO, `${slug}-gameplay.mp4`);
-const sheet = join(PROMO, `${slug}-gameplay.png`);
+const outName = option('--out') ?? `${slug}-gameplay`;
+const master = join(PROMO, `${outName}.mp4`);
+const sheet = join(PROMO, `${outName}.png`);
 const input = ['-v', 'error', '-y', '-framerate', String(FPS), '-i', join(frames, 'f%05d.png')];
 run('ffmpeg', [...input, '-c:v', 'libx264', '-crf', '12', '-preset', 'slow', '-pix_fmt', 'yuv420p', master]);
 run('ffmpeg', [...input, '-vf', `select='not(mod(n\\,${FPS}))',scale=256:-1,tile=4x${Math.ceil(seconds / 4)}`, '-frames:v', '1', sheet]);
 await rm(frames, { recursive: true, force: true });
 console.log(`wrote ${master}\nwrote ${sheet} (one frame a second, left to right)`);
-run('node', [join(HERE, '..', 'loops.mjs'), slug, master, '--from', String(from), '--to', String(to)]);
+// --no-loop: keep the take only (e.g. footage for a video), don't re-cut the site's cover loop.
+if (!args.includes('--no-loop')) run('node', [join(HERE, '..', 'loops.mjs'), slug, master, '--from', String(from), '--to', String(to)]);

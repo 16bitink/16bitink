@@ -1,0 +1,35 @@
+{
+  "title": "Gus & Pip play InkFish, episode 1 (Margin Notes)",
+  "recording": "../../../../../promo/source/2026-11-16 11-36-24.mov",
+  "cut": [
+    4.3,
+    62.3
+  ],
+  "voices": "../../../../../promo/duo/work/voices.wav",
+  "timeline": "ep1-timeline.json",
+  "words": "ep1-words.json",
+  "track": "ep1-track.json",
+  "output": "../../../../../promo/inkfish-duo-ep1.mp4",
+  "credit": "InkFish · 16bit.ink",
+  "end_card": {
+    "at": 55.45,
+    "centre": [
+      1010,
+      350
+    ]
+  },
+  "part_card": {
+    "at": 57.15,
+    "text": "PART 2?"
+  },
+  "caption_fixes": {
+    "Toldja.": "Told ya!",
+    "Derrick": "Derek",
+    "Derrick,": "Derek,",
+    "Wee,": "WHEEE!",
+    "for-": "for—",
+    "and-": "and—",
+    "And?": "AND?!",
+    "Pfft,": "Pfft,"
+  }
+}

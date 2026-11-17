@@ -1,0 +1,193 @@
+{
+  "lines": [
+    {
+      "id": "G1",
+      "who": "gus",
+      "at": 0.15,
+      "text": "Watch and learn, Pip! I'm gonna eat EVERYTHING in this ocean!",
+      "pose": "talk",
+      "rest": "neutral",
+      "other": "suspicious",
+      "start": 0.15,
+      "end": 3.817
+    },
+    {
+      "id": "P1",
+      "who": "pip",
+      "after": 0.12,
+      "text": "Gus\u2026 that striped one is TWICE your size! Swim AWAY!",
+      "pose": "puff-scared",
+      "rest": "puff-scared",
+      "other": "smug",
+      "start": 3.937,
+      "end": 7.987
+    },
+    {
+      "id": "G3",
+      "who": "gus",
+      "at": 9.0,
+      "text": "Bread? Pfft. Amateurs. Real pros go for CHIPS.",
+      "pose": "talk",
+      "rest": "smug",
+      "other": "suspicious",
+      "start": 9.0,
+      "end": 13.423
+    },
+    {
+      "id": "P3",
+      "who": "pip",
+      "at": 14.4,
+      "text": "Whoa, four in a row!",
+      "pose": "talk",
+      "rest": "laugh",
+      "other": "laugh",
+      "start": 14.4,
+      "end": 16.247
+    },
+    {
+      "id": "G4a",
+      "who": "gus",
+      "after": 0.1,
+      "text": "Told ya!",
+      "pose": "laugh",
+      "rest": "laugh",
+      "other": "laugh",
+      "start": 16.347,
+      "end": 17.606
+    },
+    {
+      "id": "G4b",
+      "who": "gus",
+      "after": 0.1,
+      "text": "So, this guy hides his chips under his HAT. Smart guy. But I've got a plan\u2026 my cousin Derek fakes a broken wing.",
+      "pose": "talk",
+      "rest": "smug",
+      "other": "suspicious",
+      "start": 17.706,
+      "end": 25.792
+    },
+    {
+      "id": "G5",
+      "who": "gus",
+      "after": 0.1,
+      "cut": 29.5,
+      "text": "Guy bends down to help Derek\u2026 hat comes off\u2026 and I go in for the\u2014",
+      "pose": "talk",
+      "rest": "hungry",
+      "other": "neutral",
+      "start": 25.892,
+      "end": 29.5
+    },
+    {
+      "id": "P5",
+      "who": "pip",
+      "at": 29.5,
+      "text": "WAIT! You grew! You're BIGGER!",
+      "pose": "talk",
+      "rest": "laugh",
+      "other": "smug",
+      "start": 29.5,
+      "end": 31.952
+    },
+    {
+      "id": "G6",
+      "who": "gus",
+      "after": 0.1,
+      "text": "Ooh\u2026 remember that striped guy from before?",
+      "pose": "talk",
+      "rest": "hungry",
+      "other": "suspicious",
+      "start": 32.052,
+      "end": 35.199
+    },
+    {
+      "id": "G7",
+      "who": "gus",
+      "at": 35.35,
+      "text": "REVENGE!",
+      "pose": "laugh",
+      "rest": "laugh",
+      "other": "horror",
+      "start": 35.35,
+      "end": 37.334
+    },
+    {
+      "id": "P7",
+      "who": "pip",
+      "after": 0.12,
+      "text": "You ATE him!",
+      "pose": "horror",
+      "rest": "horror",
+      "other": "laugh",
+      "start": 37.454,
+      "end": 38.831
+    },
+    {
+      "id": "G8",
+      "who": "gus",
+      "after": 0.12,
+      "text": "Anyway. Hat's off, chips are RIGHT there, I dive\u2026",
+      "pose": "talk",
+      "rest": "hungry",
+      "other": "neutral",
+      "start": 38.951,
+      "end": 42.48
+    },
+    {
+      "id": "P8",
+      "who": "pip",
+      "after": 0.12,
+      "text": "Did you know? Scientists found if you STARE at a gull, it takes way longer to steal your food.",
+      "pose": "talk",
+      "rest": "neutral",
+      "other": "eyeroll",
+      "start": 42.6,
+      "end": 48.323
+    },
+    {
+      "id": "G10",
+      "who": "gus",
+      "at": 48.4,
+      "text": "WHEEE! I'm FLYING again!",
+      "pose": "point",
+      "rest": "point",
+      "other": "puff-scared",
+      "start": 48.4,
+      "end": 50.638
+    },
+    {
+      "id": "P9",
+      "who": "pip",
+      "after": 0.1,
+      "text": "Fish don't FLY, Gus!",
+      "pose": "puff-scared",
+      "rest": "puff-scared",
+      "other": "laugh",
+      "start": 50.738,
+      "end": 52.325
+    },
+    {
+      "id": "G11",
+      "who": "gus",
+      "after": 0.1,
+      "text": "So the guy turns around\u2026 looks me DEAD in the eye\u2026 and\u2014",
+      "pose": "talk",
+      "rest": "neutral",
+      "other": "horror",
+      "start": 52.425,
+      "end": 56.077
+    },
+    {
+      "id": "P10",
+      "who": "pip",
+      "after": 0.1,
+      "text": "AND?!",
+      "pose": "puff-angry",
+      "rest": "puff-angry",
+      "other": "smug",
+      "start": 56.177,
+      "end": 56.821
+    }
+  ],
+  "end": 58.8
+}

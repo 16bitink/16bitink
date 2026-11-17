@@ -1,0 +1,345 @@
+{
+  "lines": [
+    {
+      "id": "L01",
+      "who": "gus",
+      "text": "Pip. Somebody stole from ME.",
+      "pose": "angry",
+      "rest": "angry",
+      "other": "nervous",
+      "start": 0.7,
+      "end": 2.944
+    },
+    {
+      "id": "L02",
+      "who": "pip",
+      "text": "Somebody stole from the BIGGEST thief on the pier? Good.",
+      "pose": "talk",
+      "rest": "laugh",
+      "other": "angry",
+      "start": 3.194,
+      "end": 7.737
+    },
+    {
+      "id": "L03",
+      "who": "gus",
+      "text": "Oi! This is serious. Every morning I hide a cone of chips under the pier. My breakfast. And for a whole month\u2026 it kept DISAPPEARING.",
+      "pose": "angry",
+      "rest": "sad",
+      "other": "eyeroll",
+      "start": 8.037,
+      "end": 17.593
+    },
+    {
+      "id": "L04",
+      "who": "pip",
+      "text": "Who would steal from YOU?",
+      "pose": "talk",
+      "rest": "actually",
+      "other": "eyeroll",
+      "start": 17.843,
+      "end": 19.427
+    },
+    {
+      "id": "L05",
+      "who": "gus",
+      "text": "Seymour. The harbour seal. Big lad, massive whiskers, smells like a fishing boat. Lies on the rocks all day pretending to sleep.",
+      "pose": "talk",
+      "rest": "scheme",
+      "other": "nervous",
+      "start": 19.727,
+      "end": 29.54
+    },
+    {
+      "id": "L06",
+      "who": "pip",
+      "text": "Seals eat fish, Gus. Fish like ME.",
+      "pose": "puff-scared",
+      "rest": "puff-scared",
+      "other": "chill",
+      "start": 29.79,
+      "end": 33.234
+    },
+    {
+      "id": "L07",
+      "who": "gus",
+      "text": "So I set a trap. I went round the back of the chip shop\u2026 and borrowed a bottle of their HOTTEST sauce. Ghost pepper. The one with the skull on it.",
+      "pose": "laugh",
+      "rest": "scheme",
+      "other": "horror",
+      "start": 33.584,
+      "end": 43.986
+    },
+    {
+      "id": "L08",
+      "who": "pip",
+      "text": "You STOLE sauce\u2026 to catch a thief?",
+      "pose": "horror",
+      "rest": "facepalm",
+      "other": "smug",
+      "start": 44.236,
+      "end": 46.966
+    },
+    {
+      "id": "L09",
+      "who": "gus",
+      "text": "BORROWED! And I soaked my chips in it. Every. Single. Day.",
+      "pose": "angry",
+      "rest": "smug",
+      "other": "disgust",
+      "start": 47.216,
+      "end": 52.212
+    },
+    {
+      "id": "L10",
+      "who": "pip",
+      "text": "Gus, you can't EAT that!",
+      "pose": "horror",
+      "rest": "horror",
+      "other": "bring-it",
+      "start": 52.412,
+      "end": 54.566
+    },
+    {
+      "id": "L11",
+      "who": "gus",
+      "text": "Ate the lot. Didn't feel a thing. Tough beak.",
+      "pose": "laugh",
+      "rest": "smug",
+      "other": "eyeroll",
+      "start": 54.816,
+      "end": 59.005
+    },
+    {
+      "id": "L12",
+      "who": "gus",
+      "text": "Then, Tuesday. I hear this SCREAM from under the pier. Seymour! Rolling around, flapping his flippers, diving into the sea with his mouth wide open!",
+      "pose": "laugh",
+      "rest": "laugh",
+      "other": "horror",
+      "start": 59.805,
+      "end": 69.706
+    },
+    {
+      "id": "L13",
+      "who": "pip",
+      "text": "Nooo! Is he okay?",
+      "pose": "horror",
+      "rest": "cry",
+      "other": "laugh",
+      "start": 69.906,
+      "end": 73.121
+    },
+    {
+      "id": "L14",
+      "who": "gus",
+      "text": "Oh, he's fine. But here's the thing. Two weeks later\u2026 he REPORTS me. To the Pier Council. For trying to POISON him.",
+      "pose": "talk",
+      "rest": "shrug",
+      "other": "horror",
+      "start": 73.421,
+      "end": 82.792
+    },
+    {
+      "id": "L15",
+      "who": "pip",
+      "text": "Wait. YOU'RE the one in trouble?!",
+      "pose": "horror",
+      "rest": "horror",
+      "other": "shrug",
+      "start": 82.992,
+      "end": 85.262
+    },
+    {
+      "id": "L16",
+      "who": "gus",
+      "text": "The Council goes, Gus, one more complaint and you're banned from the pier. For LIFE.",
+      "pose": "angry",
+      "rest": "sad",
+      "other": "cry",
+      "start": 85.562,
+      "end": 90.959
+    },
+    {
+      "id": "L17",
+      "who": "pip",
+      "text": "No pier\u2026 means no chips.",
+      "pose": "talk",
+      "rest": "cry",
+      "other": "sad",
+      "start": 91.259,
+      "end": 94.073
+    },
+    {
+      "id": "L18",
+      "who": "gus",
+      "text": "So I ask ONE question. Did Seymour admit he was eating MY chips? And the old Councillor goes\u2026 yes.",
+      "pose": "talk",
+      "rest": "scheme",
+      "other": "think",
+      "start": 94.523,
+      "end": 103.89
+    },
+    {
+      "id": "L19",
+      "who": "pip",
+      "text": "He CONFESSED?!",
+      "pose": "talk",
+      "rest": "excited",
+      "other": "smug",
+      "start": 104.09,
+      "end": 105.286
+    },
+    {
+      "id": "L20",
+      "who": "gus",
+      "text": "So I bring the sauce to the meeting. Pour it out. Everybody tastes it. And the whole Council goes\u2026 meh. Bit spicy. Totally fine.",
+      "pose": "laugh",
+      "rest": "smug",
+      "other": "suspicious",
+      "start": 105.686,
+      "end": 115.165
+    },
+    {
+      "id": "L21",
+      "who": "pip",
+      "text": "Gus\u2026 who's on the Council?",
+      "pose": "talk",
+      "rest": "think",
+      "other": "neutral",
+      "start": 115.865,
+      "end": 118.323
+    },
+    {
+      "id": "L22",
+      "who": "gus",
+      "text": "Three seagulls\u2026 and a pigeon.",
+      "pose": "talk",
+      "rest": "smug",
+      "other": "think",
+      "start": 118.673,
+      "end": 121.253
+    },
+    {
+      "id": "L23",
+      "who": "pip",
+      "text": "BIRDS! Gus, birds can't even FEEL chili heat! That's real! It's why birds happily eat chili peppers and spread the seeds, and mammals stay away!",
+      "pose": "talk",
+      "rest": "actually",
+      "other": "eyeroll",
+      "start": 121.553,
+      "end": 131.447
+    },
+    {
+      "id": "L24",
+      "who": "gus",
+      "text": "Shhh. Don't tell Seymour.",
+      "pose": "talk",
+      "rest": "scheme",
+      "other": "eyeroll",
+      "start": 131.747,
+      "end": 134.8
+    },
+    {
+      "id": "L25",
+      "who": "pip",
+      "text": "So much for the tough beak.",
+      "pose": "talk",
+      "rest": "suspicious",
+      "other": "angry",
+      "start": 135.05,
+      "end": 137.145
+    },
+    {
+      "id": "L26",
+      "who": "gus",
+      "text": "Still tough! Anyway. Case closed. Seymour stops stealing. For about a week.",
+      "pose": "angry",
+      "rest": "smug",
+      "other": "eyeroll",
+      "start": 137.445,
+      "end": 143.574
+    },
+    {
+      "id": "L27",
+      "who": "pip",
+      "text": "And then?",
+      "pose": "talk",
+      "rest": "suspicious",
+      "other": "scheme",
+      "start": 143.824,
+      "end": 144.579
+    },
+    {
+      "id": "L28",
+      "who": "gus",
+      "text": "Then he gets caught raiding a fishing boat. A WHOLE crate of mackerel. The harbour master bans him from the harbour. Gone.",
+      "pose": "laugh",
+      "rest": "cheer",
+      "other": "excited",
+      "start": 144.879,
+      "end": 152.469
+    },
+    {
+      "id": "L29",
+      "who": "pip",
+      "text": "So justice wins!",
+      "pose": "talk",
+      "rest": "excited",
+      "other": "smug",
+      "start": 152.719,
+      "end": 154.564
+    },
+    {
+      "id": "L30",
+      "who": "gus",
+      "text": "And now the chip shop sells my sauce. Gus's Revenge. Skull on the bottle. MY face on the skull.",
+      "pose": "laugh",
+      "rest": "cheer",
+      "other": "disgust",
+      "start": 155.064,
+      "end": 163.08
+    },
+    {
+      "id": "L31",
+      "who": "pip",
+      "text": "You took their sauce\u2026 and now they sell it with YOUR face on it?",
+      "pose": "horror",
+      "rest": "facepalm",
+      "other": "smug",
+      "start": 163.33,
+      "end": 167.539
+    },
+    {
+      "id": "L32",
+      "who": "gus",
+      "text": "Business, Pip. BUSINESS.",
+      "pose": "laugh",
+      "rest": "cheer",
+      "other": "eyeroll",
+      "start": 167.789,
+      "end": 171.029
+    },
+    {
+      "id": "L33",
+      "who": "pip",
+      "text": "Next time, I'M telling the story. And mine has a SHARK in it.",
+      "pose": "talk",
+      "rest": "excited",
+      "other": "bring-it",
+      "start": 171.829,
+      "end": 176.354
+    },
+    {
+      "id": "L34",
+      "who": "gus",
+      "text": "\u2026Go on then.",
+      "pose": "talk",
+      "rest": "chill",
+      "other": "excited",
+      "start": 176.654,
+      "end": 177.97
+    }
+  ],
+  "end": 182.0
+}

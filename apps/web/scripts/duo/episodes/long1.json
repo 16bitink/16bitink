@@ -1,0 +1,17 @@
+{
+  "title": "Gus & Pip: The Revenge Sauce (long-form sample)",
+  "story_source": "Premise adapted from r/ProRevenge 'A coworker was eating people's lunches so I…' (u/jamesjaceable, ~16k upvotes), retold as Gus's seaside story; the birds-can't-feel-chili twist is ours (Tewksbury & Nabhan, Nature 2001).",
+  "footage": "../../../../../promo/duo/long/work/footage.mp4",
+  "footage_has_audio": true,
+  "game_gain": 1.0,
+  "music": "../../../../../promo/duo/long/work/music.mp3",
+  "music_gain": 0.16,
+  "voices": "../../../../../promo/duo/long/work/voices.wav",
+  "timeline": "long1-timeline.json",
+  "words": "long1-words.json",
+  "output": "../../../../../promo/inkfish-duo-long-sample.mp4",
+  "credit": "InkFish · 16bit.ink",
+  "cards": [{"at": 0.2, "until": 4.2, "text": "THE REVENGE SAUCE"}],
+  "reactions": [],
+  "caption_fixes": {"Shh,": "Shhh,", "councilor": "Councillor", "council": "Council", "council?": "Council?", "council,": "Council,", "harbor": "harbour", "harbor.": "harbour."}
+}
