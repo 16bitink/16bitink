@@ -18,9 +18,11 @@ const CELL = 20;
 const BODY = 10;
 const REACH_SHARE = 0.85;
 /** Floor further than this from anything (solid, cover, zone edge) is empty walking. */
-const EMPTY_PX = 230;
-/** Campaign boards run up to 21% (p90 13%): a pattern may have no more than 15%. */
-const EMPTY_SHARE = 0.15;
+export const EMPTY_PX = 200;
+/** No more than 15% of a daily board is empty floor (remixes and patterns alike). */
+export const EMPTY_SHARE = 0.15;
+/** Solids and cover together: fewer than this and the board is bare. */
+export const MIN_PIECES = 7;
 const GLIDE_GAP = 135;
 
 const fail = (why: string): CheckResult => ({ ok: false, why });
@@ -63,19 +65,38 @@ function reachable(level: LevelDef): number {
 }
 
 /** Share of the board further than EMPTY_PX from any feature. */
-export function emptyShare(level: LevelDef): number {
-  const feats: { x: number; y: number; r: number }[] = [
+export function emptyShare(level: Pick<LevelDef, 'solids' | 'cover' | 'zones'>): number {
+  const pts = emptyPoints(level);
+  return pts.filter((p) => p.d > EMPTY_PX).length / pts.length;
+}
+
+/** A feature as a circle (rects by their short half side). */
+interface Feat { readonly x: number; readonly y: number; readonly r: number }
+
+function features(level: Pick<LevelDef, 'solids' | 'cover' | 'zones'>): Feat[] {
+  return [
     ...(level.solids ?? []).map((s) => (s.kind === 'circle' ? { x: s.x, y: s.y, r: s.r } : { x: s.x + s.w / 2, y: s.y + s.h / 2, r: Math.min(s.w, s.h) / 2 })),
     ...(level.cover ?? []),
     ...(level.zones ?? []).flatMap((z) => (z.shape === 'circle' && z.r < 400 ? [{ x: z.x, y: z.y, r: z.r }] : [])),
   ];
-  let empty = 0;
-  let all = 0;
+}
+
+/** Every sample point of the board with its distance to the nearest feature's edge. */
+export function emptyPoints(level: Pick<LevelDef, 'solids' | 'cover' | 'zones'>): { x: number; y: number; d: number }[] {
+  const feats = features(level);
+  const out: { x: number; y: number; d: number }[] = [];
   for (let y = CELL; y < BOARD.h; y += CELL * 2) for (let x = CELL; x < BOARD.w; x += CELL * 2) {
-    all++;
-    if (feats.every((f) => Math.hypot(f.x - x, f.y - y) - f.r > EMPTY_PX)) empty++;
+    out.push({ x, y, d: feats.length ? Math.min(...feats.map((f) => Math.hypot(f.x - x, f.y - y) - f.r)) : Infinity });
   }
-  return empty / all;
+  return out;
+}
+
+/** The density floor (docs/inksnake-daily.md "Generator notes"): enough pieces, and little empty floor. Canopy and water places lay their own ground. */
+export function densityOk(level: Pick<LevelDef, 'solids' | 'cover' | 'zones' | 'place'>): CheckResult {
+  if (level.place === 'rainforest' || level.place === 'reef' || level.place === 'flooded') return { ok: true };
+  if ((level.solids?.length ?? 0) + (level.cover?.length ?? 0) < MIN_PIECES) return fail('too few solids and cover');
+  if (emptyShare(level) > EMPTY_SHARE) return fail('empty floor');
+  return { ok: true };
 }
 
 /** The canopy: the start in a crown, every crown a glide from another, all of them joined. */
@@ -98,8 +119,7 @@ function canopyOk(level: LevelDef): boolean {
   return seen.size === crowns.length;
 }
 
-/** `pattern`: a generated board (remixes keep their campaign board's floor, so the empty-floor limit is for patterns). */
-export function cheapCheck(level: LevelDef, pattern = true): CheckResult {
+export function cheapCheck(level: LevelDef): CheckResult {
   try {
     parseLevel(JSON.parse(JSON.stringify(level)));
   } catch (e) {
@@ -116,6 +136,5 @@ export function cheapCheck(level: LevelDef, pattern = true): CheckResult {
   if ([...(level.nests ?? []), ...(level.spots ?? [])].some((p) => nearSolid(p.x, p.y, solids, 4))) return fail('nest or hole in a solid');
   if (reachable(level) < REACH_SHARE) return fail('board walled off');
   if (level.place === 'rainforest' && !canopyOk(level)) return fail('crowns too far apart');
-  if (level.place !== 'rainforest' && level.place !== 'reef' && level.place !== 'flooded' && pattern && emptyShare(level) > EMPTY_SHARE) return fail('empty floor');
-  return { ok: true };
+  return densityOk(level);
 }

@@ -4,6 +4,7 @@
 //   npm run gen -- --audit   (the variety audit of every frozen day)
 //   npm run gen -- --tomorrow   (rewrite every frozen day's tomorrow teaser from the day after it)
 // Frozen days (content/daily/YYYY-MM.json) are never regenerated without --force or --redo.
+// --force plans the days afresh (ignoring yesterday's teaser, but not the frozen days after them); --redo keeps a day's dials.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -88,7 +89,7 @@ async function main() {
   const opts = Object.fromEntries(['candidates', 'enough'].map((k) => [k, flag(args, `--${k}`)]).filter(([, v]) => v !== undefined).map(([k, v]) => [k, Number(v)]));
   // Plans are sequential (limits and novelty against the days before); the days run in parallel.
   const base = force && !redo ? Object.fromEntries(Object.entries(frozen).filter(([d]) => !todo.includes(d))) : frozen;
-  const plans = gen.planDates(todo, base, salts, new Set(redoDates));
+  const plans = gen.planDates(todo, base, salts, new Set(redoDates), force && !redo);
   const workers = Number(flag(args, '--workers', Math.max(1, os.cpus().length - 1)));
   const t0 = performance.now();
   const done = { ...base };

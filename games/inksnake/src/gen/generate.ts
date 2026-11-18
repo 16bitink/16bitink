@@ -167,7 +167,7 @@ export function generateDay(plan: DayPlan, book: PlaceBook, bot: BotPlay, o: Gen
       st.composed++;
       const layout = buildLayout(info, choice, rng);
       const c = compose(plan, info, book, layout, rng);
-      if (!cheapCheck(c.level, choice.kind === 'pattern').ok) {
+      if (!cheapCheck(c.level).ok) {
         st.cheapFailed++;
         continue;
       }

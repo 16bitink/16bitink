@@ -2,7 +2,7 @@ import { addDays, eventOn, seasonOf } from '@16bitink/game-sdk';
 import { describe, expect, it } from 'vitest';
 import { BOOK, dateRange, planDates } from '../dev/genDays';
 import { buildLayout, layoutFamily, layoutKey } from '../src/gen/layouts';
-import { cheapCheck } from '../src/gen/checks';
+import { cheapCheck, densityOk } from '../src/gen/checks';
 import { compose } from '../src/gen/compose';
 import { EVENT_PLANS, type DayPlan } from '../src/gen/plan';
 import { BLIZZARD_PLACES, GOLDEN_PLACES, SEASON_PLACES } from '../src/gen/places';
@@ -57,9 +57,24 @@ describe('daily plans', () => {
       const rng = createRng(1);
       const c = compose(p, BOOK[p.place], BOOK, buildLayout(BOOK[p.place], p.layouts[0]!, rng), rng);
       expect(c.level.id).toBe(`daily-${p.date}`);
-      if (cheapCheck(c.level, p.layouts[0]!.kind === 'pattern').ok) ok++;
+      if (cheapCheck(c.level).ok) ok++;
     }
     expect(ok).toBeGreaterThan(15);
     expect(byDate.get('2026-12-24')?.snake).toBe('candycane');
+  });
+});
+
+describe('density floor', () => {
+  const full = { place: 'farm' as const, solids: Array.from({ length: 5 }, (_, i) => ({ kind: 'circle' as const, look: 'rock', x: 120 + i * 180, y: 270, r: 30 })), cover: [{ look: 'grass', x: 480, y: 100, r: 50 }, { look: 'grass', x: 480, y: 450, r: 50 }] };
+  it('wants at least 7 solids and cover together, and little empty floor', () => {
+    expect(densityOk(full).ok).toBe(true);
+    expect(densityOk({ ...full, cover: [] }).ok).toBe(false);
+    expect(densityOk({ place: 'farm', solids: full.solids.slice(0, 1), cover: [], zones: [] }).ok).toBe(false);
+  });
+  it('every frozen day passes it', async () => {
+    const { DAILY_MONTHS } = await import('../content/daily/index');
+    const days = (DAILY_MONTHS as { days: Record<string, { level: Parameters<typeof densityOk>[0] }> }[]).flatMap((m) => Object.values(m.days));
+    expect(days.length).toBeGreaterThan(0);
+    for (const d of days) expect(densityOk(d.level).ok).toBe(true);
   });
 });

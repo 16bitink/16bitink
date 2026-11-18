@@ -47,8 +47,8 @@ interface EventPlan { readonly place: Place; readonly snake: SnakeId; readonly r
 /** docs/inksnake-daily.md "Events". Halloween's second day trades the night for fog. */
 export const EVENT_PLANS: Readonly<Record<EventId, EventPlan>> = {
   christmasEve: { place: 'farm', snake: 'candycane', rule: 'ice', treats: 'cookie', goal: 'feast' },
-  christmas: { place: 'barrens', snake: 'candycane', rule: 'night', treats: 'candycane', goal: 'feast' },
-  boxingDay: { place: 'farm', snake: 'candycane', rule: 'plenty', treats: 'cookie', goal: 'feast' },
+  christmas: { place: 'barrens', snake: 'candycane', rule: 'lure', treats: 'candycane', goal: 'feast' },
+  boxingDay: { place: 'mountains', snake: 'candycane', rule: 'plenty', treats: 'cookie', goal: 'feast' },
   newYearsEve: { place: 'farm', snake: 'rainbowboa', rule: 'night', treats: 'confetti', goal: 'feast' },
   newYear: { place: 'mountains', snake: 'rainbowboa', rule: 'goldRush', treats: 'confetti', goal: 'feast' },
   lunarNewYear: { place: 'mountains', snake: 'goldentree', rule: 'goldRush', treats: 'envelope', goal: 'feast' },
@@ -171,9 +171,10 @@ export function eventPlanStub(date: string): DayPlan | null {
 
 /** Layout choices for the place and snake, best first: none used within 60 days, no family within 14. */
 function chooseLayouts(info: PlaceInfo, snake: SnakeId, boss: boolean, rng: Rng, history: readonly DayPlan[], date: string, variant: number): LayoutChoice[] {
-  const recent = history.filter((p) => p.date >= addDays(date, -LAYOUT_DAYS));
-  const usedKeys = new Set(recent.flatMap((p) => p.layouts.map(layoutKey)));
-  const usedFamilies = new Set(history.filter((p) => p.date >= addDays(date, -FAMILY_DAYS)).flatMap((p) => p.layouts.slice(0, 1).map(layoutFamily)));
+  // Both sides of the day: a redo sits among frozen days that came after it too.
+  const near = (p: DayPlan, days: number) => p.date >= addDays(date, -days) && p.date <= addDays(date, days);
+  const usedKeys = new Set(history.filter((p) => near(p, LAYOUT_DAYS)).flatMap((p) => p.layouts.map(layoutKey)));
+  const usedFamilies = new Set(history.filter((p) => near(p, FAMILY_DAYS)).flatMap((p) => p.layouts.map(layoutFamily)));
   const boards = boardsFor(info, snake, boss);
   const remixes: LayoutChoice[] = boards.flatMap((b) => TRANSFORMS.map((t) => ({ kind: 'remix', board: b.id, t }) as const));
   const patterns: LayoutChoice[] = boards.flatMap((b) => SHAPES.map((shape) => ({ kind: 'pattern', shape, source: b.id, t: pickOne(rng, TRANSFORMS), variant }) as const));
@@ -191,14 +192,14 @@ function chooseLayouts(info: PlaceInfo, snake: SnakeId, boss: boolean, rng: Rng,
   return out;
 }
 
-function proposal(date: string, rng: Rng, book: PlaceBook, history: readonly DayPlan[], ahead: readonly DayPlan[], keep: KeepPlan | undefined, variant: number, relax = false): DayPlan | null {
+function proposal(date: string, rng: Rng, book: PlaceBook, history: readonly DayPlan[], ahead: readonly DayPlan[], keep: KeepPlan | undefined, variant: number, later: readonly DayPlan[], relax = false): DayPlan | null {
   const wd = weekdayOf(date);
   const season = seasonOf(date);
   const known = [...history, ...ahead];
   const ev = eventOn(date);
   if (ev) {
     const e = EVENT_PLANS[ev];
-    return { date, weekday: wd, season, event: ev, place: e.place, snake: e.snake, guest: false, goal: e.goal, rule: e.rule, treats: e.treats, layouts: chooseLayouts(book[e.place], e.snake, e.goal === 'boss', rng, history, date, variant) };
+    return { date, weekday: wd, season, event: ev, place: e.place, snake: e.snake, guest: false, goal: e.goal, rule: e.rule, treats: e.treats, layouts: chooseLayouts(book[e.place], e.snake, e.goal === 'boss', rng, [...history, ...later], date, variant) };
   }
   // Place: the season's pool, not within 3 days, the least seen lately most likely.
   // Event days ahead can leave a small winter pool nothing (4 places, farm and mountains taken by New Year): then only the next days count.
@@ -227,7 +228,7 @@ function proposal(date: string, rng: Rng, book: PlaceBook, history: readonly Day
   const fallback = relax ? DAILY_RULES.filter((r) => kinds.includes(RULE_INFO[r].kind) && ruleFits(r, info, snake, goal, season, wd)).sort((a, b) => lastUsed(a).localeCompare(lastUsed(b)))[0] : undefined;
   const rule = keep?.rule ?? weighted(rng, rules, (r) => weightOf(r, season)) ?? fallback;
   if (!rule) return null;
-  const layouts = chooseLayouts(info, snake, goal === 'boss', rng, history, date, variant);
+  const layouts = chooseLayouts(info, snake, goal === 'boss', rng, [...history, ...later], date, variant);
   if (layouts.length === 0) return null;
   return { date, weekday: wd, season, event: null, place, snake, guest: snake !== info.home, goal, rule, treats: null, layouts };
 }
@@ -245,17 +246,21 @@ export function staleness(p: DayPlan, recent: readonly DayPlan[]): number {
 
 /**
  * The plan for `date`, given every plan before it (oldest first; the last 60
- * days matter) and the event days known ahead. `salt` gives a redo other choices.
+ * days matter) and the event days known ahead. `later` are frozen days after it
+ * (a redo): their layouts count in the 60-day and 14-day limits too. `salt` gives a redo other choices.
  */
-export function planDay(date: string, book: PlaceBook, history: readonly DayPlan[], salt = 0, keep?: KeepPlan): DayPlan {
+export function planDay(date: string, book: PlaceBook, history: readonly DayPlan[], salt = 0, keep?: KeepPlan, later: readonly DayPlan[] = []): DayPlan {
   const rng = createRng((daySeed(date) + Math.imul(salt, 0x85ebca6b)) >>> 0);
   const variant = (daySeed(date) + salt) % 100_000;
-  const ahead = Array.from({ length: RULE_DAYS - 1 }, (_, i) => eventPlanStub(addDays(date, i + 1))).filter((p): p is DayPlan => p !== null);
+  // Days after: the frozen ones (a redo, a forced day) and the event days still to come.
+  const frozenAhead = later.filter((p) => p.date > date && p.date <= addDays(date, RULE_DAYS - 1));
+  const stubs = Array.from({ length: RULE_DAYS - 1 }, (_, i) => eventPlanStub(addDays(date, i + 1))).filter((p): p is DayPlan => p !== null && !frozenAhead.some((f) => f.date === p.date));
+  const ahead = [...frozenAhead, ...stubs];
   const recent = history.slice(-MEMORY_DAYS);
   let best: DayPlan | null = null;
   let bestScore = Infinity;
   for (let i = 0; i < PLAN_TRIES * 2 && !(best && i >= PLAN_TRIES); i++) {
-    const p = proposal(date, rng, book, history, ahead, keep, variant, i >= PLAN_TRIES);
+    const p = proposal(date, rng, book, history, ahead, keep, variant, later, i >= PLAN_TRIES);
     if (!p) continue;
     const score = staleness(p, recent);
     if (score < bestScore) {
