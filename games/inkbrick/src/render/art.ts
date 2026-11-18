@@ -2,7 +2,8 @@ import Phaser from 'phaser';
 import { art, ART_KEYS } from '../art/manifest';
 import type { BrickDef } from '../sim/types';
 import { CELL } from '../sim/types';
-import { inkBrickCanvas, inkCanvas, inkUrl, isInkDrawn } from './ink';
+import { inkBrickCanvas, inkCanvas, inkUrl, isInkDrawn, OWN_KEYS } from './ink';
+import { linkColour } from './ink/variety';
 
 /**
  * The one place the game asks for art: the Art agent's manifest
@@ -43,9 +44,27 @@ export function toughStage(hp: number, maxHp: number): 1 | 2 | 3 {
   return (1 + Math.round((lost / steps) * 2)) as 1 | 2 | 3;
 }
 
-/** The image for a brick in its current state (variant by index, cracks by hits lost). */
-export function brickTexture(def: BrickDef, index: number, hp: number, maxHp: number, cracked: boolean): string {
+/**
+ * Each key/gate link of a level gets its own pair look (colour and shape), in the order
+ * the level first mentions it, so two pairs never look alike.
+ */
+export function lockPairs(bricks: readonly BrickDef[]): ReadonlyMap<string, number> {
+  const m = new Map<string, number>();
+  for (const b of bricks) if ((b.kind === 'key' || b.kind === 'gate') && b.link !== undefined && !m.has(b.link)) m.set(b.link, m.size % 4);
+  return m;
+}
+
+/**
+ * The image for a brick in its current state (variant by index, cracks by hits lost).
+ * A lever leans right once its link's walls have been flipped (`flipped`); keys and
+ * gates take their pair's look from `pairs` (lockPairs).
+ */
+export function brickTexture(def: BrickDef, index: number, hp: number, maxHp: number, cracked: boolean, flipped = false, pairs?: ReadonlyMap<string, number>): string {
   const sq = def.w === def.h ? '-sq' : '';
+  if (def.kind === 'key' || def.kind === 'gate') return `brick-${def.kind}-${pairs?.get(def.link ?? '') ?? linkColour(def.link ?? '')}`;
+  if (def.kind === 'lever') return `brick-lever-${flipped ? 'r' : 'l'}-${linkColour(def.link ?? '')}`;
+  // Armour (BrickDef.armour, open levels): its own lashed driftwood, cracking like tough.
+  if ((def as BrickDef & { readonly armour?: boolean }).armour) return `brick-armour-${toughStage(hp, maxHp)}`;
   if (def.tint !== undefined) return `brick-dense${sq}`;
   switch (def.kind) {
     case 'soft':
@@ -100,7 +119,7 @@ export function surroundTexture(scene: Phaser.Scene, key: string, screenW: numbe
 export function playArtKeys(chapter: number): readonly string[] {
   const own = ART_KEYS.filter((k) => !k.startsWith('bg-') && k !== 'map');
   const c = Math.max(1, Math.min(5, chapter));
-  return [...own, `bg-${c}-board`, `bg-${c}-wide`, 'chip'];
+  return [...own, ...OWN_KEYS, `bg-${c}-board`, `bg-${c}-wide`];
 }
 
 export const boardKey = (chapter: number): string => `bg-${Math.max(1, Math.min(5, chapter))}-board`;

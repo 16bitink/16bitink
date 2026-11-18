@@ -11,6 +11,11 @@ import { BOARD_W, CELL, COLS, type BrickDef, type LevelDef } from '../sim/types'
 /** Rows the screen may use, tried in order (each pass covers the shots still free). */
 // Row 50 last: under a whirlpool low in the open water (rows 46-49).
 const SCREEN_ROWS: readonly number[] = [41, 38, 44, 50];
+/**
+ * A layers board's way in is its bottom floor's gap (row 36-38): driftwood right under it blocks
+ * every shot at the gap, not just the launch spot's, so its screen goes low, near the raft.
+ */
+export const LOW_SCREEN_ROWS: readonly number[] = [50, 47, 44];
 const SCREEN_HP = 3;
 const SCREEN_DIRECTIONS = 240;
 /** Most of a launch fan a level may leave open (under the skilled bot's aim noise). */
@@ -36,10 +41,10 @@ function freeShots(level: LevelDef): number[] {
   return out;
 }
 
-/** The level with driftwood across every free launch shot (at most a few passes). */
-export function screenLaunch(level: LevelDef): LevelDef {
+/** The level with driftwood across every free launch shot (at most a few passes), never over the `keep` cells (pearls, the friend). */
+export function screenLaunch(level: LevelDef, keep: readonly { readonly x: number; readonly y: number }[] = [], rows: readonly number[] = SCREEN_ROWS): LevelDef {
   let out = level;
-  for (const row of SCREEN_ROWS) {
+  for (const row of rows) {
     if (launchWindow(out, LAUNCH_X) <= LAUNCH_MAX) return out;
     const y = (row + 0.5) * CELL;
     const starts = new Set<number>();
@@ -48,8 +53,16 @@ export function screenLaunch(level: LevelDef): LevelDef {
       starts.add(Math.max(0, Math.min(COLS - 3, c - 1)));
     }
     const screen: BrickDef[] = [];
+    // Never over a wall, a key, gate or lever, armour, a flip wall or a shutter (only plain bricks give way).
+    const fixed = [
+      ...out.bricks.filter((b) => (b.kind !== 'soft' && b.kind !== 'tough') || b.armour || b.floe !== undefined),
+      ...(out.flips ?? []).map((f) => ({ ...f, kind: 'stone' as const })), ...(out.shutters ?? []).map((f) => ({ ...f, kind: 'stone' as const })),
+    ];
+    const blocked = (x: number) => fixed.some((b) => b.y <= row && row < b.y + b.h && x < b.x + b.w && b.x < x + 3);
     for (const x of [...starts].sort((a, b) => a - b)) {
+      if (blocked(x)) continue;
       if (screen.some((b) => x < b.x + b.w)) continue;
+      if (keep.some((k) => k.y === row && k.x >= x && k.x < x + 3)) continue;
       screen.push({ x, y: row, w: 3, h: 1, kind: 'tough', hp: SCREEN_HP });
     }
     out = { ...out, bricks: [...minus(out.bricks, screen), ...screen] };

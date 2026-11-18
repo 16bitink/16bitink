@@ -2,10 +2,12 @@ import type { DailyStanding } from '@16bitink/game-sdk';
 import { countdown, longDate, msToMidnight, tomorrowTeaser } from '../app/dates';
 import type { Look } from '../app/milestones';
 import type { Shells } from '../app/save';
+import type { GoalKind, RuleKind } from '../sim/types';
 import { ART_STYLE } from '../art/style';
 import { artUrl } from '../render/art';
 import { teaserWallUrl } from '../render/ink/teaser';
 import { clock, esc, render, shellsHtml } from './dom';
+import { ruleIcon, tomorrowLine } from './rules';
 
 /**
  * The daily's end card, the screen that brings players back: the result,
@@ -26,6 +28,12 @@ export interface DailyEndData {
   readonly totalDays: number;
   readonly newLook: Look | null;
   readonly canShare: boolean;
+  /** Tomorrow's rule and goal, from today's level (null: an older level without it). */
+  readonly tomorrow: { readonly rule: RuleKind; readonly goal: GoalKind } | null;
+  /** The day's hidden pearl: just found, found before, still hidden, or the level has none. */
+  readonly pearl: 'new' | 'had' | 'missed' | null;
+  /** Pearls found this month (counts only go up). */
+  readonly monthPearls: number;
 }
 
 export interface DailyEndActs {
@@ -63,8 +71,23 @@ function challengeHtml(d: DailyEndData): string {
   return diff >= 0 ? `<p class="gold t32">You beat the challenge by ${clock(diff)}!</p>` : `<p>${clock(-diff)} slower than the challenge. Again?</p>`;
 }
 
+/** The day's hidden pearl: found (with this month's count) or a nudge that one is out there. */
+function pearlHtml(d: DailyEndData): string {
+  if (d.pearl === null) return '';
+  const pic = `<img src="${artUrl('pearl-daily') ?? ''}" alt="">`;
+  const month = `${d.monthPearls} ${d.monthPearls === 1 ? 'pearl' : 'pearls'} this month`;
+  if (d.pearl === 'new') return `<p class="pearl-line gold">${pic}You found the hidden pearl! · ${month}</p>`;
+  if (d.pearl === 'had') return `<p class="pearl-line">${pic}Pearl found · ${month}</p>`;
+  return `<p class="pearl-line dim">${pic}A pearl is hidden on this board.</p>`;
+}
+
 function teaserHtml(d: DailyEndData): string {
   if (!d.isToday) return '';
+  const line = d.tomorrow ? tomorrowLine(d.tomorrow) : '';
+  if (line && d.tomorrow) {
+    return `<div class="row teaser" style="background:#ece0c4;border-radius:14px;padding:8px 14px;gap:14px">${ruleIcon(d.tomorrow.rule, 'tomorrow-ic')}<div class="col" style="gap:2px;text-align:left">
+    <b>${esc(line)}</b><span style="white-space:nowrap">New daily in <span data-k="cd">${countdown(msToMidnight(new Date()))}</span></span></div></div>`;
+  }
   const brumm = artUrl('brumm-smug');
   // Ink: Brumm peeks over a wall with a "?" on it (a tease; nothing of tomorrow's layout).
   const pic = ART_STYLE === 'ink' && brumm ? `<div class="tz-pic"><img class="tz-brumm" src="${brumm}" alt=""><img class="tz-wall" src="${teaserWallUrl()}" alt=""></div>` : null;
@@ -82,7 +105,7 @@ export function showDailyEnd(root: HTMLElement, d: DailyEndData, a: DailyEndActs
     <div>${shellsHtml(d.shells)}</div>
     ${d.breakIn !== null ? `<p>Broke in at ${clock(d.breakIn)}</p>` : ''}
     ${challengeHtml(d)}<div data-k="standing">${standingHtml(d)}</div>
-    ${teaserHtml(d)}${look}
+    ${pearlHtml(d)}${teaserHtml(d)}${look}
     <div class="row wrap center btns">${share}<button class="btn" data-act="again">Play again</button><button class="btn" data-act="calendar">Calendar</button><button class="btn small menu" data-act="menu">Menu</button></div>
     <a href="${SITE_CALENDAR}" target="_top" class="t18 cal-link" style="color:var(--sea)">Every game's dailies on the 16bit.ink calendar</a>
     <p class="t18 dim" data-k="copied"></p>

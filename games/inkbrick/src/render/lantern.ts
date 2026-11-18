@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { ART_STYLE } from '../art/style';
 import { BOARD_H, BOARD_W } from '../sim/types';
 import type { BoardView } from './port';
 
@@ -16,6 +17,8 @@ const RAFT_ALPHA = 0.5;
 const MAX_LIGHTS = 40;
 const MERGE_PX = 26;
 const EDGE = 0.3;
+/** Ink: the dark is the pen's own ink (a deep warm grey-black), not a blue night. */
+const DARK_RGB = ART_STYLE === 'ink' ? '27,26,31' : '4,8,14';
 
 export class Lantern {
   private readonly canvas: HTMLCanvasElement;
@@ -51,7 +54,7 @@ export class Lantern {
     const c = this.ctx;
     c.globalCompositeOperation = 'source-over';
     c.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    c.fillStyle = `rgba(4,8,14,${DARK_ALPHA})`;
+    c.fillStyle = `rgba(${DARK_RGB},${DARK_ALPHA})`;
     c.fillRect(0, 0, this.canvas.width, this.canvas.height);
     c.globalCompositeOperation = 'destination-out';
     this.light(v.paddleX, raftY, RAFT_R, RAFT_ALPHA);

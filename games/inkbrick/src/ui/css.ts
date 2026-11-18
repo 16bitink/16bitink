@@ -79,7 +79,7 @@ const CSS_INK = `
 .ikb .hud .bar { height: 14px; border: 2px solid var(--ink); border-radius: 7px 5px 8px 4px; background: #f4eddc; overflow: hidden; min-width: 90px; }
 .ikb .hud .bar i { display: block; height: 100%; background: #d6b0c0; }
 .ikb .hud .beat { color: #9a6a1a; }
-.ikb .hint { position: absolute; left: 50%; transform: translateX(-50%); z-index: 3; color: var(--ink); font-size: 30px; pointer-events: none; text-align: center; white-space: nowrap; }
+.ikb .hint { position: absolute; left: 50%; transform: translateX(-50%); z-index: 3; color: var(--ink); font-size: clamp(20px, 7vw, 30px); pointer-events: none; text-align: center; white-space: nowrap; }
 /* The calendar */
 .ikb .cal { border-collapse: separate; border-spacing: 4px; margin: 0 auto; }
 .ikb .cal th { font-size: 18px; color: var(--dim); }
@@ -138,5 +138,41 @@ const CSS_INK = `
 }
 `;
 
+/** Goals, rules and daily pearls (2026-11-18): the same in both art sets. */
+const CSS_VARIETY = `
+.ikb .rule-ic { width: 34px; height: 34px; flex: none; vertical-align: middle; }
+.ikb .rule-ic.big { width: 44px; height: 44px; }
+.ikb .rule-banner { display: flex; flex-direction: column; gap: 6px; text-align: left; padding: 8px 12px; margin-bottom: 8px; background: #f4eddc; border: 2.5px solid #1b1a1f; border-radius: 14px 9px 15px 8px; box-shadow: 0 3px 0 #1b1a1f; }
+.ikb .rb-row { display: flex; align-items: center; gap: 10px; }
+.ikb .rb-row .rule-ic { width: 46px; height: 46px; }
+.ikb .rb-row div { display: flex; flex-direction: column; line-height: 1.02; }
+.ikb .rb-row b { font-size: 28px; } .ikb .rb-row span { font-size: 21px; color: #4a443d; }
+.ikb .hint.fresh { white-space: normal; display: flex; flex-direction: column; align-items: stretch; gap: 4px; font-size: 26px; transform: translate(-50%, -50%); }
+.ikb .hint .tip { color: #6a6258; }
+.ikb .goal-k { display: flex; align-items: center; gap: 4px; flex-shrink: 0; font-size: 32px; white-space: nowrap; }
+.ikb .goal-k:empty { display: none; }
+.ikb .goal-k b { font-size: 34px; }
+.ikb .gk-ic { width: 34px; height: 34px; object-fit: contain; } .ikb .gk-ic.big { width: 44px; height: 44px; }
+.ikb .gk-stack { position: relative; display: inline-block; width: 44px; height: 44px; } .ikb .gk-stack img { position: absolute; left: 0; top: 0; }
+.ikb .hud .side .goal-k { font-size: 30px; }
+.ikb .hud .bar { position: relative; }
+.ikb .hud .bar .need { position: absolute; top: -3px; bottom: -3px; width: 3px; margin-left: -1.5px; background: #1b1a1f; }
+.ikb .hud .bar { overflow: visible; }
+.ikb .hud .bar i { border-radius: 5px 3px 6px 3px; }
+.ikb .hud .bar .need::after { content: ''; position: absolute; left: 1px; top: -9px; border: 5px solid transparent; border-left: 8px solid #c8644e; border-right: 0; }
+.ikb .hud .bar.passed i { background: #e2b04a; }
+.ikb .shell-labels { display: flex; justify-content: center; gap: 6px; font-size: 17px; color: #6a6258; }
+.ikb .shell-labels span { width: 110px; text-align: center; line-height: 1; }
+.ikb .tomorrow-ic { width: 52px; height: 52px; flex: none; }
+.ikb .cal td .pearl-mark { position: absolute; right: -5px; top: -7px; width: 22px; height: 22px; }
+.ikb .pearl-line { display: flex; align-items: center; justify-content: center; gap: 6px; }
+.ikb .pearl-line img { width: 26px; height: 26px; }
+@media (max-width: 600px), (max-height: 500px) {
+  .ikb .rb-row b { font-size: 26px; } .ikb .rb-row span { font-size: 20px; }
+  .ikb .hud .strip { padding: 0 6px; gap: 6px; }
+  .ikb .shell-labels span { width: 92px; font-size: 15px; }
+}
+`;
+
 /** The screens' style sheet for the active art set (src/art/style.ts). */
-export const CSS = ART_STYLE === 'ink' ? CSS_INK : CSS_PAINT;
+export const CSS = (ART_STYLE === 'ink' ? CSS_INK : CSS_PAINT) + CSS_VARIETY;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { inkbrickDaily, inkbrickDailyDates } from '../content/daily';
-import { dateRange, weekday } from '../src/gen/calendar';
+import { addDays, dateRange, weekday } from '../src/gen/calendar';
 import { cheapCheck, unreachableBricks } from '../src/gen/checks';
 import { compose } from '../src/gen/compose';
 import { planDays } from '../src/gen/plan';
@@ -101,6 +101,18 @@ describe('frozen dailies', () => {
     expect(level?.number).toBe(0);
     expect(inkbrickDaily('2019-01-01')).toBeNull();
     expect(weekday('2026-11-22')).toBe(0);
+  });
+
+  it("every frozen day has a rule, a hidden pearl and tomorrow's teaser, true to the next day", () => {
+    for (const d of dates) {
+      const level = inkbrickDaily(d)!;
+      expect(level.rule, d).toBeDefined();
+      expect(level.dailyPearl, d).toBeDefined();
+      expect(level.tomorrow, d).toBeDefined();
+      expect(level.goal === 'stones', d).toBe(false);
+      const next = inkbrickDaily(addDays(d, 1));
+      if (next) expect(level.tomorrow, d).toEqual({ rule: next.rule, goal: next.goal ?? 'clear' });
+    }
   });
 
   it('every frozen day loads, is in budget and reaches every brick', () => {

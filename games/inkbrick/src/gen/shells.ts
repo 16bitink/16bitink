@@ -28,8 +28,14 @@ export interface Shell {
   readonly payoffCol?: number;
   /** Rows reserved for the core's x3 shells. */
   readonly core?: Rect;
-  /** A sealed chamber past the last turn (maze, nested): packed with x3 shells and kegs. */
+  /** A sealed chamber past the last turn (maze, nested, layers): packed with x3 shells and kegs. */
   readonly chamber?: Rect;
+  /** layers: every floor's gap, lowest first (shutters, flip walls). */
+  readonly gaps?: readonly Rect[];
+  /** open: the armour's rectangles (driftwood hp 3 or ice, `armour: true`), and what they enclose. */
+  readonly armour?: readonly Rect[];
+  /** open: the payload inside the armour (x3 core, keg web or ice). */
+  readonly payloads?: readonly Rect[];
 }
 
 const COLS = 36;
@@ -206,6 +212,95 @@ function nested(plan: DayPlan, rng: Rng): Shell {
   };
 }
 
+/**
+ * Layers (Level 23, The Winding Way): full-width stone floors with their gaps on alternating
+ * sides near the walls; a 3-row band of bricks in each corridor with empty rows above and below
+ * it (the stone runs along the band), and a sealed top room past the last gap packed with x3
+ * shells and kegs. The gaps may become trap doors, flip walls, a spinner or a whirlpool (twists).
+ */
+function layers(plan: DayPlan, rng: Rng): Shell {
+  const k = Math.min(INSIDE_PROBE - 1, plan.holeW);
+  const floors = plan.size === 'short' ? 2 : 3;
+  const spacing = plan.size === 'big' ? 8 : pick(rng, [7, 8]);
+  const bottom = (plan.size === 'short' ? 30 : randInt(rng, 36, 38)) - (floors === 3 && spacing === 8 ? 0 : 0);
+  let left = rng() < 0.5;
+  const walls: BrickDef[] = [];
+  const gaps: Rect[] = [];
+  const fills: Rect[] = [];
+  for (let f = 0; f < floors; f++) {
+    const row = bottom - f * spacing;
+    const gx = left ? randInt(rng, 3, 6) : COLS - randInt(rng, 3, 6) - k;
+    walls.push(stone(0, row, gx, 1), stone(gx + k, row, COLS - gx - k, 1));
+    gaps.push({ x: gx, y: row, w: k, h: 1 });
+    // The corridor above this floor (between it and the next): a band of bricks, a run above and below.
+    if (f < floors - 1) fills.push({ x: 0, y: row - spacing + 2, w: COLS, h: spacing - 5 });
+    left = !left;
+  }
+  const top = bottom - (floors - 1) * spacing;
+  const g0 = gaps[0]!;
+  return {
+    walls, fills, gaps,
+    chamber: { x: 0, y: TOP, w: COLS, h: top - 3 - TOP },
+    field: bandWithLane(bottom + 2, fieldRows(plan, rng), g0.x, k),
+    pocket: { x: COLS / 2, y: bottom - 1 },
+    window: { ...g0, side: 'bottom' },
+    payoffRow: bottom - spacing + 2,
+  };
+}
+
+/** Rows of armour (driftwood, 3 hits) the open layout stacks; a stone needs to chew through them (2 rows doubled the break-in: 60 s skilled). */
+const ARMOUR_ROWS = 1;
+/** Empty rows between the armour and the payload's face (the band's are TOP-relative: row - TOP - 3). */
+const OPEN_RUN = 3;
+
+/**
+ * Open: no stone at all. The way in is breakable armour (`armour: true`): a full-width band
+ * under the payload (the wall made of driftwood), two pods flush with the side walls (no corridor
+ * between pod and edge, so their insides count), or a ring in the middle. The payload inside is
+ * an x3 core, a keg web or an ice sheet (compose decides).
+ */
+function open(plan: DayPlan, rng: Rng): Shell {
+  const shape = pick(rng, ['band', 'band', 'pods', 'ring'] as const);
+  if (shape === 'band') {
+    const row = sized(plan, 14, [15, 18], 19, rng);
+    return {
+      walls: [], fills: [], armour: [{ x: 0, y: row, w: COLS, h: ARMOUR_ROWS }],
+      payloads: [{ x: 0, y: TOP, w: COLS, h: row - TOP - OPEN_RUN }],
+      field: [{ x: 0, y: row + ARMOUR_ROWS + 2, w: COLS, h: fieldRows(plan, rng) }].filter((r) => r.h > 0),
+      pocket: { x: COLS / 2, y: row - 1 }, payoffRow: TOP,
+    };
+  }
+  if (shape === 'pods') {
+    const w = randInt(rng, 12, 14);
+    const h = sized(plan, 12, [13, 15], 16, rng);
+    const y = randInt(rng, 5, 8);
+    const pod = (x: number): Rect[] => [
+      { x, y: y + h - ARMOUR_ROWS, w, h: ARMOUR_ROWS }, { x, y, w, h: 1 },
+      x === 0 ? { x: w - 1, y: y + 1, w: 1, h: h - 1 - ARMOUR_ROWS } : { x, y: y + 1, w: 1, h: h - 1 - ARMOUR_ROWS },
+    ];
+    // The pods are the side walls' own: the board's edge closes them.
+    const leftArm = pod(0).map((r) => (r.w === 1 ? r : { ...r, w }));
+    const rightArm = pod(COLS - w);
+    return {
+      walls: [], fills: [], armour: [...leftArm, ...rightArm],
+      payloads: [{ x: 0, y: y + 1, w: w - 1, h: h - 1 - ARMOUR_ROWS - OPEN_RUN }, { x: COLS - w + 1, y: y + 1, w: w - 1, h: h - 1 - ARMOUR_ROWS - OPEN_RUN }],
+      field: [{ x: w + 1, y: TOP, w: COLS - 2 * w - 2, h: y + h - TOP }, { x: 0, y: y + h + 2, w: COLS, h: fieldRows(plan, rng) }].filter((r) => r.h > 0 && r.w >= 3),
+      pocket: { x: 2, y: y + h - ARMOUR_ROWS - 1 }, payoffRow: y + 1,
+    };
+  }
+  const w = pick(rng, [18, 20, 22]);
+  const h = sized(plan, 12, [13, 15], 16, rng);
+  const x = (COLS - w) / 2;
+  const y = randInt(rng, 6, 9);
+  return {
+    walls: [], fills: [],
+    armour: [{ x, y, w, h: 1 }, { x, y: y + h - ARMOUR_ROWS, w, h: ARMOUR_ROWS }, { x, y: y + 1, w: 1, h: h - 1 - ARMOUR_ROWS }, { x: x + w - 1, y: y + 1, w: 1, h: h - 1 - ARMOUR_ROWS }],
+    payloads: [{ x: x + 1, y: y + 1, w: w - 2, h: h - 1 - ARMOUR_ROWS - OPEN_RUN }],
+    field: [{ x: 0, y: TOP, w: COLS, h: Math.max(0, y - 2 - TOP) }, ...wings(x, y, w, h, rng() < 0.5, rng)].filter((r) => r.h > 0),
+    pocket: { x: x + 2, y: y + h - ARMOUR_ROWS - 1 }, payoffRow: y + 1,
+  };
+}
+
 export function buildShell(plan: DayPlan, rng: Rng): Shell {
   switch (plan.layout) {
     case 'vault':
@@ -226,5 +321,9 @@ export function buildShell(plan: DayPlan, rng: Rng): Shell {
       return core(plan, rng);
     case 'nested':
       return nested(plan, rng);
+    case 'layers':
+      return layers(plan, rng);
+    case 'open':
+      return open(plan, rng);
   }
 }

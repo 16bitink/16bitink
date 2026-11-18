@@ -39,10 +39,21 @@ export interface RunSpec {
   readonly soundOn: boolean;
 }
 
-export const shellsFor = (o: PlayOutcome, par: number): Shells => {
+/**
+ * The three shells for a play (docs/inkbrick-design.md, the goals' shells table):
+ * most goals are win / no heart lost / under par; Few Stones is the share
+ * broken: at least `need`, halfway from `need` to everything, and everything.
+ */
+export function shellsFor(o: PlayOutcome, level: Pick<LevelDef, 'par' | 'goal' | 'need'>): Shells {
   const won = o.result === 'win';
-  return [won, won && o.heartsLost === 0, won && o.seconds <= par];
-};
+  if (level.goal === 'stones') {
+    const need = level.need ?? 0;
+    const share = o.share ?? 0;
+    const eps = 1e-6;
+    return [won || share + eps >= need, share + eps >= (need + 1) / 2, share + eps >= 1];
+  }
+  return [won, won && o.heartsLost === 0, won && o.seconds <= level.par];
+}
 
 export class PlayRun {
   private readonly scene: PlayScene;

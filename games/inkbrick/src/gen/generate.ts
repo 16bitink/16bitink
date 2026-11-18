@@ -60,16 +60,16 @@ function withPar(level: LevelDef, metrics: Metrics): LevelDef {
 const MAX_HOLE = 4;
 
 /** How far a measured candidate is from the day: misses first, then distance and the novice pull. */
-export function dayScore(metrics: Metrics, weekday: number): number {
-  const verdicts = judge(metrics, dailyTargets(weekday));
+export function dayScore(metrics: Metrics, weekday: number, level?: LevelDef): number {
+  const verdicts = judge(metrics, dailyTargets(weekday, level));
   const misses = verdicts.filter((v) => v.pass === false || v.pass === null).length;
   const nc = metrics.noviceClear;
   const pull = nc === null ? 1 : Math.abs(nc - (DAILY_NOVICE_AIM[weekday] ?? 0.7));
   return misses + DISTANCE_SHARE * distance(verdicts, WEIGHTS) + NOVICE_PULL * pull;
 }
 
-function missCount(metrics: Metrics, weekday: number): number {
-  return judge(metrics, dailyTargets(weekday)).filter((v) => v.pass === false).length;
+function missCount(metrics: Metrics, weekday: number, level: LevelDef): number {
+  return judge(metrics, dailyTargets(weekday, level)).filter((v) => v.pass === false).length;
 }
 
 /** Nothing passed the cheap checks (the 2% aim floor is hard): widen the hole a cell and try again. */
@@ -79,7 +79,7 @@ export function generateDay(plan: DayPlan, o: GenOptions = {}): DailyEntry {
     for (let round = 0; round <= (o.rounds ?? 1); round++) {
       const entry = generateWith(p, o, (o.salt ?? 0) + round * ROUND_SALT);
       if (entry && (!best || entry.score < best.score)) best = entry;
-      if (best && missCount(best.metrics, plan.weekday) <= MISS_OK) return best;
+      if (best && missCount(best.metrics, plan.weekday, best.level) <= MISS_OK) return best;
       if (!entry) break;
     }
     if (!best && p.holeW >= MAX_HOLE) best = generateWith(p, o, o.salt ?? 0, true);
@@ -94,7 +94,7 @@ interface Played { readonly k: number; readonly level: LevelDef; readonly metric
 
 function play(level: LevelDef, k: number, runs: number, weekday: number): Played {
   const m = measureLevel(level, { runs, seed: k + 1, maxSeconds: GEN_MAX_SECONDS });
-  return { k, level, metrics: m.metrics, score: dayScore(m.metrics, weekday) };
+  return { k, level, metrics: m.metrics, score: dayScore(m.metrics, weekday, level) };
 }
 
 /** `relaxed`: the last resort, any aim window over the design's 2% floor. */

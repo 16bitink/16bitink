@@ -29,6 +29,12 @@ export interface RunResult {
   /** Seconds from 95% broken to the clear (-1: not reached). */
   readonly hunt: number;
   readonly peakBalls: number;
+  /** Share of the breakable bricks broken at the end. */
+  readonly share: number;
+  /** Rising Tide floods. */
+  readonly floods: number;
+  /** The daily's hidden pearl was found. */
+  readonly pearlFound: boolean;
 }
 
 /** Breakable bricks with a cell inside (all breakable bricks when none is). */
@@ -71,6 +77,7 @@ export function runBot(level: LevelDef, kind: BotKind, seed: number, aim: Aimer 
   return {
     bot: kind, cleared, time: s.elapsed, heartsLost: s.heartsLost, breakInAt: s.breakInAt,
     cascade, drought, hunt: cleared && huntFrom >= 0 ? s.elapsed - huntFrom : -1, peakBalls: s.peakBalls,
+    share: s.brokenShare, floods: s.floods, pearlFound: s.dailyPearlFound,
   };
 }
 
@@ -103,9 +110,17 @@ export interface MeasureOptions {
   readonly maxSeconds?: number;
 }
 
-/** True when the level has an inside (a vault, or behind a wall): its hole is measured even when no shot finds it. */
+/** True when the level has an inside (a vault, behind a wall, or inside armour): its break-in is measured. */
 export function hasInside(level: LevelDef): boolean {
   return insideMask(wallMask(level)).some((v) => v === 1);
+}
+
+/**
+ * True when stone (not armour) makes the inside: only then is there a hole to aim at. An open
+ * level's way in is breakable, so its aim window reads n/a (docs/inkbrick-design.md).
+ */
+export function hasStoneInside(level: LevelDef): boolean {
+  return insideMask(wallMask(level, false)).some((v) => v === 1);
 }
 
 export function summarize(level: LevelDef, runs: readonly RunResult[], aim: number): Metrics {
@@ -116,18 +131,26 @@ export function summarize(level: LevelDef, runs: readonly RunResult[], aim: numb
   const decent = of('decent');
   const novice = of('novice');
   const boss = level.boss;
+  const goal = level.goal ?? 'clear';
+  // The clock only matters while the board has to be cleared; Few Stones is judged by the share.
+  const timed = goal !== 'stones';
+  const hunts = !boss && (goal === 'clear' || goal === 'tide');
+  const skilled = of('skilled');
   return {
-    aimWindow: hasHole ? aim : null,
+    aimWindow: hasHole && hasStoneInside(level) ? aim : null,
     breakInNovice: bi('novice'),
     breakInSkilled: bi('skilled'),
     // A boss level is won on hits, not bricks: no cascade and no last-brick hunt there.
     cascade: hasHole && !boss ? median(decent.filter((r) => r.breakInAt >= 0).map((r) => r.cascade)) : null,
     drought: median(decent.map((r) => r.drought)),
-    clearSkilled: median(of('skilled').filter((r) => r.cleared).map((r) => r.time)),
+    clearSkilled: timed ? median(skilled.filter((r) => r.cleared).map((r) => r.time)) : null,
     noviceClear: novice.length ? novice.filter((r) => r.cleared).length / novice.length : null,
-    hunt: boss ? null : median(decent.filter((r) => r.hunt >= 0).map((r) => r.hunt)),
+    hunt: hunts ? median(decent.filter((r) => r.hunt >= 0).map((r) => r.hunt)) : null,
     bossHits: boss ? boss.hits : null,
-    luckCV: cv(decent.filter((r) => r.cleared).map((r) => r.time)),
+    luckCV: timed ? cv(decent.filter((r) => r.cleared).map((r) => r.time)) : null,
+    shareSkilled: goal === 'stones' ? median(skilled.map((r) => r.share)) : null,
+    floods: goal === 'tide' ? median(decent.map((r) => r.floods)) : null,
+    pearlFound: level.dailyPearl && decent.length ? decent.filter((r) => r.pearlFound).length / decent.length : null,
     bricks: level.bricks.length,
     peakBalls: runs.reduce((m, r) => Math.max(m, r.peakBalls), 0),
   };

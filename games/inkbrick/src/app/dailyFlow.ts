@@ -30,6 +30,10 @@ export interface DailyApp {
   track(e: GameEvent): void;
   /** Ends any run and clears the screens (before a card that replaces the game). */
   endRun(): void;
+  /** The daily's hidden pearl was found on `date` (saved with the day; counters only go up). */
+  foundPearl(date: string): void;
+  /** Dates whose hidden pearl was found. */
+  pearls(): readonly string[];
 }
 
 export class DailyFlow {
@@ -73,12 +77,15 @@ export class DailyFlow {
 
   private async ended(level: LevelDef, date: string, beat: number | null, o: PlayOutcome): Promise<void> {
     const today = this.today();
-    const shells = shellsFor(o, level.par);
+    const shells = shellsFor(o, level);
     const before = this.app.totalDays();
     const won = o.result === 'win';
+    if (o.dailyPearl) this.app.foundPearl(date);
     let d: DailyEndData = {
       date, isToday: date === today, won, seconds: o.seconds, breakIn: o.breakIn, shells, standing: undefined,
       challenge: beat, totalDays: before, newLook: null, canShare: typeof navigator.share === 'function',
+      tomorrow: level.tomorrow ?? null, pearl: level.dailyPearl ? (this.app.pearls().includes(date) ? (o.dailyPearl ? 'new' : 'had') : 'missed') : null,
+      monthPearls: this.monthPearls(date),
     };
     this.cleanup = showDailyEnd(this.app.card, d, {
       share: () => void this.share(date, o.seconds),
@@ -101,6 +108,12 @@ export class DailyFlow {
         menu: () => this.app.menu(),
       });
     } else updateStanding(this.app.card, d);
+  }
+
+  /** Pearls found this month (the month of `date`). */
+  private monthPearls(date: string): number {
+    const prefix = date.slice(0, 8);
+    return this.app.pearls().filter((p) => p.startsWith(prefix)).length;
   }
 
   private async record(play: Parameters<DailyHost['record']>[0]): Promise<DailyStanding | null> {
@@ -162,7 +175,7 @@ export class DailyFlow {
     const [days, total] = await Promise.all([this.history(), this.fetchTotal(this.app.totalDays())]);
     this.app.setTotalDays(total);
     const m = this.month;
-    showCalendar(this.app.card, { today, year: m.year, month0: m.month0, days, totalDays: total, owned: this.app.owned }, {
+    showCalendar(this.app.card, { today, year: m.year, month0: m.month0, days, totalDays: total, owned: this.app.owned, pearls: this.app.pearls() }, {
       play: (date) => void this.open(date),
       locked: () => this.missed(),
       month: (delta) => {

@@ -1,6 +1,6 @@
 /** What breaking things does: x3 splits, keg blasts and chains, ice waves, keys opening gates, pickups. */
 import {
-  BALL_R, FIRE_SECONDS, ICE_DELAY, KEG_CHAIN_DELAY, KEG_RADIUS, MAX_BALLS, PADDLE_H, PADDLE_Y,
+  FIRE_SECONDS, ICE_DELAY, KEG_CHAIN_DELAY, KEG_RADIUS, MAX_BALLS, PADDLE_H, PADDLE_Y,
   PICKUP_FALL, PICKUP_H, PICKUP_W, PLUS3_SPREAD_DEG, SPLIT_DEG, WIDE_SECONDS,
 } from './constants';
 import { cellIndex, forEachCell } from './grid';
@@ -25,11 +25,13 @@ export function breakBrick(w: World, i: number, ball: Ball | null, effects = tru
   if (!b.alive) return;
   b.alive = false;
   b.hp = 0;
+  b.revealed = true;
   clearCells(w, b);
   const c = centre(b);
   w.events.push({ type: 'break', brick: i, kind: b.kind, x: c.x, y: c.y });
   if (!b.breakable) return;
   w.breakableLeft--;
+  w.brokenShare = 1 - w.breakableLeft / w.breakableTotal;
   w.lastBreakAt = w.elapsed;
   if (!effects) return;
   switch (b.kind) {
@@ -62,6 +64,10 @@ export function hitBrick(w: World, i: number, ball: Ball): void {
   else {
     const c = centre(b);
     w.events.push({ type: 'hit', brick: i, x: c.x, y: c.y });
+    if (!b.revealed) {
+      b.revealed = true;
+      w.events.push({ type: 'reveal', brick: i });
+    }
   }
 }
 
@@ -145,7 +151,7 @@ function catchPickup(w: World, kind: 'wide' | 'plus3' | 'fireball'): void {
   else if (kind === 'fireball') w.fireLeft = FIRE_SECONDS;
   else {
     const x = w.paddle.x;
-    const y = PADDLE_Y - BALL_R;
+    const y = PADDLE_Y - w.ballRadius;
     for (const deg of [-PLUS3_SPREAD_DEG, 0, PLUS3_SPREAD_DEG]) {
       if (w.balls.length >= MAX_BALLS) break;
       w.balls.push(newBall(x, y, w.speed * sinDeg(deg), -w.speed * cosDeg(deg)));

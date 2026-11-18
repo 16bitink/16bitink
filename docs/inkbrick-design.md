@@ -131,6 +131,17 @@ export type SimEvent =
 | Luck: spread of the decent bot's clear times | coefficient of variation ≤ 0.5 |
 | Budget | ≤ 1,500 bricks; ≤ 300 balls |
 
+**Per goal** (2026-11-18, `goalTargets()` in `src/sim/targets.ts`; everything not named is as above):
+
+| Goal | Clear time becomes | Dropped | Added |
+|---|---|---|---|
+| `rescue` | time to the rescue, skilled 30–90 s | last-brick hunt | |
+| `pearls` | time to the last pearl, skilled 40–100 s | last-brick hunt | |
+| `stones` | (no clock) | clear time, hunt, luck | novice clears = novice reaches `need`; skilled median share broken ≥ (need + 1) / 2 |
+| `tide` | as clear | | floods (decent bot, median) ≤ 1 |
+
+On `open` levels (armour, no stone) the aim window is n/a; break-in and cascade count from the armour's inside.
+
 - **Lab** (`npm run lab -- <level|date>`): an ASCII board, the aim window, and the bots' numbers against the targets in one call. Content agents measure with it, never with probe tests.
 
 ## The daily level
@@ -208,6 +219,143 @@ export interface DailyDay { date: string; result: 'win' | 'lose'; late: boolean;
 - Server: `dailyPlays` collection, one record per player (visitor id or user id), game and date; `late` is true when played after that date. Percentiles come from the same date's records. `/api/daily/[game]?date=` serves the level: today's for everyone (any date within the range of real time zones, UTC−12 to UTC+14), past dates to owners, future dates never.
 - Daily content: `games/inkbrick/content/daily.ts` exports `inkbrickDaily(date): unknown | null`, read by `apps/web/src/games/daily.server.ts`, like paid content.
 - Dev harness: a local `DailyHost` reading the content files and localStorage.
+
+## Variety: goals, rules of the day, new pieces (2026-11-18)
+
+The owner's playtest: levels feel too alike, because every level is "break in, then clear everything" under the same rules. What other games do (research 2026-11-18: Ricochet, Arkanoid vs Space Invaders, Shatter, Holedown, DX-Ball 2, Peggle, and the daily climbs of Slay the Spire, Spelunky and Caveblazers): vary the **goal**, add **pieces** with their own behaviour, and give every daily a **rule of its own** so players come back to see today's twist. The owner chose all of it for launch (Sunday 2026-11-22).
+
+### Goals (`LevelDef.goal`, default `'clear'`)
+
+Every goal ends in a set piece, never a bare counter.
+
+| Goal | Fields | Win | Fail | Shells (1 / 2 / 3) |
+|---|---|---|---|---|
+| `clear` | none | every breakable brick gone (crumble rule as before) | out of hearts | clear / no heart lost / under par |
+| `rescue` | `rescue: { x, y, who }` (cells, a 2 × 2 friend: `'crab' \| 'pup' \| 'puffin'`), usually inside a vault | a ball touches the friend: it's freed and swims or flies to Skip's raft | out of hearts | rescue / no heart lost / under par |
+| `pearls` | `pearls: { x, y }[]` (3–5 cells; a pearl is a pass-through pickup, no bounce) | every pearl collected | out of hearts | collect / no heart lost / under par |
+| `stones` (Few Stones) | `stones: n` (3–6), `need: 0..1` | the share of breakable bricks broken when the last stone falls (or all gone) is ≥ `need` | below `need` | ≥ need / ≥ (need + 1) / 2 / everything |
+| `tide` (Rising Tide) | `tide: { every, line }` (seconds per step, the danger row) | as `clear` | out of hearts | as `clear` |
+
+- **Few Stones:** no hearts; each launch spends a stone; HUD shows stones left and the share broken. The clock doesn't matter for shells. **Not used in dailies** (the website ranks dailies by time).
+- **Rising Tide:** every `every` seconds of play (not aim), every brick and stone that isn't part of the border wall moves down one cell. Moving pieces' anchors move with it. When any brick reaches row `line`, a heart is lost and the whole field rises back 6 cells. Bricks never overlap the raft.
+- `rescue` and `pearls` don't need the board cleared, so the break-in is the payoff. Bricks still give the cascade.
+
+### Rules (`LevelDef.rule`, at most one per level; every daily has exactly one)
+
+The rule's name and line are shown before the level ("Strong Current: the sea pushes the stone sideways") and in the daily's tomorrow teaser.
+
+| Rule | Effect (deterministic) | Kind |
+|---|---|---|
+| `current` | a constant sideways pull on every ball (`ruleDir` ±1, about 120 px/s²), with the ball's speed kept constant, so paths curve | hard |
+| `heavy` | a downward pull (about 160 px/s²), speed kept constant | hard |
+| `speedy` | ball speed ×1.25 | hard |
+| `tinyRaft` | raft 60 px (wide pickup 100) | hard |
+| `oneHeart` | 1 heart | hard |
+| `fog` | the `dark` lantern | hard |
+| `slow` | ball speed ×0.85 | easy |
+| `wideRaft` | raft 130 px | easy |
+| `bigStone` | ball radius ×1.6 (also against bricks) | easy |
+| `sticky` | the raft catches the stone; it's thrown again on tap or after 1.5 s; **the clock keeps running** (only a lost heart stops it) | easy |
+| `twoStones` | every launch throws two stones, mirrored about straight up | spectacle |
+| `ghost` | after each raft hit the stone passes through the first brick it breaks | spectacle |
+| `goldRush` | about 12% of soft bricks become x3 (applied by the generator to the level's bricks, no engine change) | spectacle |
+| `kegDay` | about 10% of soft bricks become kegs (generator, as `goldRush`) | spectacle |
+
+### New pieces
+
+| Piece | Fields | Behaviour |
+|---|---|---|
+| Bumper | `bumpers: { x, y, r }[]` (centre in px, r 14–24 px) | round, unbreakable; reflects the ball off its normal and adds a kick (speed kept), with an event `bump` |
+| Lever | brick kind `'lever'` with `link`; `flips: { x, y, w, h, link, on }[]` | a lever is never broken; each hit (0.4 s cooldown) toggles every flip wall with its link between solid and open. The render shows open walls as a dashed outline |
+| Hidden brick | `BrickDef.hidden: true` | plays normally but isn't drawn until its first hit (a faint shimmer every few seconds hints at it) |
+| Crab | `crabs: { y, x0, x1, speed, phase }[]` (cells; a 3 × 2 box walking on a row) | solid and unbreakable; it moves the ball's bounce like a moving stone; scuttles faster for 1 s after a hit |
+
+### New layouts, and fewer boxes in the middle (owner, 2026-11-18)
+
+"Too many levels with the square in the centre." 23 of the 45 non-boss levels were a stone box in the middle (vault, guarded, nested, core).
+
+**New rule:** at most **2 centre-box levels per chapter** (10 of 45). Two new layouts take their place:
+
+| Layout | The hard start | The payoff |
+|---|---|---|
+| `layers` | Full-width stone floors with gaps on alternating sides, as in Level 23 (The Winding Way). Variants: the gaps are shutters (trap doors), flip walls worked by levers, spinners, or whirlpools linking the floors | Floor by floor: each corridor clears as the stone climbs |
+| `open` | **No stone at all.** The way in is breakable: thick driftwood (hp 3) armour, ice sheets, keg webs, hidden bricks, bumper fields, crabs | A keg chain, an ice crack or an x3 core inside the armour cascades through everything |
+
+**Break-in on `open` levels:** the level marks its armour with `BrickDef.armour: true`. The break-in is the first time a ball reaches a cell enclosed by armour. Before that there's no inside, and the aim-window target doesn't apply.
+The engine's inside map counts the armour **as it starts** (alive or not), together with stone: a breach doesn't change what's inside, so the break-in can't be missed by breaking a wide hole first (engine, 2026-11-18).
+
+**The campaign after the refit** (the id and file stay; rebuilt levels get a new name):
+
+| Ch | Lv | Layout | Goal | New piece introduced | Change |
+|---|---|---|---|---|---|
+| 1 | 1 | vault | clear | | keep (box 1) |
+| 1 | 2 | wall | clear | | keep |
+| 1 | 3 | **open** | clear | x3 inside driftwood armour | rebuild (was a stone core) |
+| 1 | 4 | fuse | clear | | keep |
+| 1 | 5 | **layers** | **pearls** | | rebuild (was a vault) |
+| 1 | 6 | **open** | clear | **bumper** | rebuild (was a wall) |
+| 1 | 7 | core (flat) | clear | | keep (box 2) |
+| 1 | 8 | picture | clear | | keep |
+| 1 | 9 | **layers** | **rescue** (seal pup at the top) | | rebuild (was nested) |
+| 2 | 11 | **open** | clear | ice sheets, no stone | rebuild (was a vault) |
+| 2 | 12 | hourglass | clear | | keep |
+| 2 | 13 | picture | clear | | keep |
+| 2 | 14 | vault | **rescue** (puffin in the hut) | | goal change (box 1) |
+| 2 | 15 | **open** | **tide** | | rebuild (was a wall) |
+| 2 | 16 | hourglass | clear | | keep |
+| 2 | 17 | core | clear | | keep (box 2) |
+| 2 | 18 | fuse | **stones** | | goal change |
+| 2 | 19 | maze | clear | | keep |
+| 3 | 21 | **layers** | clear | **lever + flip walls** as the floor gaps | rebuild (was a vault) |
+| 3 | 22 | guarded | clear | | keep (box 1) |
+| 3 | 23 | layers | clear | | keep |
+| 3 | 24 | vault | clear | | keep (box 2) |
+| 3 | 25 | wall | clear | **crab** on the quay | add crabs |
+| 3 | 26 | **layers** | clear | shutters as trap doors in the floors | rebuild (was guarded) |
+| 3 | 27 | picture | clear | | keep |
+| 3 | 28 | **open** | **tide** | | rebuild (was a core) |
+| 3 | 29 | fuse | **stones** | | goal change |
+| 4 | 31 | vault | clear | | keep (box 1) |
+| 4 | 32 | guarded | clear | | keep (box 2) |
+| 4 | 33 | **open** | clear | **hidden bricks** in the dark | rebuild (was a vault) |
+| 4 | 34 | **layers** | clear | spinners guarding the gaps | rebuild (was guarded) |
+| 4 | 35 | **layers** | **pearls** | whirlpools link the floors | rebuild (was a vault) |
+| 4 | 36 | **open** | **rescue** in the dark | | rebuild (was a picture) |
+| 4 | 37 | maze | clear | | keep |
+| 4 | 38 | **open** | clear | bumpers + x3 | rebuild (was a core) |
+| 4 | 39 | wall | clear | | keep |
+| 5 | 41 | nested | clear | | keep (box 1) |
+| 5 | 42 | **layers** | clear | levers + shutters | rebuild (was guarded) |
+| 5 | 43 | picture | **rescue** | | goal change |
+| 5 | 44 | maze | clear | | keep |
+| 5 | 45 | core (nested) | clear | | keep (box 2) |
+| 5 | 46 | fuse | **tide** | | goal change |
+| 5 | 47 | wall | clear | crabs on the rampart | add crabs |
+| 5 | 48 | hourglass | **pearls** | | goal change |
+| 5 | 49 | **open** | clear | everything, no stone | rebuild (was nested) |
+
+**Totals after the refit:**
+- 10 centre boxes, 9 open levels, 9 layered levels.
+- Goals besides clear: 3 pearls, 4 rescue, 3 tide, 2 few stones.
+- The bosses (10, 20, 30, 40, 50) stay.
+
+**Dailies:**
+- At most 2 centre-box days a week.
+- `layers` and `open` join the generator's layouts from day one.
+- `open` days carry the no-stone pieces.
+
+### Daily: a day is layout × goal × rule
+
+- **Plan:** each day picks a goal (`clear` most days; `rescue`, `pearls`, `tide` 1–2 times a week each), then a rule by weekday:
+  - Monday: an **easy** rule.
+  - Tuesday–Friday: any rule.
+  - Saturday: a **hard** one.
+  - Sunday: a **spectacle**.
+  - No rule repeats within 7 days.
+- **Daily pearl:** every daily hides one pearl (pass-through, off the obvious path), `LevelDef.dailyPearl: { x, y }` (cells), separate from the `pearls` goal's pearls; the Sim fires `dailyPearl` and sets `state.dailyPearlFound`. Finding it is saved with the day. InkBrick's calendar shows a pearl on those days and "N pearls this month". Owners can replay past days to find missed ones. Counters only go up.
+- **Tomorrow teaser:** today's level JSON carries `tomorrow: { rule, goal }` (written by the generator), so the end card can say "Tomorrow: Rising Tide, with a Strong Current" without loading a future level.
+- **Regenerating:** all frozen days (2026-11-20 onward) are regenerated, since nobody has played them yet.
+- **New pieces in dailies:** each new piece enters the dailies a week after launch and is featured for its first two weeks, through `LATE_PIECES`.
 
 ## Who builds what (2026-11-17)
 

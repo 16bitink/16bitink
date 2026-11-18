@@ -20,6 +20,8 @@ export interface CalendarData {
   readonly days: readonly DailyDay[];
   readonly totalDays: number;
   readonly owned: boolean;
+  /** Dates whose hidden pearl was found. */
+  readonly pearls: readonly string[];
 }
 
 export interface CalendarActs {
@@ -29,13 +31,14 @@ export interface CalendarActs {
   back(): void;
 }
 
-function cellHtml(date: string | null, d: CalendarData, played: ReadonlyMap<string, DailyDay>): string {
+function cellHtml(date: string | null, d: CalendarData, played: ReadonlyMap<string, DailyDay>, pearls: ReadonlySet<string>): string {
   if (!date) return '<td></td>';
+  const pearl = pearls.has(date) ? `<img class="pearl-mark" src="${artUrl('pearl-daily') ?? ''}" alt="pearl">` : '';
   const day = played.get(date);
   const future = date > d.today;
   const tooEarly = date < FIRST_DAILY;
   const cls = ['day', day ? (day.late ? 'late' : 'played') : '', date === d.today ? 'today' : '', future || tooEarly ? 'future' : 'pick'].filter(Boolean).join(' ');
-  return `<td class="${cls}" ${future || tooEarly ? '' : `data-act="d${date}"`}>${parseDate(date).getDate()}</td>`;
+  return `<td class="${cls}" ${future || tooEarly ? '' : `data-act="d${date}"`}>${parseDate(date).getDate()}${pearl}</td>`;
 }
 
 function milestonesHtml(total: number): string {
@@ -59,12 +62,16 @@ export function showCalendar(root: HTMLElement, d: CalendarData, a: CalendarActs
   const now = parseDate(d.today);
   const canPrev = d.year * 12 + d.month0 > first.getFullYear() * 12 + first.getMonth();
   const canNext = d.year * 12 + d.month0 < now.getFullYear() * 12 + now.getMonth();
-  const rows = grid.map((w) => `<tr>${w.map((date) => cellHtml(date, d, played)).join('')}</tr>`).join('');
+  const pearls = new Set(d.pearls);
+  const rows = grid.map((w) => `<tr>${w.map((date) => cellHtml(date, d, played, pearls)).join('')}</tr>`).join('');
+  const prefix = `${d.year}-${String(d.month0 + 1).padStart(2, '0')}-`;
+  const monthPearls = d.pearls.filter((p) => p.startsWith(prefix)).length;
+  const pearlLine = `<p class="pearl-line"><img src="${artUrl('pearl-daily') ?? ''}" alt="">${monthPearls} ${monthPearls === 1 ? 'pearl' : 'pearls'} this month</p>`;
   render(root, 'card', `<div class="panel col center">
     <div class="row spread" style="width:100%"><button class="btn small" data-act="prev" ${canPrev ? '' : 'disabled'}>‹</button>
       <h2 class="t32">${monthName(d.month0)} ${d.year}</h2><button class="btn small" data-act="next" ${canNext ? '' : 'disabled'}>›</button></div>
     <table class="cal"><tr>${WEEK.map((w) => `<th>${w}</th>`).join('')}</tr>${rows}</table>
-    <p class="t32">${d.totalDays} ${d.totalDays === 1 ? 'day' : 'days'} played</p>
+    <p class="t32">${d.totalDays} ${d.totalDays === 1 ? 'day' : 'days'} played</p>${pearlLine}
     <p class="t18 dim">Every game's dailies count. Gaps are days you can still fill${d.owned ? ': tap one to play it' : ' with the full game'}.</p>
     <p class="t18">Days played that give Skip a new raft and trail:</p><div class="row wrap center" style="gap:4px">${milestonesHtml(d.totalDays)}</div>
     <button class="btn" data-act="back">Back</button>

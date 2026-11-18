@@ -36,3 +36,26 @@ export function nudge(b: Moving, count: number): void {
   b.vy = b.vx * s + b.vy * c;
   b.vx = vx;
 }
+
+/** Scales the velocity back to `speed` (no-op for a resting stone). */
+export function keepSpeed(b: Moving, speed: number): void {
+  const s = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
+  if (s < 1e-9) return;
+  b.vx *= speed / s;
+  b.vy *= speed / s;
+}
+
+/** A bumper's kick: `share` of the speed added along the normal, the speed kept. */
+export function kick(b: Moving, nx: number, ny: number, speed: number, share: number): void {
+  b.vx += nx * share * speed;
+  b.vy += ny * share * speed;
+  keepSpeed(b, speed);
+}
+
+/** A constant pull (current, heavy) of (ax, ay) for dt, the speed kept, at least MIN_VY_SHARE vertical. */
+export function pull(b: Moving, ax: number, ay: number, dt: number, speed: number): void {
+  b.vx += ax * dt;
+  b.vy += ay * dt;
+  keepSpeed(b, speed);
+  keepUpright(b, speed);
+}

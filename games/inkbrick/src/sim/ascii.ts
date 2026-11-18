@@ -5,14 +5,14 @@ import { COLS, type BrickKind, type LevelDef } from './types';
 import { createWorld } from './world';
 
 const CHARS: Readonly<Record<BrickKind, string>> = {
-  soft: 'o', tough: 'T', stone: '#', x3: '3', keg: 'K', pickup: '+', ice: '*', key: 'k', gate: 'G',
+  soft: 'o', tough: 'T', stone: '#', x3: '3', keg: 'K', pickup: '+', ice: '*', key: 'k', gate: 'G', lever: 'L',
 };
 
-export const ASCII_LEGEND = "# stone  o soft  T tough  3 x3  K keg  + pickup  * ice  k key  G gate  = shutter  @ spinner  O whirlpool  B Brumm  _ shield  : inside (empty)  ~ on a floe";
+export const ASCII_LEGEND = "# stone  o soft  T tough  3 x3  K keg  + pickup  * ice  k key  G gate  L lever  A armour  ? hidden  = shutter  % flip wall (shut)  / flip wall (open)  @ spinner  O whirlpool  U bumper  C crab  F friend  P pearl  $ daily pearl  - tide line  B Brumm  _ shield  : inside (empty)  ~ on a floe";
 
 export function asciiBoard(level: LevelDef): string {
   const w = createWorld(level);
-  const rows = BRICK_ROW_MAX + 3;
+  const rows = Math.max(BRICK_ROW_MAX + 3, (level.tide?.line ?? 0) + 1);
   const grid: string[][] = [];
   for (let y = 0; y < rows; y++) {
     const row: string[] = [];
@@ -23,7 +23,21 @@ export function asciiBoard(level: LevelDef): string {
     const row = grid[y];
     if (row && x >= 0 && x < COLS) row[x] = ch;
   };
-  for (const b of level.bricks) forEachCell(b, (x, y) => put(x, y, b.floe ? (b.kind === 'stone' ? '~' : CHARS[b.kind].toUpperCase() === CHARS[b.kind] ? '~' : CHARS[b.kind]) : CHARS[b.kind]));
+  const tl = level.tide?.line;
+  if (tl !== undefined) for (let x = 0; x < COLS; x++) put(x, tl, '-');
+  const charOf = (b: (typeof level.bricks)[number]): string => {
+    if (b.floe) return b.kind === 'stone' ? '~' : CHARS[b.kind].toUpperCase() === CHARS[b.kind] ? '~' : CHARS[b.kind];
+    if (b.hidden) return '?';
+    if (b.armour) return 'A';
+    return CHARS[b.kind];
+  };
+  for (const b of level.bricks) forEachCell(b, (x, y) => put(x, y, charOf(b)));
+  for (const f of level.flips ?? []) forEachCell({ ...f, kind: 'stone' }, (x, y) => put(x, y, f.on ? '%' : '/'));
+  for (const b of level.bumpers ?? []) put(Math.floor(b.x / 15), Math.floor(b.y / 15), 'U');
+  for (const c of level.crabs ?? []) forEachCell({ x: Math.round(c.x0 + (c.x1 - c.x0) * (1 - Math.abs(1 - 2 * c.phase))), y: c.y, w: 3, h: 2, kind: 'stone' }, (x, y) => put(x, y, 'C'));
+  if (level.goal === 'rescue' && level.rescue) forEachCell({ ...level.rescue, w: 2, h: 2, kind: 'stone' }, (x, y) => put(x, y, 'F'));
+  if (level.goal === 'pearls') for (const p of level.pearls ?? []) put(p.x, p.y, 'P');
+  if (level.dailyPearl) put(level.dailyPearl.x, level.dailyPearl.y, '$');
   for (const s of level.shutters ?? []) forEachCell({ ...s, kind: 'stone' }, (x, y) => put(x, y, '='));
   for (const s of level.spinners ?? []) put(s.x, s.y, '@');
   for (const p of level.whirlpools ?? []) {

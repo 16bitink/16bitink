@@ -3,9 +3,11 @@ import { fill, minus, stone } from '../sim/kit';
 import { mulberry32, pick, randInt, type Rng } from '../sim/rng';
 import type { BrickDef, LevelDef, PickupKind } from '../sim/types';
 import type { Layout, Twist } from './calendar';
+import { applyRuleBricks, placeDailyPearl, placePearls, placeRescue, spotsOf, tideFor } from './goals';
+import { addBumpers, addCrab, addHidden, addLevers, addTrapDoors } from './newpieces';
 import { pictureById } from './pictures';
 import { daySeed, type DayPlan } from './plan';
-import { screenLaunch } from './screen';
+import { LOW_SCREEN_ROWS, screenLaunch } from './screen';
 import { bandWithLane, buildShell, type Rect, type Shell } from './shells';
 
 const COLS = 36;
@@ -33,8 +35,19 @@ export const LAYOUT_NAMES: Readonly<Record<Layout, readonly string[]>> = {
   fuse: ['The Long Fuse', 'The Powder Line', 'Chain Blast'],
   picture: ['Picture'],
   nested: ['The Box in a Box', 'The Double Vault', 'Two Doors'],
+  layers: ['The Winding Way', 'Floor by Floor', 'The Stairway', 'The Decks'],
+  open: ['The Driftwood Fort', 'Open Water', 'The Crate Pile', 'The Soft Shell'],
 };
 const TWIST_NAMES: Partial<Record<Twist, string>> = { shutter: 'The Shuttered Gate', spinner: 'The Spinning Gate' };
+const LAYER_TWIST_NAMES: Partial<Record<Twist, string>> = { shutter: 'The Trap Doors', lever: 'The Lever Decks', spinner: 'The Turning Stair', whirlpool: 'The Whirling Decks' };
+/** Open layout: armour hits (Monday a little softer). */
+const ARMOUR_HP = 3;
+const ARMOUR_HP_MONDAY = 2;
+/** Open: the second face of x3 shells sits this many rows above the first (out of the face's keg blasts). */
+const OPEN_SECOND_FACE = 4;
+/** Few Stones (campaign only): a starting point for level agents to tune. */
+const FEW_STONES = 4;
+const FEW_STONES_NEED = 0.6;
 
 function tagged(bricks: readonly BrickDef[], extra: Partial<BrickDef>): BrickDef[] {
   return bricks.map((b) => ({ ...b, ...extra }));
@@ -142,11 +155,63 @@ interface Extras {
   spinners?: LevelDef['spinners'];
   whirlpools?: LevelDef['whirlpools'];
   dark?: boolean;
+  bumpers?: LevelDef['bumpers'];
+  flips?: LevelDef['flips'];
+  crabs?: LevelDef['crabs'];
+}
+
+/** A rectangle covered fully with armour: 3 x 1 bricks along rows (1 x 1 where 3 doesn't fit, and up thin columns). */
+function armourBricks(r: Rect, kind: 'tough' | 'ice', hp: number): BrickDef[] {
+  const out: BrickDef[] = [];
+  for (let y = r.y; y < r.y + r.h; y++) {
+    for (let x = r.x; x < r.x + r.w; ) {
+      const w = Math.min(3, r.x + r.w - x);
+      out.push({ x, y, w, h: 1, kind, ...(kind === 'tough' ? { hp } : {}), armour: true });
+      x += w;
+    }
+  }
+  return out;
+}
+
+/**
+ * Open: the armour (driftwood, `armour: true`) and the payload it encloses (dev/recipes/open.ts).
+ * The payload's face, its bottom row of 1 x 1 bricks, is what a stone through the breach meets:
+ * a keg web (keg, x3, sandcastle repeating: the kegs chain along the whole face) or an x3 core
+ * (a shell every other cell); a second face of x3 shells 4 rows up, out of the blasts' reach.
+ * On an ice day the payload is an ice sheet.
+ */
+function openBricks(shell: Shell, plan: DayPlan, rng: Rng, mix: Mix): BrickDef[] {
+  const hp = plan.weekday === 1 ? ARMOUR_HP_MONDAY : ARMOUR_HP;
+  const armour = (shell.armour ?? []).flatMap((r) => armourBricks(r, 'tough', hp));
+  const web = rng() < 0.5;
+  const out: BrickDef[] = [...armour];
+  for (const r of shell.payloads ?? []) {
+    if (r.w < 1 || r.h < 2) continue;
+    const fy = r.y + r.h - 1;
+    const face = fill(r.x, fy, r.w, 1, 'soft', { bw: 1 }).map((b) => {
+      const k = (b.x - r.x) % 3;
+      if (web) return k === 0 ? { ...b, kind: 'keg' as const } : k === 1 ? { ...b, kind: 'x3' as const } : b;
+      return (b.x - r.x) % 2 === 0 ? { ...b, kind: 'x3' as const } : b;
+    });
+    const second = fy - OPEN_SECOND_FACE >= r.y ? fill(r.x, fy - OPEN_SECOND_FACE, r.w, 1, 'x3', { bw: 1, skip: (x) => (x - r.x) % 2 === 1 }) : [];
+    const special = [...face, ...second];
+    const rest = { x: r.x, y: r.y, w: r.w, h: r.h - 1 };
+    out.push(...special, ...minus(fillArea(rest, plan, rng, plan.twist === 'ice' ? 'ice' : 'soft', mix), special));
+  }
+  return out;
 }
 
 function twist(plan: DayPlan, shell: Shell, rng: Rng, bricks: BrickDef[]): { bricks: BrickDef[]; extras: Extras } {
   const win = shell.window;
   switch (plan.twist) {
+    case 'bumper':
+      return addBumpers(bricks, rng, plan.layout === 'open');
+    case 'hidden':
+      return { bricks: addHidden(bricks, rng), extras: {} };
+    case 'crab':
+      return addCrab(bricks, rng);
+    case 'lever':
+      return addLevers(bricks, shell, rng);
     case 'floe': {
       const x = randInt(rng, 0, 8);
       const row = tagged(fill(x, randInt(rng, 44, 46), 9, 1, 'soft'), { floe: 'f1' });
@@ -160,6 +225,7 @@ function twist(plan: DayPlan, shell: Shell, rng: Rng, bricks: BrickDef[]): { bri
       return { bricks: [...minus(bricks, [key]), gate, key], extras: {} };
     }
     case 'shutter':
+      if (plan.layout === 'layers') return { bricks, extras: addTrapDoors(shell, rng) };
       if (!win) return { bricks, extras: {} };
       return { bricks, extras: { shutters: [{ x: win.x, y: win.y, w: win.w, h: win.h, open: 1.6 + rng(), closed: 1.2 + rng(), phase: 0 }] } };
     case 'spinner': {
@@ -183,7 +249,24 @@ function twist(plan: DayPlan, shell: Shell, rng: Rng, bricks: BrickDef[]): { bri
 
 function levelName(plan: DayPlan, rng: Rng): string {
   if (plan.layout === 'picture') return pictureById(plan.picture ?? 'heart').name.replace(/^the /, 'The ');
+  if (plan.layout === 'layers') return LAYER_TWIST_NAMES[plan.twist] ?? pick(rng, LAYOUT_NAMES.layers);
   return TWIST_NAMES[plan.twist] ?? pick(rng, LAYOUT_NAMES[plan.layout]);
+}
+
+/** The day's goal on the board: the friend, the pearls, or the tide (after the launch screen); the daily's hidden pearl. */
+function withGoal(level: LevelDef, plan: DayPlan, rng: Rng): LevelDef {
+  let out: LevelDef = { ...level, goal: plan.goal };
+  if (plan.goal === 'rescue') {
+    const r = placeRescue(out, rng);
+    out = r ? { ...out, bricks: r.bricks, rescue: r.rescue } : { ...out, goal: 'clear' };
+  } else if (plan.goal === 'pearls') {
+    const p = placePearls(out, rng, []);
+    out = p ? { ...out, bricks: p.bricks, pearls: p.pearls } : { ...out, goal: 'clear' };
+  }
+  else if (plan.goal === 'stones') out = { ...out, stones: FEW_STONES, need: FEW_STONES_NEED };
+  if (plan.date.startsWith('level-')) return out;
+  const d = placeDailyPearl(out, rng, spotsOf(out));
+  return d ? { ...out, bricks: d.bricks, dailyPearl: d.pearl } : out;
 }
 
 /** Candidate `k` of a day (deterministic: the same date, plan and k give the same level). */
@@ -194,12 +277,12 @@ export function compose(plan: DayPlan, k: number, salt = 0): LevelDef {
   const pic = plan.layout === 'picture' ? pictureShell(plan, rng, mix) : null;
   const shell = pic?.shell ?? buildShell(plan, rng);
   const main = plan.twist === 'ice' ? 'ice' : 'soft';
-  let bricks: BrickDef[] = [...shell.walls, ...(pic?.bricks ?? [])];
+  let bricks: BrickDef[] = [...shell.walls, ...(pic?.bricks ?? []), ...(plan.layout === 'open' ? openBricks(shell, plan, rng, mix) : [])];
   for (const r of shell.fills) bricks.push(...minus(fillArea(r, plan, rng, main, mix), bricks));
   if (shell.chamber) {
     const c = shell.chamber;
     // The maze's chamber is met from below, the nested inner vault's from its band above.
-    const face = plan.layout === 'maze' ? c.y + c.h - 1 : c.y;
+    const face = plan.layout === 'maze' || plan.layout === 'layers' ? c.y + c.h - 1 : c.y;
     bricks.push(...minus(chamberBricks(c, plan, rng, mix, face), bricks));
   }
   if (shell.payoffCol !== undefined) bricks = lineColumn(bricks, shell.payoffCol);
@@ -208,11 +291,16 @@ export function compose(plan: DayPlan, k: number, salt = 0): LevelDef {
     const kegs = shell.fills.flatMap((r) => fill(r.x, r.y, r.w, 1, 'keg', { bw: 1, skip: (x) => (x - r.x) % 3 !== 0 }));
     bricks = [...minus(bricks, kegs), ...kegs];
   }
-  if (plan.layout !== 'core') bricks = seedShells(bricks, plan, rng, shell.payoffRow);
+  if (plan.layout !== 'core' && plan.layout !== 'open') bricks = seedShells(bricks, plan, rng, shell.payoffRow);
   for (const r of shell.field) bricks.push(...minus(fieldArea(r, plan, rng, mix), bricks));
+  bricks = applyRuleBricks(bricks, plan, rng);
   const t = twist(plan, shell, rng, bricks);
-  return screenLaunch({
+  const rule = plan.rule ? { rule: plan.rule, ...(plan.rule === 'current' ? { ruleDir: plan.ruleDir } : {}) } : {};
+  const base: LevelDef = {
     id: `daily-${plan.date}`, name: levelName(plan, rng), number: 0, chapter: 0, par: 90,
-    layout: plan.layout, bricks: t.bricks, ...t.extras,
-  });
+    layout: plan.layout, bricks: t.bricks, ...t.extras, ...rule,
+  };
+  const goal = withGoal(base, plan, rng);
+  const screened = screenLaunch(goal, spotsOf(goal), plan.layout === 'layers' ? LOW_SCREEN_ROWS : undefined);
+  return plan.goal === 'tide' ? { ...screened, tide: tideFor(screened) } : screened;
 }

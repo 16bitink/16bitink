@@ -6,7 +6,7 @@
  */
 import { distance, formatValue, judge, measureLevel, type Metrics } from '../sim/measure';
 import { levelTargets } from '../sim/targets';
-import type { BrickDef, LevelDef } from '../sim/types';
+import { GOAL_KINDS, RULE_KINDS, type BrickDef, type GoalKind, type LevelDef, type RuleKind } from '../sim/types';
 import type { Layout, Twist } from './calendar';
 import { cheapCheck } from './checks';
 import { compose } from './compose';
@@ -15,9 +15,12 @@ import type { DayPlan } from './plan';
 
 /** The design's chapter table: what each chapter adds (layouts and twists). */
 const CHAPTER_LAYOUTS: readonly (readonly Layout[])[] = [
-  ['vault', 'wall', 'core', 'fuse'], ['hourglass', 'picture'], ['guarded', 'maze'], [], ['nested'],
+  ['vault', 'wall', 'core', 'fuse', 'layers', 'open'], ['hourglass', 'picture'], ['guarded', 'maze'], [], ['nested'],
 ];
-const CHAPTER_TWISTS: readonly (readonly Twist[])[] = [['none'], ['ice', 'floe'], ['keyGate', 'shutter'], ['whirlpool', 'spinner', 'dark'], []];
+/** The refit of 2026-11-18: bumpers in chapter 1, levers and crabs in 3, hidden bricks in 4. */
+const CHAPTER_TWISTS: readonly (readonly Twist[])[] = [
+  ['none', 'bumper'], ['ice', 'floe'], ['keyGate', 'shutter', 'lever', 'crab'], ['whirlpool', 'spinner', 'dark', 'hidden'], [],
+];
 
 export function allowedLayouts(chapter: number): Layout[] {
   return CHAPTER_LAYOUTS.slice(0, chapter).flat();
@@ -31,6 +34,8 @@ export interface ProposeOptions {
   readonly number: number;
   readonly layout: Layout;
   readonly twist?: Twist;
+  readonly goal?: GoalKind;
+  readonly rule?: RuleKind;
   /** Candidates composed (default 80), finalists the bots play (default 6), runs per bot (default 6). */
   readonly candidates?: number;
   readonly finalists?: number;
@@ -58,6 +63,7 @@ function planFor(o: ProposeOptions, twist: Twist): DayPlan {
     picture: o.layout === 'picture' ? PICTURES[o.number % PICTURES.length]!.id : null,
     // Campaign levels run 60-120 s for a skilled player: bigger boards than most dailies.
     holeW, size: local <= 3 ? 'normal' : 'big', density: local <= 6 ? 'normal' : 'dense',
+    goal: o.goal ?? 'clear', rule: o.rule ?? null, ruleDir: 1,
   };
 }
 
@@ -68,6 +74,8 @@ function check(o: ProposeOptions, twist: Twist): void {
   if (!allowedLayouts(o.chapter).includes(o.layout)) throw new Error(`layout '${o.layout}' isn't allowed in chapter ${o.chapter} (allowed: ${allowedLayouts(o.chapter).join(', ')})`);
   if (!allowedTwists(o.chapter).includes(twist)) throw new Error(`twist '${twist}' isn't allowed in chapter ${o.chapter} (allowed: ${allowedTwists(o.chapter).join(', ')})`);
   if (o.layout === 'guarded' && twist !== 'shutter' && twist !== 'spinner') throw new Error(`a guarded gate needs --twist shutter or spinner`);
+  if (o.goal !== undefined && !GOAL_KINDS.includes(o.goal)) throw new Error(`--goal must be one of ${GOAL_KINDS.join(', ')}`);
+  if (o.rule !== undefined && !RULE_KINDS.includes(o.rule)) throw new Error(`--rule must be one of ${RULE_KINDS.join(', ')}`);
 }
 
 export function summaryOf(level: LevelDef, metrics: Metrics): { summary: string; table: string[] } {

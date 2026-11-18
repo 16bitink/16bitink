@@ -8,9 +8,10 @@ import { PADDLE_Y, PiecesView, type Looks } from '../render/piecesView';
 import { Lantern } from '../render/lantern';
 import { ensureSoftTextures } from '../render/softTextures';
 import { StonesView } from '../render/stonesView';
+import { VarietyView } from '../render/varietyView';
 import { DevProbe } from './devProbe';
 import type { BoardView, SimPort } from '../render/port';
-import { BOARD_H, BOARD_W, STEP, type LevelDef, type SimEvent, type SimInput } from '../sim/types';
+import { BOARD_H, BOARD_W, STEP, type GoalKind, type LevelDef, type SimEvent, type SimInput } from '../sim/types';
 import { PlayInput } from './playInput';
 
 /**
@@ -33,6 +34,10 @@ export interface PlayOutcome {
   readonly seconds: number;
   readonly breakIn: number | null;
   readonly heartsLost: number;
+  /** Share of the breakable bricks broken (Few Stones' shells), 0..1. */
+  readonly share?: number;
+  /** The daily's hidden pearl was found. */
+  readonly dailyPearl?: boolean;
 }
 
 export interface HudState {
@@ -44,6 +49,18 @@ export interface HudState {
   /** Brumm's hits left, or null on a level without him. */
   readonly bossHits: number | null;
   readonly bossTotal: number | null;
+  readonly goal: GoalKind;
+  readonly pearlsTaken: number;
+  readonly pearlsTotal: number;
+  /** Few Stones: stones left to throw (-1 otherwise), share broken and the share to reach. */
+  readonly stonesLeft: number;
+  readonly share: number;
+  readonly need: number;
+  /** Rising Tide: seconds of play to the next step. */
+  readonly tideNextIn: number;
+  readonly rescued: boolean;
+  /** The first launch hasn't happened yet (the rule banner shows). */
+  readonly fresh: boolean;
 }
 
 export interface PlayHooks {
@@ -70,6 +87,8 @@ export class PlayScene extends Phaser.Scene {
   private bricks!: BricksView;
   private pieces!: PiecesView;
   private stones!: StonesView;
+  private variety!: VarietyView;
+  private launched = false;
   private lantern: Lantern | null = null;
   private probe: DevProbe | null = null;
   private fx!: Fx;
@@ -106,8 +125,10 @@ export class PlayScene extends Phaser.Scene {
       ? this.add.image(0, 0, bk).setOrigin(0, 0).setDisplaySize(BOARD_W, BOARD_H)
       : this.add.rectangle(0, 0, BOARD_W, BOARD_H, 0x2f6f78).setOrigin(0, 0).setStrokeStyle(4, 0x14110c));
     this.bricks = new BricksView(this, this.board, level);
+    this.variety = new VarietyView(this, this.board, level, this.opts.port.view());
     this.pieces = new PiecesView(this, this.board, looks, level);
-    this.stones = new StonesView(this, this.board, looks.trail, level.dark ? 'stone-dark' : 'stone');
+    const dark = level.dark === true || level.rule === 'fog';
+    this.stones = new StonesView(this, this.board, looks.trail, dark ? 'stone-dark' : 'stone');
     this.fx = new Fx(this, this.board, HAND_FONT);
     this.input2 = new PlayInput(this, (x) => this.toBoardX(x), () => this.opts.hooks.pauseKey());
     this.scale.on('resize', this.fit, this);
@@ -115,7 +136,7 @@ export class PlayScene extends Phaser.Scene {
     this.events.once('shutdown', () => this.scale.off('resize', this.fit, this));
     this.draw(this.opts.port.view(), 0);
     // After the first draw, so the pieces made then (shutters, spinners) sit in the dark too.
-    if (level.dark) this.lantern = new Lantern(this, this.board);
+    if (dark) this.lantern = new Lantern(this, this.board);
     if (import.meta.env.DEV) {
       this.probe = new DevProbe();
       this.probe.emit = (e) => this.onEvent(e);
@@ -184,14 +205,20 @@ export class PlayScene extends Phaser.Scene {
   }
 
   private draw(v: BoardView, deltaMs: number): void {
-    this.bricks.sync(v);
+    this.bricks.sync(v, deltaMs);
+    this.variety.sync(v, deltaMs);
     this.pieces.sync(v, deltaMs);
     this.stones.sync(v);
     this.lantern?.sync(v, PADDLE_Y);
     this.hudIn -= deltaMs;
     if (this.hudIn <= 0) {
       this.hudIn = HUD_EVERY_MS;
-      this.opts.hooks.hud({ lives: v.lives, broken: v.broken, breakable: v.breakable, t: v.t, held: v.held, bossHits: v.boss ? v.boss.hitsLeft : null, bossTotal: v.boss ? v.boss.hits : null });
+      if (!v.held) this.launched = true;
+      this.opts.hooks.hud({
+        lives: v.lives, broken: v.broken, breakable: v.breakable, t: v.t, held: v.held, bossHits: v.boss ? v.boss.hitsLeft : null, bossTotal: v.boss ? v.boss.hits : null,
+        goal: v.goal, pearlsTaken: v.pearlsTaken, pearlsTotal: v.pearls.length, stonesLeft: v.stonesLeft, share: v.brokenShare, need: v.need,
+        tideNextIn: v.tideNextIn, rescued: v.rescued, fresh: !this.launched,
+      });
     }
   }
 
@@ -215,6 +242,7 @@ export class PlayScene extends Phaser.Scene {
         return;
       case 'break':
         this.bricks.hide(e.brick);
+        if (e.kind === 'key') this.bricks.unlock(e.brick, e.x, e.y);
         this.lastBreak = { x: e.x, y: e.y };
         this.fx.breakAt(e.x, e.y, e.kind);
         s.play('break', this.cascadePitch());
@@ -250,6 +278,48 @@ export class PlayScene extends Phaser.Scene {
         this.cameras.main.shake(180, 0.008);
         s.play('blast', 1.4);
         return;
+      case 'bump':
+        this.variety.bump(e.bumper);
+        s.play('bump');
+        return;
+      case 'lever':
+        this.bricks.lever(e.brick);
+        s.play('lever');
+        return;
+      case 'reveal':
+        this.bricks.reveal(e.brick);
+        s.play('hit');
+        return;
+      case 'crabHit':
+        this.variety.crabHit(e.crab);
+        s.play('stone');
+        return;
+      case 'caught':
+        s.play('paddle', 0.8);
+        return;
+      case 'pearl':
+        this.fx.pop(e.x, e.y - 14, e.left > 0 ? `${this.pearlCount() - e.left} / ${this.pearlCount()}` : 'All the pearls!', '#ffffff', e.left > 0 ? 24 : 30);
+        s.play('pearl', e.left > 0 ? 1 : 1.25);
+        return;
+      case 'dailyPearl':
+        this.fx.pop(e.x, e.y - 14, 'A hidden pearl!', '#ffffff', 26);
+        s.play('pearl', 1.5);
+        return;
+      case 'rescued':
+        this.pieces.pose('cheer', CHEER_MS * 1.5);
+        this.fx.shout('Free!', BOARD_W / 2, BOARD_H * 0.42);
+        s.play('rescued');
+        return;
+      case 'tideStep':
+        this.variety.tideStep();
+        this.cameras.main.shake(90, 0.003);
+        s.play('tide');
+        return;
+      case 'tideFlood':
+        this.cameras.main.shake(260, 0.01);
+        this.fx.shout('The tide!', BOARD_W / 2, BOARD_H * 0.5);
+        s.play('tide', 0.7);
+        return;
       case 'crumble':
         this.bricks.shiver();
         this.cameras.main.shake(400, 0.005);
@@ -262,6 +332,10 @@ export class PlayScene extends Phaser.Scene {
       default:
         return;
     }
+  }
+
+  private pearlCount(): number {
+    return this.opts.level.pearls?.length ?? 0;
   }
 
   private onBreakIn(): void {
@@ -278,7 +352,8 @@ export class PlayScene extends Phaser.Scene {
     this.ended = true;
     this.opts.sound.play(result);
     if (result === 'win') this.cameras.main.flash(300, 255, 240, 200);
-    const outcome: PlayOutcome = { result, seconds: this.opts.port.view().t, breakIn: this.breakIn, heartsLost: this.heartsLost };
+    const v = this.opts.port.view();
+    const outcome: PlayOutcome = { result, seconds: v.t, breakIn: this.breakIn, heartsLost: this.heartsLost, share: v.brokenShare, dailyPearl: v.dailyPearlFound };
     this.time.delayedCall(END_DELAY_MS, () => this.opts.hooks.end(outcome));
   }
 }

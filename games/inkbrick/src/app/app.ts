@@ -14,7 +14,7 @@ import { DailyFlow } from './dailyFlow';
 import { longDate } from './dates';
 import { nextMilestone, wornLook } from './milestones';
 import { PlayRun, shellsFor, type RunSpec } from './playRun';
-import { cleared, parseSave, recordClear, SAVE_KEY, serializeSave, shellCount, type SaveData } from './save';
+import { cleared, parseSave, recordClear, recordDailyPearl, SAVE_KEY, serializeSave, shellCount, type SaveData } from './save';
 import { Stage } from './stage';
 
 /**
@@ -277,7 +277,7 @@ export class App {
     const ref = { level: level.id, n: level.number, name: level.name };
     this.track({ ...ref, type: 'level_start' });
     this.startRun(level, {
-      hud: { title: `Level ${level.number}`, subtitle: level.name, par: level.par, tip: level.tip ?? null, beat: null, cheats: this.host.cheats === true },
+      hud: { title: `Level ${level.number}`, subtitle: level.name, par: level.par, tip: level.tip ?? null, beat: null, cheats: this.host.cheats === true, level },
       leaveLabel: 'Map',
     }, (o) => this.results(level, o), (o, retry) => {
       this.track({ ...ref, type: 'level_end', result: 'quit', seconds: Math.round(o?.seconds ?? 0), progress: retry ? 'restarted' : 'left' });
@@ -300,15 +300,16 @@ export class App {
 
   private results(level: LevelDef, o: PlayOutcome): void {
     const n = level.number;
-    const got = shellsFor(o, level.par);
+    const got = shellsFor(o, level);
     const had = this.save.shells[String(n)] ?? [false, false, false];
-    if (o.result === 'win') this.persist(recordClear(this.save, n, got, o.seconds));
+    if (o.result === 'win' || got.some(Boolean)) this.persist(recordClear(this.save, n, got, o.seconds));
     this.track({ level: level.id, n, name: level.name, type: 'level_end', result: o.result, seconds: Math.round(o.seconds), score: got.filter(Boolean).length,
       ...(o.result === 'lose' ? { cause: 'out of hearts' } : {}), progress: `${o.breakIn !== null ? 'broke in' : 'never broke in'}, ${o.heartsLost} hearts lost` });
     const next = this.nextStep(n, o.result === 'win');
     showResults(this.card, {
       title: `Level ${n}: ${level.name}`, won: o.result === 'win', seconds: o.seconds, breakIn: o.breakIn,
       shells: this.save.shells[String(n)] ?? got, fresh: got.map((g, i) => g && !had[i]), best: this.save.best[String(n)] ?? null, next,
+      level, share: o.share ?? 0,
     }, {
       retry: () => this.play(level),
       map: () => this.map(),
@@ -334,7 +335,7 @@ export class App {
         const ref = { level: `daily-${date}`, n: 0, name: level.name };
         this.track({ ...ref, type: 'level_start' });
         this.startRun(level, {
-          hud: { title: 'Daily', subtitle: `${longDate(date)} · ${level.name}`, par: level.par, tip: level.tip ?? null, beat, cheats: this.host.cheats === true },
+          hud: { title: 'Daily', subtitle: `${longDate(date)} · ${level.name}`, par: level.par, tip: level.tip ?? null, beat, cheats: this.host.cheats === true, level },
           leaveLabel: 'Menu',
         }, (o) => {
           this.track({ ...ref, type: 'level_end', result: o.result, seconds: Math.round(o.seconds) });
@@ -352,6 +353,8 @@ export class App {
       buy: (w) => this.buy(w),
       track: (e) => this.track(e),
       endRun: () => this.endRun(),
+      foundPearl: (date) => this.persist(recordDailyPearl(this.save, date)),
+      pearls: () => this.save.pearls,
     };
   }
 

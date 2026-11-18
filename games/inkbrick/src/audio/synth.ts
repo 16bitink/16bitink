@@ -3,13 +3,15 @@
  * and bursts of filtered noise, the same voice as the other 16bit.ink games.
  * No audio files.
  */
-export const SFX_IDS = ['bounce', 'paddle', 'stone', 'hit', 'break', 'blast', 'split', 'pickup', 'breakIn', 'lifeLost', 'launch', 'crumble', 'win', 'lose', 'click'] as const;
+export const SFX_IDS = ['bounce', 'paddle', 'stone', 'hit', 'break', 'blast', 'split', 'pickup', 'breakIn', 'lifeLost', 'launch', 'crumble', 'win', 'lose', 'click',
+  'bump', 'lever', 'pearl', 'rescued', 'tide'] as const;
 export type SfxId = (typeof SFX_IDS)[number];
 
 /** Shortest gap between two plays of one sound, ms (hundreds of stones hit at once). */
 export const MIN_GAP_MS: Readonly<Record<SfxId, number>> = {
   bounce: 45, paddle: 40, stone: 45, hit: 35, break: 30, blast: 80, split: 120, pickup: 100,
   breakIn: 1000, lifeLost: 500, launch: 100, crumble: 500, win: 1000, lose: 1000, click: 40,
+  bump: 50, lever: 150, pearl: 120, rescued: 1500, tide: 400,
 };
 
 interface Voice {
@@ -98,6 +100,32 @@ export const VOICES: Readonly<Record<SfxId, (v: Voice) => void>> = {
   win: (v) => notes(v, [523, 659, 784, 1047, 1319], 0.11, 0.4, 0.16),
   lose: (v) => notes(v, [392, 330, 262], 0.16, 0.4, 0.16),
   click: (v) => tone(v, { type: 'sine', from: 900, to: 700, dur: 0.04, gain: 0.08 }),
+  // A hollow "boing" off the buoy: a rising sine over a soft knock.
+  bump: (v) => {
+    tone(v, { type: 'sine', from: 240, to: 520, dur: 0.14, gain: 0.2 });
+    noise(v, { dur: 0.04, gain: 0.08, filter: 'lowpass', from: 600 });
+  },
+  // A wooden clack and a ratchet: the lever flips.
+  lever: (v) => {
+    noise(v, { dur: 0.05, gain: 0.18, filter: 'bandpass', from: 900, q: 4 });
+    tone(v, { type: 'square', from: 180, to: 140, dur: 0.06, gain: 0.07, delay: 0.06 });
+    noise(v, { dur: 0.04, gain: 0.12, filter: 'bandpass', from: 1300, q: 5, delay: 0.1 });
+  },
+  // A bright glassy chime.
+  pearl: (v) => {
+    notes(v, [1568, 2093], 0.06, 0.25, 0.1, 'sine');
+    tone(v, { type: 'triangle', from: 3136, dur: 0.18, gain: 0.03, delay: 0.1 });
+  },
+  // A happy little fanfare for a freed friend.
+  rescued: (v) => {
+    notes(v, [523, 659, 784, 659, 1047], 0.08, 0.3, 0.15);
+    noise(v, { dur: 0.4, gain: 0.06, filter: 'highpass', from: 2500, delay: 0.2 });
+  },
+  // The field sinks a step: a low wash.
+  tide: (v) => {
+    noise(v, { dur: 0.5, gain: 0.16, filter: 'lowpass', from: 700, to: 180 });
+    tone(v, { type: 'sine', from: 110, to: 82, dur: 0.4, gain: 0.14 });
+  },
 };
 
 export type { Voice };

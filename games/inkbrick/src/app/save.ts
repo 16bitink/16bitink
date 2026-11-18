@@ -1,6 +1,6 @@
 /**
  * InkBrick's save: shells per level, best times, the picked raft and trail,
- * sound. Versioned JSON in host.storage; account copies merge with
+ * sound, and the dailies whose hidden pearl was found. Versioned JSON in host.storage; account copies merge with
  * mergeSave (shells OR, best times min), so no device ever loses progress.
  */
 export const SAVE_KEY = 'inkbrick.save';
@@ -18,9 +18,19 @@ export interface SaveData {
   readonly raft: string;
   readonly trail: string;
   readonly sound: boolean;
+  /** Daily dates (YYYY-MM-DD) whose hidden pearl was found. Only ever grows. */
+  readonly pearls: readonly string[];
 }
 
-export const newSave = (): SaveData => ({ v: SAVE_VERSION, shells: {}, best: {}, raft: '', trail: '', sound: true });
+export const newSave = (): SaveData => ({ v: SAVE_VERSION, shells: {}, best: {}, raft: '', trail: '', sound: true, pearls: [] });
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Sorted, unique, well-formed dates (an older save has none). */
+function parsePearls(x: unknown): string[] {
+  if (!Array.isArray(x)) return [];
+  return [...new Set(x.filter((d): d is string => typeof d === 'string' && DATE_RE.test(d)))].sort();
+}
 
 export interface Loaded {
   readonly save: SaveData;
@@ -64,6 +74,7 @@ export function parseSave(raw: string | null): Loaded {
       raft: typeof x.raft === 'string' ? x.raft : '',
       trail: typeof x.trail === 'string' ? x.trail : '',
       sound: x.sound !== false,
+      pearls: parsePearls(x.pearls),
     },
     problem: null,
   };
@@ -80,8 +91,20 @@ export function mergeSave(mine: SaveData, theirs: SaveData): SaveData {
   }
   const best: Record<string, number> = { ...theirs.best };
   for (const [k, m] of Object.entries(mine.best)) best[k] = Math.min(m, best[k] ?? Infinity);
-  return { ...mine, shells, best };
+  return { ...mine, shells, best, pearls: parsePearls([...mine.pearls, ...theirs.pearls]) };
 }
+
+/** The save after a daily whose hidden pearl was found (counters only go up). */
+export function recordDailyPearl(s: SaveData, date: string): SaveData {
+  if (!DATE_RE.test(date) || s.pearls.includes(date)) return s;
+  return { ...s, pearls: parsePearls([...s.pearls, date]) };
+}
+
+/** Pearls found on the dailies of one month (year, month0 as Date's). */
+export const pearlsInMonth = (s: SaveData, year: number, month0: number): number => {
+  const prefix = `${year}-${String(month0 + 1).padStart(2, '0')}-`;
+  return s.pearls.filter((d) => d.startsWith(prefix)).length;
+};
 
 /** The save after a level: shells only ever gained, best time only ever lowered. */
 export function recordClear(s: SaveData, n: number, got: Shells, seconds: number): SaveData {

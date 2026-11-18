@@ -4,7 +4,8 @@ import type { LevelDef } from './types';
 
 export type MetricKey =
   | 'aimWindow' | 'breakInNovice' | 'breakInSkilled' | 'cascade' | 'drought' | 'clearSkilled'
-  | 'noviceClear' | 'hunt' | 'luckCV' | 'bricks' | 'peakBalls' | 'bossHits';
+  | 'noviceClear' | 'hunt' | 'luckCV' | 'bricks' | 'peakBalls' | 'bossHits'
+  | 'shareSkilled' | 'floods' | 'pearlFound';
 
 export interface Target {
   readonly key: MetricKey;
@@ -50,6 +51,38 @@ export function bossTargets(): Target[] {
 
 export type Overrides = Partial<Record<MetricKey, readonly [number, number]>>;
 
+/**
+ * The goal's version of the targets (docs/inkbrick-design.md "Variety"):
+ * - rescue: the clear time is the time to the rescue, skilled 30-90 s (the board needn't be
+ *   cleared: the break-in and the dig to the friend are the level); no last-brick hunt.
+ * - pearls: the time to the last pearl, skilled 40-100 s; no hunt.
+ * - stones (Few Stones): no clock, so no clear time, hunt or luck; novice clears = novice runs
+ *   that reach `need`; the skilled bot's median share broken at least halfway from need to all.
+ * - tide: as clear, plus floods (the decent bot's median) at most 1.
+ */
+export const RESCUE_TIME: readonly [number, number] = [30, 90];
+export const PEARLS_TIME: readonly [number, number] = [40, 100];
+export const TIDE_FLOODS: readonly [number, number] = [0, 1];
+
+export function goalTargets(targets: readonly Target[], level: LevelDef): Target[] {
+  const goal = level.goal ?? 'clear';
+  if (goal === 'clear' || level.boss) return [...targets];
+  const drop = (keys: readonly MetricKey[]) => targets.filter((t) => !keys.includes(t.key));
+  if (goal === 'rescue' || goal === 'pearls') {
+    const [lo, hi] = goal === 'rescue' ? RESCUE_TIME : PEARLS_TIME;
+    const label = goal === 'rescue' ? 'rescue skilled' : 'last pearl skilled';
+    return drop(['hunt']).map((t) => (t.key === 'clearSkilled' ? { ...t, label, lo, hi } : t));
+  }
+  if (goal === 'stones') {
+    const need = level.need ?? 0;
+    return [
+      ...drop(['clearSkilled', 'hunt', 'luckCV']).map((t) => (t.key === 'noviceClear' ? { ...t, label: 'novice reaches need' } : t)),
+      { key: 'shareSkilled', label: 'share skilled', lo: (need + 1) / 2, hi: 1, unit: '%' },
+    ];
+  }
+  return [...targets, { key: 'floods', label: 'floods (decent)', lo: TIDE_FLOODS[0], hi: TIDE_FLOODS[1], unit: '' }];
+}
+
 function withOverrides(overrides: Overrides): Target[] {
   return BASE.map((t) => {
     const o = overrides[t.key];
@@ -73,7 +106,7 @@ export function levelTargets(level: LevelDef): Target[] {
   const o: Overrides = {};
   if (level.chapter === 1 && local <= 3) o.noviceClear = [0.9, 1];
   else if (level.chapter === 1) o.noviceClear = CH1_NOVICE_CLEAR;
-  return withOverrides(o);
+  return goalTargets(withOverrides(o), level);
 }
 
 /**
@@ -83,8 +116,8 @@ export function levelTargets(level: LevelDef): Target[] {
 export const DAILY_NOVICE_AIM: readonly number[] = [0.88, 0.85, 0.78, 0.72, 0.68, 0.64, 0.58];
 const NOVICE_BAND = 0.12;
 
-/** Targets for a daily by local weekday (0 = Sunday): Monday is a warm-up, Saturday the hard one. */
-export function dailyTargets(weekday: number): Target[] {
+/** Targets for a daily by local weekday (0 = Sunday): Monday is a warm-up, Saturday the hard one; `level` adds its goal's version. */
+export function dailyTargets(weekday: number, level?: LevelDef): Target[] {
   const aimNovice = DAILY_NOVICE_AIM[weekday] ?? DAILY_NOVICE_AIM[3]!;
   const novice: readonly [number, number] = [aimNovice - NOVICE_BAND, Math.min(1, aimNovice + NOVICE_BAND)];
   const byDay: Readonly<Record<number, Overrides>> = {
@@ -97,5 +130,6 @@ export function dailyTargets(weekday: number): Target[] {
     5: { aimWindow: [0.025, 0.05] },
     6: { aimWindow: [0.015, 0.035], breakInNovice: [25, 75] },
   };
-  return withOverrides({ ...(byDay[weekday] ?? {}), noviceClear: novice });
+  const base = withOverrides({ ...(byDay[weekday] ?? {}), noviceClear: novice });
+  return level ? goalTargets(base, level) : base;
 }

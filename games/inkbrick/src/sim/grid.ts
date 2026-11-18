@@ -23,14 +23,28 @@ export function forEachCell(b: BrickDef, fn: (cx: number, cy: number) => void): 
   for (let y = b.y; y < b.y + b.h; y++) for (let x = b.x; x < b.x + b.w; x++) fn(x, y);
 }
 
-/** Layer 0 = still bricks, layer i + 1 = floe i. Returns the layers and each brick's layer. */
+/**
+ * Rising Tide's border wall: stone standing along a side edge (touching column 0 or 35, at least
+ * as tall as wide). It stays put while the rest of the field sinks.
+ */
+export function isBorderWall(b: BrickDef): boolean {
+  return b.kind === 'stone' && b.floe === undefined && (b.x === 0 || b.x + b.w === COLS) && b.h >= b.w;
+}
+
+/**
+ * Layer 0 = still bricks, layer i + 1 = floe i; on a Rising Tide level one more layer holds every
+ * still brick but the border wall (it sinks). Returns the layers and each brick's layer.
+ */
 export function buildLayers(level: LevelDef): { layers: Layer[]; layerOf: Int32Array } {
   const floes = level.floes ?? [];
   const layers: Layer[] = [{ grid: new Int32Array(COLS * ROWS).fill(NO_BRICK), ox: 0, oy: 0 }];
   for (let i = 0; i < floes.length; i++) layers.push({ grid: new Int32Array(COLS * ROWS).fill(NO_BRICK), ox: 0, oy: 0 });
+  const tide = level.goal === 'tide';
+  if (tide) layers.push({ grid: new Int32Array(COLS * ROWS).fill(NO_BRICK), ox: 0, oy: 0 });
   const layerOf = new Int32Array(level.bricks.length);
   level.bricks.forEach((b, i) => {
-    const li = b.floe === undefined ? 0 : floes.findIndex((f) => f.id === b.floe) + 1;
+    let li = b.floe === undefined ? 0 : floes.findIndex((f) => f.id === b.floe) + 1;
+    if (tide && li === 0 && !isBorderWall(b)) li = floes.length + 1;
     layerOf[i] = li;
     const layer = layers[li]!;
     forEachCell(b, (cx, cy) => {
@@ -40,13 +54,19 @@ export function buildLayers(level: LevelDef): { layers: Layer[]; layerOf: Int32A
   return { layers, layerOf };
 }
 
-/** Still walls for the inside map: stone and gates not on a floe, plus shutters (closed). */
-export function wallMask(level: LevelDef): Uint8Array {
+/**
+ * Still walls for the inside map: stone, gates and levers not on a floe, armour bricks as they
+ * start (an open level's inside is what its armour encloses at the start, so breaching it doesn't
+ * move the goalposts), plus shutters and flip walls (shut). `armour: false` leaves armour out.
+ */
+export function wallMask(level: LevelDef, armour = true): Uint8Array {
   const mask = new Uint8Array(COLS * ROWS);
   for (const b of level.bricks) {
-    if ((b.kind === 'stone' || b.kind === 'gate') && b.floe === undefined) forEachCell(b, (x, y) => (mask[cellIndex(x, y)] = 1));
+    const wall = b.kind === 'stone' || b.kind === 'gate' || b.kind === 'lever' || (armour && b.armour === true);
+    if (wall && b.floe === undefined) forEachCell(b, (x, y) => (mask[cellIndex(x, y)] = 1));
   }
   for (const s of level.shutters ?? []) forEachCell({ ...s, kind: 'stone' }, (x, y) => (mask[cellIndex(x, y)] = 1));
+  for (const f of level.flips ?? []) forEachCell({ x: f.x, y: f.y, w: f.w, h: f.h, kind: 'stone' }, (x, y) => (mask[cellIndex(x, y)] = 1));
   return mask;
 }
 

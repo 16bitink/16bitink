@@ -2,7 +2,8 @@
 //   npm run gen -- --from 2026-11-20 --days 60 [--candidates 200] [--enough 24] [--finalists 6] [--runs 4] [--verify 2] [--verify-runs 12] [--rounds 2] [--workers N] [--force]
 //   npm run gen -- --redo 2026-12-03[,2026-12-09]   (vetoed days: new candidates, the rest untouched)
 //   npm run gen -- --report [--from 2026-11-20 --days 73] [--runs 20]   (every frozen day measured as the lab does)
-//   npm run gen -- --propose --chapter 2 --number 14 --layout hourglass [--twist ice] --out content/ch2/neck.ts
+//   npm run gen -- --tomorrow   (rewrite every frozen day's tomorrow: { rule, goal } from the day after it)
+//   npm run gen -- --propose --chapter 2 --number 14 --layout hourglass [--twist ice] [--goal rescue] [--rule current] --out content/ch2/neck.ts
 // Frozen days (content/daily/YYYY-MM.json) are never regenerated without --force or --redo.
 import fs from 'node:fs';
 import os from 'node:os';
@@ -80,7 +81,7 @@ async function runPool(jobs, workers, onDone) {
 async function proposeLevel(gen, args) {
   const out = flag(args, '--out');
   if (!out) throw new Error('--propose needs --out <path.ts>');
-  const o = { chapter: Number(flag(args, '--chapter')), number: Number(flag(args, '--number')), layout: flag(args, '--layout'), twist: flag(args, '--twist') };
+  const o = { chapter: Number(flag(args, '--chapter')), number: Number(flag(args, '--number')), layout: flag(args, '--layout'), twist: flag(args, '--twist'), goal: flag(args, '--goal'), rule: flag(args, '--rule') };
   const t0 = performance.now();
   const p = gen.propose(o);
   const file = path.resolve(pkg, out);
@@ -107,6 +108,11 @@ async function main() {
   if (args.includes('--propose')) return proposeLevel(gen, args);
   const frozen = readFrozen();
   if (args.includes('--report')) return report(gen, args, frozen);
+  if (args.includes('--tomorrow')) {
+    writeFrozen(gen.withTomorrow(frozen));
+    console.log(`rewrote tomorrow's teaser on ${Object.keys(frozen).length} frozen days`);
+    return;
+  }
   const redo = flag(args, '--redo');
   const force = args.includes('--force');
   const redoDates = redo ? redo.split(',') : [];
@@ -126,7 +132,8 @@ async function main() {
   );
 
   // Plans are sequential (novelty against the days before); the days themselves run in parallel.
-  const plans = gen.planDates(dates, force && !redo ? {} : frozen, salts).filter((p) => todo.includes(p.date));
+  const keep = Object.fromEntries(redoDates.map((d) => [d, gen.keepOf(frozen[d])]).filter(([, k]) => k));
+  const plans = gen.planDates(dates, force && !redo ? {} : frozen, salts, keep).filter((p) => todo.includes(p.date));
   const workers = Number(flag(args, '--workers', Math.max(1, os.cpus().length - 1)));
   const t0 = performance.now();
   const done = { ...frozen };
@@ -135,7 +142,7 @@ async function main() {
     console.log(gen.dayLine(entry, seconds));
     if (redoDates.length === 1) console.log(gen.board(entry));
   });
-  writeFrozen(done);
+  writeFrozen(gen.withTomorrow(done));
   console.log(`froze ${plans.length} day(s) in ${((performance.now() - t0) / 1000).toFixed(0)}s with ${workers} workers -> content/daily/`);
 }
 

@@ -3,12 +3,17 @@
  * bouncing off walls and stone (at most MAX_BOUNCES), carried by whirlpools, stopped by any
  * breakable brick outside, counted when it reaches an inside cell. Same contact code as the Sim.
  * Gates are closed until their key breaks (a ghost that reaches a key counts: it opens the way),
- * and moving pieces (floes, shutters, spinners, Brumm's shield) are sampled over their cycle.
+ * flip walls stand as their levers left them (a ghost that reaches a lever while a wall is shut
+ * counts too), and moving pieces (floes, shutters, spinners, Brumm's shield, crabs) are sampled
+ * over their cycle. The rule's pull (current, heavy) bends the ghost as it bends the stone, and
+ * bumpers kick it as they kick the stone.
  */
-import { BALL_R, BALL_SPEED, BOSS_DEFAULT, MAX_BOUNCE_DEG, PADDLE_Y, WHIRL_COOLDOWN, WHIRL_RADIUS } from './constants';
-import { C_BRICK, C_NONE, findContact, newContact } from './contact';
-import { movePieces } from './pieces';
-import { keepSideways, keepUpright } from './steer';
+import {
+  BALL_SPEED, BOSS_DEFAULT, BUMP_KICK, CURRENT_PULL, HEAVY_PULL, MAX_BOUNCE_DEG, PADDLE_Y, WHIRL_COOLDOWN, WHIRL_RADIUS,
+} from './constants';
+import { C_BRICK, C_BUMPER, C_NONE, findContact, newContact } from './contact';
+import { crabPeriod, crabsAt, movePieces } from './pieces';
+import { keepSideways, keepUpright, kick, pull } from './steer';
 import { cosDeg, sinDeg } from './trig';
 import { BOARD_W, CELL, COLS, type LevelDef } from './types';
 import { createWorld, newBall, type World } from './world';
@@ -24,10 +29,14 @@ export const AIM_PHASES = 8;
 const WHIRL_COOLDOWN_STEPS = Math.ceil((WHIRL_COOLDOWN * BALL_SPEED) / TRACE_STEP);
 
 export interface TraceState {
-  /** True once every gate's key is broken (the gates are gone). */
+  /** True once every gate's key is broken (the gates are gone). With no `flips`, flip walls are open too. */
   readonly gatesOpen: boolean;
   /** Level clock (s) the moving pieces are placed at. */
   readonly time: number;
+  /** Each flip wall solid or not (default: open when gatesOpen, else as the level starts). */
+  readonly flips?: readonly boolean[];
+  /** Rising Tide: cells the field has sunk. */
+  readonly tide?: number;
 }
 
 const START: TraceState = { gatesOpen: false, time: 0 };
@@ -38,6 +47,7 @@ export function pieceCycle(level: LevelDef): number {
   const shutters = (level.shutters ?? []).map((s) => s.open + s.closed);
   // A bar looks the same after half a turn.
   const spinners = (level.spinners ?? []).map((s) => Math.abs(s.period) / 2);
+  const crabs = (level.crabs ?? []).map(crabPeriod);
   const b = level.boss;
   let shield = 0;
   if (b && b.speed > 0) {
@@ -45,7 +55,7 @@ export function pieceCycle(level: LevelDef): number {
     const x1 = b.trackX1 ?? (b.x ?? BOSS_DEFAULT.x) + (b.w ?? BOSS_DEFAULT.w);
     shield = Math.max(0, (2 * (x1 - x0)) / b.speed);
   }
-  return Math.max(0, ...floes, ...shutters, ...spinners, shield);
+  return Math.max(0, ...floes, ...shutters, ...spinners, ...crabs, shield);
 }
 
 export function hasGates(level: LevelDef): boolean {
@@ -56,8 +66,18 @@ export function hasGates(level: LevelDef): boolean {
 export function traceWorld(level: LevelDef, st: TraceState = START): World {
   const w = createWorld(st.gatesOpen ? { ...level, bricks: level.bricks.filter((b) => b.kind !== 'gate') } : level);
   w.time = st.time;
+  w.tideOffset = st.tide ?? 0;
+  w.flips.forEach((f, i) => (f.solid = st.flips ? st.flips[i] === true : st.gatesOpen ? false : f.solid));
+  if (w.crabs.length > 0) crabsAt(w, st.time);
   movePieces(w);
   return w;
+}
+
+/** The rule's pull as ghost units (px per trace step, per step): the stone's pull over one step's time. */
+function ghostPull(w: World): { ax: number; ay: number } {
+  const tau = TRACE_STEP / (BALL_SPEED * w.speedMul);
+  const k = tau * tau;
+  return { ax: w.rule === 'current' ? CURRENT_PULL * w.ruleDir * k : 0, ay: w.rule === 'heavy' ? HEAVY_PULL * k : 0 };
 }
 
 interface Ghost { x: number; y: number; vx: number; vy: number }
@@ -65,11 +85,7 @@ interface Ghost { x: number; y: number; vx: number; vy: number }
 /** A whirlpool end under the ghost moves it to the other end; true when it did. */
 function whirl(w: World, g: Ghost): boolean {
   const r2 = WHIRL_RADIUS * WHIRL_RADIUS;
-  for (const p of w.level.whirlpools ?? []) {
-    const ax = (p.a.x + 0.5) * CELL;
-    const ay = (p.a.y + 0.5) * CELL;
-    const bx = (p.b.x + 0.5) * CELL;
-    const by = (p.b.y + 0.5) * CELL;
+  for (const { ax, ay, bx, by } of w.whirlpools) {
     const toB = (g.x - ax) ** 2 + (g.y - ay) ** 2 < r2;
     const toA = !toB && (g.x - bx) ** 2 + (g.y - by) ** 2 < r2;
     if (!toA && !toB) continue;
@@ -81,25 +97,29 @@ function whirl(w: World, g: Ghost): boolean {
 }
 
 /**
- * True when a ghost ball from (x0, raft line) at `deg` (0 = straight up, + = right) gets inside,
- * or (`keys`) reaches a key brick, which opens the way in.
+ * True when a ghost ball from (x0, raft line) at `deg` (0 = straight up, + = right) gets inside
+ * (or onto a `target` cell, when given: a pearl, the rescue friend), or (`keys`) reaches a key
+ * brick or a lever, which opens the way in.
  */
-export function traceInside(w: World, x0: number, deg: number, keys = false): boolean {
-  const b = newBall(x0, PADDLE_Y - BALL_R, sinDeg(deg) * TRACE_STEP, -cosDeg(deg) * TRACE_STEP);
+export function traceInside(w: World, x0: number, deg: number, keys = false, target?: Uint8Array): boolean {
+  const r = w.ballRadius;
+  const b = newBall(x0, PADDLE_Y - r, sinDeg(deg) * TRACE_STEP, -cosDeg(deg) * TRACE_STEP);
   const c = newContact();
+  const g = w.rule === 'current' || w.rule === 'heavy' ? ghostPull(w) : null;
   let bounces = 0;
   let whirlCd = 0;
   for (let i = 0; i < MAX_TRACE_STEPS; i++) {
+    if (g) pull(b, g.ax, g.ay, 1, TRACE_STEP);
     b.x += b.vx;
     b.y += b.vy;
-    if (b.x < BALL_R || b.x > BOARD_W - BALL_R) {
+    if (b.x < r || b.x > BOARD_W - r) {
       b.vx = -b.vx;
-      b.x = b.x < BALL_R ? BALL_R : BOARD_W - BALL_R;
+      b.x = b.x < r ? r : BOARD_W - r;
       bounces++;
     }
-    if (b.y < BALL_R) {
+    if (b.y < r) {
       b.vy = -b.vy;
-      b.y = BALL_R;
+      b.y = r;
       keepSideways(b, TRACE_STEP, 0);
       bounces++;
     }
@@ -108,10 +128,13 @@ export function traceInside(w: World, x0: number, deg: number, keys = false): bo
     else if (whirl(w, b)) whirlCd = WHIRL_COOLDOWN_STEPS;
     const cx = Math.floor(b.x / CELL);
     const cy = Math.floor(b.y / CELL);
-    if (cy >= 0 && w.inside[cy * COLS + cx]) return true;
+    if (target) {
+      if (cy >= 0 && target[cy * COLS + cx]) return true;
+    } else if (cy - w.tideOffset >= 0 && w.inside[(cy - w.tideOffset) * COLS + cx]) return true;
     findContact(w, b, c);
     if (c.kind !== C_NONE) {
       if (c.kind === C_BRICK && w.bricks[c.id]!.breakable) return keys && w.bricks[c.id]!.kind === 'key';
+      if (c.kind === C_BRICK && keys && w.bricks[c.id]!.kind === 'lever') return true;
       const dot = b.vx * c.nx + b.vy * c.ny;
       b.x += c.nx * c.pen;
       b.y += c.ny * c.pen;
@@ -119,7 +142,8 @@ export function traceInside(w: World, x0: number, deg: number, keys = false): bo
         b.vx -= 2 * dot * c.nx;
         b.vy -= 2 * dot * c.ny;
         // The same steering as the Sim's stone bounces (the ghost moves TRACE_STEP px a step).
-        keepSideways(b, TRACE_STEP, 0);
+        if (c.kind === C_BUMPER) kick(b, c.nx, c.ny, TRACE_STEP, BUMP_KICK);
+        else keepSideways(b, TRACE_STEP, 0);
         keepUpright(b, TRACE_STEP);
         bounces++;
       }
@@ -213,11 +237,19 @@ export class Aimer {
   readonly mouths: readonly { readonly x: number; readonly y: number }[];
   /** Indices of the breakable bricks with a cell inside (gates open). */
   readonly insideBricks: readonly number[];
+  /** The level's stone radius (bigStone). */
+  readonly radius: number;
+  /** The inside cells (gates and flips open). */
+  readonly insideMask: Uint8Array;
+  private readonly flipCount: number;
 
-  constructor(private readonly level: LevelDef, private readonly stepDeg = 0.5) {
+  constructor(readonly level: LevelDef, private readonly stepDeg = 0.5) {
     this.phases = samplePhases(level);
     this.cycle = pieceCycle(level);
     const open = traceWorld(level, { gatesOpen: true, time: 0 });
+    this.radius = open.ballRadius;
+    this.insideMask = open.inside;
+    this.flipCount = open.flips.length;
     this.hasInside = open.inside.some((v) => v === 1);
     this.mouths = findMouths(open);
     this.gates = level.bricks.flatMap((b, i) => (b.kind === 'gate' ? [i] : []));
@@ -235,28 +267,36 @@ export class Aimer {
     return Math.round((t / this.cycle) * this.phases.length) % this.phases.length;
   }
 
-  private world(p: number, gatesOpen: boolean): World {
-    const id = `${p}:${gatesOpen ? 1 : 0}`;
+  private world(p: number, gatesOpen: boolean, flips: readonly boolean[] | undefined, tide: number): World {
+    const fk = flips ? flips.map((f) => (f ? 1 : 0)).join('') : '-';
+    const id = `${p}:${gatesOpen ? 1 : 0}:${fk}:${tide}`;
     let w = this.worlds.get(id);
     if (!w) {
-      w = traceWorld(this.level, { gatesOpen, time: this.phases[p]! });
+      w = traceWorld(this.level, { gatesOpen, time: this.phases[p]!, ...(flips ? { flips } : {}), tide });
       this.worlds.set(id, w);
     }
     return w;
   }
 
-  /** Angles from hit x that get inside (or, gates closed, onto a key), with the pieces as at `time` + the lead. */
+  /**
+   * Angles from hit x that get inside (or, gates closed or a flip wall shut, onto a key or a
+   * lever), with the pieces as at `time` + the lead.
+   */
   angles(x: number, st: TraceState = START): readonly number[] {
     if (!this.hasInside) return [];
-    const px = AIM_PX * Math.round(Math.min(BOARD_W - BALL_R, Math.max(BALL_R, x)) / AIM_PX);
+    const px = AIM_PX * Math.round(Math.min(BOARD_W - this.radius, Math.max(this.radius, x)) / AIM_PX);
     const open = st.gatesOpen || this.gates.length === 0;
     const p = this.phaseIndex(st.time);
-    const id = `${px}:${p}:${open ? 1 : 0}`;
+    // Flip walls: as the bot sees them (start: as the level starts).
+    const flips = this.flipCount > 0 ? st.flips ?? this.level.flips!.map((f) => f.on) : undefined;
+    const shut = flips?.some((f) => f) ?? false;
+    const tide = st.tide ?? 0;
+    const id = `${px}:${p}:${open ? 1 : 0}:${flips ? flips.map((f) => (f ? 1 : 0)).join('') : ''}:${tide}`;
     const hit = this.cache.get(id);
     if (hit) return hit;
-    const w = this.world(p, open);
+    const w = this.world(p, open, flips, tide);
     const list: number[] = [];
-    for (let a = -MAX_BOUNCE_DEG; a <= MAX_BOUNCE_DEG; a += this.stepDeg) if (traceInside(w, px, a, !open)) list.push(a);
+    for (let a = -MAX_BOUNCE_DEG; a <= MAX_BOUNCE_DEG; a += this.stepDeg) if (traceInside(w, px, a, !open || shut)) list.push(a);
     this.cache.set(id, list);
     return list;
   }

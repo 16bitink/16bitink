@@ -1,5 +1,6 @@
 /** The generator's cheap checks: valid, in budget, every breakable brick reachable, an aim window. */
 import { MAX_BRICKS } from '../sim/constants';
+import { hasStoneInside } from '../sim/measure';
 import { cellIndex, forEachCell } from '../sim/grid';
 import { LAUNCH_X } from '../sim/constants';
 import { aimWindow, launchWindow } from '../sim/trace';
@@ -10,7 +11,7 @@ import { levelProblems } from '../sim/validate';
 /** A ball-sized flood from the raft's area through everything but still stone. */
 export function unreachableBricks(level: LevelDef): number {
   const blocked = new Uint8Array(COLS * ROWS);
-  for (const b of level.bricks) if (b.kind === 'stone' && b.floe === undefined) forEachCell(b, (x, y) => (blocked[cellIndex(x, y)] = 1));
+  for (const b of level.bricks) if ((b.kind === 'stone' || b.kind === 'lever') && b.floe === undefined) forEachCell(b, (x, y) => (blocked[cellIndex(x, y)] = 1));
   const seen = new Uint8Array(COLS * ROWS);
   const stack: number[] = [];
   for (let x = 0; x < COLS; x++) {
@@ -32,7 +33,7 @@ export function unreachableBricks(level: LevelDef): number {
   }
   let missing = 0;
   for (const b of level.bricks) {
-    if (b.kind === 'stone' || b.kind === 'gate' || b.floe !== undefined) continue;
+    if (b.kind === 'stone' || b.kind === 'gate' || b.kind === 'lever' || b.floe !== undefined) continue;
     let any = false;
     forEachCell(b, (x, y) => (any = any || seen[cellIndex(x, y)] === 1));
     if (!any) missing++;
@@ -59,6 +60,8 @@ export function cheapCheck(level: LevelDef, aimLo: number, aimHi: number, launch
   if (level.bricks.length > MAX_BRICKS) return { ok: false, reason: 'over budget', aim: 0 };
   const missing = unreachableBricks(level);
   if (missing > 0) return { ok: false, reason: `${missing} bricks unreachable`, aim: 0 };
+  // An open level's way in is breakable armour: no hole, no aim window to check.
+  if (!hasStoneInside(level)) return { ok: true, reason: '', aim: 0 };
   const aim = aimWindow(level, CHEAP_DIRECTIONS);
   // Hard floor: the cheap trace has fewer directions, so it must clear 2% outright.
   const floor = Math.max(AIM_FLOOR, aimLo * 0.75);

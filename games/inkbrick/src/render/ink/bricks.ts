@@ -70,6 +70,64 @@ function crack(p: Pen, x0: number, y0: number, steps: readonly (readonly [number
   p.hair([mid, { x: mid.x + k * 0.07, y: mid.y + h * 0.08 }], 1.8, INK, 0.9);
 }
 
+/**
+ * Armour (the shell of a stone-free "open" level): thick dark driftwood
+ * lashed with rope, iron caps on its ends. It reads as the wall to break:
+ * plainly wood (grain, knots) where stone is hatched cobbles, and it splits
+ * more with every hit (stage 1 intact, 3 split through).
+ */
+const armour = (stage: 1 | 2 | 3): BrickDraw => (ctx, w, h) => {
+  const long = w >= h;
+  const p = brick(ctx, w, h, 121, C.driftDark, (pen, body) => {
+    // Heavy grain along the long side, and a knot.
+    const lines = Math.max(2, Math.round((long ? h : w) / 12));
+    for (let i = 1; i < lines; i++) {
+      const t = INSET + (((long ? h : w) - INSET * 2) * i) / lines;
+      const pts = Array.from({ length: 8 }, (_, k) => {
+        const u = INSET + (((long ? w : h) - INSET * 2) * k) / 7;
+        const d = Math.sin(k * 1.4 + i * 2) * 1.8;
+        return long ? { x: u, y: t + d } : { x: t + d, y: u };
+      });
+      pen.hair(pts, 1.6, INK, 0.75);
+    }
+    pen.closed(ellipse(w * 0.36, h * 0.55, Math.min(6, w * 0.05), Math.min(4, h * 0.12), 10), 1.6);
+    pen.hatch(body, 4, 0.7, 1.1, { onlyBelow: h * 0.6, alpha: 0.55 });
+    // Rope lashings: two wrapped bands across the short side.
+    const n = Math.max(2, Math.round((long ? w : h) / 70));
+    for (let i = 0; i < n; i++) {
+      const c = ((long ? w : h) * (i + 0.5)) / n;
+      const band = long ? roundRect(c - 6, 0, 12, h, 1, 3) : roundRect(0, c - 6, w, 12, 1, 3);
+      pen.fill(band, C.sand);
+      pen.hatch(band, 3, long ? -1.1 : -0.45, 1.1, { alpha: 0.9 });
+      pen.closed(band, 1.8);
+    }
+  }, 4.4);
+  // Iron caps on both ends.
+  for (const end of [0, 1]) {
+    const cap = long
+      ? roundRect(end ? w - INSET - 9 : INSET, INSET, 9, h - INSET * 2, 2, 3)
+      : roundRect(INSET, end ? h - INSET - 9 : INSET, w - INSET * 2, 9, 2, 3);
+    p.fill(cap, '#5d5a63');
+    p.closed(cap, 2);
+    if (long) p.dot(end ? w - INSET - 4.5 : INSET + 4.5, h / 2, 2, C.paperGrey);
+    else p.dot(w / 2, end ? h - INSET - 4.5 : INSET + 4.5, 2, C.paperGrey);
+  }
+  // Splits show pale wood through the dark, so they read at phone size.
+  if (stage >= 2) split(p, w * 0.58, INSET, [[-0.06, 0.4], [0.07, 0.66], [-0.02, 0.95]], w, h);
+  if (stage >= 3) {
+    split(p, w * (long ? 0.24 : 0.7), h - INSET, [[0.05, -0.35], [-0.06, -0.6], [0.05, -0.9]], w, h);
+    split(p, w * (long ? 0.82 : 0.3), INSET, [[0.04, 0.5], [-0.03, 0.8]], w, h);
+  }
+};
+
+/** A split in dark wood: a pale gash with ink edges. */
+function split(p: Pen, x0: number, y0: number, steps: readonly (readonly [number, number])[], w: number, h: number): void {
+  const k = Math.min(w, h * 3);
+  const pts = [{ x: x0, y: y0 }, ...steps.map(([dx, dy]) => ({ x: x0 + dx * k * 0.5, y: y0 + dy * h }))];
+  p.stroke(pts, 7, INK, 1, false);
+  p.stroke(pts, 3.6, C.sand, 1, false);
+}
+
 const stone: BrickDraw = (ctx, w, h) =>
   void brick(ctx, w, h, 41, C.stone, (p, body) => {
     p.hatch(body, 5, 0.75, 1.1, { alpha: 0.5 });
@@ -188,4 +246,5 @@ export const BRICK_DRAWERS: Readonly<Record<string, BrickDraw>> = {
   'soft-1': soft(0), 'soft-2': soft(1), 'soft-3': soft(2),
   'tough-1': tough(1), 'tough-2': tough(2), 'tough-3': tough(3),
   stone, x3, keg, pickup, 'ice-1': ice(false), 'ice-2': ice(true), key, gate, dense,
+  'armour-1': armour(1), 'armour-2': armour(2), 'armour-3': armour(3),
 };

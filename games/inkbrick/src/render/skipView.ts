@@ -122,10 +122,12 @@ export class SkipView {
 
   sync(v: BoardView, dtMs: number): void {
     this.clock += dtMs;
-    if (this.wasHeld && !v.held) this.strike('throw', THROW_MS);
-    this.wasHeld = v.held;
+    // A caught stone (Sticky Raft) is held just like one waiting to be skipped.
+    const holding = v.held || v.caught;
+    if (this.wasHeld && !holding) this.strike('throw', THROW_MS);
+    this.wasHeld = holding;
     this.tickTimers(dtMs);
-    const target = v.held ? null : watchedBall(v.balls, this.deckY);
+    const target = holding ? null : watchedBall(v.balls, this.deckY);
     this.checkNearMiss(v);
     this.setPose(this.choose(v, target));
     this.place(v, target);
@@ -149,7 +151,7 @@ export class SkipView {
 
   /** A stone that slipped just past the raft's end makes him flinch. */
   private checkNearMiss(v: BoardView): void {
-    if (this.flinchCooldown > 0 || v.held) return;
+    if (this.flinchCooldown > 0 || v.held || v.caught) return;
     const half = v.paddleW / 2;
     for (const b of v.balls) {
       if (b.vy <= 0 || b.y < this.deckY + 10 || b.y > this.deckY + 10 + MISS_BAND) continue;
@@ -164,7 +166,7 @@ export class SkipView {
 
   private choose(v: BoardView, target: BallView | null): SkipPose {
     if (this.override) return this.override;
-    if (v.held) return 'aim';
+    if (v.held || v.caught) return 'aim';
     if (target && this.deckY - target.y < READY_PX && Math.abs(target.x - v.paddleX) < v.paddleW / 2 + NEAR_X) return 'ready';
     return 'idle';
   }

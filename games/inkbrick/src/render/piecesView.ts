@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { CELL, type LevelDef } from '../sim/types';
+import { brickKey } from './art';
 import type { BoardView } from './port';
 import { SkipView, type SkipPose } from './skipView';
 
@@ -29,7 +30,8 @@ export class PiecesView {
   private readonly raft: Phaser.GameObjects.Image;
   private readonly skip: SkipView;
   private readonly pickups: Phaser.GameObjects.Image[] = [];
-  private readonly shutters: Phaser.GameObjects.TileSprite[] = [];
+  /** Each trap door twice: shut (the plank door) and open (its dashed frame). */
+  private readonly shutters: { readonly shut: Phaser.GameObjects.Image; readonly open: Phaser.GameObjects.Image }[] = [];
   private readonly spinners: Phaser.GameObjects.Image[] = [];
   private readonly boss: Phaser.GameObjects.Image | null;
   private readonly shield: Phaser.GameObjects.Image | null;
@@ -43,6 +45,13 @@ export class PiecesView {
         scene.tweens.add({ targets: img, angle: 360, duration: 2400, repeat: -1 });
       }
     }
+    for (const s of level.shutters ?? []) {
+      const at = (key: string): Phaser.GameObjects.Image =>
+        scene.add.image(s.x * CELL, s.y * CELL, brickKey(scene, key, s.w, s.h)).setOrigin(0, 0).setDisplaySize(s.w * CELL, s.h * CELL);
+      const pair = { open: at('shutter-open'), shut: at('shutter-closed') };
+      layer.add([pair.open, pair.shut]);
+      this.shutters.push(pair);
+    }
     this.boss = level.boss ? scene.add.image(0, 0, 'brumm-smug').setOrigin(0.5, 1) : null;
     this.shield = level.boss ? scene.add.image(0, 0, 'shield').setOrigin(0, 0) : null;
     if (this.boss && this.shield) layer.add([this.boss, this.shield]);
@@ -52,7 +61,7 @@ export class PiecesView {
     this.skip = new SkipView(scene, layer, PADDLE_Y);
   }
 
-  private pooled<T extends Phaser.GameObjects.Image | Phaser.GameObjects.TileSprite>(pool: T[], i: number, make: () => T): T {
+  private pooled<T extends Phaser.GameObjects.Image>(pool: T[], i: number, make: () => T): T {
     let o = pool[i];
     if (!o) {
       o = make();
@@ -96,8 +105,14 @@ export class PiecesView {
   }
 
   private syncPieces(v: BoardView, dtMs: number): void {
-    v.shutters.forEach((s, i) => this.pooled(this.shutters, i, () => this.scene.add.tileSprite(0, 0, s.w, s.h, 'shutter').setOrigin(0, 0).setTileScale(0.5))
-      .setPosition(s.x, s.y).setSize(s.w, s.h).setVisible(s.closed));
+    v.shutters.forEach((s, i) => {
+      const pair = this.shutters[i];
+      if (!pair) return;
+      pair.shut.setPosition(s.x, s.y).setVisible(s.closed);
+      // The open frame darkens just before the door slams shut.
+      const warn = !s.closed && s.switchIn < 0.45;
+      pair.open.setPosition(s.x, s.y).setVisible(!s.closed).setAlpha(warn ? 0.6 + 0.4 * Math.abs(Math.sin(s.switchIn * 40)) : 0.7);
+    });
     v.spinners.forEach((s, i) => this.pooled(this.spinners, i, () => this.scene.add.image(0, 0, 'spinner'))
       .setPosition(s.x, s.y).setDisplaySize(s.length, 12).setRotation(s.angle));
     const b = v.boss;

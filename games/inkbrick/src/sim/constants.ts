@@ -56,3 +56,36 @@ export const INSIDE_PROBE = 5;
 export const BRICK_ROW_MIN = 3;
 export const BRICK_ROW_MAX = 50;
 export const MAX_BRICKS = 1500;
+
+// Goals, rules of the day and the new pieces (docs/inkbrick-design.md "Variety", 2026-11-18).
+/** current: sideways pull, px/s^2 (speed kept). heavy: downward pull, px/s^2. */
+export const CURRENT_PULL = 120;
+export const HEAVY_PULL = 160;
+export const SPEEDY_MUL = 1.25;
+export const SLOW_MUL = 0.85;
+export const TINY_RAFT_W = 60;
+export const TINY_RAFT_W_WIDE = 100;
+export const WIDE_RAFT_W = 130;
+export const BIG_STONE_MUL = 1.6;
+/** sticky: the caught stone is thrown by itself after this long. */
+export const STICKY_HOLD = 1.5;
+/** twoStones: the two stones never fly closer than this to each other (degrees off straight up). */
+export const TWO_STONES_MIN_DEG = 4;
+/** A bumper's kick: this share of the speed added along its normal, then the speed restored. */
+export const BUMP_KICK = 0.35;
+export const BUMPER_R_MIN = 14;
+export const BUMPER_R_MAX = 24;
+export const LEVER_COOLDOWN = 0.4;
+/** A crab scuttles this much faster for CRAB_FAST_SECONDS after a hit. */
+export const CRAB_FAST_MUL = 2;
+export const CRAB_FAST_SECONDS = 1;
+/** A pearl (goal or daily) is taken when a stone's centre comes this close to the pearl's centre plus the stone's radius. */
+export const PEARL_R = 6;
+/** Rising Tide: the field rises back this many cells after a flood. */
+export const TIDE_RISE = 6;
+/** Nothing the tide moves goes below this row (the raft is on row 60). */
+export const TIDE_FLOOR_ROW = 57;
+export const STONES_MIN = 3;
+export const STONES_MAX = 6;
+export const PEARLS_MIN = 3;
+export const PEARLS_MAX = 5;
