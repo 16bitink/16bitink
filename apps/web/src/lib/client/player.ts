@@ -10,6 +10,7 @@ import { classifyMountFailure, isShaderFailure } from './mountFailure';
 import { cleanStack } from '../stackText';
 import { accountProgress } from './progress';
 import { scopedStorage } from './scopedStorage';
+import { settleWithin } from './settleWithin';
 import { SITE_BUILD } from '../build';
 import { isNewerBuild, reloadForNewBuild, shouldReloadForNewBuild } from './staleBuild';
 
@@ -45,15 +46,21 @@ async function checkAccess(game: string): Promise<Access> {
   }
 }
 
-/** Best effort: real fullscreen where supported (desktop, Android, iPad). */
+/** How long the game start waits for fullscreen to open, and again for the screen to turn. */
+const FULLSCREEN_WAIT_MS = 1_000;
+
+/**
+ * Best effort: real fullscreen where supported (desktop, Android, iPad), then landscape.
+ * Never blocks the game for more than a moment: on Android the orientation lock can stay
+ * pending for as long as the page is fullscreen (the load sat at 36% until fullscreen was left).
+ * iPhone Safari has no element fullscreen; the page already fills the viewport.
+ */
 async function goFullscreen(el: HTMLElement): Promise<void> {
-  try {
-    if (!document.fullscreenElement && el.requestFullscreen) await el.requestFullscreen({ navigationUI: 'hide' });
-    const orientation = screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> };
-    await orientation.lock?.('landscape').catch(() => undefined);
-  } catch {
-    // iPhone Safari has no element fullscreen; the page already fills the viewport.
+  if (!document.fullscreenElement && el.requestFullscreen) {
+    await settleWithin(() => el.requestFullscreen({ navigationUI: 'hide' }), FULLSCREEN_WAIT_MS);
   }
+  const orientation = screen.orientation as (ScreenOrientation & { lock?: (o: string) => Promise<void> }) | undefined;
+  await settleWithin(() => orientation?.lock?.('landscape'), FULLSCREEN_WAIT_MS);
 }
 
 /** Downloads a game package and checks it implements the SDK contract. */
