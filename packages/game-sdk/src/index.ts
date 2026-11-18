@@ -247,3 +247,7 @@ export function isGameModule(value: unknown): value is GameModule {
 }
 
 export { runInSlices, yieldToBrowser, type SliceJob, type SliceOptions } from './slices';
+export {
+  addDays, daysBetween, eventOn, EVENT_IDS, EVENTS, isDate, missingMovingDates, MOVING_DATES, MOVING_EVENTS, nextEvent, seasonOf, SEASONS,
+  type EventId, type EventInfo, type MovingEvent, type Season,
+} from './calendar';
