@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { cardFit, hudPlan } from '../src/scenes/uiLayout';
 import {
-  interfaceScale, isPhone, MAP_NODE, mapZoom, PHONE_CARD_CSS, PHONE_CELL, phoneCardFit, sizer, TEXT_MIN, TOUCH_GAP, TOUCH_MIN,
+  DAILY_PAGE, interfaceScale, isPhone, MAP_NODE, mapZoom, PHONE_CARD_CSS, PHONE_CELL, phoneCardFit, sizer, TEXT_MIN, TOUCH_GAP, TOUCH_MIN,
 } from '../src/scenes/uiSizes';
 
 /** As the scenes use them (uiPaint's ROUND, the meter, a long level tag, the cards). */
@@ -79,6 +79,10 @@ describe('phone UI sizes', () => {
         expect(DAILY_W * fit * ui).toBeLessThanOrEqual(css.width);
         expect(fit * ui).toBeGreaterThanOrEqual(PHONE_CARD_CSS);
         expect(PHONE_CELL * fit * ui).toBeGreaterThanOrEqual(TOUCH_MIN - 0.5);
+      });
+
+      it('draws the daily hunt\'s calendar page at least 64 CSS px', () => {
+        expect(Math.min(DAILY_PAGE.phoneCss.w, DAILY_PAGE.phoneCss.h)).toBeGreaterThanOrEqual(64);
       });
 
       it('zooms the map in so nests can be tapped and names read', () => {

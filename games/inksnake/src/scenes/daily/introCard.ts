@@ -3,7 +3,7 @@ import type Phaser from 'phaser';
 import { RED } from '../../art/palette';
 import { bakeForLevel } from '../../art/textures';
 import type { DailyStart } from '../../daily/client';
-import { longDate } from '../../daily/dates';
+import { countdown, longDate, msToMidnight } from '../../daily/dates';
 import { goalLine, placeName, snakeName, winterLine } from '../../daily/text';
 import { placeOf } from '../../level/levels';
 import { ruleLine } from '../../level/daily';
@@ -42,6 +42,15 @@ export function introCard(scene: Phaser.Scene, s: DailyStart, isToday: boolean, 
   const aside = winterLine(level);
   if (aside) c.text(aside, 19, SOFT_INK, 4);
   if (s.beat !== null) c.text(`A friend's time to beat: ${clock(s.beat)}`, 24, GOLD_INK, 4);
+  if (isToday) {
+    // When the next hunt opens: something to look forward to, not a deadline.
+    const next = c.text('', 19, SOFT_INK, 4);
+    const tick = (): void => {
+      if (next.active) next.setText(`New hunt in ${countdown(msToMidnight(new Date()))}`);
+    };
+    tick();
+    scene.time.addEvent({ delay: 1000, loop: true, callback: tick });
+  }
   c.y += 6;
   c.buttons([{ label: 'Hunt!', run: a.play, kind: 'leaf' }], 62, 34);
   c.buttons([{ label: 'Calendar', run: a.calendar }, { label: 'Album', run: a.album }, { label: 'Map', run: a.menu }], 48, 23);

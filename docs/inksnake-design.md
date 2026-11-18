@@ -161,6 +161,8 @@ The owner's phone playtest (2026-11-18): "UI elements on the mobile screen shoul
 
 A vertical scroll as in InkGecko: a field guide's route map that climbs from the farm (chapter 1) to the flooded forest (chapter 10), a pocket for each level along a winding snake track. Chapters not built yet are pencil drafts; the full game's chapters are painted but locked until bought.
 
+The daily hunt isn't on the trail. It's a painted calendar page fixed on the right (`scenes/map/dailyButton.ts`): today's month on a plum header (no nest uses plum), the day big, the day's snake in the corner and "Daily hunt" under it. On phones it sits low on the right rail above the Snake button, 64 css px or more; on a laptop it sits under the bar. While today is unplayed it has a red dot and pulses gently every few seconds; once played it shows a green check. Christmas days get a candy-cane corner, other events a red star. A tap opens the card before the hunt: the date, place, snake, rule, "New hunt in …", Hunt!, Calendar, Album and Map. The top bar shows only the chapter and its progress.
+
 ## Art
 
 The house ballpoint notebook style (blue ink lines, watercolour washes, paper), painterly rather than doodled (see [art-pipeline.md](art-pipeline.md)). Seen from above.

@@ -43,6 +43,9 @@ export const PHONE_CARD_CSS = 0.72;
 /** A day's cell in the calendar on a phone, units: TOUCH_MIN CSS px once the card fills a 360 px screen. */
 export const PHONE_CELL = 56;
 
+/** The daily hunt's calendar page on the map: at least 64 CSS px on a phone (a thumb's easy target), and its laptop size, units. */
+export const DAILY_PAGE = { phoneCss: { w: 64, h: 70 }, desk: { w: 66, h: 72 } } as const;
+
 export interface Size {
   readonly width: number;
   readonly height: number;
