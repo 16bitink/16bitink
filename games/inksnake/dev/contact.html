@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>InkSnake dailies: contact sheet</title>
+  <style>
+    body { font: 12px/1.35 system-ui, sans-serif; background: #f4efe4; color: #2b2620; margin: 16px; }
+    h1 { font-size: 18px; margin: 0 0 4px; }
+    p.note { margin: 0 0 12px; color: #6b6255; }
+    #sheet { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
+    .day { background: #fffaf0; border: 1px solid #d8cdb8; border-radius: 6px; padding: 6px; }
+    .day.sun { border-color: #c98a2b; }
+    .day.sat { border-color: #8b3a3a; }
+    .day.event { background: #fff1f1; border-color: #c0392b; border-width: 2px; }
+    .day canvas { display: block; width: 240px; height: 135px; margin: 0 auto 4px; border-radius: 3px; }
+    .day b { display: block; }
+    .miss { color: #a33; font-weight: 600; }
+    .guest { color: #2b6cb0; font-weight: 600; }
+    .legend span { display: inline-block; margin-right: 10px; }
+    .legend i { display: inline-block; width: 10px; height: 10px; margin-right: 3px; vertical-align: -1px; }
+  </style>
+</head>
+<body>
+  <h1>InkSnake dailies</h1>
+  <p class="note">Every frozen day (content/daily/*.json). Veto one with <code>npm run gen -- --redo YYYY-MM-DD</code> (new board and cast; place, snake, rule and goal stay, as yesterday's teaser promised them). Bot times are 3 seeds; the band is the weekday's.</p>
+  <p class="note legend">
+    <span><i style="background:#6b4a2b"></i>solid</span><span><i style="background:#5f9e4f"></i>cover</span><span><i style="background:#8fc3e0"></i>water</span>
+    <span><i style="background:#e6d3a3"></i>sand / land</span><span><i style="background:#2f7a3a"></i>tree crown</span><span><i style="background:#f3d36b"></i>sun</span>
+    <span><i style="background:#c9dd8a"></i>tall grass</span><span><i style="background:#d33"></i>start</span><span><i style="background:#222"></i>hole / spot</span><span><i style="background:#e8c33a"></i>nest</span>
+  </p>
+  <div id="sheet"></div>
+  <script type="module" src="./contact.ts"></script>
+</body>
+</html>
