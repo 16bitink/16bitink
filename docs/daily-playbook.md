@@ -116,3 +116,6 @@ The game never talks to the network: the host does. `today()`, `load(date)`, `re
 
 - **InkBrick (2026-11-18):** the owner's playtest found the levels felt too alike, because every level asked the same thing. Varying the **goal**, adding **pieces** that behave differently, and giving every day **a rule of its own** fixed it. Limit how often one layout shape appears (no more than 2 "box in the middle" levels per chapter).
 - **InkBrick:** goals with a fixed length (Few Stones) don't rank by time, so they're kept out of dailies.
+- **InkSnake (2026-11-18):** tune the length to the band rather than throwing candidates away. Scaling the target growth by (band middle ÷ bot time) and playing once more brought 90% of bot-won candidates into the band, and all 71 frozen days met it. Boss days can't be tuned by length; tune the boss's strikes instead.
+- **InkSnake:** event days lock place and rule, so plan them first. Look them up ahead when choosing the days around them: a 4-place winter pool with two event places in the next two days has no place left otherwise.
+

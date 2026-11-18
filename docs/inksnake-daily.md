@@ -221,3 +221,65 @@ Event snakes: `candycane` and `rainbowboa` are painted (recoloured from the corn
 ### In the game
 
 Menu: a "Today's Hunt" button under the bar (bigger on phones) shows place, snake and rule once the host has the day. A challenge link opens straight onto the card before the hunt. The end card records through `host.daily.record` once per play, adds the snake to the album (`inksnake.album.v1` in the host's storage), and never touches campaign progress. Dev: `pnpm dev`, then `?hunt=ice|xmas|rival|golden|newyear` picks today's sample (earlier days take the next ones round), `?beat=75` fakes a challenge; `node dev/tools/dailyshots.mjs <url> <out> <hunt...>` screenshots the card, the board and the end card (`PHONE=1`, `EXTRA=1` for the calendar, album and menu).
+
+## Generator notes
+
+Built 2026-11-18 (build plan steps 2 and 3). Code in `games/inksnake/src/gen` (pure: the chapters and the bot are passed in, so `src/` never imports the paid chapters or test code), the CLI in `dev/gen.mjs` with its pure side in `dev/genDays.ts`, frozen months in `content/daily/YYYY-MM.json`, served by `content/daily.ts` (`inksnakeDaily(date)`, package export `./daily`).
+
+```
+npm run gen -- --from 2026-11-22 --days 71   # freeze the days not yet frozen (--force to remake them)
+npm run gen -- --redo 2026-12-09             # vetoed day: new board and cast, same place, snake, rule and goal
+npm run gen -- --audit                       # the variety audit below
+npm run gen -- --tomorrow                    # rewrite every day's teaser from the day after it
+```
+
+### How a day is made
+
+1. **Plan** (`plan.ts`, sequential, seeded by `hash('inksnake:' + date)`): the event's fixed dials (table in `EVENT_PLANS`), else the season's pool minus the last 2 days' places (and event days next to it), weighted towards places not seen in 14 days; the weekday's goal (Mon grow, Tue feast, Wed grow or rush with a guest, Thu rush, Fri grow or feast with a hard rule, Sat golden 55% or a spectacle, Sun boss with a spectacle); a guest on Wednesdays and a quarter of Saturdays; the rule of the weekday's kind not used within 7 days and leaving the next Monday/Friday/weekend one of theirs. 48 proposals; the one sharing fewest dials with the last 14 days wins (the last 7 count double). Then three layouts: none used within 60 days, no family (a board's mirrors, a place's pattern shape) within 14. All three are reserved.
+2. **Promises:** a day whose yesterday is frozen keeps the place, snake and rule its teaser showed. `tomorrow` on every day comes from the next frozen day or the next day's plan, so a later run of the next month keeps it (the audit checks: 0 broken).
+3. **Compose** (`layouts.ts`, `compose.ts`): a remix (board 1–9 mirrored none/x/y/xy, solids jittered ±10 px with holes and nests following their solid, cover ±18 px), or a pattern (`ring`, `lanes`, `scatter`, `rooms`, `islands`, `spiral`) in the place's own solids, with a campaign board's zones (sun, sand, scree, stream, tall grass). The reef lays out cays, coral and eel holes; the flooded forest islands, trunks and the caiman's and jaguar's spots; the rainforest crowns a glide apart; the savanna hangs two nests on up to five acacias. Christmas days wrap half the solids as presents. Cast from the place's prey and enemies (only what the snake eats; eggs only with nests; hens, weavers and caimans only where their nests or holes are). Data rules are written into the fields.
+4. **Cheap checks** (`checks.ts`): the validator, a clear start, 85% of open floor reachable, cover, nests and holes off solids, crowns joined within 135 px, and (patterns) at most 15% of the floor further than 230 px from anything. Campaign boards run up to 21% (p90 13%), so remixes are exempt.
+5. **Bot** (`generate.ts`): 3 seeds, 300 s cap, at least 2 wins. Off the band, the growth is scaled to the band's middle (up to 3 tries); a boss day gets one strike more or less instead (hp 2–6). Up to 8 survivors per layout; the next layout only if none met the band. Par = mean win × 1.6 (rounded to 5 s); a rush's clock = slowest win × 1.9 (at least 30 s).
+
+### Bands as set (bot's mean win time, s)
+
+| Mon | Tue | Wed | Thu | Fri | Sat | Sun | Events |
+|---|---|---|---|---|---|---|---|
+| 10–28 | 14–40 | 14–45 | 14–45 | 18–62 | 16–55 | 20–80 | 12–45 |
+
+From the engine notes: plain level 1s run 11–45 s, hard rules to ~80 s. Ice and blizzard are kept off Monday and Tuesday (a mountain blizzard missed Tuesday's band at 42 s with the shortest target).
+
+### The first freeze (2026-11-22 to 2027-01-31, 71 days)
+
+All 71 days met their band, the bot winning 3/3 on every one. 608 candidates composed: 4% failed the cheap checks; of the 584 the bot played, 7% lost on 2+ seeds and 10% stayed off the band after tuning; 975 bot plays; an alternate layout was needed on 1 day. 90 s on 7 workers.
+
+| week of | days | places | snakes | goals | rules | layouts | guests | bands met |
+|---|---|---|---|---|---|---|---|---|
+| 2026-11-16 | 1 | 1 | 1 | 1 | 1 | 1 | 0 | 1/1 |
+| 2026-11-23 | 7 | 6 | 6 | 5 | 7 | 7 | 2 | 7/7 |
+| 2026-11-30 | 7 | 5 | 5 | 5 | 7 | 7 | 1 | 7/7 |
+| 2026-12-07 | 7 | 4 | 4 | 5 | 7 | 7 | 1 | 7/7 |
+| 2026-12-14 | 7 | 4 | 4 | 5 | 7 | 7 | 1 | 7/7 |
+| 2026-12-21 | 7 | 4 | 5 | 3 | 7 | 7 | 1 | 7/7 |
+| 2026-12-28 | 7 | 4 | 4 | 5 | 7 | 7 | 2 | 7/7 |
+| 2027-01-04 | 7 | 4 | 3 | 5 | 7 | 7 | 2 | 7/7 |
+| 2027-01-11 | 7 | 4 | 3 | 5 | 7 | 7 | 2 | 7/7 |
+| 2027-01-18 | 7 | 4 | 4 | 4 | 7 | 7 | 1 | 7/7 |
+| 2027-01-25 | 7 | 4 | 4 | 5 | 7 | 7 | 2 | 7/7 |
+
+- **Shortest repeats:** layout never; layout family 16 days; a rule 7 days on ordinary days (6 days only between the Christmas Day and New Year's Eve nights, both set by the event table); a place 2 days only round Christmas (farm on Dec 24 and 26, from the table).
+- **Totals:** places farm 17, mountains 17, barrens 17, heath 16, jungle 2, dunes 2 (the last autumn week). Snakes corn 17, spidertail 15, hognose 15, adder 14, candycane 3, sidewinder 2, cobra 2, rainbowboa 2, krait 1. Goals feast 20, grow 16, rush 16, boss 11, golden 8. All 14 winter-possible rules used, 4–7 times each. Layouts: 43 remixes, 28 patterns (ring 9, rooms 5, spiral 4, lanes 4, scatter 4, islands 2).
+- **Checks:** no out-of-season place, every event on its date, no broken teaser.
+- Patterns for the places not in this range (reef, flooded, rainforest, savanna, jungle, dunes) were tried on 6 candidates per shape: 80–100% pass the cheap checks and the bot, except savanna `lanes` (half have no acacia left after the start is cleared, so no eggs; the cheap check drops them).
+
+### For the owner on the contact sheet
+
+Open `dev/contact.html` (`pnpm dev`, then `/contact.html`).
+
+- **The four winter places carry all of December–February.** Variety then comes from the snake, rule, goal and board, but there are only 4 places a week. If it feels samey in play, add a winter look to another place (the doc's pools allow it).
+- **Christmas boards are sparse** (3–5 solids, half wrapped as presents): the remixes come from early campaign boards. Redo one if it looks bare.
+- **Guests in winter** are corn, hognose and the horned viper only (the adder needs its sun patches). The horned viper on the farm (Dec 19, Jan 9) lures birds the farm doesn't have; the bot wins, but check it looks right.
+- **Golden days with Plenty** have long targets (Jan 2: 130 → 793 px). The bot wins in 22 s, but the number is big on the card.
+- **Boss days** are tuned by the boss's strikes, so the barrens fox can be 4 strikes.
+- **Later events:** the golden tree snake's Lunar New Year (Feb 6) is on the mountains, where it has no trees to glide from, so it moves at its forest-floor speed. Move it to the rainforest or give it its own ability before the February freeze. A day the bot can't win on any layout is still frozen (`ok: false` in the JSON, red on the sheet); redo it.
+- **Redo** keeps place, snake, rule and goal and draws new layouts. It checks the 60-day layout limit against earlier days only.
