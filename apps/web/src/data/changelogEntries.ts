@@ -4,6 +4,14 @@ import type { ChangelogEntry } from './changelog';
 
 export const SITE_ENTRIES: readonly ChangelogEntry[] = [
   {
+    date: "2026-11-17",
+    title: "Daily levels and the calendar",
+    changes: [
+      "A new daily level, the same for everyone: today's is on the home page.",
+      "The Daily page keeps a calendar of every day you played, with stamps for 3, 7, 14, 30, 50 and 100 days. It counts days played, never a streak, and works without an account.",
+    ],
+  },
+  {
     date: "2026-11-12",
     title: "Reload when graphics fail to start",
     changes: [
@@ -481,6 +489,18 @@ export const GAME_ENTRIES: Readonly<Record<string, readonly ChangelogEntry[]>> =
         "Every level is a different mission: clear the farm, blow up fuel stacks, escort a supply truck, hold a bridge, hunt an enemy ace and more.",
         "Swap in the guns, hulls and drives enemies drop, and keep the blueprints they leave to upgrade your tank in the workshop.",
         "Earn up to three medals per mission and rise through the ranks from Private to General.",
+      ],
+    },
+  ],
+  inkbrick: [
+    {
+      date: "2026-11-22",
+      title: "InkBrick launches",
+      changes: [
+        "Launched InkBrick: a brick-breaking adventure on a sunny coast with Skip the sea otter and Brumm the walrus, 50 levels in 5 chapters. The first 10 levels are free.",
+        "Every level is a shell of bricks: break in, and the ball runs wild inside.",
+        "A new daily level every day, the same for everyone, free with no sign-up.",
+        "Collect shells on each level and earn stamps for the days you play.",
       ],
     },
   ],

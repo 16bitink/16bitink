@@ -8,6 +8,8 @@ import { createHiddenTime, visibleMs } from './hiddenTime';
 import { createLoadingBar } from './loadingBar';
 import { classifyMountFailure, isShaderFailure } from './mountFailure';
 import { cleanStack } from '../stackText';
+import { dailyGame } from '../../data/dailies';
+import { createDailyHost } from './dailyHost';
 import { accountProgress } from './progress';
 import { scopedStorage } from './scopedStorage';
 import { SITE_BUILD } from '../build';
@@ -232,6 +234,7 @@ export function bootPlayer(game: string, fonts: readonly string[]): void {
         signedIn: me?.signedIn === true,
         price: stage.dataset.price || undefined,
         loadContent: () => getJson<unknown>(`/api/content/${encodeURIComponent(game)}`),
+        daily: dailyGame(game) ? createDailyHost(game, rawStorage(), window.location) : undefined,
         // Only as a new chapter or level loads (see GameHost): never in the middle of play.
         filesMissing: () => void offerRefresh(stage, false),
         onBuy: (where) => {
@@ -390,6 +393,15 @@ function watchForNewBuild(tapped: () => boolean): void {
 function safeStorage(userId: string | null): KeyValueStore | undefined {
   try {
     return scopedStorage(window.localStorage, userId);
+  } catch {
+    return undefined;
+  }
+}
+
+/** The browser's own storage, not scoped to an account: the daily calendar is the browser's until it syncs. */
+function rawStorage(): KeyValueStore | undefined {
+  try {
+    return window.localStorage;
   } catch {
     return undefined;
   }

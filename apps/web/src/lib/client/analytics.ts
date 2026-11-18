@@ -119,6 +119,9 @@ function visitorId(now: number): string {
   }
 }
 
+/** This browser's visitor id, for features that need to tell browsers apart without an account (daily plays). */
+export const currentVisitorId = (): string => visitorId(Date.now());
+
 function optedOut(): boolean {
   const nav = navigator as Navigator & { globalPrivacyControl?: boolean };
   return nav.globalPrivacyControl === true || navigator.doNotTrack === '1' || readStorage(OPT_OUT_KEY) === '1';

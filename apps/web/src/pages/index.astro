@@ -1,8 +1,10 @@
 ---
 import Base from '../layouts/Base.astro';
+import DailyCard from '../components/DailyCard.astro';
 import GameSpread from '../components/GameSpread.astro';
 import PartnerAd from '../components/PartnerAd.astro';
 import SundaySignup from '../components/SundaySignup.astro';
+import { DAILY_GAMES } from '../data/dailies';
 import { homeGames, homeListings } from '../data/games';
 import { currentUser, ownedGameSlugs } from '../lib/owner';
 import { siteJsonLd } from '../lib/seo';
@@ -57,6 +59,10 @@ Astro.response.headers.set('cache-control', 'private, no-store');
       <li>No in-game ads</li>
     </ul>
   </div>
+  <!-- Today's daily, for every visitor: the same level for everyone, free, no sign-up. -->
+  <section class="dailies" aria-label="Today’s daily">
+    {DAILY_GAMES.map((daily) => <DailyCard daily={daily} />)}
+  </section>
   <!-- Each top card says why it is there; the rest wear no sticker, so the two labels don't compete with more. -->
   <div class="games">
     {top.map(({ game, label }, i) => <GameSpread game={game} owned={owned.has(game.slug)} position={i + 1} featured label={label} />)}
@@ -84,6 +90,7 @@ Astro.response.headers.set('cache-control', 'private, no-store');
   }
   /* The row spaces the cards; their own outer margins are for when they stand alone. */
   .closing > :global(.paper-card) { margin: 0; }
+  .dailies { display: grid; gap: 16px; margin: -12px 0 52px; }
   .hero { margin: 8px 0 44px; }
   .intro { margin: 0; font-size: clamp(1.9rem, 4vw, 2.5rem); font-weight: 700; color: var(--ink); }
   .weekly { color: var(--blue-ink); white-space: nowrap; }

@@ -38,7 +38,7 @@ export function createRateLimiter(opts: { readonly limit: number; readonly windo
   };
 }
 
-export type LimitedRoute = 'checkout' | 'mail' | 'auth' | 'progress' | 'admin' | 'redeem' | 'events' | 'subscribe' | 'oauth';
+export type LimitedRoute = 'checkout' | 'mail' | 'auth' | 'progress' | 'admin' | 'redeem' | 'events' | 'subscribe' | 'oauth' | 'daily';
 
 /** Routes that cost money, credentials or database writes if hammered. The Stripe webhook is never limited: Stripe retries in bursts. */
 export function limitFor(pathname: string): LimitedRoute | null {
@@ -52,5 +52,6 @@ export function limitFor(pathname: string): LimitedRoute | null {
   if (pathname === '/api/subscribe' || pathname === '/api/unsubscribe') return 'subscribe';
   if (pathname === '/admin' || pathname.startsWith('/admin/') || pathname.startsWith('/api/admin/') || pathname === '/mcp') return 'admin';
   if (pathname.startsWith('/oauth/')) return 'oauth';
+  if (pathname.startsWith('/api/daily/')) return 'daily';
   return null;
 }

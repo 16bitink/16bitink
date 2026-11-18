@@ -96,6 +96,12 @@ h3 { font-size: 1.9rem; }
   padding-block: 20px;
 }
 
+/* The Daily link sits beside the logo; the account stays at the far end. */
+.site-nav { margin-right: auto; display: flex; gap: 18px; }
+.site-nav a { font-family: var(--font-hand); font-size: 1.6rem; font-weight: 700; color: var(--ink); text-decoration: none; padding: 4px 6px; }
+.site-nav a:hover { color: var(--blue-ink); }
+.site-nav a:focus-visible { outline: 2px dashed var(--blue-ink); outline-offset: 3px; }
+
 .logo { display: inline-flex; align-items: baseline; color: var(--ink); text-decoration: none; }
 .logo .bits { font-family: var(--font-pixel); font-size: 1.35rem; letter-spacing: 0.02em; }
 .logo .ink { font-family: var(--font-hand); font-size: 2rem; color: var(--blue-ink); margin-left: -4px; transform: translateY(2px) rotate(-4deg); display: inline-block; }
