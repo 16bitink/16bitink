@@ -4,7 +4,7 @@ import { Bot } from '../src/sim/bot';
 import { BALL_R, BALL_SPEED, PADDLE_Y, STICKY_HOLD, TINY_RAFT_W, WIDE_RAFT_W } from '../src/sim/constants';
 import { fill, shell, stone } from '../src/sim/kit';
 import { Sim } from '../src/sim/sim';
-import { Aimer } from '../src/sim/trace';
+import { Aimer, traceInside, traceWorld } from '../src/sim/trace';
 import type { BrickDef, LevelDef, SimEvent, SimInput } from '../src/sim/types';
 import { LevelError } from '../src/sim/validate';
 
@@ -261,5 +261,19 @@ describe('state the renderer reads (2026-11-18)', () => {
     expect(sim.state.tideOffset).toBe(2);
     expect(sim.state.whirlpools[0]!.ay).toBe((30 + 0.5 + 2) * 15);
     expect(sim.state.whirlpools[0]!.ax).toBe(10.5 * 15);
+  });
+});
+
+describe('the aim trace and levers (2026-11-18)', () => {
+  it('counts a lever shot as a way in only while a flip wall on its link is shut, gates or not', () => {
+    // A gated floor hole, its key far left, and a lever straight above the launch spot whose flip wall is elsewhere.
+    const bricks: BrickDef[] = [
+      ...shell(20, 8, 12, 10, [{ side: 'bottom', at: 3, width: 4 }]), { x: 23, y: 17, w: 4, h: 1, kind: 'gate', link: 'g' },
+      { x: 1, y: 40, w: 3, h: 1, kind: 'key', link: 'g' }, { x: 17, y: 30, w: 3, h: 1, kind: 'lever', link: 'a' }, ...TOP,
+    ];
+    const flipsAt = (on: boolean): LevelDef => lv(bricks, { flips: [{ x: 2, y: 24, w: 4, h: 1, link: 'a', on }] });
+    const straightUp = (level: LevelDef, flips: boolean[]) => traceInside(traceWorld(level, { gatesOpen: false, time: 0, flips }), 18.5 * 15, 0, true);
+    expect(straightUp(flipsAt(false), [false])).toBe(false);
+    expect(straightUp(flipsAt(true), [true])).toBe(true);
   });
 });

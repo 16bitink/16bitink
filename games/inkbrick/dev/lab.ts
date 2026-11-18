@@ -9,6 +9,7 @@ import { ASCII_LEGEND, asciiBoard } from '../src/sim/ascii';
 import { formatValue, judge, measureLevel, type RunResult } from '../src/sim/measure';
 import { dailyTargets, levelTargets } from '../src/sim/targets';
 import type { LevelDef } from '../src/sim/types';
+import { checkLevel } from '../src/level/validate';
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -94,6 +95,9 @@ export async function main(args: readonly string[], fileModule?: Record<string, 
   const file = flag('--file');
   if (!query && !file) return 'usage: npm run lab -- <level id | number | YYYY-MM-DD> [--runs 20] [--file path.ts] [--quiet]';
   const level = await findLevel(query, file, fileModule);
+  // The same check the game runs on the paid payload: one bad level there stops every paid level loading.
+  const checked = checkLevel(level);
+  if (!checked.ok) return `INVALID ${checked.problem} (the game would refuse to load the paid levels)`;
   const runs = Number(flag('--runs') ?? 20);
   const t0 = performance.now();
   const m = measureLevel(level, { runs });

@@ -32,14 +32,14 @@ const LEFT = [
 ];
 const RIGHT = [
   ...face(18, 36, 24), ...beds(18, 36, 20), ...fill(18, 21, 18, 3, 'soft', { tint: 4 }),
-  ...fill(18, 13, 18, 7, 'soft', { tint: 4 }), ...fill(18, 9, 18, 4, 'tough', { hp: 2, tint: 6 }), ...fill(18, 6, 18, 3, 'tough', { hp: 2, tint: 6 }), ...fill(18, 4, 18, 2, 'soft', { tint: 6 }),
+  ...fill(18, 13, 18, 7, 'soft', { tint: 4 }), ...fill(18, 9, 18, 4, 'tough', { hp: 2, tint: 6 }), ...fill(18, 6, 18, 3, 'soft', { tint: 6 }), ...fill(18, 4, 18, 2, 'soft', { tint: 6 }),
 ];
 const at = (col: number, row: number, r: number): BumperDef => ({ x: col * CELL, y: row * CELL + CELL / 2, r });
 // Coral bumpers in the lanes where returns fall, off the launch column, staggered on two heights.
 const BUMPERS: BumperDef[] = [at(9, 38, 20), at(27, 40, 20), at(3, 45, 16), at(33, 46, 16)];
 const TEASERS = [...fill(0, 28, 9, 1, 'tough', { hp: 2 }), ...fill(30, 33, 6, 1, 'soft')];
 // Kegs in the corners of the field: they blast the last stragglers, so no hunt.
-const CORNER_KEGS = [[0, 4], [33, 4], [0, 15], [33, 21], [33, 25]];
+const CORNER_KEGS: [number, number][] = [[0, 4], [33, 4], [0, 6], [33, 6], [15, 4], [18, 4], [0, 15], [33, 21], [33, 25]];
 
 export const WHIRLING_CORE: LevelDef = {
   id: 'ch4-38-core',

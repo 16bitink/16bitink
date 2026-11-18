@@ -106,8 +106,13 @@ export class VarietyView {
     }
   }
 
-  /** Dark levels: lift the daily pearl's glint above the darkness (call after the Lantern is made) and light it. */
+  /**
+   * Dark levels (call after the Lantern is made): the goal shows through the dark, since it is
+   * what you are steering for: the caged friend and the level's pearls go over the darkness.
+   * The daily pearl stays hidden; only its glint comes up, lit.
+   */
   aboveDark(layer: Phaser.GameObjects.Container): void {
+    for (const img of [this.friend, this.cage, ...this.pearls]) if (img) layer.bringToTop(img);
     if (!this.glint) return;
     layer.bringToTop(this.glint);
     this.glint.setTint(0xfff1c8).setTintMode(Phaser.TintModes.FILL);

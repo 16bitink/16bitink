@@ -1,6 +1,6 @@
 // The InkBrick daily generator (docs/inkbrick-design.md "The daily level"):
 //   npm run gen -- --from 2026-11-20 --days 60 [--candidates 200] [--enough 24] [--finalists 6] [--runs 4] [--verify 2] [--verify-runs 12] [--rounds 2] [--workers N] [--force]
-//   npm run gen -- --redo 2026-12-03[,2026-12-09]   (vetoed days: new candidates, the rest untouched)
+//   npm run gen -- --redo 2026-12-03[,2026-12-09] [--relayout 2026-12-09]   (vetoed days: new candidates, the rest untouched; goal and rule kept, layout too unless --relayout)
 //   npm run gen -- --report [--from 2026-11-20 --days 73] [--runs 20]   (every frozen day measured as the lab does)
 //   npm run gen -- --tomorrow   (rewrite every frozen day's tomorrow: { rule, goal } from the day after it)
 //   npm run gen -- --propose --chapter 2 --number 14 --layout hourglass [--twist ice] [--goal rescue] [--rule current] --out content/ch2/neck.ts
@@ -132,7 +132,8 @@ async function main() {
   );
 
   // Plans are sequential (novelty against the days before); the days themselves run in parallel.
-  const keep = Object.fromEntries(redoDates.map((d) => [d, gen.keepOf(frozen[d])]).filter(([, k]) => k));
+  const relayout = (flag(args, '--relayout') ?? '').split(',').filter(Boolean);
+  const keep = Object.fromEntries(redoDates.map((d) => [d, gen.keepOf(frozen[d], relayout.includes(d))]).filter(([, k]) => k));
   const plans = gen.planDates(dates, force && !redo ? {} : frozen, salts, keep).filter((p) => todo.includes(p.date));
   const workers = Number(flag(args, '--workers', Math.max(1, os.cpus().length - 1)));
   const t0 = performance.now();

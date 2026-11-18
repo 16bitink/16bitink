@@ -96,10 +96,15 @@ function whirl(w: World, g: Ghost): boolean {
   return false;
 }
 
+/** A lever with this link would open something: a flip wall on its link is shut. */
+function leverOpens(w: World, link: string | undefined): boolean {
+  return w.flips.some((f) => f.solid && f.link === (link ?? ''));
+}
+
 /**
  * True when a ghost ball from (x0, raft line) at `deg` (0 = straight up, + = right) gets inside
- * (or onto a `target` cell, when given: a pearl, the rescue friend), or (`keys`) reaches a key
- * brick or a lever, which opens the way in.
+ * (or onto a `target` cell, when given: a pearl, the rescue friend), or reaches a key brick
+ * (`keys`: a gate is shut) or a lever whose flip wall is shut, which opens the way in.
  */
 export function traceInside(w: World, x0: number, deg: number, keys = false, target?: Uint8Array): boolean {
   const r = w.ballRadius;
@@ -134,7 +139,8 @@ export function traceInside(w: World, x0: number, deg: number, keys = false, tar
     findContact(w, b, c);
     if (c.kind !== C_NONE) {
       if (c.kind === C_BRICK && w.bricks[c.id]!.breakable) return keys && w.bricks[c.id]!.kind === 'key';
-      if (c.kind === C_BRICK && keys && w.bricks[c.id]!.kind === 'lever') return true;
+      // A lever opens the way only while a flip wall on its link is shut (a shut gate alone doesn't make it a way in).
+      if (c.kind === C_BRICK && w.bricks[c.id]!.kind === 'lever' && leverOpens(w, w.bricks[c.id]!.def.link)) return true;
       const dot = b.vx * c.nx + b.vy * c.ny;
       b.x += c.nx * c.pen;
       b.y += c.ny * c.pen;

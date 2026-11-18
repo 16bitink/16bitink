@@ -36,12 +36,12 @@ const CAGE: BrickDef[] = [
 ];
 // The loft: x3 shells every 4th cell on its bottom row (mirrored), sandcastle, driftwood round the cage.
 // Roof plank: row 3 over the cage, so a stone can no longer run the empty ceiling rows to the pup.
-const ROOF = fill(9, 3, 18, 1, 'tough', { hp: 3 });
+const ROOF = fill(3, 3, 30, 1, 'tough', { hp: 3 });
 const LOFT_SHELLS = [2, 6, 10, 14, 21, 25, 29, 33];
 const LOFT = [
   ...fill(0, 14, 36, 1, 'soft', { bw: 1 }).map((b) => (LOFT_SHELLS.includes(b.x) ? { ...b, kind: 'x3' as const } : b)),
   ...fill(0, 11, 36, 3, 'soft'),
-  ...fill(0, 8, 36, 3, 'tough', { hp: 2 }),
+  ...fill(0, 8, 36, 3, 'tough', { hp: 3 }),
   ...fill(0, 4, 15, 4, 'tough', { hp: 2 }), ...fill(21, 4, 15, 4, 'tough', { hp: 2 }),
 ];
 // Teasers right of the first gap's lane. Two planks of driftwood low by the raft screen the launch

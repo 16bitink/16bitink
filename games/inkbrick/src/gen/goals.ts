@@ -11,6 +11,7 @@ import { pick, randInt, type Rng } from '../sim/rng';
 import {
   CELL, COLS, RESCUE_SIZE, RESCUE_WHO, ROWS, type BrickDef, type CellPoint, type LevelDef, type RescueDef, type TideDef,
 } from '../sim/types';
+import { ruleNumbers } from '../sim/world';
 import type { DayPlan } from './plan';
 
 const LAUNCH_COL = Math.floor(LAUNCH_X / CELL);
@@ -27,8 +28,9 @@ export const TIDE_LINE_GAP = 10;
 export const TIDE_EVERY: readonly [number, number] = [4.5, 12];
 export const GOLD_RUSH_SHARE = 0.12;
 export const KEG_DAY_SHARE = 0.1;
-/** Hits the friend's cage bricks take. */
+/** Hits the friend's cage bricks take (Monday-Wednesday, the easier days: 2; a 3-hit cage on a Wednesday layers day left novices at 40-50%). */
 export const CAGE_HP = 3;
+export const CAGE_HP_EARLY = 2;
 
 interface Spot { readonly x: number; readonly y: number }
 
@@ -75,7 +77,7 @@ function cellsOf(spots: readonly Spot[], size = 1): BrickDef[] {
 }
 
 /** The friend: a 2 x 2 spot deep inside (among the deepest), its bricks taken away. */
-export function placeRescue(level: LevelDef, rng: Rng): { bricks: BrickDef[]; rescue: RescueDef } | null {
+export function placeRescue(level: LevelDef, rng: Rng, cageHp = CAGE_HP): { bricks: BrickDef[]; rescue: RescueDef } | null {
   const inside = insideMask(wallMask(level));
   const depth = insideDepth(inside);
   const stone = stoneCells(level);
@@ -94,15 +96,15 @@ export function placeRescue(level: LevelDef, rng: Rng): { bricks: BrickDef[]; re
   spots.sort((a, b) => b.d - a.d || a.y - b.y || a.x - b.x);
   const s = pick(rng, spots.slice(0, Math.min(6, spots.length)));
   const rescue: RescueDef = { x: s.x, y: s.y, who: pick(rng, RESCUE_WHO) };
-  return { bricks: cage(minus(level.bricks, cellsOf([s], RESCUE_SIZE)), s, stone), rescue };
+  return { bricks: cage(minus(level.bricks, cellsOf([s], RESCUE_SIZE)), s, stone, cageHp), rescue };
 }
 
 /**
- * The friend's cage: every brick touching the 2 x 2 spot becomes driftwood (CAGE_HP hits), and an
+ * The friend's cage: every brick touching the 2 x 2 spot becomes driftwood (`hp` hits), and an
  * empty cell of the ring gets a 1 x 1 one, so the stone must break in to the friend too (an open
  * friend was freed by the skilled bot in 5-26 s).
  */
-function cage(bricks: readonly BrickDef[], s: Spot, stone: Uint8Array): BrickDef[] {
+function cage(bricks: readonly BrickDef[], s: Spot, stone: Uint8Array, hp: number): BrickDef[] {
   const ring: Spot[] = [];
   for (let y = s.y - 1; y <= s.y + RESCUE_SIZE; y++) {
     for (let x = s.x - 1; x <= s.x + RESCUE_SIZE; x++) {
@@ -111,10 +113,10 @@ function cage(bricks: readonly BrickDef[], s: Spot, stone: Uint8Array): BrickDef
     }
   }
   const touches = (b: BrickDef) => ring.some((c) => c.x >= b.x && c.x < b.x + b.w && c.y >= b.y && c.y < b.y + b.h);
-  const out = bricks.map((b) => ((b.kind === 'soft' || b.kind === 'tough' || b.kind === 'ice') && touches(b) ? { ...b, kind: 'tough' as const, hp: CAGE_HP } : b));
+  const out = bricks.map((b) => ((b.kind === 'soft' || b.kind === 'tough' || b.kind === 'ice') && touches(b) ? { ...b, kind: 'tough' as const, hp } : b));
   const taken = new Set<string>();
   for (const b of out) forEachCell(b, (x, y) => taken.add(`${x},${y}`));
-  for (const c of ring) if (!taken.has(`${c.x},${c.y}`)) out.push({ x: c.x, y: c.y, w: 1, h: 1, kind: 'tough', hp: CAGE_HP });
+  for (const c of ring) if (!taken.has(`${c.x},${c.y}`)) out.push({ x: c.x, y: c.y, w: 1, h: 1, kind: 'tough', hp });
   return out;
 }
 
@@ -179,7 +181,9 @@ export function tideFor(level: LevelDef): TideDef {
   const low = Math.max(...level.bricks.filter((b) => b.kind !== 'stone' && b.kind !== 'gate' && b.kind !== 'lever').map((b) => b.y + b.h - 1));
   const line = Math.min(TIDE_FLOOR_ROW, low + TIDE_LINE_GAP);
   const steps = Math.max(1, line - low);
-  const every = Math.max(TIDE_EVERY[0], Math.min(TIDE_EVERY[1], Math.round((2 * TIDE_FIRST_FLOOD) / steps) / 2));
+  // A slower stone (slow) clears slower: the tide waits for it; a faster one (speedy) doesn't.
+  const pace = TIDE_FIRST_FLOOD / ruleNumbers(level).speedMul;
+  const every = Math.max(TIDE_EVERY[0], Math.min(TIDE_EVERY[1], Math.round((2 * pace) / steps) / 2));
   return { every, line };
 }
 

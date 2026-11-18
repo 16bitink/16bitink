@@ -37,9 +37,10 @@ export function planDates(
   return out;
 }
 
-/** What a frozen day's redo must keep. */
-export function keepOf(e: DailyEntry | undefined): KeepPlan | undefined {
+/** What a frozen day's redo must keep (`relayout`: everything but the layout and twist, never a centre box, never the same layout). */
+export function keepOf(e: DailyEntry | undefined, relayout = false): KeepPlan | undefined {
   if (!e?.plan.rule) return undefined;
+  if (relayout) return { goal: e.plan.goal, rule: e.plan.rule, ruleDir: e.plan.ruleDir, noBoxes: true, avoid: e.plan.layout };
   const base = { goal: e.plan.goal, rule: e.plan.rule, ruleDir: e.plan.ruleDir };
   // A layout the goal no longer allows (a tide day on layers) is planned again, never as a centre box.
   if (e.plan.goal === 'tide' && !TIDE_LAYOUTS.includes(e.plan.layout)) return { ...base, noBoxes: true };

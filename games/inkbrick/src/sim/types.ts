@@ -148,6 +148,9 @@ export interface LevelDef {
   readonly tomorrow?: { readonly rule: RuleKind; readonly goal: GoalKind };
 }
 
+/** One shutter of `LevelDef.shutters` (cells; open/closed/phase in seconds). */
+export type ShutterDef = NonNullable<LevelDef['shutters']>[number];
+
 export interface SimInput {
   /** The raft's wanted centre x in board px. */
   readonly paddleX: number;

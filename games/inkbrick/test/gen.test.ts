@@ -10,6 +10,7 @@ import { mulberry32 } from '../src/sim/rng';
 import { DAILY_NOVICE_AIM, dailyTargets } from '../src/sim/targets';
 import { launchWindow } from '../src/sim/trace';
 import { Sim } from '../src/sim/sim';
+import { checkLevel } from '../src/level/validate';
 import { levelProblems } from '../src/sim/validate';
 
 describe('generator', () => {
@@ -122,6 +123,9 @@ describe('frozen dailies', () => {
       expect(level.bricks.length).toBeLessThanOrEqual(MAX_BRICKS);
       expect(unreachableBricks(level)).toBe(0);
       expect(`${d} ${cheapCheck(level, 0, 1).reason}`).toBe(`${d} `);
+      // The website serves it as untrusted JSON: the game's own payload check must pass it.
+      const checked = checkLevel(JSON.parse(JSON.stringify(level)));
+      expect(`${d} ${checked.ok ? '' : checked.problem}`).toBe(`${d} `);
     }
   }, 120_000);
 });

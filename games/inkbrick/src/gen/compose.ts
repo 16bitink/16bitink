@@ -3,7 +3,7 @@ import { fill, minus, stone } from '../sim/kit';
 import { mulberry32, pick, randInt, type Rng } from '../sim/rng';
 import type { BrickDef, LevelDef, PickupKind } from '../sim/types';
 import type { Layout, Twist } from './calendar';
-import { applyRuleBricks, placeDailyPearl, placePearls, placeRescue, spotsOf, tideFor } from './goals';
+import { applyRuleBricks, CAGE_HP, CAGE_HP_EARLY, placeDailyPearl, placePearls, placeRescue, spotsOf, tideFor } from './goals';
 import { addBumpers, addCrab, addHidden, addLevers, addTrapDoors } from './newpieces';
 import { pictureById } from './pictures';
 import { daySeed, type DayPlan } from './plan';
@@ -196,7 +196,8 @@ function openBricks(shell: Shell, plan: DayPlan, rng: Rng, mix: Mix): BrickDef[]
     const second = fy - OPEN_SECOND_FACE >= r.y ? fill(r.x, fy - OPEN_SECOND_FACE, r.w, 1, 'x3', { bw: 1, skip: (x) => (x - r.x) % 2 === 1 }) : [];
     const special = [...face, ...second];
     const rest = { x: r.x, y: r.y, w: r.w, h: r.h - 1 };
-    out.push(...special, ...minus(fillArea(rest, plan, rng, plan.twist === 'ice' ? 'ice' : 'soft', mix), special));
+    // 3 x 1 bricks whatever the day's density (a dense open payload made a 468-brick board).
+    out.push(...special, ...minus(fillArea(rest, { ...plan, density: 'normal' }, rng, plan.twist === 'ice' ? 'ice' : 'soft', mix), special));
   }
   return out;
 }
@@ -257,7 +258,7 @@ function levelName(plan: DayPlan, rng: Rng): string {
 function withGoal(level: LevelDef, plan: DayPlan, rng: Rng): LevelDef {
   let out: LevelDef = { ...level, goal: plan.goal };
   if (plan.goal === 'rescue') {
-    const r = placeRescue(out, rng);
+    const r = placeRescue(out, rng, plan.weekday >= 1 && plan.weekday <= 3 ? CAGE_HP_EARLY : CAGE_HP);
     out = r ? { ...out, bricks: r.bricks, rescue: r.rescue } : { ...out, goal: 'clear' };
   } else if (plan.goal === 'pearls') {
     const p = placePearls(out, rng, []);

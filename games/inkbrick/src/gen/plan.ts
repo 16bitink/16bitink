@@ -161,7 +161,7 @@ function chooseTwist(rng: Rng, date: string, layout: Layout, wd: number): Twist 
 function proposal(date: string, rng: Rng, recent: readonly DayPlan[], keep?: KeepPlan): DayPlan {
   const wd = weekday(date);
   const pool = (wd === 1 ? MONDAY : MIDWEEK).filter((l) => available(l, date));
-  const allowed = pool.filter((l) => (keep?.goal !== 'tide' || TIDE_LAYOUTS.includes(l)) && !(keep?.noBoxes && CENTRE_BOXES.includes(l)));
+  const allowed = pool.filter((l) => (keep?.goal !== 'tide' || TIDE_LAYOUTS.includes(l)) && !(keep?.noBoxes && CENTRE_BOXES.includes(l)) && l !== keep?.avoid);
   const picked: Layout = wd === 0 ? 'core' : pick(rng, allowed.length > 0 ? allowed : pool);
   const layout = keep?.layout ?? picked;
   const drawn = chooseTwist(rng, date, layout, wd);
@@ -204,6 +204,8 @@ export interface KeepPlan {
   readonly goal: GoalKind; readonly rule: RuleKind; readonly ruleDir?: 1 | -1; readonly layout?: Layout; readonly twist?: Twist;
   /** A redo that must change its layout: no centre box (the days after it are frozen; the box limit must still hold). */
   readonly noBoxes?: boolean;
+  /** A redo that must change its layout: not this one again. */
+  readonly avoid?: Layout;
 }
 
 /** The plan for one date given the days before it (oldest first; only the last 14 matter). */
