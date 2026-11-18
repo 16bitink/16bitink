@@ -48,13 +48,14 @@ async function checkAccess(game: string): Promise<Access> {
   }
 }
 
-/** How long the game start waits for fullscreen to open, and again for the screen to turn. */
+/** How long the landscape lock waits for fullscreen to open first. */
 const FULLSCREEN_WAIT_MS = 1_000;
 
 /**
  * Best effort: real fullscreen where supported (desktop, Android, iPad), then landscape.
- * Never blocks the game for more than a moment: on Android the orientation lock can stay
+ * The game start never waits on it: the fullscreen promise and the orientation lock can stay
  * pending for as long as the page is fullscreen (the load sat at 36% until fullscreen was left).
+ * The games follow the stage's size, so they fit whenever fullscreen opens.
  * iPhone Safari has no element fullscreen; the page already fills the viewport.
  */
 async function goFullscreen(el: HTMLElement): Promise<void> {
@@ -204,12 +205,12 @@ export function bootPlayer(game: string, fonts: readonly string[]): void {
     hiddenTime.begin();
     track({ type: 'play_tap', ...tag, ms: Math.round(attempt.start) });
     let step: LoadStage = 'download';
-    // Must be requested synchronously inside the click for browsers to allow it.
-    const fs = goFullscreen(stage);
+    // Must be requested synchronously inside the click for browsers to allow it; never awaited.
+    void goFullscreen(stage);
     // The last moment a reload costs the player nothing: once the game mounts, it plays on the files it has.
     const newerP = newerBuildServed();
     try {
-      const [module, { unlocked, allLevelsOpen, cheats }, accountSaves, me, , , newer] = await Promise.all([engineP, accessP, progressP, meP, fontP, fs, newerP]);
+      const [module, { unlocked, allLevelsOpen, cheats }, accountSaves, me, , newer] = await Promise.all([engineP, accessP, progressP, meP, fontP, newerP]);
       if (newer && reloadOntoNewBuild()) {
         attempt = null;
         status.textContent = 'Updating to the latest version…';
