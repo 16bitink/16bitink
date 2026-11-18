@@ -9,6 +9,7 @@ import { placeOf } from '../../level/levels';
 import { ruleLine } from '../../level/daily';
 import { boardPreview } from '../map/thumb';
 import { clock } from '../ui';
+import { screenSize } from '../hidpi';
 import { CardBuilder, GOLD_INK, SOFT_INK } from './cardKit';
 
 export interface IntroActs {
@@ -33,7 +34,9 @@ export function introCard(scene: Phaser.Scene, s: DailyStart, isToday: boolean, 
   c.text(`${isToday ? "Today's Hunt" : 'Hunt'} · ${longDate(s.date)}`, 22, SOFT_INK, 2);
   if (level.event) c.text(EVENTS[level.event].name, 34, RED, 0);
   c.text(`${placeName(place)} · the ${snakeName(level.snake)}`, level.event ? 26 : 32, undefined, 8);
-  c.block(THUMB.h, (cy) => boardPreview(scene, level, place, THUMB.w, THUMB.h).setY(cy), 12);
+  // A phone on its side has no height to spare: the essentials (the rule, the goal, Hunt!) go without the picture.
+  const css = screenSize(scene);
+  if (!(c.phone && css.width > css.height)) c.block(THUMB.h, (cy) => boardPreview(scene, level, place, THUMB.w, THUMB.h).setY(cy), 12);
   if (level.rule) c.text(ruleLine(level.rule), 30, RED, 4);
   c.text(goalLine(level), 22, SOFT_INK, 4);
   const aside = winterLine(level);

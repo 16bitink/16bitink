@@ -4,6 +4,8 @@ import { BLUE_HEX, RED_HEX } from '../../art/palette';
 import { monthGrid, monthTitle } from '../../daily/dates';
 import { inkButton, inkText } from '../ui';
 import { CardBuilder, GOLD_INK, SOFT_INK, TEXT_W } from './cardKit';
+import { screenSize } from '../hidpi';
+import { isPhone, PHONE_CELL, TOUCH_MIN } from '../uiSizes';
 
 export interface CalendarData {
   readonly today: string;
@@ -23,7 +25,7 @@ export interface CalendarActs {
   back(): void;
 }
 
-const CELL = 54;
+const DESK_CELL = 54;
 const GOLD_HEX = 0xa0622c;
 const WEEKDAYS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
 
@@ -34,16 +36,20 @@ const WEEKDAYS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
  * everyone else a past day offers the full game. No streaks: only days played.
  */
 export function calendarCard(scene: Phaser.Scene, d: CalendarData, a: CalendarActs): CardBuilder {
-  const c = new CardBuilder(scene, 75);
+  const phone = isPhone(screenSize(scene));
+  const cell = phone ? PHONE_CELL : DESK_CELL;
+  const c = new CardBuilder(scene, 75, TOUCH_MIN / cell);
+  const z = c.z;
   const played = new Map(d.days.map((x) => [x.date, x]));
-  c.block(44, (cy) => [
-    inkButton(scene, -TEXT_W / 2 + 20, cy, '‹', () => a.month(-1), { width: 46, height: 44, size: 30 }),
+  const arrow = z.tap(44);
+  c.block(arrow, (cy) => [
+    inkButton(scene, -TEXT_W / 2 + 20, cy, '‹', () => a.month(-1), { width: Math.max(46, arrow), height: arrow, size: 30 }),
     inkText(scene, 0, cy, monthTitle(d.year, d.month0), 32),
-    inkButton(scene, TEXT_W / 2 - 20, cy, '›', () => a.month(1), { width: 46, height: 44, size: 30 }),
+    inkButton(scene, TEXT_W / 2 - 20, cy, '›', () => a.month(1), { width: Math.max(46, arrow), height: arrow, size: 30 }),
   ], 4);
-  c.block(24, (cy) => WEEKDAYS.map((w, i) => inkText(scene, (i - 3) * CELL, cy, w, 18, SOFT_INK)), 2);
+  c.block(24, (cy) => WEEKDAYS.map((w, i) => inkText(scene, (i - 3) * cell, cy, w, z.text(18), SOFT_INK)), 2);
   for (const week of monthGrid(d.year, d.month0)) {
-    c.block(CELL - 4, (cy) => week.flatMap((date, i) => (date ? dayCell(scene, (i - 3) * CELL, cy, date, played.get(date), d, a) : [])), 4);
+    c.block(cell - 4, (cy) => week.flatMap((date, i) => (date ? dayCell(scene, (i - 3) * cell, cy, cell, date, played.get(date), d, a, phone) : [])), 4);
   }
   c.y += 4;
   c.text(`${d.totalDays} ${d.totalDays === 1 ? 'day' : 'days'} played`, 26, undefined, 2);
@@ -53,10 +59,10 @@ export function calendarCard(scene: Phaser.Scene, d: CalendarData, a: CalendarAc
   return c;
 }
 
-function dayCell(scene: Phaser.Scene, x: number, y: number, date: string, day: DailyDay | undefined, d: CalendarData, a: CalendarActs): Phaser.GameObjects.GameObject[] {
+function dayCell(scene: Phaser.Scene, x: number, y: number, cell: number, date: string, day: DailyDay | undefined, d: CalendarData, a: CalendarActs, phone: boolean): Phaser.GameObjects.GameObject[] {
   const g = scene.add.graphics();
   const future = date > d.today;
-  const r = CELL * 0.38;
+  const r = cell * 0.38;
   if (day) {
     if (day.result === 'win' && !day.late) g.fillStyle(BLUE_HEX, 0.78).fillCircle(x, y, r);
     g.lineStyle(day.late ? 2.4 : 2, BLUE_HEX, day.late ? 0.9 : 0.7).strokeCircle(x, y, r);
@@ -72,10 +78,11 @@ function dayCell(scene: Phaser.Scene, x: number, y: number, date: string, day: D
     const sx = x - r * 0.85;
     const sy = y - r * 0.85;
     g.fillStyle(GOLD_HEX, 1).fillCircle(sx, sy, 8).lineStyle(1.5, RED_HEX, 0.9).strokeCircle(sx, sy, 8);
-    out.push(inkText(scene, sx, sy, reached, reached.length > 2 ? 9 : 11, '#fffaf0'));
+    // The milestone's number is too small to read on a phone: the rosette alone says it there.
+    if (!phone) out.push(inkText(scene, sx, sy, reached, reached.length > 2 ? 9 : 11, '#fffaf0'));
   }
   if (!future) {
-    const zone = scene.add.zone(x, y, CELL - 2, CELL - 2).setInteractive({ useHandCursor: true });
+    const zone = scene.add.zone(x, y, cell, cell).setInteractive({ useHandCursor: true });
     zone.on('pointerup', () => (date === d.today || d.owned ? a.play(date) : a.locked()));
     out.push(zone);
   }

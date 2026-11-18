@@ -141,6 +141,22 @@ Today's Hunt is a free daily level, the same for everyone. Every day sets a new 
 - **Keyboard:** arrow keys or WASD steer (the head turns towards the direction held); Space strikes; the chapter's ability is on E (or its round button on touch).
 - **Pause:** Esc, P or the ❚❚ button. **Sound:** M or ♪.
 
+### Phone UI sizes
+
+The owner's phone playtest (2026-11-18): "UI elements on the mobile screen should be bigger" and "the map can be zoomed in". The numbers live in `src/scenes/uiSizes.ts`, and every screen uses them. `test/uiSizes.test.ts` checks them at 360×640, 390×844 and 844×390. A phone is any screen whose short side is under 500 css px. Desktop layouts don't change.
+
+| What | Minimum on a phone | Source |
+|---|---|---|
+| Touch target | 44 × 44 css px | Apple HIG (44 pt), WCAG 2.5.5 (44 px, AAA); Material asks 48 dp, WCAG 2.5.8 at least 24 px (AA) |
+| Gap between targets | 8 css px | Material (8 dp) |
+| Body text | 18 css px | The usual mobile floor is 16 px. Caveat's small x-height needs 2 px more |
+| Secondary text (captions) | 14 css px | The usual floor is 12–14 px, plus Caveat's 2 px |
+
+- **Interface scale:** phones lay the HUD and cards out for a 420-unit short side (0.86 at 360 px, never under 0.8). Before, they drew at the laptop design's 0.55.
+- **Cards** fill the phone's width. Text and buttons are raised to the minimums at the size the card actually draws. A daily card taller than the screen scrolls (drag or wheel) rather than drawing smaller than 0.72 css px per unit.
+- **Phones keep only the essentials:** the album shows 3 snakes a page in one column, the calendar drops the milestone number inside its rosette, and a phone on its side drops the before-hunt card's board picture.
+- **Map:** zoom 0.8 or more on phones. Nests are then 48 css px and names 18 px. The map pans sideways too, centred on the current level and clamped to the plan's 760-px width. A tap on a nest still opens its card.
+
 ## The map
 
 A vertical scroll as in InkGecko: a field guide's route map that climbs from the farm (chapter 1) to the flooded forest (chapter 10), a pocket for each level along a winding snake track. Chapters not built yet are pencil drafts; the full game's chapters are painted but locked until bought.

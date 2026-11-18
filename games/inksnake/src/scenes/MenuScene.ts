@@ -7,6 +7,7 @@ import { BUILT_CHAPTERS, CHAPTER_NAMES, CHAPTER_PLACES, CHAPTER_SNAKES, levelByI
 import { chapterTally, loadProgress, type Progress } from '../logic/save';
 import { loadPaidChapters } from './BootScene';
 import { crispText, DPR, screenSize, uiCamera, uiScaleFor } from './hidpi';
+import { isPhone, mapZoom, sizer } from './uiSizes';
 import { SnakeWalker } from './map/snakeWalker';
 import { computeMapLayout, MAP, regionAt, type MapLayout, type MapNode } from './map/layout';
 import { MapCard } from './map/levelCard';
@@ -59,7 +60,11 @@ export class MenuScene extends Phaser.Scene {
   private zoom = 1;
   private focusY = 0;
   private targetY = 0;
-  private drag: { y: number; target: number; moved: boolean; lastY: number; lastT: number; vel: number } | null = null;
+  /** Across: a phone's zoomed-in map pans sideways too (on a laptop it stays on the middle). */
+  private focusX: number = MAP.mid;
+  private targetX: number = MAP.mid;
+  private pans = false;
+  private drag: { x: number; y: number; target: number; targetX: number; moved: boolean; lastY: number; lastT: number; vel: number } | null = null;
   private card: MapCard | null = null;
   private caption!: Phaser.GameObjects.Text;
   private tally!: Phaser.GameObjects.Text;
@@ -97,7 +102,9 @@ export class MenuScene extends Phaser.Scene {
     this.currentNode = this.layout.nodes.find((n) => n.levelId === current) ?? this.layout.nodes[0]!;
 
     const screen = screenSize(this);
-    this.zoom = Phaser.Math.Clamp(Math.min(screen.width / FIT.w, screen.height / FIT.h), 0.5, 1.5);
+    // A phone zooms in (nests big enough to tap, names to read) and pans sideways; see uiSizes.
+    this.zoom = mapZoom(screen, FIT);
+    this.pans = isPhone(screen) && screen.width / this.zoom < FIT.w;
     const cam = this.cameras.main.setZoom(this.zoom * DPR).setBackgroundColor('#f5f0e1');
     const textRes = DPR * Math.max(1, this.zoom);
     const paint = this.add.layer();
@@ -136,7 +143,9 @@ export class MenuScene extends Phaser.Scene {
 
     this.focusY = this.clampY(data.focusY ?? start.y - 40);
     this.targetY = this.focusY;
-    cam.centerOn(MAP.mid, this.focusY);
+    this.focusX = this.clampX(start.x);
+    this.targetX = this.focusX;
+    cam.centerOn(this.focusX, this.focusY);
     this.view.update(this.focusY - this.halfView(), this.focusY + this.halfView(), true);
     if (walkFrom) this.time.delayedCall(450, () => this.walkOn());
     this.bindInput();
@@ -173,9 +182,12 @@ export class MenuScene extends Phaser.Scene {
 
   update(_t: number, delta: number): void {
     const dt = Math.min(0.05, delta / 1000);
-    if (this.following) this.targetY = this.clampY(this.walker.position.y - 40);
-    if (!this.drag?.moved) this.focusY += (this.targetY - this.focusY) * Math.min(1, dt * GLIDE);
-    this.cameras.main.centerOn(MAP.mid, this.focusY);
+    if (this.following) this.lookAtSnake();
+    if (!this.drag?.moved) {
+      this.focusY += (this.targetY - this.focusY) * Math.min(1, dt * GLIDE);
+      this.focusX += (this.targetX - this.focusX) * Math.min(1, dt * GLIDE);
+    }
+    this.cameras.main.centerOn(this.focusX, this.focusY);
     const half = this.halfView();
     this.view.update(this.focusY - half, this.focusY + half);
     this.walker.update(_t, dt);
@@ -185,6 +197,19 @@ export class MenuScene extends Phaser.Scene {
   /** Half the world height the view shows. */
   private halfView(): number {
     return screenSize(this).height / this.zoom / 2;
+  }
+
+  /** Across, kept within the plan's width (the middle when the screen shows all of it). */
+  private clampX(x: number): number {
+    if (!this.pans) return MAP.mid;
+    const half = screenSize(this).width / this.zoom / 2;
+    return Phaser.Math.Clamp(x, MAP.mid - FIT.w / 2 + half, MAP.mid + FIT.w / 2 - half);
+  }
+
+  /** Sends the view to the snake. */
+  private lookAtSnake(): void {
+    this.targetY = this.clampY(this.walker.position.y - 40);
+    this.targetX = this.clampX(this.walker.position.x);
   }
 
   private clampY(y: number): number {
@@ -282,6 +307,9 @@ export class MenuScene extends Phaser.Scene {
     const w = screen.width / s;
     const h = screen.height / s;
     this.ui = { width: w, height: h };
+    // Buttons and text at least the phone minimums (see uiSizes).
+    const z = sizer(isPhone(screen), s);
+    const tap = z.tap(44);
     const bar = this.add.graphics();
     bar.fillStyle(PAPER_HEX, 0.88).fillRect(0, 0, w, TOP_BAR);
     bar.lineStyle(1.5, 0x27408b, 0.5).lineBetween(0, TOP_BAR, w, TOP_BAR);
@@ -289,7 +317,7 @@ export class MenuScene extends Phaser.Scene {
     const narrow = w < 640;
     if (!narrow) this.uiLayer.add(inkText(this, 90, TOP_BAR / 2, 'InkSnake', 36));
     this.caption = inkText(this, w / 2, TOP_BAR / 2 - 10, '', 26);
-    this.tally = inkText(this, w / 2, TOP_BAR / 2 + 16, '', 18, SOFT_INK);
+    this.tally = inkText(this, w / 2, TOP_BAR / 2 + 16, '', z.text(18), SOFT_INK);
     this.uiLayer.add([this.caption, this.tally]);
     const host = getHost(this);
     const sound = inkButton(this, w - 34, TOP_BAR / 2, getSound(this)?.muted ? '♪̸' : '♪', () => {
@@ -297,11 +325,9 @@ export class MenuScene extends Phaser.Scene {
       if (!sb) return;
       sb.setMuted(!sb.muted);
       (sound.list[1] as Phaser.GameObjects.Text).setText(sb.muted ? '♪̸' : '♪');
-    }, { width: 46, height: 44, size: 24 });
-    const exit = inkButton(this, narrow ? 50 : w - 112, TOP_BAR / 2, 'Exit', () => host.onExit(), { width: 84, height: 44, size: 24 });
-    this.homeButton = inkButton(this, w - 70, h - 40, 'Snake', () => {
-      this.targetY = this.clampY(this.walker.position.y - 40);
-    }, { width: 110, height: 46, size: 24 });
+    }, { width: Math.max(46, tap), height: tap, size: 24 });
+    const exit = inkButton(this, narrow ? 50 : w - 112, TOP_BAR / 2, 'Exit', () => host.onExit(), { width: 84, height: tap, size: 24 });
+    this.homeButton = inkButton(this, w - 70, h - 8 - z.tap(46) / 2, 'Snake', () => this.lookAtSnake(), { width: 110, height: z.tap(46), size: 24 });
     this.uiLayer.add([sound, exit, this.homeButton]);
     this.huntButton(w);
     const total = chapterTally(this.progress, loadedLevels().map((l) => l.id));
@@ -359,17 +385,19 @@ export class MenuScene extends Phaser.Scene {
   private bindInput(): void {
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
       if (this.card) return;
-      this.drag = { y: p.y, target: this.targetY, moved: false, lastY: p.y, lastT: p.event.timeStamp, vel: 0 };
+      this.drag = { x: p.x, y: p.y, target: this.targetY, targetX: this.targetX, moved: false, lastY: p.y, lastT: p.event.timeStamp, vel: 0 };
       this.following = false;
     });
     this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
       const d = this.drag;
       if (!d || !p.isDown || this.card) return;
-      if (Math.abs(p.y - d.y) > DRAG_THRESHOLD * DPR) d.moved = true;
+      if (Math.abs(p.y - d.y) > DRAG_THRESHOLD * DPR || (this.pans && Math.abs(p.x - d.x) > DRAG_THRESHOLD * DPR)) d.moved = true;
       if (!d.moved) return;
       const scale = this.cameras.main.zoom;
       this.targetY = this.clampY(d.target - (p.y - d.y) / scale);
       this.focusY = this.targetY;
+      this.targetX = this.clampX(d.targetX - (p.x - d.x) / scale);
+      this.focusX = this.targetX;
       const dt = Math.max(1, p.event.timeStamp - d.lastT);
       d.vel = d.vel * 0.6 + ((-(p.y - d.lastY) / scale) / dt) * 1000 * 0.4;
       d.lastY = p.y;
@@ -401,7 +429,11 @@ export class MenuScene extends Phaser.Scene {
     kb?.on('keydown-DOWN', () => go(KEY_STEP));
     kb?.on('keydown-PAGE_UP', () => go(-page()));
     kb?.on('keydown-PAGE_DOWN', () => go(page()));
-    kb?.on('keydown-HOME', () => go(this.walker.position.y - 40 - this.targetY));
+    kb?.on('keydown-HOME', () => {
+      if (this.card) return;
+      this.following = false;
+      this.lookAtSnake();
+    });
     kb?.on('keydown-ENTER', () => {
       if (this.card || this.walker.walking) return;
       const level = levelById(this.currentNode.levelId);

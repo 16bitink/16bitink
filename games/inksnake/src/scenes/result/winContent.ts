@@ -5,6 +5,7 @@ import type { LevelDef } from '../../level/types';
 import type { ResultData } from '../ResultScene';
 import { clock, inkText } from '../ui';
 import { BLOT_R, stamp, UI_RES, UI_TEX } from '../uiPaint';
+import type { Sizer } from '../uiSizes';
 
 const SOFT_INK = '#4a463e';
 /** When the first blot stamps down, and the beat between blots, ms. */
@@ -21,21 +22,22 @@ export const WIN = { title: 66, level: 114, blots: 176, why: 224, rule: 252, sta
  * the snake's length and its meals (or best coil), with a red "New best!" stamp when it was the
  * fastest yet.
  */
-export function winContent(scene: Phaser.Scene, card: Phaser.GameObjects.Container, data: ResultData, level: LevelDef, top: number, titleX: number): void {
+export function winContent(scene: Phaser.Scene, card: Phaser.GameObjects.Container, data: ResultData, level: LevelDef, top: number, titleX: number, z: Sizer, narrow = false): void {
   card.add(inkText(scene, titleX, top + WIN.title, 'Cleared!', 62, BLUE));
   blots(scene, card, data.blots, titleX, top + WIN.blots);
   const why = ['cleared', data.time <= level.par ? `under ${clock(level.par)}` : `par ${clock(level.par)}`, data.livesLost === 0 ? 'no lives lost' : `${data.livesLost} ${data.livesLost === 1 ? 'life' : 'lives'} lost`];
-  card.add(inkText(scene, titleX, top + WIN.why, why.join('  ·  '), 20, SOFT_INK));
+  // A narrow card centres the reasons under the portrait and title: they need its whole width.
+  card.add(inkText(scene, narrow ? 0 : titleX, top + WIN.why, why.join(narrow ? ' · ' : '  ·  '), z.text(20), SOFT_INK));
   card.add(rule(scene, top + WIN.rule));
   const counted = Math.min(data.blots, 3);
   const statsAt = BLOTS_AT + counted * BLOT_BEAT + 120;
   const best = data.previousBest !== undefined && data.time < data.previousBest;
-  const cols = [-195, -65, 65, 195];
-  const score = stat(scene, card, cols[0]!, top, '0', 'points');
-  const timeCaption = data.previousBest !== undefined && !best ? `time · best ${clock(data.previousBest)}` : 'time';
-  stat(scene, card, cols[1]!, top, clock(data.time), timeCaption);
-  stat(scene, card, cols[2]!, top, `${data.length}`, 'long');
-  stat(scene, card, cols[3]!, top, data.bestCoil > 1 ? `×${data.bestCoil}` : `${data.eaten}`, data.bestCoil > 1 ? 'best coil' : 'eaten');
+  const cols = narrow ? [-165, -55, 55, 165] : [-195, -65, 65, 195];
+  const score = stat(scene, card, cols[0]!, top, z, '0', 'points');
+  const timeCaption = data.previousBest !== undefined && !best ? `${narrow ? '' : 'time · '}best ${clock(data.previousBest)}` : 'time';
+  stat(scene, card, cols[1]!, top, z, clock(data.time), timeCaption);
+  stat(scene, card, cols[2]!, top, z, `${data.length}`, 'long');
+  stat(scene, card, cols[3]!, top, z, data.bestCoil > 1 ? `×${data.bestCoil}` : `${data.eaten}`, data.bestCoil > 1 ? 'best coil' : 'eaten');
   scene.tweens.addCounter({
     from: 0, to: data.score, duration: COUNT_MS, delay: statsAt, ease: 'Quad.Out',
     onUpdate: (t) => score.setText(`${Math.round(t.getValue() ?? 0)}`),
@@ -68,9 +70,9 @@ function blots(scene: Phaser.Scene, card: Phaser.GameObjects.Container, earned: 
 }
 
 /** A big hand-lettered number with a small caption under it; returns the number. */
-function stat(scene: Phaser.Scene, card: Phaser.GameObjects.Container, x: number, top: number, value: string, caption: string): Phaser.GameObjects.Text {
+function stat(scene: Phaser.Scene, card: Phaser.GameObjects.Container, x: number, top: number, z: Sizer, value: string, caption: string): Phaser.GameObjects.Text {
   const t = inkText(scene, x, top + WIN.stats, value, 38, BLUE);
-  card.add([t, inkText(scene, x, top + WIN.caption, caption, 18, SOFT_INK)]);
+  card.add([t, inkText(scene, x, top + WIN.caption, caption, z.text(18), SOFT_INK)]);
   return t;
 }
 
