@@ -78,21 +78,24 @@ const latest = latestUpdate(game.slug);
         </p>
       )}
       <div class="numbers"><GameStats game={game} owned={owned} large /></div>
-      {game.description.map((p) => <p>{p}</p>)}
-      <div class="actions">
-        <a class="btn btn-ink" href={`/play/${game.slug}`}>{owned ? 'Play the full game' : 'Play free, full-screen'}</a>
-        {!owned && forSale && <BuyButton game={game.slug} label={`Unlock full game · ${game.price}`} />}
+      <!-- Play and buy on the first screen, before the description. -->
+      <div class="buy">
+        <div class="actions">
+          <a class="btn btn-ink" href={`/play/${game.slug}`}>{owned ? 'Play the full game' : 'Play free, full-screen'}</a>
+          {!owned && forSale && <BuyButton game={game.slug} label={`Unlock full game · ${game.price}`} />}
+        </div>
+        {!forSale ? (
+          <p class="one-time"><strong>Free to play.</strong> The demo is the whole first chapter, free and with no sign-up. The rest of the game is coming soon.</p>
+        ) : owned ? (
+          <p class="one-time"><strong>You own the full game.</strong> Every level is yours to keep, with nothing more to pay.</p>
+        ) : (
+          <p class="one-time"><strong>One-time purchase.</strong> Pay once and the full game is yours to keep: no subscription, no ads, nothing more to buy. Refunds within 14 days, see the <a href="/terms#refunds">terms</a>.</p>
+        )}
+        <p class="cancelled" hidden>Checkout cancelled. No charge was made.</p>
+        {forSale && !owned && !user && <p class="restore">Bought it already? <a href={signInPageUrl(`/games/${game.slug}`)} data-restore={game.slug}>Sign in</a> with the email on your receipt to unlock it here.</p>}
+        {forSale && !owned && <p class="restore">Got a key? <a href="/redeem">Redeem it here</a>.</p>}
       </div>
-      {!forSale ? (
-        <p class="one-time"><strong>Free to play.</strong> The demo is the whole first chapter, free and with no sign-up. The rest of the game is coming soon.</p>
-      ) : owned ? (
-        <p class="one-time"><strong>You own the full game.</strong> Every level is yours to keep, with nothing more to pay.</p>
-      ) : (
-        <p class="one-time"><strong>One-time purchase.</strong> Pay once and the full game is yours to keep: no subscription, no ads, nothing more to buy. Refunds within 14 days, see the <a href="/terms#refunds">terms</a>.</p>
-      )}
-      <p class="cancelled" hidden>Checkout cancelled. No charge was made.</p>
-      {forSale && !owned && !user && <p class="restore">Bought it already? <a href={signInPageUrl(`/games/${game.slug}`)} data-restore={game.slug}>Sign in</a> with the email on your receipt to unlock it here.</p>}
-      {forSale && !owned && <p class="restore">Got a key? <a href="/redeem">Redeem it here</a>.</p>}
+      {game.description.map((p) => <p>{p}</p>)}
       <div class="cols">
         {game.features && (
           <section>
@@ -183,7 +186,8 @@ const latest = latestUpdate(game.slug);
   .tag { font-family: var(--font-hand); font-size: 1.8rem; color: var(--blue-ink); margin: -6px 0 12px; }
   .fans { color: var(--ink-soft); font-style: italic; margin: -8px 0 14px; }
   .numbers { margin: 0 0 18px; }
-  .actions { display: flex; flex-wrap: wrap; gap: 14px; margin: 26px 0 10px; }
+  .buy { margin: 0 0 24px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 14px; margin: 0 0 10px; }
   .cancelled { color: var(--red-ink); }
   .one-time { margin: 0 0 6px; font-size: 1rem; }
   .one-time strong { color: var(--blue-ink); }
