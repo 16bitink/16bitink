@@ -1,5 +1,6 @@
 import type { AccumulatorOperator, Expression, PipelineStage } from 'mongoose';
 import type { StoredEvent } from '../analytics';
+import type { PlayerDays } from '../returnStreaks';
 import { AnalyticsEvent } from './eventModel';
 
 /** Reports cover events with `from <= ts < to`. */
@@ -106,6 +107,15 @@ export async function gameStats(range: Range): Promise<GameStats[]> {
     { $group: { _id: '$meta.game', players: visitorsWith('game_start'), plays: countOf('game_start'), playSeconds } },
     { $project: { _id: 0, game: '$_id', players: { $size: '$players' }, plays: 1, playSeconds: 1 } },
     { $sort: { players: -1, game: 1 } },
+  ]);
+}
+
+/** Each visitor's days (UTC) with a game started, per game: the input for return streaks (lib/returnStreaks). */
+export async function playDays(range: Range): Promise<PlayerDays[]> {
+  return aggregate<PlayerDays>([
+    { $match: { ...inRange(range), 'meta.event': 'game_start', 'meta.game': { $ne: null } } },
+    { $group: { _id: { player: '$visitor', game: '$meta.game' }, days: { $addToSet: { $dateToString: { date: '$ts', format: '%Y-%m-%d' } } } } },
+    { $project: { _id: 0, player: '$_id.player', game: '$_id.game', days: 1 } },
   ]);
 }
 

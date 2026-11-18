@@ -12,7 +12,9 @@ import { findGame, playableGames } from '../data/games';
 import { rangeFor } from './adminStats';
 import { actionStats, appVisitors } from './db/actionRepo';
 import { entryStats, homeClicks, playFunnel, topErrors } from './db/diagnosticsRepo';
-import { breakdown, gameStats, levelFunnel, overview } from './db/eventRepo';
+import { breakdown, gameStats, levelFunnel, overview, playDays } from './db/eventRepo';
+import { dailyPlayDays } from './db/dailyPlayRepo';
+import { ALL_GAMES, RUN_BUCKETS, streakRows, type StreakRow } from './returnStreaks';
 import { countApiKeysSince, createKey, listKeys } from './db/keyRepo';
 import { levelDetail, type LevelReport } from './db/levelRepo';
 import { firstFrames } from './stackText';
@@ -209,6 +211,27 @@ export function buildMcpServer(admin: McpAdmin, origin: string): McpServer {
       summary: { ...summary, cameFrom: refs(summary.cameFrom) },
       players: shown.map((p, i) => playerRow(ids[i]!, p)),
     });
+  }));
+
+  server.registerTool('streaks', {
+    title: 'Return streaks',
+    description: 'How many days in a row players come back, over the last N days (admin only: players never see a streak). '
+      + '`games`: days (UTC) a visitor started a game; `dailies`: daily dates (the player\'s own) played on the day, late plays left out. '
+      + 'Each has a row for all games together (game "*"), then one per game, most players first: players, cameBack (played on 2+ days), '
+      + 'going (on a run of 2+ days reaching today or yesterday), longest run in days, and `runs`: players by their longest run of back-to-back days.',
+    inputSchema: { days: z.number().int().min(1).max(365).optional().describe('How many days back (default 30)') },
+    annotations: { readOnlyHint: true },
+  }, async (args) => guarded('streaks', async () => {
+    const days = args.days ?? 30;
+    const range = rangeFor(days, new Date());
+    const today = range.to.toISOString().slice(0, 10);
+    const [games, dailies] = await Promise.all([playDays(range), dailyPlayDays(range)]);
+    const rows = (list: readonly StreakRow[]) => list.map(({ buckets, ...r }) => ({
+      ...r,
+      game: r.game === ALL_GAMES ? '*' : r.game,
+      runs: Object.fromEntries(RUN_BUCKETS.map((b, i) => [b.label, buckets[i] ?? 0])),
+    }));
+    return ok({ days, games: rows(streakRows(games, today)), dailies: rows(streakRows(dailies, today)) });
   }));
 
   server.registerTool('levels', {

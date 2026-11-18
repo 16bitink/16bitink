@@ -1,6 +1,7 @@
 import type { DailyStanding } from '@16bitink/game-sdk';
 import { isBetterPlay, toStanding, type GameDay, type PlayResult, type StandingCounts } from '../daily';
 import { DailyPlayModel } from './dailyPlayModel';
+import type { PlayerDays } from '../returnStreaks';
 
 const DUPLICATE_KEY = 11000;
 const isDuplicateKey = (err: unknown): boolean => (err as { code?: unknown } | null)?.code === DUPLICATE_KEY;
@@ -72,4 +73,18 @@ export async function dailyHistory(players: readonly string[]): Promise<readonly
     .lean<GameDay[]>()
     .exec();
   return docs.map((d) => ({ game: d.game, date: d.date, result: d.result, late: d.late, seconds: d.seconds }));
+}
+
+/**
+ * Each player's daily dates played on the day (late plays left out: they say nothing about coming
+ * back that day), per game, for dates within `range`: the input for return streaks (lib/returnStreaks).
+ */
+export async function dailyPlayDays(range: { readonly from: Date; readonly to: Date }): Promise<PlayerDays[]> {
+  const from = range.from.toISOString().slice(0, 10);
+  const to = range.to.toISOString().slice(0, 10);
+  return DailyPlayModel.aggregate<PlayerDays>([
+    { $match: { late: false, date: { $gte: from, $lte: to } } },
+    { $group: { _id: { player: '$player', game: '$game' }, days: { $addToSet: '$date' } } },
+    { $project: { _id: 0, player: '$_id.player', game: '$_id.game', days: 1 } },
+  ]).exec();
 }

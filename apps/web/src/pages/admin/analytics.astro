@@ -5,7 +5,9 @@ import { currentAdmin } from '../../lib/adminAuth';
 import { cameFromLabel, countryName, formatDuration, funnelRows, parsePeriod, percent, PERIODS, rangeFor, visitOutcome } from '../../lib/adminStats';
 import { registeredPlayers } from '../../lib/db/playerStatsRepo';
 import { entryStats, homeClicks, playFunnel, QUICK_LEAVE_MS, topErrors } from '../../lib/db/diagnosticsRepo';
-import { breakdown, daily, gameStats, levelFunnel, overview, recentSessions, type Dimension } from '../../lib/db/eventRepo';
+import { breakdown, daily, gameStats, levelFunnel, overview, playDays, recentSessions, type Dimension } from '../../lib/db/eventRepo';
+import { dailyPlayDays } from '../../lib/db/dailyPlayRepo';
+import { ALL_GAMES, RUN_BUCKETS, streakRows, type PlayerDays, type StreakRow } from '../../lib/returnStreaks';
 import { countSubscribers } from '../../lib/db/subscriberRepo';
 
 export const prerender = false;
@@ -22,7 +24,12 @@ const range = rangeFor(days, new Date());
 const games = playableGames();
 const DIMENSIONS: readonly (readonly [Dimension, string])[] = [['country', 'Country'], ['os', 'OS'], ['browser', 'Browser'], ['device', 'Device']];
 
-const [totals, perDay, perGame, funnels, shares, recent, entries, plays, errors, home, subscribers, registered] = await Promise.all([
+/** Extra: if a part can't be read, the rest of the page still shows. */
+const orNull = <T,>(what: string, p: Promise<T>): Promise<T | null> => p.catch((err: unknown) => {
+  console.error(`[admin] could not read ${what}`, err);
+  return null;
+});
+const [totals, perDay, perGame, funnels, shares, recent, entries, plays, errors, home, subscribers, registered, gameDays, dailyDays] = await Promise.all([
   overview(range),
   daily(range),
   gameStats(range),
@@ -39,7 +46,15 @@ const [totals, perDay, perGame, funnels, shares, recent, entries, plays, errors,
     console.error('[admin] could not read registered players', err);
     return null;
   }),
+  orNull('play days', playDays(range)),
+  orNull('daily play days', dailyPlayDays(range)),
 ]);
+const today = range.to.toISOString().slice(0, 10);
+const streaks = (rows: PlayerDays[] | null): readonly StreakRow[] | null => rows && streakRows(rows, today);
+const streakTables = [
+  { heading: 'Games', note: 'Days (UTC) a visitor started a game.', rows: streaks(gameDays), all: 'Any game' },
+  { heading: 'Dailies', note: 'Dates (the player’s own) a daily was played on the day; late plays left out.', rows: streaks(dailyDays), all: 'Any daily' },
+];
 
 const title = (slug: string): string => findGame(slug)?.title ?? slug;
 const peakDay = Math.max(1, ...perDay.map((d) => d.visitors));
@@ -233,6 +248,31 @@ const when = (d: Date): string => d.toISOString().slice(0, 16).replace('T', ' ')
       </table>
     </div>
     {perGame.length === 0 && <p class="empty">No games played yet.</p>}
+
+    <h2>Return streaks</h2>
+    <p class="note">Admin only: players never see a streak. Each player counts once, in the bucket of their longest run of back-to-back days in the period. Came back = played on 2+ days. Going = on a run of 2+ days that reaches today or yesterday.</p>
+    {streakTables.map((t) => (
+      <article class="card">
+        <h3>{t.heading}</h3>
+        <p class="note">{t.note}</p>
+        {t.rows === null ? <p class="empty">Couldn't be read.</p> : t.rows.length === 0 ? <p class="empty">No plays yet.</p> : (
+          <div class="scroll">
+            <table>
+              <thead><tr><th>Game</th><th>Players</th><th>Came back</th><th>Going</th><th>Longest</th>{RUN_BUCKETS.map((b) => <th>{b.label}</th>)}</tr></thead>
+              <tbody>
+                {t.rows.map((r) => (
+                  <tr>
+                    <td>{r.game === ALL_GAMES ? <strong>{t.all}</strong> : title(r.game)}</td>
+                    <td>{r.players}</td><td>{share(r.cameBack, r.players)}</td><td>{r.going}</td><td>{r.longest} {r.longest === 1 ? 'day' : 'days'}</td>
+                    {r.buckets.map((n) => <td>{share(n, r.players)}</td>)}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </article>
+    ))}
 
     <h2>Visitors per day</h2>
     {perDay.length === 0 ? <p class="empty">No visits yet.</p> : (
