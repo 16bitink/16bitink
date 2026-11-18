@@ -40,7 +40,8 @@ export function devDailyHost(store: KeyValueStore, search: string, owned: boolea
       return { players: 37, ...(play.result === 'win' ? { clearBetterThan: Math.max(5, Math.min(95, Math.round(100 - play.seconds))) } : {}) };
     },
     history: async () => readDays(store),
-    totalDays: async () => readDays(store).length,
+    // ?days=6 pretends six more days were played elsewhere (to see a milestone).
+    totalDays: async () => readDays(store).length + (Number(params.get('days')) || 0),
     challengeLink: (date, seconds) => `${location.origin}${location.pathname}?beat=${seconds}#${date}`,
     ...(beat > 0 ? { challenge: { date: today(), seconds: beat } } : {}),
   };

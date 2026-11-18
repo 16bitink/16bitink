@@ -5,7 +5,7 @@ import { SNAKES, type SnakeId } from '../logic/species';
 /**
  * The snake album: one card per snake hunted with in a daily, with the date
  * first played (and the event, for event snakes). It only grows: merging two
- * copies keeps every snake and the earlier date. Kept in the host's storage.
+ * copies keeps every snake and the earlier date. Kept in the synced progress save (older versions kept it in the browser only).
  */
 export interface AlbumCard {
   readonly date: string;
@@ -14,7 +14,7 @@ export interface AlbumCard {
 
 export type Album = Readonly<Partial<Record<SnakeId, AlbumCard>>>;
 
-const KEY = 'inksnake.album.v1';
+const LEGACY_KEY = 'inksnake.album.v1';
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 /** Untrusted saved data to an album: anything malformed is dropped. */
@@ -39,20 +39,30 @@ export function addToAlbum(album: Album, snake: SnakeId, date: string, event?: E
   return { ...album, [snake]: { date, ...(event ? { event } : had?.event ? { event: had.event } : {}) } };
 }
 
-export function loadAlbum(store: KeyValueStore | undefined): Album {
-  try {
-    const raw = store?.getItem(KEY);
-    return raw ? parseAlbum(JSON.parse(raw)) : {};
-  } catch (err) {
-    console.warn('[inksnake] could not read the snake album', err);
-    return {};
-  }
+/** Two albums combined: every snake from either, the earlier first-played date winning. */
+export function mergeAlbum(a: Album, b: Album): Album {
+  return SNAKES.reduce<Album>((acc, id) => {
+    const x = a[id];
+    const y = b[id];
+    const win = x && y ? (y.date < x.date ? y : x) : (x ?? y);
+    if (!win) return acc;
+    const event = win.event ?? (x && y ? (win === x ? y.event : x.event) : undefined);
+    return { ...acc, [id]: { date: win.date, ...(event ? { event } : {}) } };
+  }, {});
 }
 
-export function saveAlbum(store: KeyValueStore | undefined, album: Album): void {
+/** Whether `a` already holds everything in `b` (so saving `b` over `a` adds nothing). */
+export function coversAlbum(a: Album, b: Album): boolean {
+  return SNAKES.every((id) => !b[id] || (a[id] !== undefined && a[id]!.date <= b[id]!.date && (a[id]!.event !== undefined || b[id]!.event === undefined)));
+}
+
+/** The album an older version kept in this browser only (migrated into the account save, never written again). */
+export function loadLegacyAlbum(store: KeyValueStore | undefined): Album {
   try {
-    store?.setItem(KEY, JSON.stringify(album));
+    const raw = store?.getItem(LEGACY_KEY);
+    return raw ? parseAlbum(JSON.parse(raw)) : {};
   } catch (err) {
-    console.warn('[inksnake] could not save the snake album', err);
+    console.warn('[inksnake] could not read the old snake album', err);
+    return {};
   }
 }

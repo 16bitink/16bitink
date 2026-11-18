@@ -2,11 +2,12 @@ import { EVENTS } from '@16bitink/game-sdk';
 import type Phaser from 'phaser';
 import { RED } from '../../art/palette';
 import type { Album } from '../../daily/album';
+import { albumTier, nextMilestone } from '../../daily/milestones';
 import { shortDate } from '../../daily/dates';
 import { SNAKE_FACTS } from '../../daily/snakeFacts';
 import { SNAKES, SNAKE_SPECS } from '../../logic/species';
 import { inkButton, inkText } from '../ui';
-import { CardBuilder, snakeHead, snakeSilhouette, SOFT_INK, TEXT_W } from './cardKit';
+import { CardBuilder, snakeHead, snakeSilhouette, GOLD_INK, SOFT_INK, TEXT_W } from './cardKit';
 
 export interface AlbumActs {
   page(n: number): void;
@@ -24,13 +25,16 @@ const COL_W = TEXT_W / 2;
  * and the day first met; event snakes carry their event's stamp. Snakes
  * not met yet are ink silhouettes. It only grows.
  */
-export function albumCard(scene: Phaser.Scene, album: Album, page: number, a: AlbumActs): CardBuilder {
+export function albumCard(scene: Phaser.Scene, album: Album, totalDays: number, page: number, a: AlbumActs): CardBuilder {
   const pages = Math.ceil(SNAKES.length / PER_PAGE);
   const p = Math.max(0, Math.min(pages - 1, page));
   const met = SNAKES.filter((id) => album[id]).length;
   const c = new CardBuilder(scene, 77);
+  c.frameTier = albumTier(totalDays);
   c.text('Snake Album', 36, undefined, 0);
   c.text(`${met} of ${SNAKES.length} snakes met in the daily hunts`, 20, SOFT_INK, 8);
+  const next = nextMilestone(totalDays);
+  c.text(next === null ? `${totalDays} days played: every album page is yours` : `${totalDays} days played · a new page at ${next}`, 18, GOLD_INK, 8);
   const ids = SNAKES.slice(p * PER_PAGE, p * PER_PAGE + PER_PAGE);
   for (let row = 0; row < ids.length; row += 2) {
     c.block(ROW_H, (cy) => ids.slice(row, row + 2).flatMap((id, i) => {

@@ -1,7 +1,8 @@
 import type { DailyStanding } from '@16bitink/game-sdk';
 import type Phaser from 'phaser';
 import { RED } from '../../art/palette';
-import { MILESTONES, type DailyOutcome, type DailyStart } from '../../daily/client';
+import { type DailyOutcome, type DailyStart } from '../../daily/client';
+import { reachedAt } from '../../daily/milestones';
 import { countdown, longDate, msToMidnight } from '../../daily/dates';
 import { chapterNumber, eventTeaser, placeName, standingLine } from '../../daily/text';
 import { placeOf } from '../../level/levels';
@@ -39,7 +40,7 @@ export interface EndCard {
 
 function daysLine(n: number, before: number): string {
   const days = `${n} ${n === 1 ? 'day' : 'days'} played`;
-  return n > before && (MILESTONES as readonly number[]).includes(n) ? `${days}: a new stamp on your calendar!` : days;
+  return n > before && reachedAt(n) !== null ? `${days}: a new album page!` : days;
 }
 
 /** "Caught in 1:23" or how it ended. */

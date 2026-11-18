@@ -87,6 +87,3 @@ export class DailyClient {
     return this.host.challengeLink(date, Math.round(seconds));
   }
 }
-
-/** Days-played milestones (every game's dailies count): each one stamps the calendar. */
-export const MILESTONES = [3, 7, 14, 30, 50, 100] as const;

@@ -5,6 +5,7 @@ import { releaseScratch } from '../../art/pen';
 import { snakeArt } from '../../art/snakes/index';
 import type { SnakeId } from '../../logic/species';
 import { inkButton, inkText, type ButtonOpts } from '../ui';
+import { albumFrame } from './albumFrame';
 import { freePaper, paperCard } from '../uiPaint';
 
 /**
@@ -22,6 +23,8 @@ export const TEXT_W = CARD_W - PAD * 2;
 export class CardBuilder {
   readonly root: Phaser.GameObjects.Container;
   y = 30;
+  /** Album page tier (0..6): a decorative frame on the paper. */
+  frameTier = 0;
   private readonly seed: number;
 
   constructor(private readonly scene: Phaser.Scene, seed: number) {
@@ -55,7 +58,7 @@ export class CardBuilder {
     const h = Math.ceil((this.y + 18) / 10) * 10;
     const paper = paperCard(this.scene, 0, h / 2, CARD_W, h, this.seed, { tapes: ['tl', 'tr'], rule: true });
     const body = this.scene.add.zone(0, h / 2, CARD_W, h).setInteractive();
-    this.root.addAt([body, paper], 0);
+    this.root.addAt([body, paper, ...(this.frameTier > 0 ? [albumFrame(this.scene, CARD_W, h, this.frameTier)] : [])], 0);
     const fit = Math.max(0.3, Math.min(upright ? 1.5 : 1.15, (view.height - 24) / h, (view.width - 16) / CARD_W));
     this.root.setPosition(view.width / 2, view.height / 2 - (h / 2) * fit).setScale(fit * 0.94).setAlpha(0);
     this.scene.tweens.add({ targets: this.root, scale: fit, alpha: 1, duration: 200, ease: 'Back.Out' });

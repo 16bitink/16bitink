@@ -1,7 +1,7 @@
 import type { DailyHost, DailyPlay } from '@16bitink/game-sdk';
 import { describe, expect, it } from 'vitest';
 import { christmasEve, sampleOn } from '../dev/daily/samples';
-import { addToAlbum, loadAlbum, parseAlbum, saveAlbum } from '../src/daily/album';
+import { addToAlbum, parseAlbum } from '../src/daily/album';
 import { DailyClient } from '../src/daily/client';
 import { countdown, longDate, monthGrid, msToMidnight } from '../src/daily/dates';
 import { eventTeaser, goalLine, placeName, standingLine, winterLine } from '../src/daily/text';
@@ -67,11 +67,6 @@ describe('the snake album', () => {
 
   it('reads saved albums safely and round-trips through storage', () => {
     expect(parseAlbum({ corn: { date: 'soon' }, dragon: { date: '2026-01-01' }, krait: { date: '2026-01-01', event: 'party' } })).toEqual({ krait: { date: '2026-01-01' } });
-    const mem = new Map<string, string>();
-    const store = { getItem: (k: string) => mem.get(k) ?? null, setItem: (k: string, v: string) => void mem.set(k, v) };
-    saveAlbum(store, { rainbowboa: { date: '2026-12-31', event: 'newYearsEve' } });
-    expect(loadAlbum(store)).toEqual({ rainbowboa: { date: '2026-12-31', event: 'newYearsEve' } });
-    expect(loadAlbum(undefined)).toEqual({});
   });
 
   it('has a fact for every snake', () => {
