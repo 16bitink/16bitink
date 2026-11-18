@@ -14,7 +14,9 @@ import type { BoardView } from './port';
  */
 const GLINT_EVERY_MS = 3600;
 const GLINT_MS = 600;
-const GLINT_SIZE = 18;
+const GLINT_SIZE = 26;
+/** In the dark the glint is drawn over the lantern's darkness, in lantern light instead of ink. */
+const DARK_GLINT_TINT = 0xfff1c8;
 const REVEAL_MS = 220;
 /** The unlock moment: the key flies to its gate, turns in the lock, the door slides up. */
 const KEY_FLY_MS = 420;
@@ -66,6 +68,14 @@ export class BricksView {
         this.hidden.set(i, glint);
       }
     });
+  }
+
+  /** Dark levels: lift the hidden bricks' glints above the darkness (call after the Lantern is made) and light them. */
+  aboveDark(): void {
+    for (const glint of this.hidden.values()) {
+      this.layer.bringToTop(glint);
+      glint.setTint(DARK_GLINT_TINT).setTintMode(Phaser.TintModes.FILL);
+    }
   }
 
   /** A hit that didn't break it: a flash (the crack shows on the next sync). */

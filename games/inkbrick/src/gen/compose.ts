@@ -7,7 +7,7 @@ import { applyRuleBricks, placeDailyPearl, placePearls, placeRescue, spotsOf, ti
 import { addBumpers, addCrab, addHidden, addLevers, addTrapDoors } from './newpieces';
 import { pictureById } from './pictures';
 import { daySeed, type DayPlan } from './plan';
-import { LOW_SCREEN_ROWS, screenLaunch } from './screen';
+import { LOW_SCREEN_ROWS, screenLaunch, TIDE_SCREEN_ROWS } from './screen';
 import { bandWithLane, buildShell, type Rect, type Shell } from './shells';
 
 const COLS = 36;
@@ -278,7 +278,9 @@ export function compose(plan: DayPlan, k: number, salt = 0): LevelDef {
   const shell = pic?.shell ?? buildShell(plan, rng);
   const main = plan.twist === 'ice' ? 'ice' : 'soft';
   let bricks: BrickDef[] = [...shell.walls, ...(pic?.bricks ?? []), ...(plan.layout === 'open' ? openBricks(shell, plan, rng, mix) : [])];
-  for (const r of shell.fills) bricks.push(...minus(fillArea(r, plan, rng, main, mix), bricks));
+  // A layers corridor's band is plain 3 x 1 rows whatever the day's density (1 x 1 bands made 400-brick boards).
+  const fillPlan: DayPlan = plan.layout === 'layers' ? { ...plan, density: 'normal' } : plan;
+  for (const r of shell.fills) bricks.push(...minus(fillArea(r, fillPlan, rng, main, mix), bricks));
   if (shell.chamber) {
     const c = shell.chamber;
     // The maze's chamber is met from below, the nested inner vault's from its band above.
@@ -301,6 +303,7 @@ export function compose(plan: DayPlan, k: number, salt = 0): LevelDef {
     layout: plan.layout, bricks: t.bricks, ...t.extras, ...rule,
   };
   const goal = withGoal(base, plan, rng);
-  const screened = screenLaunch(goal, spotsOf(goal), plan.layout === 'layers' ? LOW_SCREEN_ROWS : undefined);
+  const rows = plan.layout !== 'layers' ? undefined : plan.goal === 'tide' ? TIDE_SCREEN_ROWS : LOW_SCREEN_ROWS;
+  const screened = screenLaunch(goal, spotsOf(goal), rows);
   return plan.goal === 'tide' ? { ...screened, tide: tideFor(screened) } : screened;
 }

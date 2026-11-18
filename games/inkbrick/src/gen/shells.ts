@@ -7,7 +7,7 @@
 import { INSIDE_PROBE } from '../sim/constants';
 import { shell, stone } from '../sim/kit';
 import { pick, randInt, type Rng } from '../sim/rng';
-import type { BrickDef } from '../sim/types';
+import { RULE_CLASS, type BrickDef } from '../sim/types';
 import type { DayPlan } from './plan';
 
 export interface Rect { readonly x: number; readonly y: number; readonly w: number; readonly h: number }
@@ -219,10 +219,13 @@ function nested(plan: DayPlan, rng: Rng): Shell {
  * shells and kegs. The gaps may become trap doors, flip walls, a spinner or a whirlpool (twists).
  */
 function layers(plan: DayPlan, rng: Rng): Shell {
-  const k = Math.min(INSIDE_PROBE - 1, plan.holeW);
-  const floors = plan.size === 'short' ? 2 : 3;
+  // Gaps a cell wider than the day's hole (a 3-wide gap behind a 3-wide gap behind a 3-wide gap
+  // cost novices every return), and three floors only on a big day with no hard rule or tide.
+  const k = Math.min(INSIDE_PROBE - 1, plan.holeW + 1);
+  const hard = plan.rule ? RULE_CLASS[plan.rule] === 'hard' : false;
+  const floors = plan.size === 'big' && !hard && plan.goal !== 'tide' ? 3 : 2;
   const spacing = plan.size === 'big' ? 8 : pick(rng, [7, 8]);
-  const bottom = (plan.size === 'short' ? 30 : randInt(rng, 36, 38)) - (floors === 3 && spacing === 8 ? 0 : 0);
+  const bottom = floors === 2 ? randInt(rng, 30, 33) : randInt(rng, 36, 38);
   let left = rng() < 0.5;
   const walls: BrickDef[] = [];
   const gaps: Rect[] = [];
@@ -233,20 +236,25 @@ function layers(plan: DayPlan, rng: Rng): Shell {
     walls.push(stone(0, row, gx, 1), stone(gx + k, row, COLS - gx - k, 1));
     gaps.push({ x: gx, y: row, w: k, h: 1 });
     // The corridor above this floor (between it and the next): a band of bricks, a run above and below.
-    if (f < floors - 1) fills.push({ x: 0, y: row - spacing + 2, w: COLS, h: spacing - 5 });
+    if (f < floors - 1) fills.push({ x: 0, y: row - spacing + 2, w: COLS, h: Math.min(2, spacing - 5) });
     left = !left;
   }
   const top = bottom - (floors - 1) * spacing;
   const g0 = gaps[0]!;
+  // The top room: at most LAYERS_ROOM rows over the last floor (a full room to the ceiling made 400-brick boards novices never cleared).
+  const roomH = Math.min(LAYERS_ROOM, top - 3 - TOP);
   return {
     walls, fills, gaps,
-    chamber: { x: 0, y: TOP, w: COLS, h: top - 3 - TOP },
+    chamber: { x: 0, y: top - 3 - roomH, w: COLS, h: roomH },
     field: bandWithLane(bottom + 2, fieldRows(plan, rng), g0.x, k),
     pocket: { x: COLS / 2, y: bottom - 1 },
     window: { ...g0, side: 'bottom' },
     payoffRow: bottom - spacing + 2,
   };
 }
+
+/** Rows of a layers board's top room. */
+const LAYERS_ROOM = 6;
 
 /** Rows of armour (driftwood, 3 hits) the open layout stacks; a stone needs to chew through them (2 rows doubled the break-in: 60 s skilled). */
 const ARMOUR_ROWS = 1;

@@ -19,7 +19,7 @@ function floor(y: number, gaps: readonly (readonly [number, number])[]): BrickDe
 const SIDE_GAPS = [[5, 3], [28, 3]] as const;
 // The bottom floor's gaps are 2 wide (the stone just fits): the way in takes a careful shot.
 const BOTTOM_GAPS = [[5, 2], [29, 2]] as const;
-const FLOORS = [...floor(38, BOTTOM_GAPS), ...floor(30, [[16, 4]]), ...floor(22, SIDE_GAPS)];
+const FLOORS = [...floor(36, BOTTOM_GAPS), ...floor(30, [[16, 4]]), ...floor(22, SIDE_GAPS)];
 /**
  * A corridor's band, hung one row under the floor above: a driftwood row over a row of 1 x 1
  * sandcastle (the face a climbing stone runs along), with x3 shells over the gaps below, where a
@@ -39,7 +39,7 @@ const ROOM = [
   ...fill(0, 9, 36, 3, 'tough', { hp: 2 }),
   ...fill(0, 7, 36, 2, 'tough', { hp: 3 }),
 ];
-const PEARLS: CellPoint[] = [{ x: 17, y: 36 }, { x: 2, y: 28 }, { x: 33, y: 28 }, { x: 17, y: 4 }];
+const PEARLS: CellPoint[] = [{ x: 17, y: 34 }, { x: 2, y: 28 }, { x: 33, y: 28 }, { x: 17, y: 4 }];
 // Teasers in the middle under the bottom floor, the lanes under its gaps kept open. Four planks of
 // driftwood low by the raft screen the launch spot's shots at the gaps, straight and banked off the
 // walls (where the generator's launch screen puts them); every other shot stays open.

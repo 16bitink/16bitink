@@ -1,38 +1,40 @@
 /**
- * Level 35, "The Hidden Vault". Signature: Vault reached through a whirlpool. A cave room whose
- * only floor hole is a tiny 2-wide slot at the right, screened by driftwood; the easy way in is the
- * whirlpool low by the left wall, whose twin sits in the room's empty right-hand chimney, lined
- * with x3 shells. Stones falling back into the twin come out low and fast. Tough cave walls (with
- * a keg each) either side. Pieces: whirlpool pair, soft, tough, x3, keg.
+ * Level 35, "The Pearl Locks". Rebuilt 2026-11-18 as layers (the old pins of ch4-35-poolvault are
+ * gone). Signature: Layers with whirlpools linking the floors, goal Pearls. Three solid stone
+ * floors close the cave into stacked chambers with no gap at all: the only way up is a whirlpool
+ * from the open water into the first chamber, another from it into the second, a third into the
+ * top room. A pearl rests in each chamber and one under the roof. Pieces: whirlpool x3, soft,
+ * tough, x3.
  */
-import { fill, shell, swapKind } from '../../src/sim/kit';
-import type { LevelDef } from '../../src/sim/types';
+import { fill, stone } from '../../src/sim/kit';
+import type { BrickDef, LevelDef } from '../../src/sim/types';
 
-const SHELL = shell(9, 12, 19, 18, [{ side: 'bottom', at: 15, width: 2 }]);
-const INSIDE = [
-  ...fill(10, 16, 9, 13, 'soft'), ...fill(19, 16, 2, 13, 'soft', { bw: 1 }),
-  ...swapKind(fill(21, 16, 1, 13, 'soft', { bw: 1 }), [16, 18, 20, 22, 24, 26, 28].map((y) => [21, y] as const), 'x3'), // x3 lining the chimney
+const FLOORS = [stone(0, 42, 36, 1), stone(0, 32, 36, 1), stone(0, 22, 36, 1)];
+/** A chamber's band, hung two rows under the floor above: driftwood over a row of 1 x 1 sandcastle with an x3 every 8th cell. */
+const band = (y: number): BrickDef[] => [
+  ...fill(0, y, 36, 1, 'tough', { hp: 3 }), ...fill(0, y + 1, 36, 1, 'tough', { hp: 2 }),
+  ...fill(0, y + 2, 36, 1, 'soft', { bw: 1 }).map((b) => (b.x % 8 === 5 ? { ...b, kind: 'x3' as const } : b)),
 ];
-// Driftwood across the free launch shots: one at the slot, one under the whirlpool.
-const DRIFTWOOD = [
-  ...fill(20, 44, 3, 1, 'tough', { hp: 3 }), ...fill(23, 40, 3, 1, 'tough', { hp: 3 }), // the launch shot and the straight shot at the slot
-  ...fill(9, 50, 3, 1, 'tough', { hp: 3 }), // the launch shot at the whirlpool
+const ROOM = [
+  ...fill(0, 18, 36, 1, 'soft', { bw: 1 }).map((b) => (b.x % 6 === 2 ? { ...b, kind: 'x3' as const } : b)),
+  ...fill(0, 11, 36, 7, 'soft'), ...fill(0, 6, 36, 5, 'tough', { hp: 3 }), ...fill(0, 4, 36, 2, 'tough', { hp: 2 }),
 ];
-// Cave walls either side of the vault, so the stones that spill out have work; kegs stop the last-brick hunt.
-const SIDES = [...swapKind([...fill(0, 13, 6, 18, 'tough', { hp: 2 }), ...fill(30, 13, 6, 18, 'tough', { hp: 2 })], [[3, 13], [30, 13]], 'keg', { hp: 1 }), ...fill(0, 7, 36, 2, 'soft', { tint: 3 })];
-const TEASERS = [
-  ...fill(0, 4, 36, 2, 'soft', { tint: 4 }), ...fill(0, 37, 6, 1, 'tough', { hp: 2 }), ...fill(30, 37, 6, 1, 'tough', { hp: 2 }),
-  ...fill(30, 33, 6, 1, 'tough', { hp: 2 }), ...fill(0, 40, 6, 1, 'tough', { hp: 2 }), ...fill(9, 31, 12, 1, 'tough', { hp: 2 }),
-];
+const TEASERS: BrickDef[] = [...fill(0, 45, 8, 1, 'tough', { hp: 2 }), ...fill(24, 45, 12, 1, 'soft'), ...fill(14, 48, 12, 1, 'soft'), { x: 1, y: 50, w: 3, h: 1, kind: 'tough', hp: 3 }, { x: 7, y: 50, w: 3, h: 1, kind: 'tough', hp: 3 }];
 
 export const HIDDEN_VAULT: LevelDef = {
   id: 'ch4-35-poolvault',
-  name: 'The Hidden Vault',
+  name: 'The Pearl Locks',
   number: 35,
   chapter: 4,
-  layout: 'vault',
+  layout: 'layers',
+  goal: 'pearls',
   par: 100,
-  tip: 'The slot is tiny. The whirlpool at the left drops you inside.',
-  whirlpools: [{ a: { x: 4, y: 43 }, b: { x: 24, y: 20 } }],
-  bricks: [...SHELL, ...INSIDE, ...TEASERS, ...DRIFTWOOD, ...SIDES],
+  tip: 'Ride the whirlpools up and take every pearl.',
+  pearls: [{ x: 22, y: 33 }, { x: 12, y: 23 }, { x: 10, y: 20 }, { x: 24, y: 3 }],
+  whirlpools: [
+    { a: { x: 4, y: 47 }, b: { x: 31, y: 41 } },
+    { a: { x: 4, y: 41 }, b: { x: 31, y: 31 } },
+    { a: { x: 4, y: 31 }, b: { x: 31, y: 21 } },
+  ],
+  bricks: [...FLOORS, ...band(34), ...band(24), ...ROOM, ...TEASERS],
 };

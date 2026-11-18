@@ -1,7 +1,7 @@
 /** The generator's pure side for dev/gen.mjs: planning with the frozen history, and the day lines. */
 import { addDays, dateRange } from '../src/gen/calendar';
 import { generateDay, type DailyEntry, type GenOptions } from '../src/gen/generate';
-import { planDay, type DayPlan, type KeepPlan } from '../src/gen/plan';
+import { planDay, TIDE_LAYOUTS, type DayPlan, type KeepPlan } from '../src/gen/plan';
 import { asciiBoard } from '../src/sim/ascii';
 import { formatValue, judge, measureLevel } from '../src/sim/measure';
 import { dailyTargets } from '../src/sim/targets';
@@ -39,7 +39,11 @@ export function planDates(
 
 /** What a frozen day's redo must keep. */
 export function keepOf(e: DailyEntry | undefined): KeepPlan | undefined {
-  return e?.plan.rule ? { goal: e.plan.goal, rule: e.plan.rule, ruleDir: e.plan.ruleDir } : undefined;
+  if (!e?.plan.rule) return undefined;
+  const base = { goal: e.plan.goal, rule: e.plan.rule, ruleDir: e.plan.ruleDir };
+  // A layout the goal no longer allows (a tide day on layers) is planned again, never as a centre box.
+  if (e.plan.goal === 'tide' && !TIDE_LAYOUTS.includes(e.plan.layout)) return { ...base, noBoxes: true };
+  return { ...base, layout: e.plan.layout, twist: e.plan.twist };
 }
 
 /** Every day's level gets `tomorrow: { rule, goal }` from the next day's plan (frozen, or planned now as it will be). */

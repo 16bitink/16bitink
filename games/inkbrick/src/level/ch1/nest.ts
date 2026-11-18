@@ -17,7 +17,7 @@ function floor(y: number, gaps: readonly (readonly [number, number])[]): BrickDe
 }
 // The floors sit high (the bottom one 26 rows over the raft) and the bottom gap is 2 wide (the stone
 // just fits): the way in is a long, careful shot.
-const FLOORS = [...floor(34, [[5, 2]]), ...floor(26, [[28, 3]]), ...floor(18, [[5, 3]])];
+const FLOORS = [...floor(33, [[5, 2]]), ...floor(26, [[28, 3]]), ...floor(18, [[5, 3]])];
 /**
  * A corridor's band, one row under the floor above: two rows of driftwood over 1 x 1 sandcastle,
  * with x3 shells over both gaps (where a climbing stone first lands), mirrored about the middle.
@@ -35,6 +35,8 @@ const CAGE: BrickDef[] = [
   ...fill(15, 7, 6, 1, 'tough', { hp: 3, bw: 3 }), ...fill(16, 4, 4, 1, 'tough', { hp: 3, bw: 2 }),
 ];
 // The loft: x3 shells every 4th cell on its bottom row (mirrored), sandcastle, driftwood round the cage.
+// Roof plank: row 3 over the cage, so a stone can no longer run the empty ceiling rows to the pup.
+const ROOF = fill(9, 3, 18, 1, 'tough', { hp: 3 });
 const LOFT_SHELLS = [2, 6, 10, 14, 21, 25, 29, 33];
 const LOFT = [
   ...fill(0, 14, 36, 1, 'soft', { bw: 1 }).map((b) => (LOFT_SHELLS.includes(b.x) ? { ...b, kind: 'x3' as const } : b)),
@@ -57,5 +59,5 @@ export const DOUBLE_WRECK: LevelDef = {
   par: 80,
   tip: 'Climb to the loft and touch the pup to set it free.',
   rescue: PUP,
-  bricks: [...FLOORS, ...BANDS, ...CAGE, ...LOFT, ...TEASERS, ...SCREEN],
+  bricks: [...FLOORS, ...BANDS, ...CAGE, ...ROOF, ...LOFT, ...TEASERS, ...SCREEN],
 };

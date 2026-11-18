@@ -1,6 +1,6 @@
 /**
  * Placing a day's goal on its board (docs/inkbrick-design.md "Variety"): the rescue friend deep
- * inside, far from the way in; 3-5 pearls spread between the inside and the field; the Rising
+ * inside, far from the way in, in a driftwood cage; 3-5 pearls, all but one inside; the Rising
  * Tide's line and pace; the daily's hidden pearl off the obvious path; and the rules the
  * generator applies itself (goldRush, kegDay).
  */
@@ -17,12 +17,18 @@ const LAUNCH_COL = Math.floor(LAUNCH_X / CELL);
 /** Pearls at least this many cells apart (Chebyshev), so each is its own shot. */
 const PEARL_SPACING = 6;
 /** Rising Tide: seconds until the lowest brick would reach the line if nothing were cleared (measured: 6 rows at 4 s each floods the decent bot 1.2 times, at 6 s 0.4, at 8 s 0). */
-export const TIDE_FIRST_FLOOD = 40;
-/** Rows between the lowest brick and the danger line. */
-export const TIDE_LINE_GAP = 6;
-export const TIDE_EVERY: readonly [number, number] = [5, 12];
+export const TIDE_FIRST_FLOOD = 48;
+/**
+ * Rows between the lowest brick and the danger line: 10, so the bots go in first and dig the
+ * lowest bricks only when the tide brings them within 7 rows (kit, "Learned building L15": at 6-8
+ * rows they dug first and broke in at 36-40 s); 4.5-5 s a row then gave novices 77-90%.
+ */
+export const TIDE_LINE_GAP = 10;
+export const TIDE_EVERY: readonly [number, number] = [4.5, 12];
 export const GOLD_RUSH_SHARE = 0.12;
 export const KEG_DAY_SHARE = 0.1;
+/** Hits the friend's cage bricks take. */
+export const CAGE_HP = 3;
 
 interface Spot { readonly x: number; readonly y: number }
 
@@ -88,7 +94,28 @@ export function placeRescue(level: LevelDef, rng: Rng): { bricks: BrickDef[]; re
   spots.sort((a, b) => b.d - a.d || a.y - b.y || a.x - b.x);
   const s = pick(rng, spots.slice(0, Math.min(6, spots.length)));
   const rescue: RescueDef = { x: s.x, y: s.y, who: pick(rng, RESCUE_WHO) };
-  return { bricks: minus(level.bricks, cellsOf([s], RESCUE_SIZE)), rescue };
+  return { bricks: cage(minus(level.bricks, cellsOf([s], RESCUE_SIZE)), s, stone), rescue };
+}
+
+/**
+ * The friend's cage: every brick touching the 2 x 2 spot becomes driftwood (CAGE_HP hits), and an
+ * empty cell of the ring gets a 1 x 1 one, so the stone must break in to the friend too (an open
+ * friend was freed by the skilled bot in 5-26 s).
+ */
+function cage(bricks: readonly BrickDef[], s: Spot, stone: Uint8Array): BrickDef[] {
+  const ring: Spot[] = [];
+  for (let y = s.y - 1; y <= s.y + RESCUE_SIZE; y++) {
+    for (let x = s.x - 1; x <= s.x + RESCUE_SIZE; x++) {
+      const inSpot = x >= s.x && x < s.x + RESCUE_SIZE && y >= s.y && y < s.y + RESCUE_SIZE;
+      if (!inSpot && x >= 0 && x < COLS && y >= 3 && y <= BRICK_ROW_MAX && !stone[cellIndex(x, y)]) ring.push({ x, y });
+    }
+  }
+  const touches = (b: BrickDef) => ring.some((c) => c.x >= b.x && c.x < b.x + b.w && c.y >= b.y && c.y < b.y + b.h);
+  const out = bricks.map((b) => ((b.kind === 'soft' || b.kind === 'tough' || b.kind === 'ice') && touches(b) ? { ...b, kind: 'tough' as const, hp: CAGE_HP } : b));
+  const taken = new Set<string>();
+  for (const b of out) forEachCell(b, (x, y) => taken.add(`${x},${y}`));
+  for (const c of ring) if (!taken.has(`${c.x},${c.y}`)) out.push({ x: c.x, y: c.y, w: 1, h: 1, kind: 'tough', hp: CAGE_HP });
+  return out;
 }
 
 /** Cells a pearl may take: not stone, on the brick rows, away from the straight launch line low down. */
@@ -121,7 +148,8 @@ function spread(rng: Rng, pool: readonly Spot[], taken: Spot[], n: number): Spot
 export function placePearls(level: LevelDef, rng: Rng, avoid: readonly Spot[]): { bricks: BrickDef[]; pearls: CellPoint[] } | null {
   const n = randInt(rng, 3, 5);
   const c = pearlCandidates(level);
-  const inN = c.inside.length > 0 ? Math.ceil(n / 2) : 0;
+  // All but one inside (the payoff): field pearls alone were taken in 12-25 s.
+  const inN = c.inside.length > 0 ? n - 1 : 0;
   const taken = [...avoid];
   const pearls = spread(rng, c.inside, taken, inN);
   pearls.push(...spread(rng, c.outside, [...taken, ...pearls], n - pearls.length));
@@ -146,12 +174,12 @@ export function placeDailyPearl(level: LevelDef, rng: Rng, avoid: readonly Spot[
   return { bricks: minus(level.bricks, cellsOf([s])), pearl: { x: s.x, y: s.y } };
 }
 
-/** Rising Tide: the line TIDE_LINE_GAP rows under the lowest brick (at most row 57), and a pace that floods in ~40 s if nothing is cleared. */
+/** Rising Tide: the line TIDE_LINE_GAP rows under the lowest brick (at most row 57), and a pace (to 0.5 s) that floods in ~48 s if nothing is cleared. */
 export function tideFor(level: LevelDef): TideDef {
   const low = Math.max(...level.bricks.filter((b) => b.kind !== 'stone' && b.kind !== 'gate' && b.kind !== 'lever').map((b) => b.y + b.h - 1));
   const line = Math.min(TIDE_FLOOR_ROW, low + TIDE_LINE_GAP);
   const steps = Math.max(1, line - low);
-  const every = Math.max(TIDE_EVERY[0], Math.min(TIDE_EVERY[1], Math.round(TIDE_FIRST_FLOOD / steps)));
+  const every = Math.max(TIDE_EVERY[0], Math.min(TIDE_EVERY[1], Math.round((2 * TIDE_FIRST_FLOOD) / steps) / 2));
   return { every, line };
 }
 

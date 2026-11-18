@@ -136,7 +136,12 @@ export class PlayScene extends Phaser.Scene {
     this.events.once('shutdown', () => this.scale.off('resize', this.fit, this));
     this.draw(this.opts.port.view(), 0);
     // After the first draw, so the pieces made then (shutters, spinners) sit in the dark too.
-    if (dark) this.lantern = new Lantern(this, this.board);
+    if (dark) {
+      this.lantern = new Lantern(this, this.board);
+      // The glints that hint at hidden things go over the dark, or nobody could see them.
+      this.bricks.aboveDark();
+      this.variety.aboveDark(this.board);
+    }
     if (import.meta.env.DEV) {
       this.probe = new DevProbe();
       this.probe.emit = (e) => this.onEvent(e);

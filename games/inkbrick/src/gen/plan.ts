@@ -54,6 +54,12 @@ const SPECIAL_GOALS: readonly GoalKind[] = ['rescue', 'pearls', 'tide'];
 const GOAL_EARLY_DAYS = 4;
 const GOAL_EARLY_CHANCE = 0.45;
 const RULE_DAYS = 7;
+/**
+ * Rising Tide only where the lowest bricks face the raft: on layers, vaults and nested or guarded
+ * boxes the field sinks bricks that sit behind a stone floor, and floods come whatever the player
+ * does (a layers tide day flooded even the skilled bot 1.9 times a run).
+ */
+export const TIDE_LAYOUTS: readonly Layout[] = ['wall', 'hourglass', 'fuse', 'maze', 'core', 'open', 'picture'];
 const BOX_DAYS_MAX = 2;
 const PLAN_TRIES = 40;
 const NOVELTY_DAYS = 14;
@@ -155,8 +161,11 @@ function chooseTwist(rng: Rng, date: string, layout: Layout, wd: number): Twist 
 function proposal(date: string, rng: Rng, recent: readonly DayPlan[], keep?: KeepPlan): DayPlan {
   const wd = weekday(date);
   const pool = (wd === 1 ? MONDAY : MIDWEEK).filter((l) => available(l, date));
-  const layout: Layout = wd === 0 ? 'core' : pick(rng, pool);
-  const twist = chooseTwist(rng, date, layout, wd);
+  const allowed = pool.filter((l) => (keep?.goal !== 'tide' || TIDE_LAYOUTS.includes(l)) && !(keep?.noBoxes && CENTRE_BOXES.includes(l)));
+  const picked: Layout = wd === 0 ? 'core' : pick(rng, allowed.length > 0 ? allowed : pool);
+  const layout = keep?.layout ?? picked;
+  const drawn = chooseTwist(rng, date, layout, wd);
+  const twist = keep?.twist ?? drawn;
   const goal = keep?.goal ?? chooseGoal(rng, recent);
   const rule = keep?.rule ?? chooseRule(rng, date, recent, goal, twist);
   return {
@@ -183,11 +192,19 @@ function breaksRules(p: DayPlan, recent: readonly DayPlan[]): boolean {
   if (p.picture && recent.some((d) => d.picture === p.picture)) return true;
   if (CENTRE_BOXES.includes(p.layout) && week.filter((d) => CENTRE_BOXES.includes(d.layout)).length >= BOX_DAYS_MAX) return true;
   if (p.rule && !ruleFits(p.rule, p.goal, p.twist)) return true;
+  if (p.goal === 'tide' && !TIDE_LAYOUTS.includes(p.layout)) return true;
   return false;
 }
 
-/** A redo keeps the day's goal and rule (yesterday's teaser already promised them). */
-export interface KeepPlan { readonly goal: GoalKind; readonly rule: RuleKind; readonly ruleDir?: 1 | -1 }
+/**
+ * A redo keeps the day's goal and rule (yesterday's teaser already promised them), and its layout
+ * and twist when given (so the week's rules, like the box limit, still hold against later days).
+ */
+export interface KeepPlan {
+  readonly goal: GoalKind; readonly rule: RuleKind; readonly ruleDir?: 1 | -1; readonly layout?: Layout; readonly twist?: Twist;
+  /** A redo that must change its layout: no centre box (the days after it are frozen; the box limit must still hold). */
+  readonly noBoxes?: boolean;
+}
 
 /** The plan for one date given the days before it (oldest first; only the last 14 matter). */
 export function planDay(date: string, history: readonly DayPlan[], salt = 0, keep?: KeepPlan): DayPlan {

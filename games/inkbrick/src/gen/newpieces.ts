@@ -7,7 +7,7 @@ import { CRAB_H, CRAB_W } from '../sim/types';
 import { minus } from '../sim/kit';
 import { randInt, type Rng } from '../sim/rng';
 import { CELL, COLS, type BrickDef, type LevelDef } from '../sim/types';
-import type { Rect, Shell } from './shells';
+import type { Shell } from './shells';
 
 const CENTRE_X = (COLS * CELL) / 2;
 /** Rows of open water the bumpers and crabs use (under the field, over the raft's reach). */
@@ -74,23 +74,25 @@ function leverBrick(rng: Rng, link: string, y0: number, y1: number): BrickDef {
 }
 
 /**
- * Flip walls over the way in, shut at the start, and a lever outside that opens them (layers: one
- * wall over every floor's gap, and a second lever in the first corridor, which shuts them again:
- * a stone that pulls it is trapped in the corridor until it pulls it once more).
+ * Flip walls over the way in, shut at the start, and a lever outside that opens them, like a key
+ * (vault, nested). On a layers board the bottom gap stays open and the walls shut the floors above
+ * it; a lever in the first corridor opens them ("pull the lever, open the next floor"): with the
+ * way in shut and the lever outside, novices cleared 10-30%.
  */
 export function addLevers(bricks: BrickDef[], shell: Shell, rng: Rng): { bricks: BrickDef[]; extras: PieceExtras } {
   const link = 'a';
-  const gaps: readonly Rect[] = shell.gaps ?? (shell.window ? [shell.window] : []);
-  if (gaps.length === 0) return { bricks, extras: {} };
-  const flips = gaps.map((g) => ({ x: g.x, y: g.y, w: g.w, h: g.h, link, on: true }));
-  // Under a layers board's bottom floor (in the open water), else where a vault's key would go.
-  const low = shell.gaps ? shell.gaps[0]!.y : 0;
-  const levers = [shell.gaps ? leverBrick(rng, link, low + 3, Math.min(48, low + 6)) : leverBrick(rng, link, 36, 42)];
-  if (shell.gaps && shell.fills[0]) {
+  if (shell.gaps && shell.gaps.length >= 2 && shell.fills[0]) {
+    const flips = shell.gaps.slice(1).map((g) => ({ x: g.x, y: g.y, w: g.w, h: g.h, link, on: true }));
     const band = shell.fills[0];
-    const lx = gaps[0]!.x < COLS / 2 ? COLS - 7 : 4;
-    levers.push({ x: lx, y: band.y, w: 3, h: 1, kind: 'lever', link });
+    const lx = shell.gaps[0]!.x < COLS / 2 ? COLS - 7 : 4;
+    const levers: BrickDef[] = [{ x: lx, y: band.y + band.h - 1, w: 3, h: 1, kind: 'lever', link }];
+    const blockers = [...levers, ...flips.map((f) => ({ ...f, kind: 'stone' as const }))];
+    return { bricks: [...minus(bricks, blockers), ...levers], extras: { flips } };
   }
+  const win = shell.window;
+  if (!win) return { bricks, extras: {} };
+  const flips = [{ x: win.x, y: win.y, w: win.w, h: win.h, link, on: true }];
+  const levers = [leverBrick(rng, link, 36, 42)];
   const blockers = [...levers, ...flips.map((f) => ({ ...f, kind: 'stone' as const }))];
   return { bricks: [...minus(bricks, blockers), ...levers], extras: { flips } };
 }

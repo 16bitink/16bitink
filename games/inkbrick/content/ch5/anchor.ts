@@ -44,10 +44,18 @@ const ROWS = HALF.map((h) => h + [...h].reverse().join(''));
 const CELL: Record<string, Partial<BrickDef> & { kind: BrickDef['kind'] }> = {
   o: { kind: 'soft', tint: 3 }, T: { kind: 'tough', hp: 2 }, '3': { kind: 'x3' }, K: { kind: 'keg' },
 };
-const PICTURE: BrickDef[] = ROWS.flatMap((row, i) =>
+const PICTURE0: BrickDef[] = ROWS.flatMap((row, i) =>
   [...row].flatMap((ch, x) => (CELL[ch] ? [{ x, y: 4 + i, w: 1, h: 1, ...CELL[ch] } as BrickDef] : [])));
 
-const QUAY = [stone(0, 36, 29, 1), stone(31, 36, 5, 1)];
+// x3 shells low on the flukes, over the quay gap, where a stone coming in lands first.
+const PICTURE = swapKind(PICTURE0.map((b) => (b.kind === 'keg' ? { ...b, kind: 'tough' as const, hp: 2 } : b)), [[27, 31], [29, 31]], 'x3');
+// The pup's cage: 3-hit driftwood bars round its 2 x 2 pen in the ring's eye.
+const CAGE: BrickDef[] = [
+  ...fill(15, 6, 2, 3, 'tough', { hp: 3 }), ...fill(19, 6, 2, 3, 'tough', { hp: 3 }), ...fill(17, 8, 2, 1, 'tough', { hp: 3 }), ...fill(14, 4, 8, 2, 'tough', { hp: 3 }), ...fill(11, 6, 3, 3, 'tough', { hp: 3 }), ...fill(22, 6, 3, 3, 'tough', { hp: 3 }), ...fill(14, 9, 8, 2, 'tough', { hp: 3 }),
+];
+// Driftwood low by the raft screens the launch spot's shots at the quay gap.
+const SCREEN: BrickDef[] = [{ x: 21, y: 50, w: 3, h: 1, kind: 'tough', hp: 3 }];
+const QUAY = [stone(0, 36, 28, 1), stone(31, 36, 5, 1)];
 const TEASERS = [
   ...fill(0, 40, 15, 1, 'tough', { hp: 2 }), ...fill(0, 44, 12, 1, 'soft'), ...fill(30, 40, 6, 1, 'soft'),
   ...fill(30, 44, 6, 1, 'tough', { hp: 2 }), ...fill(0, 47, 12, 1, 'tough', { hp: 3 }), ...fill(0, 38, 12, 1, 'tough', { hp: 2 }), ...fill(0, 50, 12, 1, 'soft'),
@@ -63,5 +71,5 @@ export const BRUMMS_ANCHOR: LevelDef = {
   par: 100,
   tip: "Free the pup caught in the anchor's ring.",
   rescue: { x: 17, y: 6, who: 'pup' },
-  bricks: [...PICTURE, ...QUAY, ...TEASERS],
+  bricks: [...minus(PICTURE, CAGE), ...CAGE, ...QUAY, ...TEASERS, ...SCREEN],
 };

@@ -47,6 +47,14 @@ const GEN_MAX_SECONDS = 240;
 const MISS_OK = 1;
 /** Pull toward the weekday's novice clear rate (the rhythm), on top of the band. */
 const NOVICE_PULL = 3;
+/**
+ * Below the novice band each point costs this much more: a free daily novices can't clear is the
+ * worst miss there is (round 4 froze layers days at 0-10% because 3 x |novice - centre| lost to a
+ * count of misses).
+ */
+const NOVICE_FLOOR = 20;
+/** Novice clears this far under the band's floor: try a hole a cell wider before keeping the day. */
+const NOVICE_SLACK = 0.1;
 const DISTANCE_SHARE = 0.3;
 /** Rounds use salts far from any redo's (a redo adds 1). */
 const ROUND_SALT = 1000;
@@ -65,7 +73,21 @@ export function dayScore(metrics: Metrics, weekday: number, level?: LevelDef): n
   const misses = verdicts.filter((v) => v.pass === false || v.pass === null).length;
   const nc = metrics.noviceClear;
   const pull = nc === null ? 1 : Math.abs(nc - (DAILY_NOVICE_AIM[weekday] ?? 0.7));
-  return misses + DISTANCE_SHARE * distance(verdicts, WEIGHTS) + NOVICE_PULL * pull;
+  const lo = verdicts.find((v) => v.target.key === 'noviceClear')?.target.lo ?? 0;
+  const under = nc === null ? 1 : Math.max(0, lo - nc);
+  return misses + DISTANCE_SHARE * distance(verdicts, WEIGHTS) + NOVICE_PULL * pull + NOVICE_FLOOR * under;
+}
+
+/** Whether a cell more of hole changes the board (open has no hole; layers' gaps are already a cell wider, at most 4). */
+function widens(layout: string, holeW: number): boolean {
+  if (layout === 'open') return false;
+  return layout !== 'layers' || holeW + 1 < MAX_HOLE;
+}
+
+/** The novice clears far enough under the weekday's band to try an easier board. */
+function novicesStuck(e: DailyEntry, weekday: number): boolean {
+  const lo = dailyTargets(weekday, e.level).find((t) => t.key === 'noviceClear')?.lo ?? 0;
+  return (e.metrics.noviceClear ?? 0) < lo - NOVICE_SLACK;
 }
 
 function missCount(metrics: Metrics, weekday: number, level: LevelDef): number {
@@ -79,10 +101,12 @@ export function generateDay(plan: DayPlan, o: GenOptions = {}): DailyEntry {
     for (let round = 0; round <= (o.rounds ?? 1); round++) {
       const entry = generateWith(p, o, (o.salt ?? 0) + round * ROUND_SALT);
       if (entry && (!best || entry.score < best.score)) best = entry;
-      if (best && missCount(best.metrics, plan.weekday, best.level) <= MISS_OK) return best;
+      if (best && missCount(best.metrics, plan.weekday, best.level) <= MISS_OK && !novicesStuck(best, plan.weekday)) return best;
       if (!entry) break;
     }
     if (!best && p.holeW >= MAX_HOLE) best = generateWith(p, o, o.salt ?? 0, true);
+    // Novices can't clear the best so far: one cell wider (the main dial), keeping the best.
+    if (best && novicesStuck(best, plan.weekday) && p.holeW < MAX_HOLE && widens(plan.layout, p.holeW)) continue;
     if (best || p.holeW >= MAX_HOLE) {
       if (!best) throw new Error(`no candidate for ${plan.date} passed the cheap checks, even with a ${MAX_HOLE}-cell hole`);
       return best;

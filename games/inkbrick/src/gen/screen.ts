@@ -16,6 +16,8 @@ const SCREEN_ROWS: readonly number[] = [41, 38, 44, 50];
  * every shot at the gap, not just the launch spot's, so its screen goes low, near the raft.
  */
 export const LOW_SCREEN_ROWS: readonly number[] = [50, 47, 44];
+/** A layers board on a Rising Tide day: no screen on row 50, or the tide line (10 rows under the lowest brick) runs off the board. */
+export const TIDE_SCREEN_ROWS: readonly number[] = [44, 47, 41];
 const SCREEN_HP = 3;
 const SCREEN_DIRECTIONS = 240;
 /** Most of a launch fan a level may leave open (under the skilled bot's aim noise). */

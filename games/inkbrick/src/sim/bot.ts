@@ -188,7 +188,7 @@ export class Bot {
       const direct = this.goalAim.angles(x);
       if (direct.length > 0) return this.clampNoisy(this.pickTarget(runsOf(direct)));
     }
-    const list = this.aim ? this.aim.angles(x, { gatesOpen: this.gatesOpen(s), time: s.time }) : [];
+    const list = this.aim ? this.aim.angles(x, { gatesOpen: this.gatesOpen(s), time: s.time, flips: s.flips.map((f) => f.solid) }) : [];
     const insideLeft = this.worthGoingIn(s);
     // Stuck in a loop that breaks nothing: try something else, as a player would.
     const stuck = s.elapsed - Math.max(s.lastBreakAt, s.lastNearAt) > STUCK_SECONDS && this.rng() < 0.5;

@@ -149,6 +149,8 @@ const CSS_VARIETY = `
 .ikb .rb-row b { font-size: 28px; } .ikb .rb-row span { font-size: 21px; color: #4a443d; }
 .ikb .hint.fresh { white-space: normal; display: flex; flex-direction: column; align-items: stretch; gap: 4px; font-size: 26px; transform: translate(-50%, -50%); }
 .ikb .hint .tip { color: #6a6258; }
+.ikb .hint.night, .ikb .hint.night .tip { color: #efe6d2; text-shadow: 0 1px 3px #1b1a1f; }
+.ikb .hint.night .rule-banner { color: var(--ink); text-shadow: none; }
 .ikb .goal-k { display: flex; align-items: center; gap: 4px; flex-shrink: 0; font-size: 32px; white-space: nowrap; }
 .ikb .goal-k:empty { display: none; }
 .ikb .goal-k b { font-size: 34px; }

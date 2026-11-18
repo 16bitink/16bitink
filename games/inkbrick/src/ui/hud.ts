@@ -153,11 +153,13 @@ export class Hud {
   private hint(h: HudState, l: BoardLayout): string {
     if (!h.held) return '';
     const banner = h.fresh && this.hasBanner;
+    // On a dark board (a dark level or a Fog day) the words are in lantern light, not ink.
+    const night = this.info.level.dark === true || this.info.level.rule === 'fog' ? ' night' : '';
     const tip = this.info.tip ? `<br><span class="t18${banner ? ' tip' : ''}">${esc(this.info.tip)}</span>` : '';
-    if (!banner) return `<div class="hint" style="left:${l.x + l.w / 2}px;top:${l.y + l.h * 0.72}px">${LAUNCH_HINT}${h.fresh ? tip : ''}</div>`;
+    if (!banner) return `<div class="hint${night}" style="left:${l.x + l.w / 2}px;top:${l.y + l.h * 0.72}px">${LAUNCH_HINT}${h.fresh ? tip : ''}</div>`;
     // Before the first throw: the goal and the rule of the day, then how to throw. Low on the
     // board, under where the bricks usually are.
-    return `<div class="hint fresh" style="left:${l.x + l.w / 2}px;top:${l.y + l.h * 0.7}px;width:${Math.min(l.w * 0.94, 460)}px">${ruleBannerHtml(this.info.level)}<span>${LAUNCH_HINT}</span>${tip.replace('<br>', '')}</div>`;
+    return `<div class="hint fresh${night}" style="left:${l.x + l.w / 2}px;top:${l.y + l.h * 0.7}px;width:${Math.min(l.w * 0.94, 460)}px">${ruleBannerHtml(this.info.level)}<span>${LAUNCH_HINT}</span>${tip.replace('<br>', '')}</div>`;
   }
 
   private set(k: string, html: string): void {

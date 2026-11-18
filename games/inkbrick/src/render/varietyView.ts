@@ -106,6 +106,13 @@ export class VarietyView {
     }
   }
 
+  /** Dark levels: lift the daily pearl's glint above the darkness (call after the Lantern is made) and light it. */
+  aboveDark(layer: Phaser.GameObjects.Container): void {
+    if (!this.glint) return;
+    layer.bringToTop(this.glint);
+    this.glint.setTint(0xfff1c8).setTintMode(Phaser.TintModes.FILL);
+  }
+
   /** The sim kicked a stone off bumper i: a flash and a pop. */
   bump(i: number): void {
     if (this.bumpers[i]) this.bumpPop[i] = BUMP_POP_MS;

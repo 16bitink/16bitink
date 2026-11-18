@@ -1,24 +1,26 @@
 /**
- * Level 25, "The Long Quay". Signature: Over the wall. A full-width stone quay with one tunnel by
- * the right edge; up the tunnel the stone climbs an empty chimney to the open water under the
- * ceiling and runs along the backs of the bricks, x3 shells lining the chimney. A band of ice in
- * front gives the stone something to chew on while it lines up. Pieces: soft, tough, x3, ice, pickup.
+ * Level 25, WIP crabs.
  */
 import { fill, stone, swapKind } from '../../src/sim/kit';
-import type { LevelDef } from '../../src/sim/types';
+import type { BrickDef, CrabDef, LevelDef } from '../../src/sim/types';
 
 const WALL = [stone(0, 14, 28, 1), stone(32, 14, 4, 1)];
+/** Both sides of the chimney over the tunnel, 1 x 1: an x3 shell every third row, sandcastle between. */
+const LINING: BrickDef[] = [26, 32].flatMap((x) => fill(x, 4, 1, 10, 'soft', { bw: 1 }).map((b) => ((b.y - 1) % 3 === 0 && b.y >= 7 ? { ...b, kind: 'x3' as const } : b)));
 const BEHIND = swapKind([
-  ...fill(0, 4, 27, 2, 'soft', { bw: 3 }), ...fill(0, 6, 27, 4, 'soft', { bw: 3 }), ...fill(0, 10, 27, 2, 'tough', { hp: 2, bw: 3 }), ...fill(0, 12, 27, 2, 'tough', { hp: 2 }),
-  ...fill(32, 4, 4, 10, 'soft', { bw: 1 }),
-], [[24, 5], [24, 8], [24, 11], [12, 8]], 'x3');
+  ...fill(0, 4, 26, 2, 'tough', { hp: 2, bw: 2 }), ...fill(0, 6, 26, 2, 'tough', { hp: 2, bw: 2 }), ...fill(0, 8, 26, 2, 'tough', { hp: 2, bw: 2 }), ...fill(0, 10, 26, 2, 'tough', { hp: 2, bw: 2 }), ...fill(0, 12, 26, 2, 'soft', { bw: 2 }),
+  ...fill(33, 4, 3, 10, 'soft', { bw: 1 }),
+], [[12, 12]], 'x3');
 const FRONT = [
-  ...fill(0, 18, 24, 1, 'tough', { hp: 2 }), ...fill(4, 22, 15, 2, 'ice'), ...swapKind(fill(0, 27, 24, 1, 'soft'), [[9, 27]], 'pickup', { drop: 'plus3' }),
-  ...fill(6, 31, 18, 1, 'tough', { hp: 2 }), ...fill(0, 35, 15, 1, 'soft'), ...fill(33, 24, 3, 6, 'soft', { bw: 1 }), ...fill(33, 33, 3, 6, 'tough', { bw: 1, hp: 2 }),
+  ...fill(0, 18, 24, 1, 'tough', { hp: 2 }), ...fill(4, 22, 15, 2, 'ice'), ...fill(0, 27, 24, 1, 'soft'),
+  ...fill(6, 31, 18, 1, 'tough', { hp: 2 }), ...fill(0, 35, 15, 1, 'tough', { hp: 2 }),
 ];
+/** A crab walks the quay's face, under the wall, back and forth across the tunnel's mouth. */
+const CRABS: CrabDef[] = [{ y: 15, x0: 24, x1: 33, speed: 2, phase: 0 }, { y: 44, x0: 16, x1: 33, speed: 5, phase: 0.5 }];
 
 export const LONG_QUAY: LevelDef = {
-  id: 'ch3-25-quay', name: 'The Long Quay', number: 25, chapter: 3, layout: 'wall', par: 95,
-  tip: 'One tunnel by the right edge. Get the stone up it and let it run.',
-  bricks: [...WALL, ...BEHIND, ...FRONT],
+  id: 'ch3-25-quay', name: 'The Crab Quay', number: 25, chapter: 3, layout: 'wall', par: 95,
+  tip: 'A crab guards the tunnel. Shoot when it walks away.',
+  crabs: CRABS,
+  bricks: [...WALL, ...LINING, ...BEHIND, ...FRONT],
 };
