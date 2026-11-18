@@ -40,7 +40,7 @@ const fontFamilies = ['family=Silkscreen', game.fonts?.googleCss].filter(Boolean
     <link href={`https://fonts.googleapis.com/css2?${fontFamilies}&display=swap`} rel="stylesheet" />
   </head>
   <body style={`--paper:${theme.paper};--ink:${theme.ink};--accent:${theme.accent}`}>
-    <div id="stage" aria-label={`${game.title} game`} data-game={game.slug} data-title={game.title} data-price={game.price ?? ''} data-fonts={JSON.stringify(game.fonts?.await ?? [])}>
+    <div id="stage" class:list={{ 'full-bleed': game.fullBleed }} aria-label={`${game.title} game`} data-game={game.slug} data-title={game.title} data-price={game.price ?? ''} data-fonts={JSON.stringify(game.fonts?.await ?? [])}>
       <div id="splash">
         <p class="brand"><span class="bits">16bit</span><span class="ink">.ink</span></p>
         <!-- What you're about to play, while there's room for it (not on a phone held sideways). Usually cached from the home page. -->
@@ -93,7 +93,7 @@ const fontFamilies = ['family=Silkscreen', game.fonts?.googleCss].filter(Boolean
 
     <style is:global>
       html, body { margin: 0; height: 100%; overflow: hidden; background: var(--paper); overscroll-behavior: none; }
-      /* Inset by the safe areas so a notch or home bar never covers the HUD; the paper fills behind them. */
+      /* Inset by the safe areas so a notch or home bar never covers the HUD; the paper fills behind them (unless .full-bleed). */
       #stage {
         position: fixed;
         top: env(safe-area-inset-top); right: env(safe-area-inset-right); left: env(safe-area-inset-left);
@@ -101,6 +101,8 @@ const fontFamilies = ['family=Silkscreen', game.fonts?.googleCss].filter(Boolean
         touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
         background: var(--paper);
       }
+      /* A game that keeps its own controls clear of the notch and home bar fills the whole screen. */
+      #stage.full-bleed { inset: 0; height: 100dvh; }
       #stage canvas { display: block; }
       #splash {
         position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
