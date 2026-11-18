@@ -42,6 +42,14 @@ function goldenTree(c: Hsl): Hsl | null {
   return null;
 }
 
+/** The python's head: the dark crown turned vivid green too. */
+function pythonHead(c: Hsl): Hsl | null {
+  if (pen(c)) return null;
+  if (red(c)) return { h: 54, s: 0.35, l: 0.93 };
+  if (c.l < 0.34 && c.s < 0.6) return { h: 108, s: 0.62, l: 0.3 + c.l * 0.7 };
+  return greenPython(c);
+}
+
 function greenPython(c: Hsl): Hsl | null {
   if (red(c)) return { h: 54, s: 0.35, l: 0.93 };
   if (green(c)) return { h: 112, s: Math.min(1, c.s * 0.85 + 0.12), l: Math.min(0.5, c.l * 0.88) };
@@ -66,6 +74,12 @@ function blackHognose(c: Hsl): Hsl | null {
   if (pen(c)) return null;
   if (c.l > 0.7 && c.s < 0.2) return { h: 215, s: 0.06, l: c.l * 0.86 }; // the pale belly
   return { h: 220, s: 0.05, l: Math.max(0.05, c.l * 0.36) };
+}
+
+/** The sea snake's body: every band painted yellow; the black back is glazed over it. */
+function yellowSeaBody(c: Hsl): Hsl | null {
+  if (pen(c)) return null;
+  return { h: 49, s: 0.95, l: Math.min(0.62, 0.34 + c.l * 0.3) };
 }
 
 function yellowSea(c: Hsl): Hsl | null {
@@ -151,25 +165,28 @@ const earthGlaze = onStrip((ctx, len) => {
   ctx.fillRect(0, 0, len, SNAKE_W);
 });
 
-const seaGlaze: Glaze = (ctx, part, size) => {
-  ctx.save();
-  ctx.globalCompositeOperation = 'source-atop';
-  if (part === 'strip') {
-    // The black back, soft-edged, with the yellow flanks left on either side.
-    const g = ctx.createLinearGradient(0, 0, 0, SNAKE_W);
-    g.addColorStop(0, 'rgba(18,20,26,0)');
-    g.addColorStop(0.3, 'rgba(18,20,26,0.95)');
-    g.addColorStop(0.7, 'rgba(18,20,26,0.95)');
-    g.addColorStop(1, 'rgba(18,20,26,0)');
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, size.w, SNAKE_W);
-  }
-  ctx.restore();
-};
+const seaGlaze = onStrip((ctx, len) => {
+  // The black back is the middle third; a third of the width of yellow on each flank.
+  const g = ctx.createLinearGradient(0, 0, 0, SNAKE_W);
+  for (const [at, a] of [[0.29, 0], [0.35, 0.96], [0.65, 0.96], [0.71, 0]] as const) g.addColorStop(at, `rgba(16,18,24,${a})`);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, len, SNAKE_W);
+  // Black spots on the yellow flanks, as the paddle tail's.
+  dots(ctx, len, 2, 6, 14, '#14161c', 0.85, 0.8, 61);
+  dots(ctx, len, 18, 22, 14, '#14161c', 0.85, 0.8, 67);
+});
+
+/** A python's head is chunky: the head art widened across the body. */
+const broader = (art: SnakeArt, by: number): SnakeArt => ({
+  ...art,
+  head: { ...art.head, draw: (d, pose) => { const c = d.pen.ctx; c.save(); c.scale(1, by); art.head.draw(d, pose); c.restore(); } },
+});
 
 export const GOLDENTREE: SnakeArt = recoloured(FLYING_ART!, goldenTree, { base: '#3f8f3a', mark: '#e8b830', belly: '#e9e2a8' }, goldGlaze);
 export const ROSYBOA: SnakeArt = recoloured(CORN, rosyGround, { base: '#d9c8ac', mark: '#b9603c', belly: '#ecd9c4' }, rosyGlaze);
-export const GREENPYTHON: SnakeArt = recoloured(FLYING_ART!, greenPython, { base: '#2fa83a', mark: '#f4f0b0', belly: '#e8eea0' }, pythonGlaze);
+const PY_COLOURS = { base: '#2fa83a', mark: '#f4f0b0', belly: '#e8eea0' };
+export const GREENPYTHON: SnakeArt = broader({ ...recoloured(FLYING_ART!, greenPython, PY_COLOURS, pythonGlaze), head: recoloured(FLYING_ART!, pythonHead, PY_COLOURS).head }, 1.28);
 export const EARTHSNAKE: SnakeArt = recoloured(HOGNOSE_ART!, earth, { base: '#8a7a64', mark: '#5a4c3c', belly: '#e4dccb' }, earthGlaze);
-export const YELLOWSEA: SnakeArt = recoloured(KRAIT_ART!, yellowSea, { base: '#16181e', mark: '#f2c820', belly: '#f6dc50' }, seaGlaze);
+const SEA_COLOURS = { base: '#16181e', mark: '#f2c820', belly: '#f6dc50' };
+export const YELLOWSEA: SnakeArt = { ...recoloured(KRAIT_ART!, yellowSeaBody, SEA_COLOURS, seaGlaze), head: recoloured(KRAIT_ART!, yellowSea, SEA_COLOURS, seaGlaze).head };
 export const BLACKHOGNOSE: SnakeArt = recoloured(HOGNOSE_ART!, blackHognose, { base: '#2a2c32', mark: '#14151a', belly: '#b8b8b4' });
