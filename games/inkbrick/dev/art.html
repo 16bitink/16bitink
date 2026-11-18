@@ -22,6 +22,7 @@
 <div class="panels"><div class="panel dark" id="dark"></div><div class="panel light" id="light"></div></div>
 <script type="module">
   import { art, ART_KEYS } from '../src/art/manifest.ts';
+  import { artUrl } from '../src/render/art.ts';
   const groups = [
     ['Skip on the raft', (k) => k.startsWith('skip-'), ''],
     ['Rafts (milestones)', (k) => k.startsWith('raft-'), ''],
@@ -42,7 +43,7 @@
       for (const k of ART_KEYS.filter(test)) {
         seen.add(k);
         const f = document.createElement('figure');
-        const i = document.createElement('img'); i.src = art[k].url; i.alt = k;
+        const i = document.createElement('img'); i.src = artUrl(k) ?? art[k].url; i.alt = k;
         const c = document.createElement('figcaption'); c.textContent = `${k} ${art[k].w}x${art[k].h}`;
         f.append(i, c); row.append(f);
       }

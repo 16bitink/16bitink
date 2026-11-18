@@ -46,13 +46,17 @@ function nodeHtml(n: number, d: MapData, pos: string): string {
 /** The coast map image's size (the manifest's MAP_POINTS are in its px). */
 const MAP_W = 1920;
 const MAP_H = 1080;
+/** Room kept under the last node of a trail (map image px): the map is cropped on wide screens. */
+const TRAIL_BOTTOM = 190;
 
 /** Landscape: a level's node near its place on the coast, winding down from it (map image px). */
 function clusterSpot(n: number): { x: number; y: number } {
   const ch = Math.floor((n - 1) / 10);
   const i = (n - 1) % 10;
   const p = MAP_POINTS[ch]!;
-  return { x: p.x + Math.sin(i * 1.3) * 85, y: p.y + 80 + i * 50 };
+  // Wind down 50 px a step, closer together when the trail would run off the bottom of the map.
+  const step = Math.min(50, (MAP_H - TRAIL_BOTTOM - (p.y + 80)) / 9);
+  return { x: p.x + Math.sin(i * 1.3) * 85, y: p.y + 80 + i * step };
 }
 
 /** Landscape: a pin on each place of the painted coast (the map image covers the screen). */
@@ -76,13 +80,22 @@ function switcherHtml(d: MapData): string {
   return `<div class="row">${prev}<b class="light t32">${esc(ch.name)}</b>${next}</div>`;
 }
 
-export function showMap(root: HTMLElement, d: MapData, a: MapActs): void {
-  const ch = CHAPTERS[d.chapter]!;
-  const portrait = root.clientHeight > root.clientWidth;
-  const acts: Record<string, () => void> = { menu: a.menu, daily: a.daily, buy: a.buy };
-  CHAPTERS.forEach((c) => (acts[`c${c.index}`] = () => a.chapter(c.index)));
+/** The screen's size in px; the window's when the screen hasn't been laid out yet. */
+export function screenSize(root: HTMLElement): { w: number; h: number } {
   const w = root.clientWidth;
   const h = root.clientHeight;
+  if (w > 0 && h > 0) return { w, h };
+  return { w: window.innerWidth, h: window.innerHeight };
+}
+
+export function showMap(root: HTMLElement, d: MapData, a: MapActs): void {
+  const ch = CHAPTERS[d.chapter]!;
+  // The screen is hidden during a run and measures 0×0: show it before placing pins and nodes in px.
+  root.hidden = false;
+  const { w, h } = screenSize(root);
+  const portrait = h > w;
+  const acts: Record<string, () => void> = { menu: a.menu, daily: a.daily, buy: a.buy };
+  CHAPTERS.forEach((c) => (acts[`c${c.index}`] = () => a.chapter(c.index)));
   const cover = Math.max(w / MAP_W, h / MAP_H);
   const at = (n: number, i: number): string => {
     if (portrait) {

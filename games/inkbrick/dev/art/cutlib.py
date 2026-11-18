@@ -7,7 +7,7 @@ from PIL import Image, ImageFilter
 
 HERE = Path(__file__).resolve().parent
 SHEETS = HERE / 'sheets'
-OUT = HERE.parent.parent / 'src' / 'art' / 'img'
+OUT = HERE.parent.parent / 'src' / 'art' / 'img-paint'  # the watercolour set; build_ink_characters.py writes ./img
 PAPER_DIST = 34       # summed RGB distance still counted as paper
 PUNCH_MIN_AREA = 200   # px of an enclosed paper gap worth cutting out
 BRIDGE = 3            # px of dilation when grouping parts of one item

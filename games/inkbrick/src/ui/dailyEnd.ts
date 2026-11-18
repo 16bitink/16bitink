@@ -2,7 +2,9 @@ import type { DailyStanding } from '@16bitink/game-sdk';
 import { countdown, longDate, msToMidnight, tomorrowTeaser } from '../app/dates';
 import type { Look } from '../app/milestones';
 import type { Shells } from '../app/save';
+import { ART_STYLE } from '../art/style';
 import { artUrl } from '../render/art';
+import { teaserWallUrl } from '../render/ink/teaser';
 import { clock, esc, render, shellsHtml } from './dom';
 
 /**
@@ -63,15 +65,16 @@ function challengeHtml(d: DailyEndData): string {
 
 function teaserHtml(d: DailyEndData): string {
   if (!d.isToday) return '';
-  const pic = artUrl('teaser');
-  const sil = pic ? `<img src="${pic}" alt="" style="width:70px;height:110px;object-fit:contain;filter:brightness(0) opacity(0.7)">`
-    : '<div style="width:62px;height:100px;border:3px solid var(--ink);border-radius:8px;background:repeating-linear-gradient(0deg,#2a1d10 0 6px,transparent 6px 12px);opacity:0.55"></div>';
-  return `<div class="row" style="background:#ece0c4;border-radius:14px;padding:8px 14px;gap:14px">${sil}<div class="col" style="gap:2px;text-align:left">
-    <b>${esc(tomorrowTeaser(d.date))}</b><span>New daily in <span data-k="cd">${countdown(msToMidnight(new Date()))}</span></span></div></div>`;
+  const brumm = artUrl('brumm-smug');
+  // Ink: Brumm peeks over a wall with a "?" on it (a tease; nothing of tomorrow's layout).
+  const pic = ART_STYLE === 'ink' && brumm ? `<div class="tz-pic"><img class="tz-brumm" src="${brumm}" alt=""><img class="tz-wall" src="${teaserWallUrl()}" alt=""></div>` : null;
+  const sil = pic ?? '<div style="border:3px solid var(--ink);border-radius:8px;background:repeating-linear-gradient(0deg,#2a1d10 0 6px,transparent 6px 12px);opacity:0.55"></div>';
+  return `<div class="row teaser" style="background:#ece0c4;border-radius:14px;padding:8px 14px;gap:14px"><div class="tz">${sil}</div><div class="col" style="gap:2px;text-align:left">
+    <b>${esc(tomorrowTeaser(d.date))}</b><span style="white-space:nowrap">New daily in <span data-k="cd">${countdown(msToMidnight(new Date()))}</span></span></div></div>`;
 }
 
 export function showDailyEnd(root: HTMLElement, d: DailyEndData, a: DailyEndActs): () => void {
-  const look = d.newLook ? `<p class="gold">${d.totalDays} days played: a new look for Skip, the ${esc(d.newLook.name)}! <button class="btn small gold" data-act="looks">Wear it</button></p>` : `<p>${d.totalDays} ${d.totalDays === 1 ? 'day' : 'days'} played</p>`;
+  const look = d.newLook ? `<p class="gold look-line">${d.totalDays} days played: a new look for Skip, the ${esc(d.newLook.name)}! <button class="btn small gold" data-act="looks">Wear it</button></p>` : `<p>${d.totalDays} ${d.totalDays === 1 ? 'day' : 'days'} played</p>`;
   const share = d.won ? `<button class="btn sea" data-act="share">${d.canShare ? 'Challenge a friend' : 'Copy challenge link'}</button>` : '';
   render(root, 'card', `<div class="panel col center">
     <p class="dim">Daily · ${esc(longDate(d.date))}${d.isToday ? '' : ' (played late)'}</p>
@@ -80,8 +83,8 @@ export function showDailyEnd(root: HTMLElement, d: DailyEndData, a: DailyEndActs
     ${d.breakIn !== null ? `<p>Broke in at ${clock(d.breakIn)}</p>` : ''}
     ${challengeHtml(d)}<div data-k="standing">${standingHtml(d)}</div>
     ${teaserHtml(d)}${look}
-    <div class="row wrap center">${share}<button class="btn" data-act="again">Play again</button><button class="btn" data-act="calendar">Calendar</button><button class="btn small" data-act="menu">Menu</button></div>
-    <a href="${SITE_CALENDAR}" target="_top" class="t18" style="color:var(--sea)">Every game's dailies on the 16bit.ink calendar</a>
+    <div class="row wrap center btns">${share}<button class="btn" data-act="again">Play again</button><button class="btn" data-act="calendar">Calendar</button><button class="btn small menu" data-act="menu">Menu</button></div>
+    <a href="${SITE_CALENDAR}" target="_top" class="t18 cal-link" style="color:var(--sea)">Every game's dailies on the 16bit.ink calendar</a>
     <p class="t18 dim" data-k="copied"></p>
   </div>`, { share: a.share, again: a.again, calendar: a.calendar, looks: a.looks, menu: a.menu });
   const cd = root.querySelector<HTMLElement>('[data-k="cd"]');

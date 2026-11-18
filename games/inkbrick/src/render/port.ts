@@ -8,6 +8,9 @@ import type { PickupKind, SimEvent, SimInput, SimState } from '../sim/types';
 export interface BallView {
   readonly x: number;
   readonly y: number;
+  /** Velocity, px/s (Skip watches the stones coming down). */
+  readonly vx: number;
+  readonly vy: number;
   readonly fire: boolean;
 }
 

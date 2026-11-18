@@ -174,6 +174,24 @@ describe('Sim', () => {
     expect(PADDLE_Y).toBe(900);
   });
 
+  it('stops the clock after a lost heart until the stone is launched again', () => {
+    const sim = new Sim(lv(fill(0, 4, 3, 1, 'soft')));
+    let lost = false;
+    for (let i = 0; i < 120 * 30 && !lost; i++) {
+      sim.step({ paddleX: sim.state.phase === 'aim' ? sim.state.aimX : 30, launch: sim.state.phase === 'aim' && !lost });
+      lost = sim.drainEvents().some((e) => e.type === 'lifeLost');
+    }
+    expect(lost).toBe(true);
+    expect(sim.state.phase).toBe('aim');
+    const at = sim.state.elapsed;
+    for (let i = 0; i < 120 * 5; i++) sim.step({ paddleX: 270, launch: false });
+    expect(sim.state.phase).toBe('aim');
+    expect(sim.state.elapsed).toBe(at);
+    sim.step({ paddleX: sim.state.aimX, launch: true });
+    sim.step({ paddleX: sim.state.aimX, launch: false });
+    expect(sim.state.elapsed).toBeGreaterThan(at);
+  });
+
   it('steps 300 balls and 1,500 bricks in well under a millisecond', () => {
     const sim = withBall(lv(fill(0, 9, 36, 42, 'tough', { bw: 1, hp: 99 }).slice(0, 1500)), 270, 60, 200, -430);
     const w = (sim as unknown as { w: { balls: object[] } }).w;

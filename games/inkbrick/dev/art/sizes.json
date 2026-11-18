@@ -258,5 +258,21 @@
  "heart-empty": [
   64,
   56
+ ],
+ "skip-ready": [
+  194,
+  105
+ ],
+ "skip-swat-up": [
+  194,
+  105
+ ],
+ "skip-swat-across": [
+  194,
+  105
+ ],
+ "skip-throw": [
+  194,
+  105
  ]
 }

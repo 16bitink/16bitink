@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import type { SoundBoard } from '../audio/sound';
 import { boardLayout, type BoardLayout } from '../render/layout';
-import { boardKey, ensureArt, playArtKeys, preloadArt } from '../render/art';
+import { boardKey, ensureArt, playArtKeys, preloadArt, surroundTexture } from '../render/art';
 import { BricksView } from '../render/bricksView';
 import { Fx, SHOUTS } from '../render/fx';
 import { PADDLE_Y, PiecesView, type Looks } from '../render/piecesView';
@@ -134,6 +134,13 @@ export class PlayScene extends Phaser.Scene {
     const l = this.cssLayout;
     this.board.setPosition(l.x * dpr, l.y * dpr).setScale(l.scale * dpr);
     if (this.backdrop instanceof Phaser.GameObjects.Image) {
+      // Board image px are drawn at half a board px: device px per image px = scale * dpr / 2.
+      const sized = surroundTexture(this, this.opts.surround, w, h, (l.scale * dpr) / 2);
+      if (this.backdrop.texture.key !== sized) {
+        const old = this.backdrop.texture.key;
+        this.backdrop.setTexture(sized);
+        if (old.includes('@') && old !== sized) this.textures.remove(old);
+      }
       const cover = Math.max(w / this.backdrop.width, h / this.backdrop.height);
       this.backdrop.setPosition(w / 2, h / 2).setScale(cover);
     } else this.backdrop.setPosition(w / 2, h / 2).setSize(w, h);
@@ -199,6 +206,7 @@ export class PlayScene extends Phaser.Scene {
     const s = this.opts.sound;
     switch (e.type) {
       case 'bounce':
+        if (e.on === 'paddle') this.pieces.swat(e.x, this.opts.port.view().paddleX);
         s.play(e.on === 'paddle' ? 'paddle' : e.on === 'stone' ? 'stone' : 'bounce');
         return;
       case 'hit':

@@ -51,7 +51,8 @@ export class Sim {
     const w = this.w;
     if (w.phase === 'cleared' || w.phase === 'failed') return;
     w.time += STEP;
-    if (w.launched) w.elapsed += STEP;
+    // The clock runs only while the stone is in play: it stops after a lost heart until the next launch.
+    if (w.phase === 'play') w.elapsed += STEP;
     movePieces(w);
     this.movePaddle(input.paddleX);
     if (w.phase === 'aim') {

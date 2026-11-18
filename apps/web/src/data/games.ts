@@ -438,7 +438,7 @@ export const GAMES: readonly CatalogGame[] = [
     demo: '10 levels + daily, free',
     price: '$4.99',
     stripeLookupKey: 'inkbrick_full',
-    theme: { paper: '#fbf1d6', ink: '#1d3a4a', accent: '#e0762f' },
+    theme: { paper: '#f4eddc', ink: '#1b1a1f', accent: '#c8644e' },
     orientation: 'portrait',
     fonts: { googleCss: 'family=Caveat:wght@500;700', await: ['32px Caveat', '700 32px Caveat'] },
     features: [

@@ -59,14 +59,16 @@ export class StonesView {
   sync(v: BoardView): void {
     this.frame++;
     const emit = this.frame % TRAIL_EVERY === 0;
-    v.balls.forEach((b, i) => {
+    // While aiming Skip holds the stone in his paws (his sprite draws it); the sim's stone stays where it is.
+    const shown = v.held ? [] : v.balls;
+    shown.forEach((b, i) => {
       if (i < SHADOWS) this.shadow(i).setPosition(b.x + SHADOW_OFFSET.x, b.y + SHADOW_OFFSET.y).setVisible(true);
       const s = this.stone(i).setPosition(b.x, b.y).setVisible(true);
       if (b.fire) s.setTint(FIRE_TINT);
       else s.clearTint();
       if (emit && i < TRAIL_BALLS) this.trail.emitParticleAt(b.x, b.y, 1);
     });
-    for (let i = v.balls.length; i < this.stones.length; i++) this.stones[i]!.setVisible(false);
-    for (let i = v.balls.length; i < this.shadows.length; i++) this.shadows[i]!.setVisible(false);
+    for (let i = shown.length; i < this.stones.length; i++) this.stones[i]!.setVisible(false);
+    for (let i = shown.length; i < this.shadows.length; i++) this.shadows[i]!.setVisible(false);
   }
 }

@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { CELL, type LevelDef } from '../sim/types';
 import type { BoardView } from './port';
+import { SkipView, type SkipPose } from './skipView';
 
 /**
  * The moving pieces: Skip on the raft, the stones (a pool up to the 300-ball
@@ -8,18 +9,9 @@ import type { BoardView } from './port';
  * and Brumm behind his shield. Synced from the view every frame.
  */
 export const PADDLE_Y = 900;
-/** The skip-* sprites are 97 x 52.5 board px with the raft's 90 px from x 0. */
-const SKIP_W = 97;
-const SKIP_H = 52.5;
 const RAFT_SPRITE_W = 90;
 /** The raft art's bottom edge below the hit line (the plain raft's deck top sits on it); taller rafts (sails) rise above. */
 const RAFT_BOTTOM = 8;
-/** Skip's own plain raft sits below this row of his sprite (image px); only the otter above it is drawn, over the chosen raft. */
-const SKIP_BODY_PX = 80;
-const SKIP_IMG_H = 105;
-/** Skip settles this far into the deck so he lies on it, not above it. */
-const SKIP_SINK = 4;
-const SKIP_IMG_W = 194;
 const PICKUP_SIZE = 26;
 const BOSS_HIT_MS = 350;
 const BOSS_SCALE = 1.4;
@@ -33,17 +25,14 @@ export interface Looks {
   readonly trail: string;
 }
 
-type Pose = 'aim' | 'idle' | 'cheer' | 'shrug';
-
 export class PiecesView {
   private readonly raft: Phaser.GameObjects.Image;
-  private readonly skip: Phaser.GameObjects.Image;
+  private readonly skip: SkipView;
   private readonly pickups: Phaser.GameObjects.Image[] = [];
   private readonly shutters: Phaser.GameObjects.TileSprite[] = [];
   private readonly spinners: Phaser.GameObjects.Image[] = [];
   private readonly boss: Phaser.GameObjects.Image | null;
   private readonly shield: Phaser.GameObjects.Image | null;
-  private poseFor = 0;
   private bossHitFor = 0;
 
   constructor(private readonly scene: Phaser.Scene, private readonly layer: Phaser.GameObjects.Container, private readonly looks: Looks, level: LevelDef) {
@@ -57,11 +46,10 @@ export class PiecesView {
     this.boss = level.boss ? scene.add.image(0, 0, 'brumm-smug').setOrigin(0.5, 1) : null;
     this.shield = level.boss ? scene.add.image(0, 0, 'shield').setOrigin(0, 0) : null;
     if (this.boss && this.shield) layer.add([this.boss, this.shield]);
-    this.skip = scene.add.image(270, PADDLE_Y, 'skip-aim').setOrigin(0, 1).setDisplaySize(SKIP_W, SKIP_H);
-    this.skip.setCrop(0, 0, SKIP_IMG_W, SKIP_BODY_PX);
     this.raft = scene.add.image(270, PADDLE_Y, looks.raft || 'raft-plain').setOrigin(0.5, 1);
     // The raft first (its sails stay behind), Skip lying on it.
-    layer.add([this.raft, this.skip]);
+    layer.add(this.raft);
+    this.skip = new SkipView(scene, layer, PADDLE_Y);
   }
 
   private pooled<T extends Phaser.GameObjects.Image | Phaser.GameObjects.TileSprite>(pool: T[], i: number, make: () => T): T {
@@ -75,10 +63,13 @@ export class PiecesView {
   }
 
   /** Skip strikes a pose for a while (the break-in's cheer, a lost heart's shrug). */
-  pose(p: Pose, ms: number): void {
-    this.poseFor = ms;
-    this.skip.setTexture(`skip-${p}`);
-    if (p === 'cheer') this.scene.tweens.add({ targets: this.skip, scaleY: this.skip.scaleY * 1.15, duration: 140, yoyo: true, repeat: 2 });
+  pose(p: SkipPose, ms: number): void {
+    this.skip.strike(p, ms);
+  }
+
+  /** The sim bounced a stone off the raft: Skip swats it (call on the bounce's own frame). */
+  swat(x: number, raftX: number): void {
+    this.skip.swat(x, raftX);
   }
 
   bossHit(): void {
@@ -99,14 +90,9 @@ export class PiecesView {
     const key = wide && !this.looks.raft ? 'raft-wide' : this.looks.raft || 'raft-plain';
     if (this.raft.texture.key !== key) this.raft.setTexture(key);
     const h = (this.raft.height / this.raft.width) * v.paddleW;
-    this.raft.setPosition(v.paddleX, PADDLE_Y + RAFT_BOTTOM).setDisplaySize(v.paddleW, h);
-    // Skip lies along the raft; the sprite's own raft hides under the raft image.
-    this.skip.setPosition(v.paddleX - RAFT_SPRITE_W / 2, PADDLE_Y + RAFT_BOTTOM + SKIP_SINK);
-    if (this.poseFor > 0 && (this.poseFor -= dtMs) <= 0) this.skip.setTexture(v.held ? 'skip-aim' : 'skip-idle');
-    else if (this.poseFor <= 0) {
-      const want = v.held ? 'skip-aim' : 'skip-idle';
-      if (this.skip.texture.key !== want) this.skip.setTexture(want);
-    }
+    // Skip lies along the raft (the sprite's own raft is cropped off); the raft rides his bob.
+    this.skip.sync(v, dtMs);
+    this.raft.setPosition(v.paddleX, PADDLE_Y + RAFT_BOTTOM + this.skip.bobY()).setDisplaySize(v.paddleW, h);
   }
 
   private syncPieces(v: BoardView, dtMs: number): void {

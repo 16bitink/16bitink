@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
 import { art, ART_KEYS } from '../art/manifest';
 import type { BrickDef } from '../sim/types';
+import { CELL } from '../sim/types';
+import { inkBrickCanvas, inkCanvas, inkUrl, isInkDrawn } from './ink';
 
 /**
  * The one place the game asks for art: the Art agent's manifest
@@ -10,7 +12,8 @@ import type { BrickDef } from '../sim/types';
  */
 export const ART_URLS: Readonly<Record<string, string>> = Object.fromEntries(ART_KEYS.map((k) => [k, art[k].url]));
 
-export const artUrl = (key: string): string | null => ART_URLS[key] ?? null;
+/** A key's image URL for the DOM screens (code-drawn ink keys bake to a data URL on first ask). */
+export const artUrl = (key: string): string | null => (isInkDrawn(key) ? inkUrl(key) : (ART_URLS[key] ?? null));
 
 interface Placeholder {
   readonly w: number;
@@ -56,6 +59,43 @@ export function brickTexture(def: BrickDef, index: number, hp: number, maxHp: nu
   }
 }
 
+/** Bricks are drawn at 2x the board, like the rest of the art. */
+const BRICK_PX = CELL * 2;
+
+/**
+ * The texture to show a brick image at its size in cells: the ink set bakes
+ * each (image, size) once so outlines stay even on long or thin bricks; the
+ * paint set stretches its one image.
+ */
+export function brickKey(scene: Phaser.Scene, key: string, wCells: number, hCells: number): string {
+  if (!isInkDrawn(key)) return key;
+  const sized = `${key}@${wCells}x${hCells}`;
+  if (!scene.textures.exists(sized)) scene.textures.addCanvas(sized, inkBrickCanvas(key, wCells * BRICK_PX, hCells * BRICK_PX));
+  return sized;
+}
+
+/** The surround's longest side is capped here (image px) so a 4K screen doesn't bake a huge texture. */
+const SURROUND_MAX = 3072;
+const SURROUND_STEP = 64;
+
+/**
+ * The ink surround baked for this screen: `devicePerImagePx` is how many
+ * device px one board-image px covers, so the surround's dots and lines come
+ * out the same real size as the board's (a 1920 px bake stretched over a big
+ * screen blew them up). Sizes snap to 64 px so a small resize reuses it.
+ * Paint (an image) keeps its key.
+ */
+export function surroundTexture(scene: Phaser.Scene, key: string, screenW: number, screenH: number, devicePerImagePx: number): string {
+  if (!isInkDrawn(key) || devicePerImagePx <= 0) return key;
+  const fit = Math.min(1, SURROUND_MAX / (Math.max(screenW, screenH) / devicePerImagePx));
+  const snap = (v: number): number => Math.max(SURROUND_STEP, Math.round((v / devicePerImagePx) * fit / SURROUND_STEP) * SURROUND_STEP);
+  const w = snap(screenW);
+  const h = snap(screenH);
+  const sized = `${key}@${w}x${h}`;
+  if (!scene.textures.exists(sized)) scene.textures.addCanvas(sized, inkBrickCanvas(key, w, h));
+  return sized;
+}
+
 /** Every key the play scene may draw (loaded up front so a crack or pickup never waits). */
 export function playArtKeys(chapter: number): readonly string[] {
   const own = ART_KEYS.filter((k) => !k.startsWith('bg-') && k !== 'map');
@@ -66,11 +106,16 @@ export function playArtKeys(chapter: number): readonly string[] {
 export const boardKey = (chapter: number): string => `bg-${Math.max(1, Math.min(5, chapter))}-board`;
 export const surroundKey = (chapter: number): string => `bg-${Math.max(1, Math.min(5, chapter))}-wide`;
 
-/** Queues the real images (scene preload). Missing ones are made in `ensureArt`. */
+/** Queues the real images (scene preload); code-drawn ink keys become textures at once. Missing ones are made in `ensureArt`. */
 export function preloadArt(scene: Phaser.Scene, keys: readonly string[]): void {
   for (const k of keys) {
-    const url = artUrl(k);
-    if (url && !scene.textures.exists(k)) scene.load.image(k, url);
+    if (scene.textures.exists(k)) continue;
+    if (isInkDrawn(k)) {
+      scene.textures.addCanvas(k, inkCanvas(k));
+      continue;
+    }
+    const url = ART_URLS[k];
+    if (url) scene.load.image(k, url);
   }
 }
 

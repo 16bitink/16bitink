@@ -32,10 +32,10 @@ export function showWardrobe(root: HTMLElement, d: WardrobeData, a: WardrobeActs
   ALL_LOOKS.forEach((l, i) => (acts[`l${i}`] = () => a.pick(l.slot, l.key)));
   const section = (slot: LookSlot, title: string): string =>
     `<h3 class="t32">${title}</h3><div class="looks">${ALL_LOOKS.map((l, i) => (l.slot === slot ? lookHtml(l, d, i) : '')).join('')}</div>`;
-  render(root, 'card', `<div class="panel col" style="width:min(560px,96vw)">
+  render(root, 'card', `<div class="panel col wardrobe" style="width:min(560px,96vw)">
     <h2 class="t44" style="text-align:center">Skip's looks</h2>
     <p class="center" style="text-align:center">${d.totalDays} ${d.totalDays === 1 ? 'day' : 'days'} played. Every daily you play counts, in any game.</p>
     ${section('raft', 'Rafts')}${section('trail', 'Stone trails')}
-    <div class="row center"><button class="btn" data-act="back">Done</button></div>
+    <div class="row center done-row"><button class="btn" data-act="back">Done</button></div>
   </div>`, acts);
 }

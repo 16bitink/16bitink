@@ -26,6 +26,12 @@ const PIECES: LevelDef = {
     { x: 4, y: 12, w: 4, h: 2, kind: 'soft', floe: 'f' },
     { x: 10, y: 12, w: 2, h: 2, kind: 'key', link: 'a' }, { x: 14, y: 12, w: 4, h: 2, kind: 'gate', link: 'a' },
     { x: 22, y: 12, w: 4, h: 2, kind: 'tough', hp: 2 },
+    // Every other kind, long and square (the style check: ?scratch=pieces).
+    { x: 2, y: 16, w: 6, h: 2, kind: 'stone' }, { x: 9, y: 16, w: 6, h: 2, kind: 'x3' }, { x: 16, y: 16, w: 6, h: 2, kind: 'keg' },
+    { x: 23, y: 16, w: 6, h: 2, kind: 'pickup', drop: 'wide' }, { x: 30, y: 16, w: 4, h: 2, kind: 'soft', tint: 4 },
+    { x: 14, y: 20, w: 2, h: 2, kind: 'stone' }, { x: 17, y: 20, w: 2, h: 2, kind: 'x3' }, { x: 20, y: 20, w: 2, h: 2, kind: 'keg' },
+    { x: 23, y: 20, w: 2, h: 2, kind: 'pickup', drop: 'fireball' }, { x: 26, y: 20, w: 2, h: 2, kind: 'ice' }, { x: 29, y: 20, w: 2, h: 2, kind: 'tough', hp: 3 },
+    { x: 32, y: 20, w: 2, h: 2, kind: 'soft' },
   ],
   floes: [{ id: 'f', dx: 6, dy: 0, period: 4 }],
   shutters: [{ x: 4, y: 20, w: 8, h: 2, open: 2, closed: 2, phase: 0 }],

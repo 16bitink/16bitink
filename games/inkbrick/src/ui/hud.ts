@@ -89,6 +89,12 @@ export class Hud {
     this.set('hearts', heartsHtml(h.lives));
     this.set('boss', this.bossLine(h));
     this.set('time', clock(h.t));
+    // The clock stops while Skip aims: dim it so it reads as paused.
+    const time = this.root.querySelector<HTMLElement>('[data-k="time"]');
+    if (time) {
+      time.style.opacity = h.held ? '0.4' : '';
+      time.title = h.held ? 'Paused until you skip the stone' : '';
+    }
     this.set('pct', `${pct}%`);
     this.set('shells', this.shellsLine(h, h.lives < 3));
     this.set('hint', this.hint(h, l));

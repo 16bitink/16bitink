@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { CELL, type LevelDef } from '../sim/types';
-import { brickTexture, PICTURE_TINTS } from './art';
+import { brickKey, brickTexture, PICTURE_TINTS } from './art';
 import type { BoardView } from './port';
 
 /**
@@ -17,7 +17,7 @@ export class BricksView {
 
   constructor(private readonly scene: Phaser.Scene, private readonly layer: Phaser.GameObjects.Container, private readonly level: LevelDef) {
     level.bricks.forEach((b, i) => {
-      const key = brickTexture(b, i, b.hp ?? 1, b.hp ?? 1, false);
+      const key = brickKey(scene, brickTexture(b, i, b.hp ?? 1, b.hp ?? 1, false), b.w, b.h);
       const img = scene.add.image(b.x * CELL, b.y * CELL, key).setOrigin(0, 0).setDisplaySize(b.w * CELL, b.h * CELL);
       if (b.tint !== undefined) img.setTint(PICTURE_TINTS[b.tint % PICTURE_TINTS.length]!);
       layer.add(img);
@@ -61,7 +61,7 @@ export class BricksView {
       }
       const def = bricks[i]!;
       if (def.kind !== 'tough' && def.kind !== 'ice') continue;
-      const key = brickTexture(def, i, v.hp(i), def.hp ?? 1, v.cracked(i));
+      const key = brickKey(this.scene, brickTexture(def, i, v.hp(i), def.hp ?? 1, v.cracked(i)), def.w, def.h);
       if (key !== this.tex[i]) {
         this.tex[i] = key;
         this.images[i]!.setTexture(key).setDisplaySize(def.w * CELL, def.h * CELL);

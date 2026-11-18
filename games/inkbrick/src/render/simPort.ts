@@ -19,7 +19,7 @@ function viewOf(s: SimState): BoardView {
     held: s.phase === 'aim',
     // Built only when read (the renderer reads it once a frame; the input reads only the raft).
     get balls() {
-      return s.balls.map((b) => ({ x: b.x, y: b.y, fire }));
+      return s.balls.map((b) => ({ x: b.x, y: b.y, vx: b.vx, vy: b.vy, fire }));
     },
     pickups: s.pickups,
     alive: (i) => s.bricks[i]?.alive ?? false,
