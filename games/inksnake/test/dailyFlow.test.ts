@@ -1,8 +1,8 @@
 import type { DailyHost, DailyPlay } from '@16bitink/game-sdk';
 import { describe, expect, it } from 'vitest';
-import { christmasEve, sampleOn } from '../dev/daily/samples';
+import { christmasEve, sampleOn, winterFarmIce } from '../dev/daily/samples';
 import { addToAlbum, parseAlbum } from '../src/daily/album';
-import { DailyClient } from '../src/daily/client';
+import { checkFits, DailyClient } from '../src/daily/client';
 import { countdown, longDate, monthGrid, msToMidnight } from '../src/daily/dates';
 import { eventTeaser, goalLine, placeName, standingLine, winterLine } from '../src/daily/text';
 import { SNAKES } from '../src/logic/species';
@@ -37,6 +37,29 @@ describe('the daily client', () => {
   it("refuses a level that isn't that date's, or isn't valid", async () => {
     await expect(new DailyClient(fakeHost([], () => christmasEve('2026-12-23'))).level('2026-12-22')).rejects.toThrow();
     await expect(new DailyClient(fakeHost([], () => ({ id: 'daily-2026-12-21', snake: 'dragon' }))).level('2026-12-21')).rejects.toThrow();
+  });
+
+  it('refuses a hunt whose theme does not fit its date', async () => {
+    const load = (date: string, make: (d: string) => unknown) => new DailyClient(fakeHost([], make)).level(date);
+    // An event hunt on a plain day, a plain hunt on an event day, another event's hunt, a winter hunt in autumn.
+    await expect(load('2026-12-23', (d) => ({ ...christmasEve(d), id: `daily-${d}` }))).rejects.toThrow(/christmasEve/);
+    await expect(load('2026-12-31', (d) => { const { event: _e, ...rest } = christmasEve(d); return rest; })).rejects.toThrow(/missing/);
+    await expect(load('2026-12-30', (d) => ({ ...christmasEve(d), event: 'newYearsEve' }))).rejects.toThrow(/newYearsEve/);
+    await expect(load('2026-11-19', (d) => winterFarmIce(d))).rejects.toThrow(/winter/);
+    await expect(load('2026-12-24', (d) => christmasEve(d))).resolves.toBeDefined();
+  });
+
+  it('checkFits: id, event and season', () => {
+    const plain = { ...winterFarmIce('2026-12-10'), id: 'daily-2026-12-10' };
+    expect(() => checkFits(plain, '2026-12-10')).not.toThrow();
+    expect(() => checkFits(plain, '2026-12-11')).toThrow(/came as/);
+    expect(() => checkFits({ ...plain, season: 'summer' }, '2026-12-10')).toThrow(/summer/);
+  });
+
+  it('serves samples stamped for their date: season is the date\'s, the event only on its own day', () => {
+    expect(sampleOn('2026-12-23', '2026-12-24', 1)?.event).toBeUndefined();
+    expect(sampleOn('2026-12-24', '2026-12-24', 1)?.event).toBe('christmasEve');
+    expect(sampleOn('2026-11-19', '2026-11-19', 1)?.season).toBe('autumn');
   });
 
   it('records a play through the host only', async () => {

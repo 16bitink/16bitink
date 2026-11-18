@@ -1,5 +1,5 @@
 // The InkSnake daily generator (docs/inksnake-daily.md "Generator"):
-//   npm run gen -- --from 2026-11-22 --days 71 [--candidates 40] [--enough 8] [--workers N] [--force]
+//   npm run gen -- --from 2026-11-19 --days 74 [--candidates 40] [--enough 8] [--workers N] [--force]
 //   npm run gen -- --redo 2026-12-03[,2026-12-09]   (vetoed days: new layout and cast; place, snake, rule and goal kept)
 //   npm run gen -- --audit   (the variety audit of every frozen day)
 //   npm run gen -- --tomorrow   (rewrite every frozen day's tomorrow teaser from the day after it)

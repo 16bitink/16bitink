@@ -138,7 +138,7 @@ readonly treats?: { readonly kind: TreatKind; readonly count: number };
 
 ## Generator
 
-The flow is InkBrick's (`src/gen`, `npm run gen -- --from 2026-11-22 --days 60`, frozen to `content/daily/YYYY-MM.json`, exported by `content/daily.ts` as `inksnakeDaily(date)`):
+The flow is InkBrick's (`src/gen`, `npm run gen -- --from 2026-11-19 --days 74`, frozen to `content/daily/YYYY-MM.json`, exported by `content/daily.ts` as `inksnakeDaily(date)`):
 
 1. `seed = hash('inksnake:' + date)`.
 2. **Plan the day:** the event (if any), then the season and weekday, then the place, snake, goal and rule. The last 14 days' memory decides among what's left.
@@ -229,7 +229,7 @@ Menu: a "Today's Hunt" button under the bar (bigger on phones) shows place, snak
 Built 2026-11-18 (build plan steps 2 and 3). Code in `games/inksnake/src/gen` (pure: the chapters and the bot are passed in, so `src/` never imports the paid chapters or test code), the CLI in `dev/gen.mjs` with its pure side in `dev/genDays.ts`, frozen months in `content/daily/YYYY-MM.json`, served by `content/daily.ts` (`inksnakeDaily(date)`, package export `./daily`).
 
 ```
-npm run gen -- --from 2026-11-22 --days 71   # freeze the days not yet frozen (--force to remake them)
+npm run gen -- --from 2026-11-19 --days 74   # freeze the days not yet frozen (--force to remake them)
 npm run gen -- --redo 2026-12-09             # vetoed day: new board and cast, same place, snake, rule and goal
 npm run gen -- --audit                       # the variety audit below
 npm run gen -- --tomorrow                    # rewrite every day's teaser from the day after it
@@ -251,13 +251,15 @@ npm run gen -- --tomorrow                    # rewrite every day's teaser from t
 
 From the engine notes: plain level 1s run 11–45 s, hard rules to ~80 s. Ice and blizzard are kept off Monday and Tuesday (a mountain blizzard missed Tuesday's band at 42 s with the shortest target).
 
-### The first freeze (2026-11-22 to 2027-01-31, 71 days)
+### The first freeze (2026-11-19 to 2027-01-31, 74 days)
+
+The first hunt is **2026-11-19**. 11-22 to 2027-01-31 (71 days) were frozen first; 11-19, 11-20 and 11-21 were added on 2026-11-18, planned against the later frozen days (place, rule and layout windows) and with 11-21's teaser matching the frozen 11-22. Nothing from 11-22 on changed. The three: 11-19 Moonlit Dunes (dunes, sidewinder, rush, Long Night, bot 28 s), 11-20 Long Tail in the Pinewoods (barrens, hognose, grow, Long Tail, 41 s), 11-21 The Golden Common Lizard (heath, corn, golden, Plenty, 37 s). All 74 days met their band; the numbers below are the first 71 days' run.
 
 All 71 days met their band, the bot winning 3/3 on every one. 608 candidates composed: 4% failed the cheap checks; of the 584 the bot played, 7% lost on 2+ seeds and 10% stayed off the band after tuning; 975 bot plays; an alternate layout was needed on 1 day. 90 s on 7 workers. After the density remake (below): 600 composed, 1% failed the cheap checks, 9% lost 2+ seeds, 9% off the band after tuning, 975 bot plays, alternates on 2 days.
 
 | week of | days | places | snakes | goals | rules | layouts | guests | bands met |
 |---|---|---|---|---|---|---|---|---|
-| 2026-11-16 | 1 | 1 | 1 | 1 | 1 | 1 | 0 | 1/1 |
+| 2026-11-16 | 4 | 4 | 3 | 4 | 4 | 4 | 1 | 4/4 |
 | 2026-11-23 | 7 | 6 | 6 | 5 | 7 | 7 | 2 | 7/7 |
 | 2026-11-30 | 7 | 5 | 5 | 5 | 7 | 7 | 1 | 7/7 |
 | 2026-12-07 | 7 | 4 | 4 | 5 | 7 | 7 | 1 | 7/7 |
@@ -273,6 +275,12 @@ All 71 days met their band, the bot winning 3/3 on every one. 608 candidates com
 - **Totals:** places farm 17, mountains 17, barrens 17, heath 16, jungle 2, dunes 2 (the last autumn week). Snakes corn 18, hognose 15, spidertail 14, adder 14, candycane 3, sidewinder 2, cobra 2, rainbowboa 2, krait 1. Goals feast 20, grow 16, rush 16, boss 11, golden 8. All 14 winter-possible rules used, 3–7 times each. Layouts: 35 remixes, 36 patterns (ring 8, spiral 7, lanes 6, islands 5, rooms 5, scatter 5).
 - **Checks:** no out-of-season place, every event on its date, no broken teaser.
 - Patterns for the places not in this range (reef, flooded, rainforest, savanna, jungle, dunes) were tried on 6 candidates per shape: 80–100% pass the cheap checks and the bot, except savanna `lanes` (half have no acacia left after the start is cleared, so no eggs; the cheap check drops them).
+
+### Dev harness and the date check
+
+The dev DailyHost (`dev/daily/host.ts`) serves the real frozen days and nothing for dates without one (the archive is empty before 2026-11-19, as on the site). `?date=YYYY-MM-DD` pretends today is that date (default: the real date; no frozen day = no hunt today). `?hunt=ice|xmas|rival|golden|newyear` serves the hand-written samples instead, stamped for the served date (its season, and its event only on that event's date). `dev/tools/dailyshots.mjs` takes `date:YYYY-MM-DD` or a sample name.
+
+The game never shows a hunt whose theme doesn't fit its date: `DailyClient.level` (`checkFits`) refuses a level whose id isn't `daily-<date>`, whose event differs from `eventOn(date)` (either way), or whose season differs from `seasonOf(date)`. The calendar leaves days before `FIRST_HUNT` (`src/daily/dates.ts`, tested against the first frozen day) and future days untappable, with no event star.
 
 ### For the owner on the contact sheet
 

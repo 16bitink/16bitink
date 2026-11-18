@@ -1,7 +1,7 @@
 import { eventOn, type DailyDay } from '@16bitink/game-sdk';
 import Phaser from 'phaser';
 import { BLUE_HEX, RED_HEX } from '../../art/palette';
-import { monthGrid, monthTitle } from '../../daily/dates';
+import { FIRST_HUNT, monthGrid, monthTitle } from '../../daily/dates';
 import { inkButton, inkText } from '../ui';
 import { CardBuilder, GOLD_INK, SOFT_INK, TEXT_W } from './cardKit';
 import { screenSize } from '../hidpi';
@@ -62,15 +62,17 @@ export function calendarCard(scene: Phaser.Scene, d: CalendarData, a: CalendarAc
 function dayCell(scene: Phaser.Scene, x: number, y: number, cell: number, date: string, day: DailyDay | undefined, d: CalendarData, a: CalendarActs, phone: boolean): Phaser.GameObjects.GameObject[] {
   const g = scene.add.graphics();
   const future = date > d.today;
+  // Before the first hunt there is nothing: no theme, no tap.
+  const none = date < FIRST_HUNT;
   const r = cell * 0.38;
-  if (day) {
+  if (day && !none) {
     if (day.result === 'win' && !day.late) g.fillStyle(BLUE_HEX, 0.78).fillCircle(x, y, r);
     g.lineStyle(day.late ? 2.4 : 2, BLUE_HEX, day.late ? 0.9 : 0.7).strokeCircle(x, y, r);
   }
   if (date === d.today) g.lineStyle(2.4, RED_HEX, 0.9).strokeCircle(x, y, r + 4);
-  if (eventOn(date)) g.fillStyle(RED_HEX, 0.85).fillPoints(star(x + r * 0.85, y - r * 0.85, 6.5, 3), true);
+  if (eventOn(date) && !future && !none) g.fillStyle(RED_HEX, 0.85).fillPoints(star(x + r * 0.85, y - r * 0.85, 6.5, 3), true);
   const light = day?.result === 'win' && !day.late;
-  const t = inkText(scene, x, y, String(Number(date.slice(8))), 22, light ? '#fffaf0' : future ? '#b8b2a4' : SOFT_INK);
+  const t = inkText(scene, x, y, String(Number(date.slice(8))), 22, light ? '#fffaf0' : future || none ? '#b8b2a4' : SOFT_INK);
   const out: Phaser.GameObjects.GameObject[] = [g, t];
   const reached = Object.entries(d.stamps).find(([, when]) => when === date)?.[0];
   if (reached) {
@@ -81,7 +83,7 @@ function dayCell(scene: Phaser.Scene, x: number, y: number, cell: number, date: 
     // The milestone's number is too small to read on a phone: the rosette alone says it there.
     if (!phone) out.push(inkText(scene, sx, sy, reached, reached.length > 2 ? 9 : 11, '#fffaf0'));
   }
-  if (!future) {
+  if (!future && !none) {
     const zone = scene.add.zone(x, y, cell, cell).setInteractive({ useHandCursor: true });
     zone.on('pointerup', () => (date === d.today || d.owned ? a.play(date) : a.locked()));
     out.push(zone);

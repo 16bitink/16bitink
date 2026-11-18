@@ -1,4 +1,4 @@
-import type { DailyDay, DailyHost, DailyStanding } from '@16bitink/game-sdk';
+import { eventOn, seasonOf, type DailyDay, type DailyHost, type DailyStanding } from '@16bitink/game-sdk';
 import { dailyId } from '../level/daily';
 import type { LevelDef } from '../level/types';
 import { parseLevel } from '../level/validate';
@@ -25,6 +25,15 @@ export interface DailyOutcome {
   readonly livesLost: number;
 }
 
+/** Throws unless `level` is the hunt for `date`: its id, event and season must all fit the date (a Christmas hunt never shows on another day). */
+export function checkFits(level: LevelDef, date: string): void {
+  if (level.id !== dailyId(date)) throw new Error(`the daily for ${date} came as ${level.id}`);
+  const event = eventOn(date);
+  if (level.event !== undefined && level.event !== event) throw new Error(`the daily for ${date} is the ${level.event} hunt`);
+  if (event !== null && level.event !== event) throw new Error(`the daily for ${date} is missing its ${event} event`);
+  if (level.season !== undefined && level.season !== seasonOf(date)) throw new Error(`the daily for ${date} is a ${level.season} hunt`);
+}
+
 const levels = new Map<string, LevelDef>();
 
 export class DailyClient {
@@ -43,7 +52,7 @@ export class DailyClient {
     const had = levels.get(date);
     if (had) return had;
     const level = parseLevel(await this.host.load(date));
-    if (level.id !== dailyId(date)) throw new Error(`the daily for ${date} came as ${level.id}`);
+    checkFits(level, date);
     levels.set(date, level);
     return level;
   }

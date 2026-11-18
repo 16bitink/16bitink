@@ -1,5 +1,8 @@
 /** Dates as the daily's cards show them (local calendar dates, YYYY-MM-DD). */
 
+/** The first day with a hunt (the first frozen day, content/daily): earlier days have none, so the calendar leaves them dark. */
+export const FIRST_HUNT = '2026-11-19';
+
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
