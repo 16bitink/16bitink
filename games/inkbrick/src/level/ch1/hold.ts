@@ -29,7 +29,7 @@ const band = (y: number, shells: readonly number[]): BrickDef[] => [
   ...fill(0, y, 36, 1, 'tough', { hp: 2 }),
   ...fill(0, y + 1, 36, 1, 'soft', { bw: 1 }).map((b) => (shells.includes(b.x) ? { ...b, kind: 'x3' as const } : b)),
 ];
-const BANDS = [...band(32, [4, 5, 6, 7, 28, 29, 30, 31]), ...band(24, [17, 18])];
+const BANDS = [...band(32, [5, 6, 29, 30]), ...band(24, [17, 18])];
 /** Four x3 shells on the top room's bottom row, mirrored about the middle. */
 const ROOM_SHELLS = [6, 14, 21, 29];
 // The top room: x3 shells on its bottom row, sandcastle, driftwood, and two 3-hit beams under the roof's pearl.
@@ -40,10 +40,11 @@ const ROOM = [
   ...fill(0, 7, 36, 2, 'tough', { hp: 3 }),
 ];
 const PEARLS: CellPoint[] = [{ x: 17, y: 36 }, { x: 2, y: 28 }, { x: 33, y: 28 }, { x: 17, y: 4 }];
-// Teasers in the middle under the bottom floor, the lanes under its gaps kept open. Driftwood logs
-// low on either side screen the launch spot's straight shots at the gaps; straight up stays open.
-const TEASERS = [...fill(11, 41, 14, 1, 'tough', { hp: 2 }), ...fill(11, 44, 14, 1, 'soft'),
-  ...fill(6, 47, 9, 1, 'tough', { hp: 3 }), ...fill(21, 47, 9, 1, 'tough', { hp: 3 })];
+// Teasers in the middle under the bottom floor, the lanes under its gaps kept open. Four planks of
+// driftwood low by the raft screen the launch spot's shots at the gaps, straight and banked off the
+// walls (where the generator's launch screen puts them); every other shot stays open.
+const TEASERS = [...fill(11, 41, 14, 1, 'tough', { hp: 2 }), ...fill(11, 44, 14, 1, 'soft')];
+const SCREEN: BrickDef[] = [6, 11, 22, 27].map((x) => ({ x, y: 50, w: 3, h: 1, kind: 'tough', hp: 3 }));
 
 export const WRECK_HOLD: LevelDef = {
   id: 'ch1-05-hold',
@@ -55,5 +56,5 @@ export const WRECK_HOLD: LevelDef = {
   par: 80,
   tip: 'Climb the gaps floor by floor and grab every pearl.',
   pearls: PEARLS,
-  bricks: [...FLOORS, ...BANDS, ...ROOM, ...TEASERS],
+  bricks: [...FLOORS, ...BANDS, ...ROOM, ...TEASERS, ...SCREEN],
 };
