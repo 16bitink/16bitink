@@ -2,7 +2,8 @@
 import Base from '../layouts/Base.astro';
 import DailyCard from '../components/DailyCard.astro';
 import { DAILY_GAMES } from '../data/dailies';
-import { findGame } from '../data/games';
+import { findGame, isOut } from '../data/games';
+import { dailiesOpenSomewhere } from '../lib/dailyOpen';
 import { dailyCover } from '../lib/dailyCover';
 import { FIRST_DAILY_DATE } from '../lib/dailyDates';
 import { MILESTONES } from '../lib/daily';
@@ -11,11 +12,19 @@ import { MILESTONES } from '../lib/daily';
 export const prerender = false;
 Astro.response.headers.set('cache-control', 'public, max-age=300');
 
-const games = DAILY_GAMES.flatMap((d) => {
+const now = new Date();
+// Only games that are out, and dailies whose first day has begun somewhere: the browser hides the rest until its own midnight.
+const dailies = dailiesOpenSomewhere(DAILY_GAMES, now, (slug) => {
+  const game = findGame(slug);
+  return game !== undefined && isOut(game, now);
+});
+
+const games = dailies.flatMap((d) => {
   const game = findGame(d.slug);
   return game ? [{ slug: game.slug, title: game.title, icon: dailyCover(game.slug) }] : [];
 });
-const firstDate = DAILY_GAMES.length > 0 ? (findGame(DAILY_GAMES[0]!.slug)?.released ?? FIRST_DAILY_DATE) : FIRST_DAILY_DATE;
+// The calendar starts at the month of the first daily that opened.
+const firstDate = dailies.map((d) => d.opens).sort()[0] ?? FIRST_DAILY_DATE;
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 ---
 <Base
@@ -27,7 +36,7 @@ const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     <p class="lead">A new level every day, the same for everyone. Free, no sign-up. A day opens at your own midnight.</p>
 
     <section class="today" aria-label="Today’s dailies">
-      {DAILY_GAMES.map((d) => <DailyCard daily={d} status />)}
+      {dailies.map((d) => <DailyCard daily={d} status />)}
     </section>
 
     <section class="paper-card summary" aria-label="Days played">
@@ -53,8 +62,10 @@ const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
   <script>
     import { bootDailyPage } from '../lib/client/dailyPage';
+    import { hideUnopenedDailies } from '../lib/client/dailyPick';
 
     const root = document.getElementById('daily');
+    if (root) hideUnopenedDailies(root);
     if (root) void bootDailyPage(root, JSON.parse(root.dataset.games ?? '[]'), root.dataset.first ?? '2026-11-22');
   </script>
 </Base>

@@ -8,13 +8,15 @@ interface Props {
   daily: DailyGame;
   /** The Daily page fills in "played today" from this browser's days. */
   status?: boolean;
+  /** Rendered but not shown: the home page's script picks which one to show. */
+  hidden?: boolean;
 }
-const { daily, status = false } = Astro.props;
+const { daily, status = false, hidden = false } = Astro.props;
 const game = findGame(daily.slug);
 if (!game) throw new Error(`Daily game ${daily.slug} is not in the catalog`);
 const cover = dailyCover(daily.slug);
 ---
-<article class="daily-card" data-daily-game={daily.slug}>
+<article class="daily-card" data-daily-game={daily.slug} data-opens={daily.opens} hidden={hidden}>
   {cover && <img class="thumb" src={cover} alt="" width="160" height="90" loading="lazy" decoding="async" />}
   <div class="body">
     <p class="kicker">Today’s daily</p>
@@ -31,6 +33,7 @@ const cover = dailyCover(daily.slug);
     padding: 16px 20px; background: var(--paper-2); border: 2px solid var(--ink);
     border-radius: 4px 8px 6px 10px / 10px 5px 9px 4px; box-shadow: var(--shadow);
   }
+  .daily-card[hidden] { display: none; }
   .thumb {
     width: 112px; height: 84px; object-fit: cover; border: 2px solid var(--ink);
     border-radius: 6px 3px 7px 3px; transform: rotate(-1.5deg);
