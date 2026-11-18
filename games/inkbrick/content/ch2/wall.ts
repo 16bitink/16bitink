@@ -3,7 +3,7 @@
  * of 3-hit driftwood planks (low in the middle, over the launch spot) spans the floe; three rows
  * above it a face of kegs and x3 shells sits on a thick band of ice, so the first stone through the
  * breach blows the face and the ice wave takes the whole band. Above: sandcastle, more ice, driftwood
- * and a keg fuse under the top row. Every 4.5 s the whole field sinks a row; a brick reaching the line
+ * and a keg fuse under the top row. Every 7 s the whole field sinks a row; a brick reaching the line
  * (row 42) costs a heart and lifts the field 6 rows. Two ice sheets low by the walls are the first
  * to sink: one hit shatters a sheet and buys ten rows. Teaches: watch the line, break the lowest
  * bricks first. Pieces: tough (armour), ice, soft, x3, keg. Mirrored about the middle.
@@ -54,7 +54,7 @@ export const FROZEN_WALL: LevelDef = {
   layout: 'open',
   par: 110,
   goal: 'tide',
-  tide: { every: 4.5, line: 42 },
+  tide: { every: 7, line: 42 },
   tip: 'The tide sinks the ice! Break the lowest bricks first.',
   bricks: [...ARMOUR, ...FACE, ...PAYLOAD, ...SHEETS],
 };

@@ -11,6 +11,7 @@ import { DAILY_NOVICE_AIM, dailyTargets } from '../src/sim/targets';
 import { launchWindow } from '../src/sim/trace';
 import { Sim } from '../src/sim/sim';
 import { checkLevel } from '../src/level/validate';
+import { DAILY_MONTHS } from '../content/daily/index';
 import { levelProblems } from '../src/sim/validate';
 
 describe('generator', () => {
@@ -87,6 +88,12 @@ describe('generator', () => {
   }, 60_000);
 });
 
+/** The twist a frozen day was planned with (from its month file: the level itself doesn't carry it). */
+const FROZEN_TWIST = (date: string): string => {
+  const month = DAILY_MONTHS.find((m) => (m as { days: Record<string, unknown> }).days[date]) as { days: Record<string, { plan: { twist: string } }> } | undefined;
+  return month?.days[date]?.plan.twist ?? 'none';
+};
+
 describe('frozen dailies', () => {
   const dates = inkbrickDailyDates();
 
@@ -113,6 +120,27 @@ describe('frozen dailies', () => {
       expect(level.goal === 'stones', d).toBe(false);
       const next = inkbrickDaily(addDays(d, 1));
       if (next) expect(level.tomorrow, d).toEqual({ rule: next.rule, goal: next.goal ?? 'clear' });
+    }
+  });
+
+  it('frozen days keep the 7-day rules: twists, layouts, rules, centre boxes, goals (redos included)', () => {
+    const plans = dates.map((d) => {
+      const l = inkbrickDaily(d)!;
+      return { date: d, layout: l.layout ?? '?', rule: l.rule, goal: l.goal ?? 'clear', twist: FROZEN_TWIST(d) };
+    });
+    const boxes = ['vault', 'guarded', 'nested', 'core'];
+    plans.forEach((p, i) => {
+      const week = plans.slice(Math.max(0, i - 6), i + 1);
+      if (p.twist !== 'none') expect(week.filter((q) => q.twist === p.twist).length, `${p.date} twist`).toBe(1);
+      if (p.layout !== 'core') expect(week.filter((q) => q.layout === p.layout).length, `${p.date} layout`).toBeLessThanOrEqual(2);
+      expect(week.filter((q) => boxes.includes(q.layout)).length, `${p.date} boxes`).toBeLessThanOrEqual(2);
+      expect(plans.slice(Math.max(0, i - 7), i).map((q) => q.rule), `${p.date} rule`).not.toContain(p.rule);
+    });
+    for (let i = 0; i + 7 <= plans.length; i++) {
+      for (const g of ['rescue', 'pearls', 'tide']) {
+        const n = plans.slice(i, i + 7).filter((q) => q.goal === g).length;
+        expect(n >= 1 && n <= 2, `${plans[i]!.date} ${g} x${n}`).toBe(true);
+      }
     }
   });
 

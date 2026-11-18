@@ -17,15 +17,19 @@ import type { DayPlan } from './plan';
 const LAUNCH_COL = Math.floor(LAUNCH_X / CELL);
 /** Pearls at least this many cells apart (Chebyshev), so each is its own shot. */
 const PEARL_SPACING = 6;
-/** Rising Tide: seconds until the lowest brick would reach the line if nothing were cleared (measured: 6 rows at 4 s each floods the decent bot 1.2 times, at 6 s 0.4, at 8 s 0). */
-export const TIDE_FIRST_FLOOD = 48;
+/**
+ * Rising Tide: seconds until the lowest brick would reach the line if nothing were cleared (measured: 6 rows at 4 s each
+ * floods the decent bot 1.2 times, at 6 s 0.4, at 8 s 0). 70 s, about 7 s a row: the owner found 4.5-5 s a row too busy.
+ */
+export const TIDE_FIRST_FLOOD = 70;
 /**
  * Rows between the lowest brick and the danger line: 10, so the bots go in first and dig the
  * lowest bricks only when the tide brings them within 7 rows (kit, "Learned building L15": at 6-8
  * rows they dug first and broke in at 36-40 s); 4.5-5 s a row then gave novices 77-90%.
  */
 export const TIDE_LINE_GAP = 10;
-export const TIDE_EVERY: readonly [number, number] = [4.5, 12];
+/** The slowest and fastest tide, in seconds a row (the owner found 4.5 s a row too busy, 2026-11-18). */
+export const TIDE_EVERY: readonly [number, number] = [7, 12];
 export const GOLD_RUSH_SHARE = 0.12;
 export const KEG_DAY_SHARE = 0.1;
 /** Hits the friend's cage bricks take (Monday-Wednesday, the easier days: 2; a 3-hit cage on a Wednesday layers day left novices at 40-50%). */
@@ -176,7 +180,7 @@ export function placeDailyPearl(level: LevelDef, rng: Rng, avoid: readonly Spot[
   return { bricks: minus(level.bricks, cellsOf([s])), pearl: { x: s.x, y: s.y } };
 }
 
-/** Rising Tide: the line TIDE_LINE_GAP rows under the lowest brick (at most row 57), and a pace (to 0.5 s) that floods in ~48 s if nothing is cleared. */
+/** Rising Tide: the line TIDE_LINE_GAP rows under the lowest brick (at most row 57), and a pace (to 0.5 s) that floods in ~TIDE_FIRST_FLOOD s if nothing is cleared. */
 export function tideFor(level: LevelDef): TideDef {
   const low = Math.max(...level.bricks.filter((b) => b.kind !== 'stone' && b.kind !== 'gate' && b.kind !== 'lever').map((b) => b.y + b.h - 1));
   const line = Math.min(TIDE_FLOOR_ROW, low + TIDE_LINE_GAP);

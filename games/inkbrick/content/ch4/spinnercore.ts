@@ -5,6 +5,10 @@
  * Coral bumpers stand in the open water: a stone that lands on one is kicked back up, steeper and
  * faster, into the planks. Teaches: bumpers kick, x3 shells multiply, aim the returns.
  * Rebuilt 2026-11-18 (was the core "The Whirling Core"): old replay pins go.
+ * Refit 2026-11-18: second faces x3 every 3rd cell (every 2nd gave novices 90-93% clears), three
+ * x3 shells high in the payload (6,7), (30,8), (24,5) for the top corners (the last-brick hunt was
+ * 15-19 s), side teasers on rows 31/33. Lab 30 runs: 10/10 (break-in novice 26.4 s, skilled
+ * 18.3 s, cascade 42.1%, drought 8.8 s, clear skilled 100.5 s, novice clears 83.3%, hunt 12.3 s).
  */
 import { fill, minus, swapKind } from '../../src/sim/kit';
 import type { BrickDef, BumperDef, LevelDef } from '../../src/sim/types';
@@ -20,26 +24,29 @@ const face = (x0: number, x1: number, y: number): BrickDef[] => [
   ...fill(x0, y, x1 - x0, 1, 'x3', { bw: 1, skip: (x) => x % 3 !== 1 }),
   ...fill(x0, y, x1 - x0, 1, 'soft', { bw: 1, skip: (x) => x % 3 !== 2 }),
 ];
-/** A second face of x3 every other cell. */
-const beds = (x0: number, x1: number, y: number): BrickDef[] => [
-  ...fill(x0, y, x1 - x0, 1, 'x3', { bw: 1, skip: (x) => x % 2 === 1 }),
-  ...fill(x0, y, x1 - x0, 1, 'soft', { bw: 1, skip: (x) => x % 2 === 0 }),
+/** A second face of x3 every `step`-th cell (every 2nd on both halves gave novices 90-93% clears, every 3rd 60% and a 150 s skilled clear). */
+const beds = (x0: number, x1: number, y: number, step: number): BrickDef[] => [
+  ...fill(x0, y, x1 - x0, 1, 'x3', { bw: 1, skip: (x) => x % step !== 0 }),
+  ...fill(x0, y, x1 - x0, 1, 'soft', { bw: 1, skip: (x) => x % step === 0 }),
 ];
 // Three empty rows over each armour, then the face; the payload above it.
 const LEFT = [
-  ...face(0, 18, 18), ...beds(0, 18, 14), ...fill(0, 15, 18, 3, 'soft', { tint: 3 }),
+  ...face(0, 18, 18), ...beds(0, 18, 14, 3), ...fill(0, 15, 18, 3, 'soft', { tint: 3 }),
   ...fill(0, 9, 18, 5, 'tough', { hp: 2, tint: 3 }), ...fill(0, 6, 18, 3, 'tough', { hp: 2, tint: 5 }), ...fill(0, 4, 18, 2, 'soft', { tint: 5 }),
 ];
 const RIGHT = [
-  ...face(18, 36, 24), ...beds(18, 36, 20), ...fill(18, 21, 18, 3, 'soft', { tint: 4 }),
-  ...fill(18, 13, 18, 7, 'soft', { tint: 4 }), ...fill(18, 9, 18, 4, 'tough', { hp: 2, tint: 6 }), ...fill(18, 6, 18, 3, 'soft', { tint: 6 }), ...fill(18, 4, 18, 2, 'soft', { tint: 6 }),
+  ...face(18, 36, 24), ...beds(18, 36, 20, 3), ...fill(18, 21, 18, 3, 'soft', { tint: 4 }),
+  ...fill(18, 13, 18, 7, 'soft', { tint: 4 }), ...fill(18, 9, 18, 4, 'tough', { hp: 2, tint: 6 }), ...fill(18, 6, 18, 3, 'soft', { tint: 6 }), ...fill(18, 4, 9, 2, 'soft', { tint: 6 }),
 ];
 const at = (col: number, row: number, r: number): BumperDef => ({ x: col * CELL, y: row * CELL + CELL / 2, r });
 // Coral bumpers in the lanes where returns fall, off the launch column, staggered on two heights.
 const BUMPERS: BumperDef[] = [at(9, 38, 20), at(27, 40, 20), at(3, 45, 16), at(33, 46, 16)];
-const TEASERS = [...fill(0, 28, 9, 1, 'tough', { hp: 2 }), ...fill(30, 33, 6, 1, 'soft')];
+const TEASERS = [...fill(0, 28, 9, 1, 'tough', { hp: 2 }), ...fill(0, 31, 6, 1, 'soft'), ...fill(30, 33, 6, 1, 'soft')];
 // Kegs in the corners of the field: they blast the last stragglers, so no hunt.
-const CORNER_KEGS: [number, number][] = [[0, 4], [33, 4], [0, 6], [33, 6], [15, 4], [18, 4], [0, 15], [33, 21], [33, 25]];
+const CORNER_KEGS: [number, number][] = [[0, 4], [33, 4], [0, 6], [33, 6], [15, 4], [18, 4], [0, 15], [33, 21], [33, 25], [30, 6]];
+
+/** x3 shells high in the payload: a stone reaching the top late splits and sweeps the corners. */
+const TOP_X3: [number, number][] = [[6, 7], [30, 8], [24, 5]];
 
 export const WHIRLING_CORE: LevelDef = {
   id: 'ch4-38-core',
@@ -50,5 +57,5 @@ export const WHIRLING_CORE: LevelDef = {
   par: 90,
   tip: 'Coral bumpers kick the stone. Use them to climb the steps.',
   bumpers: BUMPERS,
-  bricks: swapKind([...ARMOUR, ...STEP_WALL, ...LEFT, ...minus(RIGHT, STEP_WALL), ...TEASERS], CORNER_KEGS, 'keg'),
+  bricks: swapKind(swapKind([...ARMOUR, ...STEP_WALL, ...LEFT, ...minus(RIGHT, STEP_WALL), ...TEASERS], CORNER_KEGS, 'keg'), TOP_X3, 'x3'),
 };

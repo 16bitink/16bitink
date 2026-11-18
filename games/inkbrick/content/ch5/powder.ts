@@ -2,7 +2,7 @@
  * Level 46, "The Rising Powder Fort". Signature: Fuse, goal Rising Tide. Two rooms of sandcastle over
  * a stone floor with a 4-wide channel near the left. Up the channel the stone hits the keg that tops
  * it and the blast runs along the fort's top line of kegs; a second, unlit line waits lower down.
- * Every 4.5 s the field sinks a row; a brick on the line (row 51) costs a heart and lifts the field
+ * Every 7 s the field sinks a row; a brick on the line (row 51) costs a heart and lifts the field
  * 6 rows. The lowest bricks are two ice sheets (one hit buys the rows back); a 5-wide 3-hit plank (row 44,
  * placed as screenLaunch does) across the launch spot's shot keeps the break-in from being a
  * first-second shot.
@@ -36,7 +36,7 @@ export const POWDER_FORT: LevelDef = {
   layout: 'fuse',
   par: 90,
   goal: 'tide',
-  tide: { every: 4.5, line: 51 },
+  tide: { every: 7, line: 51 },
   tip: 'Rising tide! Light the fuse, break the low bricks.',
   bricks: [...FLOOR, ...LINE_A, ...LINE_B, ...ICE, ...SET, ...TEASERS],
 };

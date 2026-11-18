@@ -200,12 +200,12 @@ No stone at all; the way in is breakable armour:
 
 ## Daily levels (generator round 4, 2026-11-18: layout × goal × rule)
 
-Round 4 adds, on top of round 3 below: every day has a **goal** (clear most days; rescue, pearls and tide 1–2 times in any 7 days each, never Few Stones) and a **rule** (Monday easy, Saturday hard, Sunday a spectacle, Tuesday–Friday any; none repeated within 7 days, with a look-ahead so Monday, Saturday and Sunday always have one left), **at most 2 centre-box days** (vault, guarded, nested, core) in any 7, the layouts `layers` and `open` from day one, the new pieces from 2026-11-29 (featured to 2026-12-12), a hidden **daily pearl** on every day, and `tomorrow: { rule, goal }` written into every level. A `--redo` keeps the day's goal and rule (yesterday's teaser promised them), and its layout and twist unless the goal no longer allows the layout (then never a centre box, so the box limit still holds against the days after). `--report` prints misses by goal, by rule and by target; `--tomorrow` rewrites every frozen day's teaser from the day after it.
+Round 4 adds, on top of round 3 below: every day has a **goal** (clear most days; rescue, pearls and tide 1–2 times in any 7 days each, never Few Stones) and a **rule** (Monday easy, Saturday hard, Sunday a spectacle, Tuesday–Friday any; none repeated within 7 days, with a look-ahead so Monday, Saturday and Sunday always have one left), **at most 2 centre-box days** (vault, guarded, nested, core) in any 7, the layouts `layers` and `open` from day one, the new pieces from 2026-11-29 (featured to 2026-12-12), a hidden **daily pearl** on every day, and `tomorrow: { rule, goal }` written into every level. A `--redo` keeps the day's goal and rule (yesterday's teaser promised them), and its layout and twist unless the goal no longer allows the layout or `--relayout <dates>` asks for a new one (then never a centre box and never the same layout). A redo plans against the frozen days on both sides of it, so the 7-day rules still hold (`test/gen.test.ts` checks every frozen day). `--report` prints misses by goal, by rule and by target; `--tomorrow` rewrites every frozen day's teaser from the day after it.
 
 Round 4 fixes (2026-11-18, after the first freeze put nine days at 0–40% novice clears):
 - **Novice floor in the day score:** every point of novice clears under the weekday's band costs 20 (before, 3 × |novice − centre| lost to a plain count of misses, so a 0% day with few other misses won). A best candidate still 10+ points under the band tries a hole a cell wider before it's kept.
 - **Layers days:** gaps a cell wider than the day's hole (at most 4), two floors (three only on a big day with no hard rule and no tide), corridor bands 2 rows of 3 × 1 bricks whatever the density, the top room at most 6 rows (the first freeze had 400-brick boards and 0–10% novices). Levers on a layers day leave the bottom gap open and shut the floors above; the lever sits in the first corridor (with the gap shut and the lever outside, novices cleared 10–30%; with the lever inside, 100%).
-- **Rising Tide** only on wall, hourglass, fuse, maze, core, open and picture days: on layers, vaults and nested or guarded boxes the field sinks bricks behind a stone floor and even the skilled bot flooded 1.9 times a run. The line goes **10 rows** under the lowest brick (at most row 57) at ~48 s to a flood if nothing were cleared (≈ 4.5–5 s a row; kit "Learned building L15"); a layers board's launch screen stays off row 50 on tide days.
+- **Rising Tide** only on wall, hourglass, maze, core, open and picture days: on layers, vaults and nested or guarded boxes the field sinks bricks behind a stone floor and even the skilled bot flooded 1.9 times a run; two fuse tide days flooded the decent bot 2–3 times (novices 25–40%). The line goes **10 rows** under the lowest brick (at most row 57) at ~48 s to a flood if nothing were cleared (≈ 4.5–5 s a row; kit "Learned building L15"); a layers board's launch screen stays off row 50 on tide days.
 - **Rescue:** the friend sits in a cage of 3-hit driftwood (the bricks touching it, and 1 × 1 driftwood in the empty ring cells): open friends were freed by the skilled bot in 5–26 s against the 30–90 s target. **Pearls:** all but one inside (field pearls alone took 12–25 s).
 
 ## Daily levels (generator round 3, 2026-11-18)
@@ -332,3 +332,40 @@ L49 "The Gauntlet" (`content/ch5/keep.ts`, open, "everything"): two rows of 4-wi
 - **Gap by the side wall, teasers away from it** (L21's x 5): the same 2-wide gap at x 12 gave skilled 4.5 s at aim 1.9–2.3%; at x 5 with the left teasers gone, aim 2.8% and skilled 9 s; `screenLaunch` then added a second plank (12 s). Raising the quay 3 rows (36 → 33) also helped.
 - **Flip gates in open armour are a fine shortcut**: shut gates count as wall for the inside map (no notch), so a 4-wide gate keeps the enclosure; the bots pull the lever and go through (skilled 12 s) while the novice chews two armour rows (25 s). A second armour row must sit *inside* (over) the first, its cells over the gates left empty: under the gate it would leave a 1-row notch.
 - **Open-level x3 bed is a cliff**: 18 shells → novice 90–100% / skilled 66–74 s; 15 → novice 70% / 99 s (with 3-hit rows 5–9); 12 → novice 40–45% / 150–180 s. One more 3-hit row on top of 15 shells only slowed the skilled bot (132 s, MISS) and left novices at 70%.
+
+## Learned finishing L34 (spinners) and L35 (whirlpools), 2026-11-18
+
+- **Novice clears follow the x3 count, not the +3 pickup.** L34: removing the pickup alone changed nothing (95%); room x3 every 6th cell 95%, every 9th 80%, every 12th 45%. L35: room x3 0 / 1 / 3 gave 60% / 73% / 95%.
+- **A whirlpool mouth in the open water is found by wandering stones, not aimed shots** (bounces leave ≥ 11.5° off vertical, so stones rattle in the strip between the floor and the teasers): novices got in after 4–8 s whatever the aim window read. Caps over the mouth helped a little; mouths by the walls made it worse.
+- **A gap against a side wall slowed the skilled bot by 4–5 s at the same aim window** (L34, 11/11). Spinner phase only matters modulo half a period.
+- Lab time: whirlpool levels take 4–7 min at 20–30 runs (others ~20 s). Keep scratch scripts in your own subfolder of the scratchpad.
+
+## Learned finishing L11 (open + ice) and L14 (vault + rescue), 2026-11-18
+
+- **Kill a last-brick hunt with a keg fuse at the very top:** under the roof a beam, a keg fuse, a thin ice sheet; the stone that reaches the top sets it all off (L11 hunt 19.3 → 8.7 s). Lone kegs buried in 3-hit planks become the last bricks themselves.
+- **Open levels: novice clears move with 3-hit rows, not x3 count** (cutting x3 slows the skilled bot as much as the novice). Keep the x3 bed, add 3-hit rows: 4 rows 95%, 5 rows 73% on L11. (On layers, crab and wall levels the x3 count is the dial; see above.)
+- **Fills that leave a 2-wide strip:** a 17-wide fill in 3-wide bricks leaves 2 empty cells by the wall; on L14 that strip ran down to the friend and drove the rescue's luck. Read the `:` cells first.
+
+## Learned finishing L35, L38, L47 (2026-11-18)
+
+- **Kegs give cascade without making novices win more.** A 1×1 keg line under the ceiling gave L47 a 70% cascade with only 2 x3; once the cascade comes from kegs, the x3 count is free to set novice clears.
+- **Find the hunt before fixing it:** run a few decent-bot runs in a scratch script and list the bricks alive at the 5% mark; put x3 or kegs at those spots (15–19 s → 12–13 s). Emptying the corners instead made it worse.
+- **Armour pockets work only on open levels.** On a layers level the bots don't chew armour (aim reads 0%, runs stall). L35 (whirlpools + pearls) stays at 6/10: novices find open-water whirlpool mouths by wandering in ~10 s. A whirlpool-gated layers level needs a different way in (a bot that aims at whirlpools, or a gap as the way in and whirlpools only as shortcuts).
+- 20-run novice clears move by ±10 points: settle them at 30 runs.
+
+## Tide pace raised to 7 s a row (2026-11-18)
+
+The owner found the 4.5–5 s tide too busy ("too complex"). Every Rising Tide level now sinks a row every **7 s or slower**:
+- the generator uses `TIDE_FIRST_FLOOD` 70 s and a floor `TIDE_EVERY` [7, 12];
+- the frozen dailies are at least 7 s, and none got faster;
+- L15, L28 and L46 have `every: 7`.
+
+The paces quoted above (4.5 s, ~48 s to a flood) are history. At 7 s the lab, 20 runs, gives:
+
+| Level | Passes | Novice clears | Decent floods |
+|---|---|---|---|
+| L15 | 10/11 | 100% | 0 |
+| L28 | 10/11 | 90% | 0 |
+| L46 | 10/12 | 95% | 0.1 (novice break-in 14 s) |
+
+Novice clears now sit above the 55–85% band. That is accepted as the owner's call: harden a tide level with its board, not with a faster tide.

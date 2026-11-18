@@ -86,7 +86,17 @@ export class PlayRun {
         pauseKey: () => (this.paused ? this.resume() : this.pause()),
       },
     }));
+    document.documentElement.addEventListener('mouseleave', this.away);
+    addEventListener('blur', this.away);
+    document.addEventListener('visibilitychange', this.hidden);
   }
+
+  /** The cursor left the page or the window lost focus: pause, so no heart is lost while the player looks away. */
+  private readonly away = (): void => this.pause();
+  /** The tab went to the background (or the phone locked). */
+  private readonly hidden = (): void => {
+    if (document.hidden) this.pause();
+  };
 
   /** Dev only: ?bot=novice|decent|skilled plays the level with the engine's bot (not in production builds). */
   private async devBot(level: LevelDef): Promise<void> {
@@ -145,6 +155,9 @@ export class PlayRun {
   }
 
   destroy(): void {
+    document.documentElement.removeEventListener('mouseleave', this.away);
+    removeEventListener('blur', this.away);
+    document.removeEventListener('visibilitychange', this.hidden);
     this.hud.destroy();
     this.parts.stage.endPlay();
   }

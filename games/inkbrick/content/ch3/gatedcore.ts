@@ -1,7 +1,7 @@
 /**
  * Level 28, "The Harbour Flood". Signature: Open (no stone), goal Rising Tide. A shallow dip of 3-hit
  * driftwood planks (one lower plank over the launch spot), a face of kegs and x3 shells above it, a payload of
- * sandcastle, ice and driftwood, a keg fuse on top. Every 4.5 s the field sinks a row; ice sheets
+ * sandcastle, ice and driftwood, a keg fuse on top. Every 7 s the field sinks a row; ice sheets
  * low by the walls are the first to reach the line. Rebuilt 2026-11-18 (was the gated shell core):
  * its replay pins no longer apply.
  */
@@ -50,7 +50,7 @@ export const GATED_CORE: LevelDef = {
   layout: 'open',
   par: 100,
   goal: 'tide',
-  tide: { every: 4.5, line: 42 },
+  tide: { every: 7, line: 42 },
   tip: 'The harbour floods! Break the lowest bricks first.',
   bricks: [...ARMOUR, ...FACE, ...PAYLOAD, ...SHEETS],
 };

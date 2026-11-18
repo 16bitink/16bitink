@@ -45,12 +45,13 @@ const currentLine = (dir: 1 | -1 | undefined): string => `the sea pushes the sto
 export const ruleLine = (rule: RuleKind, dir?: 1 | -1): string => (rule === 'current' ? currentLine(dir) : RULES[rule].line);
 
 /** The goal as one line before the level: "Rescue the seal pup", "Collect 4 pearls". */
+/** The goal's line under its name on the rule banner (the name is shown above it, so not repeated). */
 export function goalLine(level: LevelDef): string {
   switch (level.goal ?? 'clear') {
     case 'rescue': return `Rescue ${FRIEND_NAMES[level.rescue?.who ?? 'pup']}: reach the cage with a stone`;
     case 'pearls': return `Collect ${level.pearls?.length ?? 0} pearls`;
-    case 'stones': return `Few Stones: break ${pct(level.need ?? 0)} with ${level.stones ?? 0} stones`;
-    case 'tide': return `Rising Tide: clear the bricks before they reach the line`;
+    case 'stones': return `Break ${pct(level.need ?? 0)} with ${level.stones ?? 0} stones`;
+    case 'tide': return 'Clear the bricks before they reach the line';
     default: return 'Break every brick';
   }
 }

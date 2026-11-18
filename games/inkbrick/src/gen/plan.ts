@@ -57,9 +57,10 @@ const RULE_DAYS = 7;
 /**
  * Rising Tide only where the lowest bricks face the raft: on layers, vaults and nested or guarded
  * boxes the field sinks bricks that sit behind a stone floor, and floods come whatever the player
- * does (a layers tide day flooded even the skilled bot 1.9 times a run).
+ * does (a layers tide day flooded even the skilled bot 1.9 times a run). Not fuse either: its kegs
+ * sit along the wall's underside and two fuse tide days flooded the decent bot 2-3 times (novices 25-40%).
  */
-export const TIDE_LAYOUTS: readonly Layout[] = ['wall', 'hourglass', 'fuse', 'maze', 'core', 'open', 'picture'];
+export const TIDE_LAYOUTS: readonly Layout[] = ['wall', 'hourglass', 'maze', 'core', 'open', 'picture'];
 const BOX_DAYS_MAX = 2;
 const PLAN_TRIES = 40;
 const NOVELTY_DAYS = 14;
@@ -185,8 +186,12 @@ export function novelty(a: DayPlan, b: DayPlan): number {
     + (a.goal !== b.goal ? 1 : 0);
 }
 
-function breaksRules(p: DayPlan, recent: readonly DayPlan[]): boolean {
-  const week = recent.slice(-6);
+/**
+ * `after`: frozen days after this one (a redo): counted with the days before, so a redo can't
+ * break a 7-day rule with a day that's already frozen (stricter than a sliding window, on purpose).
+ */
+function breaksRules(p: DayPlan, recent: readonly DayPlan[], after: readonly DayPlan[] = []): boolean {
+  const week = [...recent.slice(-6), ...after.slice(0, 6)];
   if (p.layout !== 'core' && week.filter((d) => d.layout === p.layout).length >= 2) return true;
   if (p.twist !== 'none' && week.some((d) => d.twist === p.twist)) return true;
   if (p.picture && recent.some((d) => d.picture === p.picture)) return true;
@@ -206,6 +211,8 @@ export interface KeepPlan {
   readonly noBoxes?: boolean;
   /** A redo that must change its layout: not this one again. */
   readonly avoid?: Layout;
+  /** The frozen days after a redo's day, oldest first (the 7-day rules count them too). */
+  readonly after?: readonly DayPlan[];
 }
 
 /** The plan for one date given the days before it (oldest first; only the last 14 matter). */
@@ -217,7 +224,7 @@ export function planDay(date: string, history: readonly DayPlan[], salt = 0, kee
   for (let i = 0; i < PLAN_TRIES; i++) {
     const p0 = proposal(date, rng, recent, keep);
     const p = keep?.ruleDir ? { ...p0, ruleDir: keep.ruleDir } : p0;
-    if (breaksRules(p, recent)) continue;
+    if (breaksRules(p, recent, keep?.after)) continue;
     const near = recent.length ? Math.min(...recent.map((d) => novelty(p, d))) : 99;
     const score = near >= MIN_NOVELTY ? 100 + near * 0.01 : near;
     if (score > bestScore) {

@@ -22,16 +22,30 @@ export function planDates(
   keep: Readonly<Record<string, KeepPlan>> = {},
 ): DayPlan[] {
   if (dates.length === 0) return [];
-  const first = dates[0]!;
-  const history: DayPlan[] = [];
-  for (let i = HISTORY_DAYS; i >= 1; i--) {
-    const d = addDays(first, -i);
-    const f = frozen[d];
-    history.push(f ? f.plan : planDay(d, history));
-  }
+  // Every day's history is the 14 days before it: frozen where frozen, else planned here (a redo of
+  // scattered dates must see the frozen days between them).
+  const known = new Map<string, DayPlan>(Object.entries(frozen).map(([d, e]) => [d, e.plan]));
+  const planned = new Set(dates);
+  for (const d of dates) known.delete(d);
+  const historyOf = (d: string): DayPlan[] => {
+    const out: DayPlan[] = [];
+    for (let i = HISTORY_DAYS; i >= 1; i--) {
+      const x = addDays(d, -i);
+      let p = known.get(x);
+      if (!p && !planned.has(x)) {
+        p = planDay(x, out);
+        known.set(x, p);
+      }
+      if (p) out.push(p);
+    }
+    return out;
+  };
   const out: DayPlan[] = [];
-  for (const d of dates) {
-    const plan = planDay(d, [...history, ...out], salts[d] ?? 0, keep[d]);
+  const afterOf = (d: string): DayPlan[] => Array.from({ length: 6 }, (_, i) => known.get(addDays(d, i + 1))).filter((p): p is DayPlan => p !== undefined && !planned.has(p.date));
+  for (const d of [...dates].sort()) {
+    const k = keep[d];
+    const plan = planDay(d, historyOf(d), salts[d] ?? 0, k ? { ...k, after: afterOf(d) } : undefined);
+    known.set(d, plan);
     out.push(plan);
   }
   return out;
