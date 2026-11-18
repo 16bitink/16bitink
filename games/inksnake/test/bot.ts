@@ -12,7 +12,18 @@ import type { SnakeInput } from '../src/logic/snake';
 import { SPACING } from '../src/logic/trail';
 import { dist, pt, pushOut, type Pt } from '../src/logic/vec';
 import type { World } from '../src/logic/world';
-import { BOARD, type LevelDef } from '../src/level/types';
+import { BOARD, PLACES, type LevelDef, type Place } from '../src/level/types';
+import { placeOf } from '../src/level/levels';
+
+/**
+ * Where a level is set, for its bot hook: a daily's own place, else its
+ * chapter's (read from campaign ids, "barrens-3", as chapters aren't
+ * installed in tests).
+ */
+export function botPlace(level: LevelDef): Place {
+  const prefix = level.id.split('-')[0]!;
+  return level.place ?? ((PLACES as readonly string[]).includes(prefix) ? (prefix as Place) : placeOf(level));
+}
 import { World as WorldClass } from '../src/logic/world';
 
 /**
@@ -24,7 +35,7 @@ export function botInput(w: World): SnakeInput {
   const s = w.snake;
   const h = s.head;
   // A chapter's own habits first (its snake's ability, its enemies).
-  const own = HOOKS[w.level.id.split('-')[0]!]?.(w);
+  const own = HOOKS[botPlace(w.level)]?.(w);
   if (own) return own;
   const danger = dodge(w);
   if (danger) return { toward: clear(w, danger), face: null, strike: false };

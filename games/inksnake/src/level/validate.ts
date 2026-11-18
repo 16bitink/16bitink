@@ -1,9 +1,11 @@
+import { EVENT_IDS, isDate, SEASONS, type EventId, type Season } from '@16bitink/game-sdk';
 import { BOSS_ENTRIES, CHAPTER_HINTS, ENEMY_ENTRIES } from '../logic/chapters/index';
 import { isPreyKind } from '../logic/prey';
 import { SNAKES, type SnakeId } from '../logic/species';
 import type { Pt } from '../logic/vec';
 import { CHAPTER_1 } from './chapter1';
-import { BOARD, TEACH, ZONE_KINDS, type BossDef, type CoverDef, type EnemyDef, type GoalDef, type LevelDef, type PreyDef, type SolidDef, type Teach, type ZoneDef, type ZoneKind } from './types';
+import { DAILY_RULES, dailyDate, isTreatKind, type DailyRule, type TomorrowDef, type TreatsDef } from './daily';
+import { BOARD, PLACES, TEACH, ZONE_KINDS, type BossDef, type CoverDef, type EnemyDef, type GoalDef, type LevelDef, type Place, type PreyDef, type SolidDef, type Teach, type ZoneDef, type ZoneKind } from './types';
 
 /** Caps on what the server may send. */
 const MAX_CHAPTERS = 20;
@@ -72,11 +74,13 @@ function enemy(v: unknown): EnemyDef {
   return { kind: v.kind, ...(v.count !== undefined ? { count: v.count as number } : {}), ...(v.from !== undefined ? { from: v.from as number } : {}) };
 }
 
-function goal(v: unknown): GoalDef | undefined {
+function goal(v: unknown, treats: TreatsDef | undefined): GoalDef | undefined {
   if (v === undefined) return undefined;
   if (!isObj(v)) throw new Error('bad goal');
   if (v.kind === 'rush' && num(v.seconds, 20, 300)) return { kind: 'rush', seconds: v.seconds };
-  if (v.kind === 'feast' && isPreyKind(v.food) && num(v.count, 1, 30) && Number.isInteger(v.count)) return { kind: 'feast', food: v.food, count: v.count };
+  const food = isPreyKind(v.food) || (isTreatKind(v.food) && treats?.kind === v.food);
+  if (v.kind === 'feast' && food && num(v.count, 1, 30) && Number.isInteger(v.count)) return { kind: 'feast', food: v.food as string, count: v.count };
+  if (v.kind === 'golden' && num(v.count, 1, 10) && Number.isInteger(v.count)) return { kind: 'golden', count: v.count };
   if (v.kind === 'boss') return { kind: 'boss' };
   throw new Error('bad goal');
 }
@@ -87,15 +91,48 @@ function boss(v: unknown): BossDef | undefined {
   return { kind: v.kind, hp: v.hp };
 }
 
+function treatsOf(v: unknown): TreatsDef | undefined {
+  if (v === undefined) return undefined;
+  if (!isObj(v) || !isTreatKind(v.kind) || !num(v.count, 1, 12) || !Number.isInteger(v.count)) throw new Error('bad treats');
+  return { kind: v.kind, count: v.count };
+}
+
+function tomorrowOf(v: unknown): TomorrowDef | undefined {
+  if (v === undefined) return undefined;
+  if (!isObj(v) || !oneOf<Place>(v.place, PLACES) || !oneOf<SnakeId>(v.snake, SNAKES) || !oneOf<DailyRule>(v.rule, DAILY_RULES)) throw new Error('bad tomorrow');
+  if (v.event !== undefined && !oneOf<EventId>(v.event, EVENT_IDS)) throw new Error('bad tomorrow event');
+  return { place: v.place, snake: v.snake, rule: v.rule, ...(v.event !== undefined ? { event: v.event as EventId } : {}) };
+}
+
+/** A daily's own fields (place, season, rule, event, treats, tomorrow): each checked, unknown ids refused. */
+function dailyFields(v: Record<string, unknown>, treats: TreatsDef | undefined): Partial<LevelDef> {
+  if (v.place !== undefined && !oneOf<Place>(v.place, PLACES)) throw new Error('bad place');
+  if (v.season !== undefined && !oneOf<Season>(v.season, SEASONS)) throw new Error('bad season');
+  if (v.rule !== undefined && !oneOf<DailyRule>(v.rule, DAILY_RULES)) throw new Error('bad rule');
+  if (v.event !== undefined && !oneOf<EventId>(v.event, EVENT_IDS)) throw new Error('bad event');
+  const tomorrow = tomorrowOf(v.tomorrow);
+  return {
+    ...(v.place !== undefined ? { place: v.place as Place } : {}),
+    ...(v.season !== undefined ? { season: v.season as Season } : {}),
+    ...(v.rule !== undefined ? { rule: v.rule as DailyRule } : {}),
+    ...(v.event !== undefined ? { event: v.event as EventId } : {}),
+    ...(treats ? { treats } : {}),
+    ...(tomorrow ? { tomorrow } : {}),
+  };
+}
+
 /** One level from untrusted JSON: every field checked, anything unknown dropped. Throws on anything wrong. */
 export function parseLevel(v: unknown): LevelDef {
   if (!isObj(v) || !str(v.id, /^[a-z0-9-]{1,64}$/) || typeof v.name !== 'string' || v.name.length < 1 || v.name.length > 40) throw new Error('bad level');
   if (!oneOf<SnakeId>(v.snake, SNAKES)) throw new Error('bad snake');
   if (!num(v.heading, -7, 7) || !num(v.length, 60, MAX_LENGTH) || !num(v.target, 60, MAX_LENGTH) || !num(v.par, 10, 900)) throw new Error('bad numbers');
   if (v.target <= v.length) throw new Error('target not past start');
+  // A daily's id is its date: a real one.
+  if (v.id.startsWith('daily') && !isDate(dailyDate(v.id))) throw new Error('bad daily id');
   const preyList = list(v.prey, MAX_PREY, 'prey', prey);
   if (!preyList?.length) throw new Error('no prey');
-  const g = goal(v.goal);
+  const treats = treatsOf(v.treats);
+  const g = goal(v.goal, treats);
   const b = boss(v.boss);
   if ((g?.kind === 'boss') !== (b !== undefined)) throw new Error('boss goal without boss');
   if (v.lives !== undefined && (!num(v.lives, 1, 5) || !Number.isInteger(v.lives))) throw new Error('bad lives');
@@ -124,6 +161,7 @@ export function parseLevel(v: unknown): LevelDef {
     ...(v.lives !== undefined ? { lives: v.lives as number } : {}),
     ...(v.dark === true ? { dark: true } : {}),
     ...(teach ? { teach } : {}),
+    ...dailyFields(v, treats),
   };
 }
 

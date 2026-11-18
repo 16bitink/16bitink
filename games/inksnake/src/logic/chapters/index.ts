@@ -1,6 +1,7 @@
 import type { BossEntry, ChapterHint, ChapterRules, EnemyEntry } from '../enemyTypes';
 import type { PreySpec } from '../preyTypes';
 import { BARRENS_RULES } from './barrens';
+import { DAILY_RULES_ENEMIES } from './daily';
 import { DUNES_RULES } from './dunes';
 import { FARM_RULES } from './farm';
 import { FLOODED_RULES } from './flooded';
@@ -15,7 +16,7 @@ import { SAVANNA_RULES } from './savanna';
  * Every chapter's rules, merged: each chapter owns its module here and adds
  * its prey, enemies and boss without touching any other file.
  */
-const ALL: readonly ChapterRules[] = [FARM_RULES, BARRENS_RULES, DUNES_RULES, SAVANNA_RULES, RAINFOREST_RULES, REEF_RULES, MOUNTAINS_RULES, HEATH_RULES, JUNGLE_RULES, FLOODED_RULES];
+const ALL: readonly ChapterRules[] = [FARM_RULES, BARRENS_RULES, DUNES_RULES, SAVANNA_RULES, RAINFOREST_RULES, REEF_RULES, MOUNTAINS_RULES, HEATH_RULES, JUNGLE_RULES, FLOODED_RULES, DAILY_RULES_ENEMIES];
 
 const merged = <T>(pick: (r: ChapterRules) => Readonly<Record<string, T>> | undefined): Readonly<Record<string, T>> =>
   Object.assign({}, ...ALL.map((r) => pick(r) ?? {})) as Record<string, T>;

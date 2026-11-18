@@ -66,6 +66,8 @@ export interface Prey {
   alt: number;
   /** A behaviour's own state, if it keeps any. */
   data?: Record<string, number>;
+  /** Golden (dailies): a gold rush's rich meal, or the golden goal's quarry. */
+  gold?: 'rush' | 'goal';
 }
 
 export interface PreyWorld {

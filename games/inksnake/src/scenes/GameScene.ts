@@ -65,7 +65,7 @@ export class GameScene extends Phaser.Scene {
     this.coach = new Coach(this.level.teach ?? [], twistTexts(this.level).map((t) => t.hint));
     this.over = false;
     this.lastTick = -1;
-    const place = placeOf(this.level.id);
+    const place = placeOf(this.level);
     // Only this level's boss is kept painted; its snake and critters are painted if they aren't yet.
     freeBosses(this, this.level.boss?.kind);
     bakeForLevel(this, this.level);

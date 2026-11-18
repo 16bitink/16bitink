@@ -55,7 +55,8 @@ export function isFreeEnd(id: string): boolean {
   return CHAPTER_1[CHAPTER_1.length - 1]!.id === id;
 }
 
-/** The place a level is set in (the farm for anything unknown). */
-export function placeOf(id: string): Place {
-  return CHAPTER_PLACES[chapterOf(id)] ?? 'farm';
+/** The place a level is set in: a daily's own `place` first, then its chapter's (the farm for anything unknown). */
+export function placeOf(level: LevelDef | string): Place {
+  if (typeof level !== 'string' && level.place) return level.place;
+  return CHAPTER_PLACES[chapterOf(typeof level === 'string' ? level : level.id)] ?? 'farm';
 }

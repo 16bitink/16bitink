@@ -1,4 +1,4 @@
-import type { LevelDef } from '../../level/types';
+import type { EnemyDef, LevelDef } from '../../level/types';
 import { BOSS_ENTRIES, ENEMY_ENTRIES } from '../chapters/index';
 import type { Boss, Enemy } from '../enemyTypes';
 
@@ -11,7 +11,10 @@ export type { Boss } from '../enemyTypes';
 /** The level's enemies, waiting to arrive (each kind makes its own, see logic/chapters/). */
 export function makeEnemies(level: LevelDef, nextId: () => number): Enemy[] {
   const out: Enemy[] = [];
-  for (const def of level.enemies ?? []) {
+  const defs = level.enemies ?? [];
+  // A daily's Rival rule brings a rival of the player's own species, in any place.
+  const rival = level.rule === 'rival' && !defs.some((d) => d.kind === 'rival') ? [{ kind: 'rival' } as EnemyDef] : [];
+  for (const def of [...defs, ...rival]) {
     const entry = ENEMY_ENTRIES[def.kind];
     if (!entry) continue;
     for (let i = 0; i < (def.count ?? 1); i++) out.push(entry.make(nextId(), def, level, i));

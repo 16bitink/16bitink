@@ -1,6 +1,8 @@
+import type { EventId, Season } from '@16bitink/game-sdk';
 import type { PreyKind } from '../logic/preyTypes';
 import type { SnakeId } from '../logic/species';
 import type { Pt } from '../logic/vec';
+import type { DailyRule, TomorrowDef, TreatKind, TreatsDef } from './daily';
 
 /** Every level is laid out on this board, seen from above, scaled to fit the screen. */
 export const BOARD = { w: 960, h: 540 } as const;
@@ -68,11 +70,14 @@ export interface BossDef {
 /**
  * What a level asks for besides growing to its target length. Rush: grow
  * within `seconds`. Feast: also eat `count` of the marked `kind`. Boss:
- * drive the boss off (growing isn't asked).
+ * drive the boss off (growing isn't asked). Golden (dailies): catch the
+ * golden prey `count` times, each catch sending the next somewhere else.
+ * A daily's feast may ask for its treats (`food` is then the treat kind).
  */
 export type GoalDef =
   | { readonly kind: 'rush'; readonly seconds: number }
-  | { readonly kind: 'feast'; readonly food: PreyKind; readonly count: number }
+  | { readonly kind: 'feast'; readonly food: PreyKind | TreatKind; readonly count: number }
+  | { readonly kind: 'golden'; readonly count: number }
   | { readonly kind: 'boss' };
 
 /** What a level's first-time hints teach (see logic/coach.ts). */
@@ -110,4 +115,16 @@ export interface LevelDef {
   /** Night: only round the snake's head can be seen. */
   readonly dark?: boolean;
   readonly teach?: readonly Teach[];
+  /** Dailies: where it's set (campaign levels: from their chapter). */
+  readonly place?: Place;
+  /** Dailies: the look (absent: the campaign look). */
+  readonly season?: Season;
+  /** Dailies: the rule of the day (data rules are already applied to the fields above). */
+  readonly rule?: DailyRule;
+  /** Dailies: a themed day, with its look and stamp. */
+  readonly event?: EventId;
+  /** Dailies: the event's treats on the board. */
+  readonly treats?: TreatsDef;
+  /** Dailies: tomorrow's day, for the end card's teaser. */
+  readonly tomorrow?: TomorrowDef;
 }

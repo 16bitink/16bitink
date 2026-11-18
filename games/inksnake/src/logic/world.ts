@@ -1,5 +1,7 @@
 import { BOARD, type LevelDef, type ZoneKind } from '../level/types';
 import { ABILITIES, type Ability, type AbilityCtx } from './abilities/index';
+import { TREAT } from './daily/params';
+import { DailyRun, type DailyCtx, type DailyEvent } from './daily/run';
 import { pushOffBody } from './bodyBlock';
 import { findLoop, loopHint, ringRadius, ringTargets, SQUEEZE_TIME, SWALLOW_TIME, type Loop } from './coil';
 import { makeBoss, makeEnemies } from './enemies/index';
@@ -46,7 +48,8 @@ export type WorldEvent =
   | { readonly type: 'bump' }
   | { readonly type: 'grown' }
   | { readonly type: 'won' }
-  | { readonly type: 'lost'; readonly cause: LossCause };
+  | { readonly type: 'lost'; readonly cause: LossCause }
+  | DailyEvent;
 
 export type WorldState = 'play' | 'won' | 'lost';
 
@@ -72,6 +75,8 @@ export class World {
   readonly boss: Boss | null;
   readonly solids: readonly Shape[];
   readonly maxLives: number;
+  /** A daily's rules (its rule of the day, treats, golden goal), or null on campaign levels. */
+  readonly daily: DailyRun | null;
   lives: number;
   score = 0;
   elapsed = 0;
@@ -117,7 +122,9 @@ export class World {
     this.pw = this.makePreyWorld();
     this.ctx = this.makeEnemyCtx();
     this.actx = this.makeAbilityCtx();
+    this.daily = DailyRun.wanted(level) ? new DailyRun(this.makeDailyCtx()) : null;
     for (const def of level.prey) for (let i = 0; i < def.count; i++) this.spawn(def.kind, true);
+    this.daily?.start();
   }
 
   /** The level's goal so far, 0..1: the meter shows it. */
@@ -126,6 +133,7 @@ export class World {
     if (l.goal?.kind === 'boss' && this.boss) return 1 - this.boss.hp / this.boss.maxHp;
     const grow = Math.min(1, Math.max(0, (this.snake.length + this.snake.pending - l.length) / Math.max(1, l.target - l.length)));
     if (l.goal?.kind === 'feast') return (grow + Math.min(1, this.feasted / l.goal.count)) / 2;
+    if (l.goal?.kind === 'golden') return (grow + (this.daily?.goldenProgress ?? 1)) / 2;
     return grow;
   }
 
@@ -168,6 +176,7 @@ export class World {
     this.elapsed += dt;
     const snake = this.snake;
     this.runAbility(input, dt);
+    this.daily?.beforeSnake(dt);
     snake.hidden = this.underCover(snake.head) || snake.cloak !== 'none';
     if (snake.steer(input, dt, BOARD, this.solids)) this.events.push({ type: 'strike' });
     if (snake.bumped) this.events.push({ type: 'bump' });
@@ -181,13 +190,25 @@ export class World {
     this.hint = snake.mode === 'move' && snake.spec.big === 'coil' ? loopHint(snake, this.prey) : null;
     // Prey a coil is closing round freezes in fear: the loop can always be finished.
     for (const p of this.prey) p.frozen = this.hint?.prey.includes(p) ?? false;
-    for (const p of this.prey) stepPrey(p, preySpec(p.kind), this.pw, dt);
+    this.stepAllPrey(dt);
     for (const e of this.enemies) e.step(this.ctx, dt);
     this.boss?.step(this.ctx, dt);
     this.keepOffBody();
     this.tickRespawns(dt);
     this.judge();
     return this.events;
+  }
+
+  /** Every prey animal's step, under the day's rule if there is one (a hot day, golden prey, the lure). */
+  private stepAllPrey(dt: number): void {
+    const daily = this.daily;
+    if (!daily) {
+      for (const p of this.prey) stepPrey(p, preySpec(p.kind), this.pw, dt);
+      return;
+    }
+    daily.beforePrey();
+    for (const p of this.prey) stepPrey(p, daily.preySpec(p, preySpec(p.kind)), this.pw, dt * daily.preyTime(p));
+    daily.afterPrey(dt);
   }
 
   /** The snake's ability runs first each frame: it may hold the snake, cloak it, slow it, keep its meter. */
@@ -315,12 +336,14 @@ export class World {
     const spec = preySpec(p.kind);
     const i = this.prey.indexOf(p);
     if (i >= 0) this.prey.splice(i, 1);
-    this.snake.swallowed(spec.size, spec.growth);
-    this.score += Math.round(spec.points * multiplier);
+    const k = this.daily?.mealScale(p) ?? { growth: 1, points: 1 };
+    this.snake.swallowed(spec.size, spec.growth * k.growth);
+    this.score += Math.round(spec.points * multiplier * k.points);
     const counts = this.level.goal?.kind !== 'feast' || this.level.goal.food !== p.kind || p.marked;
     if (counts) this.eaten[p.kind] = (this.eaten[p.kind] ?? 0) + 1;
     this.events.push({ type: 'eat', kind: p.kind, x: p.x, y: p.y, size: spec.size, marked: p.marked });
     this.respawn.push({ kind: p.kind, t: RESPAWN[0] + this.rng() * (RESPAWN[1] - RESPAWN[0]) });
+    this.daily?.gone(p, true);
   }
 
   /** A loop closed round prey starts a squeeze (constrictors); otherwise a head crossing the body ties a knot. */
@@ -333,7 +356,7 @@ export class World {
         return;
       }
     }
-    if (snake.bitten() >= 0) this.hurt('knot', snake.head);
+    if (snake.bitten() >= 0 && !this.daily?.looseKnots) this.hurt('knot', snake.head);
   }
 
   private startSqueeze(loop: Loop): void {
@@ -384,7 +407,7 @@ export class World {
       if (this.boss?.beaten && s.mode === 'move') this.win();
       return;
     }
-    const fed = l.goal?.kind !== 'feast' || this.feasted >= l.goal.count;
+    const fed = (l.goal?.kind !== 'feast' || this.feasted >= l.goal.count) && (l.goal?.kind !== 'golden' || (this.daily?.goldenDone ?? true));
     // The level is won once the last meal is down, not mid-swallow.
     if (grown && fed && s.mode === 'move' && s.length >= l.target - 0.5) {
       this.win();
@@ -441,6 +464,7 @@ export class World {
         if (i < 0) return;
         this.prey.splice(i, 1);
         this.respawn.push({ kind: p.kind, t: RESPAWN[1] });
+        this.daily?.gone(p, false);
       },
       emit: (e) => {
         if (e.type === 'scared') this.score += SCARE_POINTS;
@@ -466,21 +490,43 @@ export class World {
     };
   }
 
+  private makeDailyCtx(): DailyCtx {
+    return {
+      level: this.level, snake: this.snake, prey: this.prey, rng: this.rng, pw: this.pw,
+      spawn: (kind, away) => this.spawn(kind, false, away),
+      emit: (e) => this.events.push(e),
+      ate: (kind) => {
+        this.eaten[kind] = (this.eaten[kind] ?? 0) + 1;
+        this.score += TREAT.points;
+      },
+    };
+  }
+
   /** New prey of `kind`: eggs in an empty nest, the rest anywhere free in its zone and away from the head. */
-  private spawn(kind: PreyKind, atStart = false): void {
+  private spawn(kind: PreyKind, atStart = false, away = SPAWN_AWAY): Prey | null {
+    const p = this.place(kind, atStart, away);
+    if (p) this.daily?.arrived(p);
+    return p;
+  }
+
+  private place(kind: PreyKind, atStart: boolean, away: number): Prey | null {
     const spec = preySpec(kind);
     const goal = this.level.goal;
     const marked = goal?.kind === 'feast' && goal.food === kind;
     if (spec.gait === 'still' && !spec.zone) {
       const nests = this.level.nests ?? [];
       const free = nests.filter((n) => !this.prey.some((p) => p.nest && dist(p.nest, n) < 1));
-      if (!free.length) return;
+      if (!free.length) return null;
       const nest = free[Math.floor(this.rng() * free.length)]!;
-      this.prey.push(makePrey(this.nextId++, kind, nest, this.rng, nest, marked));
-      return;
+      const egg = makePrey(this.nextId++, kind, nest, this.rng, nest, marked);
+      this.prey.push(egg);
+      return egg;
     }
-    const at = freeSpot(this.pw, spec.size / 2, atStart ? SPAWN_AWAY * 0.6 : SPAWN_AWAY, spec.zone);
-    if (at) this.prey.push(makePrey(this.nextId++, kind, at, this.rng, null, marked));
+    const at = freeSpot(this.pw, spec.size / 2, atStart ? away * 0.6 : away, spec.zone);
+    if (!at) return null;
+    const p = makePrey(this.nextId++, kind, at, this.rng, null, marked);
+    this.prey.push(p);
+    return p;
   }
 
   /**
@@ -519,7 +565,8 @@ export class World {
       if (r.t > 0) continue;
       this.respawn.splice(i, 1);
       const want = this.level.prey.find((d) => d.kind === r.kind)?.count ?? 0;
-      if (this.prey.filter((p) => p.kind === r.kind).length < want) this.spawn(r.kind);
+      // The golden goal's quarry is extra: it doesn't stand in for one of the level's own.
+      if (this.prey.filter((p) => p.kind === r.kind && p.gold !== 'goal').length < want) this.spawn(r.kind);
     }
   }
 }

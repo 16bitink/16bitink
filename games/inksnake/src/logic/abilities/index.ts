@@ -1,4 +1,4 @@
-import type { SnakeId } from '../species';
+import { relativeOf, SNAKES, type SnakeId } from '../species';
 import { ADDER } from './adder';
 import { ANACONDA } from './anaconda';
 import { COBRA } from './cobra';
@@ -21,4 +21,7 @@ const MAKERS: Partial<Record<SnakeId, AbilityMaker | null>> = {
   spidertail: SPIDERTAIL, adder: ADDER, cobra: COBRA, anaconda: ANACONDA,
 };
 
-export const ABILITIES: Partial<Record<SnakeId, AbilityMaker>> = Object.fromEntries(Object.entries(MAKERS).filter(([, m]) => m)) as Partial<Record<SnakeId, AbilityMaker>>;
+/** Each snake's ability; an event snake uses its relative's (the golden tree snake glides, the sea snake swims). */
+export const ABILITIES: Partial<Record<SnakeId, AbilityMaker>> = Object.fromEntries(
+  SNAKES.map((id) => [id, MAKERS[relativeOf(id)]]).filter(([, m]) => m),
+) as Partial<Record<SnakeId, AbilityMaker>>;

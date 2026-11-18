@@ -90,6 +90,13 @@ export class Snake {
   /** The ability's effect on speed and turning this step (the forest floor, the cold…). */
   speedScale = 1;
   turnScale = 1;
+  /** A rule of the day's (dailies): speed and turning, how long speed carries on ice (s, 0: none), and a steady push (a blizzard), px/s. */
+  speedRule = 1;
+  turnRule = 1;
+  carry = 0;
+  push: Pt | null = null;
+  /** The speed it's actually going (eases towards `speed` when it carries), px/s; -1 before the first step. */
+  private vel = -1;
   /** Held still by its ability (playing dead, buried, luring): it doesn't move, but may still strike. */
   hold = false;
   /** Where the head must keep to this frame (set by the ability, see Fence), or null. */
@@ -148,7 +155,7 @@ export class Snake {
   /** Current speed, px/s. */
   get speed(): number {
     if (this.mode !== 'move' || (this.hold && !this.striking)) return 0;
-    return this.spec.speed * this.speedScale * (this.striking ? STRIKE.boost : 1);
+    return this.spec.speed * this.speedScale * this.speedRule * (this.striking ? STRIKE.boost : 1);
   }
 
   /**
@@ -163,7 +170,10 @@ export class Snake {
     if (this.mode === 'move') this.uncoil = Math.max(0, this.uncoil - dt);
     this.moved = 0;
     this.bumped = false;
-    if (this.mode !== 'move') return false;
+    if (this.mode !== 'move') {
+      this.vel = 0;
+      return false;
+    }
     let struck = false;
     if (input.strike && this.strikeRest <= 0) {
       this.strikeTime = STRIKE.time;
@@ -172,10 +182,14 @@ export class Snake {
     }
     const want = this.wanted(input);
     // A strike holds its line: it's a lunge, not a turn.
-    if (want !== null && !this.striking && !this.hold) this.heading = turnTowards(this.heading, want, this.spec.turn * this.turnScale * dt);
-    const d = this.speed * dt;
+    if (want !== null && !this.striking && !this.hold) this.heading = turnTowards(this.heading, want, this.spec.turn * this.turnScale * this.turnRule * dt);
+    const goal = this.speed;
+    // On ice the speed carries: it eases to what it should be instead of jumping there.
+    this.vel = this.carry > 0 && this.vel >= 0 ? this.vel + (goal - this.vel) * (1 - Math.exp(-dt / this.carry)) : goal;
+    const d = this.vel * dt;
     const h = this.head;
-    let next = pt(h.x + Math.cos(this.heading) * d, h.y + Math.sin(this.heading) * d);
+    const push = this.push;
+    let next = pt(h.x + Math.cos(this.heading) * d + (push ? push.x * dt : 0), h.y + Math.sin(this.heading) * d + (push ? push.y * dt : 0));
     const r = this.width / 2;
     const slid = this.slide(next, r, bounds, solids);
     next = slid.p;
@@ -237,6 +251,11 @@ export class Snake {
   swallowed(size: number, growth: number): void {
     this.lumps.push({ s: this.width * 0.8, size });
     // A px over, so rounding never leaves it a hair short of the target.
+    this.pending = Math.min(this.pending + growth, Math.max(0, this.maxLength + 1 - this.trail.length));
+  }
+
+  /** Grows `growth` px with no lump (a treat). */
+  grow(growth: number): void {
     this.pending = Math.min(this.pending + growth, Math.max(0, this.maxLength + 1 - this.trail.length));
   }
 

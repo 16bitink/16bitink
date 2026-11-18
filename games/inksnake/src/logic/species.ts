@@ -2,8 +2,27 @@
  * The player's snakes, one per chapter. Numbers are board px and seconds:
  * each species handles a little differently, loosely true to life.
  */
-export const SNAKES = ['corn', 'hognose', 'sidewinder', 'eggeater', 'flying', 'krait', 'spidertail', 'adder', 'cobra', 'anaconda'] as const;
+export const HOME_SNAKES = ['corn', 'hognose', 'sidewinder', 'eggeater', 'flying', 'krait', 'spidertail', 'adder', 'cobra', 'anaconda'] as const;
+/** The dailies' event snakes, each a real species that plays like a close relative (EVENT_RELATIVE). */
+export const EVENT_SNAKES = ['candycane', 'rainbowboa', 'goldentree', 'rosyboa', 'greenpython', 'earthsnake', 'yellowsea', 'blackhognose'] as const;
+export const SNAKES = [...HOME_SNAKES, ...EVENT_SNAKES] as const;
+export type HomeSnakeId = (typeof HOME_SNAKES)[number];
+export type EventSnakeId = (typeof EVENT_SNAKES)[number];
 export type SnakeId = (typeof SNAKES)[number];
+
+/**
+ * The home snake each event snake plays like: its ability comes from it,
+ * and its drawings too until its own are painted (art/snakes/index.ts).
+ */
+export const EVENT_RELATIVE: Readonly<Record<EventSnakeId, HomeSnakeId>> = {
+  candycane: 'corn', rainbowboa: 'anaconda', goldentree: 'flying', rosyboa: 'corn',
+  greenpython: 'flying', earthsnake: 'hognose', yellowsea: 'krait', blackhognose: 'hognose',
+};
+
+/** The home snake whose ability (and stand-in drawings) a snake uses: itself, or an event snake's relative. */
+export function relativeOf(id: SnakeId): HomeSnakeId {
+  return (EVENT_RELATIVE as Readonly<Record<string, HomeSnakeId>>)[id] ?? (id as HomeSnakeId);
+}
 
 /** How a snake deals with prey too big to swallow on the spot. */
 export type BigPrey = 'coil' | 'venom' | 'none';
@@ -38,6 +57,14 @@ export const SNAKE_SPECS: Readonly<Record<SnakeId, SnakeSpec>> = {
   adder: { name: 'adder', latin: 'Vipera berus', width: 16, speed: 135, turn: 3.8, big: 'venom' },
   cobra: { name: 'king cobra', latin: 'Ophiophagus hannah', width: 18, speed: 170, turn: 3.6, big: 'venom', snakeEater: true },
   anaconda: { name: 'green anaconda', latin: 'Eunectes murinus', width: 24, speed: 120, turn: 3.0, big: 'coil' },
+  candycane: { name: 'candy cane corn snake', latin: 'Pantherophis guttatus', width: 15, speed: 150, turn: 4.6, big: 'coil' },
+  rainbowboa: { name: 'rainbow boa', latin: 'Epicrates cenchria', width: 17, speed: 140, turn: 4.0, big: 'coil' },
+  goldentree: { name: 'golden tree snake', latin: 'Chrysopelea ornata', width: 12, speed: 165, turn: 4.4, big: 'venom' },
+  rosyboa: { name: 'rosy boa', latin: 'Lichanura trivirgata', width: 16, speed: 125, turn: 3.8, big: 'coil' },
+  greenpython: { name: 'green tree python', latin: 'Morelia viridis', width: 17, speed: 135, turn: 3.8, big: 'coil' },
+  earthsnake: { name: 'smooth earth snake', latin: 'Virginia valeriae', width: 11, speed: 135, turn: 4.6, big: 'none' },
+  yellowsea: { name: 'yellow-bellied sea snake', latin: 'Hydrophis platurus', width: 14, speed: 155, turn: 3.8, big: 'venom' },
+  blackhognose: { name: 'eastern hognose (black form)', latin: 'Heterodon platirhinos', width: 17, speed: 128, turn: 3.6, big: 'none' },
 };
 
 /** A strike: this many times cruising speed, for this long, then a rest before the next. */
