@@ -11,6 +11,7 @@ export interface DailyGame {
 
 export const DAILY_GAMES: readonly DailyGame[] = [
   { slug: 'inkbrick', blurb: 'Break into today’s shell. Same level for everyone today.' },
+  { slug: 'inksnake', blurb: 'Today’s hunt: a new place, snake and rule every day.' },
 ];
 
 export const dailyGame = (slug: string): DailyGame | undefined => DAILY_GAMES.find((g) => g.slug === slug);
