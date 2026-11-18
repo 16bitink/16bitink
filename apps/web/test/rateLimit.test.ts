@@ -40,6 +40,8 @@ describe('which routes are limited', () => {
     expect(limitFor('/auth/email/code')).toBe('auth');
     expect(limitFor('/auth/email/verify')).toBe('auth');
     expect(limitFor('/api/progress/inkfish')).toBe('progress');
+    expect(limitFor('/api/daily/inkbrick/play')).toBe('daily');
+    expect(limitFor('/api/daily/history')).toBe('daily');
     expect(limitFor('/admin')).toBe('admin');
     expect(limitFor('/api/admin/grants')).toBe('admin');
     expect(limitFor('/api/admin/keys')).toBe('admin');

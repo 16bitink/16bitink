@@ -1,0 +1,278 @@
+{
+ "skip-aim": [
+  194,
+  105
+ ],
+ "skip-idle": [
+  194,
+  105
+ ],
+ "skip-cheer": [
+  194,
+  105
+ ],
+ "skip-shrug": [
+  194,
+  105
+ ],
+ "raft-wide": [
+  280,
+  25
+ ],
+ "raft-plain": [
+  180,
+  22
+ ],
+ "raft-3": [
+  180,
+  18
+ ],
+ "raft-7": [
+  180,
+  63
+ ],
+ "raft-14": [
+  180,
+  48
+ ],
+ "raft-30": [
+  180,
+  54
+ ],
+ "raft-50": [
+  180,
+  55
+ ],
+ "raft-100": [
+  180,
+  59
+ ],
+ "brumm-smug": [
+  440,
+  360
+ ],
+ "brumm-hit": [
+  440,
+  360
+ ],
+ "brumm-defeated": [
+  440,
+  360
+ ],
+ "stone": [
+  24,
+  24
+ ],
+ "trail-3": [
+  28,
+  40
+ ],
+ "trail-7": [
+  34,
+  40
+ ],
+ "trail-14": [
+  40,
+  29
+ ],
+ "trail-30": [
+  26,
+  40
+ ],
+ "trail-50": [
+  39,
+  40
+ ],
+ "trail-100": [
+  40,
+  26
+ ],
+ "stone-dark": [
+  24,
+  24
+ ],
+ "brick-soft-1": [
+  180,
+  60
+ ],
+ "brick-soft-1-sq": [
+  60,
+  60
+ ],
+ "brick-soft-2": [
+  180,
+  60
+ ],
+ "brick-soft-2-sq": [
+  60,
+  60
+ ],
+ "brick-soft-3": [
+  180,
+  60
+ ],
+ "brick-soft-3-sq": [
+  60,
+  60
+ ],
+ "brick-tough-1": [
+  180,
+  60
+ ],
+ "brick-tough-1-sq": [
+  60,
+  60
+ ],
+ "brick-tough-2": [
+  180,
+  60
+ ],
+ "brick-tough-2-sq": [
+  60,
+  60
+ ],
+ "brick-tough-3": [
+  180,
+  60
+ ],
+ "brick-tough-3-sq": [
+  60,
+  60
+ ],
+ "brick-stone": [
+  180,
+  60
+ ],
+ "brick-stone-sq": [
+  60,
+  60
+ ],
+ "brick-x3": [
+  180,
+  60
+ ],
+ "brick-x3-sq": [
+  60,
+  60
+ ],
+ "brick-keg": [
+  180,
+  60
+ ],
+ "brick-keg-sq": [
+  60,
+  60
+ ],
+ "brick-pickup": [
+  180,
+  60
+ ],
+ "brick-pickup-sq": [
+  60,
+  60
+ ],
+ "brick-ice-1": [
+  180,
+  60
+ ],
+ "brick-ice-1-sq": [
+  60,
+  60
+ ],
+ "brick-ice-2": [
+  180,
+  60
+ ],
+ "brick-ice-2-sq": [
+  60,
+  60
+ ],
+ "brick-key": [
+  180,
+  60
+ ],
+ "brick-key-sq": [
+  60,
+  60
+ ],
+ "brick-gate": [
+  180,
+  60
+ ],
+ "brick-gate-sq": [
+  60,
+  60
+ ],
+ "brick-dense": [
+  180,
+  60
+ ],
+ "brick-dense-sq": [
+  60,
+  60
+ ],
+ "shutter": [
+  60,
+  60
+ ],
+ "pu-wide": [
+  96,
+  94
+ ],
+ "pu-plus3": [
+  96,
+  94
+ ],
+ "pu-fireball": [
+  96,
+  95
+ ],
+ "whirlpool": [
+  120,
+  116
+ ],
+ "spinner": [
+  600,
+  48
+ ],
+ "shield": [
+  360,
+  72
+ ],
+ "shell-icon": [
+  60,
+  72
+ ],
+ "shell-empty": [
+  61,
+  72
+ ],
+ "stamp": [
+  63,
+  64
+ ],
+ "heart": [
+  64,
+  57
+ ],
+ "heart-empty": [
+  64,
+  56
+ ],
+ "skip-ready": [
+  194,
+  105
+ ],
+ "skip-swat-up": [
+  194,
+  105
+ ],
+ "skip-swat-across": [
+  194,
+  105
+ ],
+ "skip-throw": [
+  194,
+  105
+ ]
+}

@@ -102,6 +102,62 @@ export interface GameHost {
    * harm. Absent in dev harnesses and tests.
    */
   readonly filesMissing?: () => void;
+  /**
+   * The site-wide daily level, for games that have one (InkBrick). Absent for games without a
+   * daily, and in dev harnesses that don't provide it. The game never talks to the network: it
+   * asks this host, which keeps plays in the browser and syncs them to the account.
+   */
+  readonly daily?: DailyHost;
+}
+
+/** One day of a game's daily played: what the game tells the host to save. */
+export interface DailyPlay {
+  /** The daily's local date, YYYY-MM-DD. */
+  readonly date: string;
+  readonly result: 'win' | 'lose';
+  /** Time spent on the level. */
+  readonly seconds: number;
+  /** Seconds until the first break-in (the moment the ball got through the shell), if it did. */
+  readonly breakIn?: number;
+  /** Shells collected on the level. */
+  readonly shells: number;
+}
+
+/** How today's players did compared with this play; percentages are whole numbers 0-100. */
+export interface DailyStanding {
+  /** How many players have played this date's daily. */
+  readonly players: number;
+  /** The percent (0–100, whole) of the other players this play broke in faster than. */
+  readonly breakInBetterThan?: number;
+  /** The percent (0–100, whole) of the other winners this play cleared faster than (winning plays only). */
+  readonly clearBetterThan?: number;
+}
+
+/** A day the player has played, for the calendar. */
+export interface DailyDay {
+  readonly date: string;
+  readonly result: 'win' | 'lose';
+  /** Played after its date (an owner filling a missed day): the calendar outlines it. */
+  readonly late: boolean;
+  readonly seconds: number;
+}
+
+/** The daily level, as the host provides it. */
+export interface DailyHost {
+  /** The player's local date, YYYY-MM-DD. */
+  today(): string;
+  /** The day's level (untrusted JSON). Rejects for future dates, and for past dates unless the player owns the game. */
+  load(date: string): Promise<unknown>;
+  /** Saves a play (kept in the browser, synced to the account when signed in) and returns the day's standing, or null offline. */
+  record(play: DailyPlay): Promise<DailyStanding | null>;
+  /** This game's days played, oldest first. */
+  history(): Promise<readonly DailyDay[]>;
+  /** Total days played across every game's dailies (for milestones). */
+  totalDays(): Promise<number>;
+  /** A link that opens this date's daily with `seconds` as the time to beat. */
+  challengeLink(date: string, seconds: number): string;
+  /** The challenge time from the link the player opened, if any. */
+  readonly challenge?: { readonly date: string; readonly seconds: number };
 }
 
 /**

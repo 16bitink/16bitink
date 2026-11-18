@@ -1,0 +1,48 @@
+---
+import { findGame } from '../data/games';
+import type { DailyGame } from '../data/dailies';
+import { dailyCover } from '../lib/dailyCover';
+import GameTitle from './GameTitle.astro';
+
+interface Props {
+  daily: DailyGame;
+  /** The Daily page fills in "played today" from this browser's days. */
+  status?: boolean;
+}
+const { daily, status = false } = Astro.props;
+const game = findGame(daily.slug);
+if (!game) throw new Error(`Daily game ${daily.slug} is not in the catalog`);
+const cover = dailyCover(daily.slug);
+---
+<article class="daily-card" data-daily-game={daily.slug}>
+  {cover && <img class="thumb" src={cover} alt="" width="160" height="90" loading="lazy" decoding="async" />}
+  <div class="body">
+    <p class="kicker">Today’s daily</p>
+    <h2><GameTitle game={game} /></h2>
+    <p class="blurb">{daily.blurb}</p>
+    {status && <p class="state" data-daily-state hidden></p>}
+  </div>
+  <a class="btn btn-ink play" href={`/play/${game.slug}?daily=1`} data-click="daily">Play</a>
+</article>
+
+<style>
+  .daily-card {
+    display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px 20px;
+    padding: 16px 20px; background: var(--paper-2); border: 2px solid var(--ink);
+    border-radius: 4px 8px 6px 10px / 10px 5px 9px 4px; box-shadow: var(--shadow);
+  }
+  .thumb {
+    width: 112px; height: 84px; object-fit: cover; border: 2px solid var(--ink);
+    border-radius: 6px 3px 7px 3px; transform: rotate(-1.5deg);
+  }
+  .kicker { margin: 0; font-family: var(--font-pixel); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--blue-ink); }
+  h2 { margin: 2px 0 2px; font-size: 2rem; }
+  .blurb, .state { margin: 0; color: var(--ink-soft); line-height: 1.35; }
+  .state { margin-top: 4px; font-family: var(--font-hand); font-size: 1.3rem; color: var(--blue-ink); }
+  .play { min-width: 110px; }
+  @media (max-width: 560px) {
+    .daily-card { grid-template-columns: auto minmax(0, 1fr); }
+    .thumb { width: 84px; height: 64px; }
+    .play { grid-column: 1 / -1; }
+  }
+</style>

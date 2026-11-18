@@ -66,6 +66,13 @@ const PRODUCTS = [
     unitAmount: 499,
     currency: 'usd',
   },
+  {
+    lookupKey: 'inkbrick_full',
+    name: 'InkBrick: Full Game',
+    description: 'The full InkBrick game on 16bit.ink: all 50 levels, with the Ice Floe, the Harbour, the Sea Cave and Brumm\'s Fort after the free Kelp Cove, and every past daily level to play. One-time purchase, no subscription.',
+    unitAmount: 499,
+    currency: 'usd',
+  },
 ];
 
 const key = process.env.STRIPE_SECRET_KEY;

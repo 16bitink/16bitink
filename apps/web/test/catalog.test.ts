@@ -17,7 +17,7 @@ describe('catalog', () => {
   });
 
   it('lists every game for sale, so the admin panel can unlock it and make keys for it', () => {
-    expect(playableGames().map((g) => g.slug)).toEqual(['inkfish', 'inkcrab', 'inkmine', 'inkgecko', 'inksnake', 'inkpin', 'inkheroes', 'inktanks']);
+    expect(playableGames().map((g) => g.slug)).toEqual(['inkfish', 'inkcrab', 'inkmine', 'inkgecko', 'inksnake', 'inkpin', 'inkheroes', 'inktanks', 'inkbrick']);
   });
 
   it('is out from the start of its release day (UTC), or always when undated', () => {
@@ -53,10 +53,15 @@ describe('catalog', () => {
   });
 
   it('still calls the newest game the latest once its new week is over', () => {
-    // InkTanks came out Nov 15; its new week (8 days) is over on Nov 23.
-    const home = homeListings(new Date('2026-11-23T00:00:00Z'));
-    expect(home.top[0]).toMatchObject({ label: 'latest' });
-    expect(home.top[0]!.game.slug).toBe('inktanks');
+    // InkTanks came out Nov 15: new through Nov 21, and InkBrick (Nov 22) takes the top the day its new week ends.
+    const before = homeListings(new Date('2026-11-21T00:00:00Z'));
+    expect(before.top[0]).toMatchObject({ label: 'new' });
+    expect(before.top[0]!.game.slug).toBe('inktanks');
+    // InkBrick came out Nov 22; its new week is over on Nov 30.
+    expect(homeListings(new Date('2026-11-23T00:00:00Z')).top[0]).toMatchObject({ label: 'new' });
+    const after = homeListings(new Date('2026-11-30T00:00:00Z'));
+    expect(after.top[0]).toMatchObject({ label: 'latest' });
+    expect(after.top[0]!.game.slug).toBe('inkbrick');
   });
 
   it('lists InkTanks from Sunday, Nov 15 (UTC), first on the home page', () => {

@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>InkBrick dailies: contact sheet</title>
+  <style>
+    body { font: 12px/1.35 system-ui, sans-serif; background: #f4efe4; color: #2b2620; margin: 16px; }
+    h1 { font-size: 18px; margin: 0 0 4px; }
+    p.note { margin: 0 0 12px; color: #6b6255; }
+    #sheet { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; }
+    .day { background: #fffaf0; border: 1px solid #d8cdb8; border-radius: 6px; padding: 6px; }
+    .day.sun { border-color: #c98a2b; }
+    .day.sat { border-color: #8b3a3a; }
+    .day canvas { display: block; width: 144px; height: 212px; margin: 0 auto 4px; image-rendering: pixelated; background: #e9f1f2; }
+    .day b { display: block; }
+    .miss { color: #a33; }
+  </style>
+</head>
+<body>
+  <h1>InkBrick dailies</h1>
+  <p class="note">Every frozen day (content/daily/*.json). Veto one with <code>npm run gen -- --redo YYYY-MM-DD</code>.</p>
+  <div id="sheet"></div>
+  <script type="module" src="./contact.ts"></script>
+</body>
+</html>

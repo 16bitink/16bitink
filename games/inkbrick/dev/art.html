@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>InkBrick art</title>
+<style>
+  body { margin: 0; font: 12px system-ui, sans-serif; background: #888; }
+  .panels { display: grid; grid-template-columns: 1fr 1fr; }
+  .panel { padding: 12px; }
+  .dark { background: #1d2230; color: #cdd; }
+  .light { background: #ece2cf; color: #433; }
+  h2 { font-size: 13px; margin: 14px 0 6px; text-transform: uppercase; letter-spacing: .08em; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: flex-end; }
+  figure { margin: 0; }
+  figcaption { font-size: 10px; opacity: .7; margin-top: 2px; }
+  figure img { display: block; }
+  .bg figure img { width: 180px; height: auto; }
+  .tall figure img { width: 90px; }
+</style>
+</head>
+<body>
+<div class="panels"><div class="panel dark" id="dark"></div><div class="panel light" id="light"></div></div>
+<script type="module">
+  import { art, ART_KEYS } from '../src/art/manifest.ts';
+  import { artUrl } from '../src/render/art.ts';
+  const groups = [
+    ['Skip on the raft', (k) => k.startsWith('skip-'), ''],
+    ['Rafts (milestones)', (k) => k.startsWith('raft-'), ''],
+    ['Stone and trails', (k) => k === 'stone' || k === 'stone-dark' || k.startsWith('trail-'), ''],
+    ['Bricks 3x1', (k) => k.startsWith('brick-') && !k.endsWith('-sq'), ''],
+    ['Bricks 1x1', (k) => k.endsWith('-sq'), ''],
+    ['Pickups and pieces', (k) => k.startsWith('pu-') || ['whirlpool', 'spinner', 'shutter', 'shield'].includes(k), ''],
+    ['Brumm', (k) => k.startsWith('brumm-'), ''],
+    ['UI', (k) => ['heart', 'heart-empty', 'shell-icon', 'shell-empty', 'stamp'].includes(k), ''],
+    ['Backgrounds and map', (k) => k.startsWith('bg-') || k === 'map', 'bg'],
+  ];
+  const seen = new Set();
+  for (const host of ['dark', 'light']) {
+    const root = document.getElementById(host);
+    for (const [title, test, cls] of groups) {
+      const h = document.createElement('h2'); h.textContent = title; root.append(h);
+      const row = document.createElement('div'); row.className = 'row ' + cls; root.append(row);
+      for (const k of ART_KEYS.filter(test)) {
+        seen.add(k);
+        const f = document.createElement('figure');
+        const i = document.createElement('img'); i.src = artUrl(k) ?? art[k].url; i.alt = k;
+        const c = document.createElement('figcaption'); c.textContent = `${k} ${art[k].w}x${art[k].h}`;
+        f.append(i, c); row.append(f);
+      }
+    }
+  }
+  const missing = ART_KEYS.filter((k) => !seen.has(k));
+  if (missing.length) console.warn('not shown:', missing);
+  const imgs = [...document.images];
+  await Promise.all(imgs.map((i) => i.decode().catch(() => {})));
+  window.__ready = true;
+</script>
+</body>
+</html>

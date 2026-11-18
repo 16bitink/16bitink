@@ -21,6 +21,8 @@ const limiters: Record<LimitedRoute, RateLimiter> = {
   subscribe: createRateLimiter({ limit: 5, windowMs: MINUTE }),
   // Connecting Claude: a handful of registrations, sign-ins and token refreshes.
   oauth: createRateLimiter({ limit: 20, windowMs: MINUTE }),
+  // A daily is loaded, played and saved a few times a day; this covers a player filling in missed days.
+  daily: createRateLimiter({ limit: 60, windowMs: MINUTE }),
 };
 
 export const onRequest = defineMiddleware((context, next) => {

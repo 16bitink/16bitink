@@ -1,0 +1,112 @@
+---
+import Base from '../layouts/Base.astro';
+import DailyCard from '../components/DailyCard.astro';
+import { DAILY_GAMES } from '../data/dailies';
+import { findGame } from '../data/games';
+import { dailyCover } from '../lib/dailyCover';
+import { FIRST_DAILY_DATE } from '../lib/dailyDates';
+import { MILESTONES } from '../lib/daily';
+
+// Rendered per request, like the other pages that change with who is looking (see about.astro).
+export const prerender = false;
+Astro.response.headers.set('cache-control', 'public, max-age=300');
+
+const games = DAILY_GAMES.flatMap((d) => {
+  const game = findGame(d.slug);
+  return game ? [{ slug: game.slug, title: game.title, icon: dailyCover(game.slug) }] : [];
+});
+const firstDate = DAILY_GAMES.length > 0 ? (findGame(DAILY_GAMES[0]!.slug)?.released ?? FIRST_DAILY_DATE) : FIRST_DAILY_DATE;
+const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+---
+<Base
+  title="Daily levels and your calendar | 16bit.ink"
+  description="A new level every day, the same for everyone, free with no sign-up. Your calendar keeps every day you played."
+>
+  <div class="daily" id="daily" data-games={JSON.stringify(games)} data-first={firstDate}>
+    <h1>Daily</h1>
+    <p class="lead">A new level every day, the same for everyone. Free, no sign-up. A day opens at your own midnight.</p>
+
+    <section class="today" aria-label="Today’s dailies">
+      {DAILY_GAMES.map((d) => <DailyCard daily={d} status />)}
+    </section>
+
+    <section class="paper-card summary" aria-label="Days played">
+      <p class="count" data-daily-count aria-live="polite">0 days played</p>
+      <p class="next" data-daily-next>Play a daily to start your calendar.</p>
+      <ol class="stamps" data-daily-stamps aria-label="Stamps">
+        {MILESTONES.map((n) => <li class="stamp"><span class="stamp-n">{n}</span><span class="stamp-l">to come</span></li>)}
+      </ol>
+      <p class="note">Every day you play gets a mark, whenever you come back. Days you missed can be played later by owners of the game; those marks are outlined.</p>
+    </section>
+
+    <section class="paper-card cal" aria-label="Calendar">
+      <div class="cal-head">
+        <button class="btn cal-btn" type="button" data-cal-prev aria-label="Previous month">‹</button>
+        <h2 data-cal-title>Calendar</h2>
+        <button class="btn cal-btn" type="button" data-cal-next aria-label="Next month">›</button>
+      </div>
+      <div class="weekdays" aria-hidden="true">{WEEKDAYS.map((w) => <span>{w}</span>)}</div>
+      <div class="grid" data-cal-body></div>
+      <p class="legend"><span class="mark"><i></i></span> played on the day · <span class="mark late"><i></i></span> played later</p>
+    </section>
+  </div>
+
+  <script>
+    import { bootDailyPage } from '../lib/client/dailyPage';
+
+    const root = document.getElementById('daily');
+    if (root) void bootDailyPage(root, JSON.parse(root.dataset.games ?? '[]'), root.dataset.first ?? '2026-11-22');
+  </script>
+</Base>
+
+<style is:global>
+  .daily { max-width: 760px; margin: 0 auto; }
+  .daily h1 { font-size: clamp(2.6rem, 6vw, 3.4rem); margin-bottom: 4px; }
+  .daily .lead { margin: 0 0 28px; color: var(--ink-soft); font-size: 1.1rem; }
+  .daily section.today { display: grid; gap: 16px; margin-bottom: 40px; }
+  .daily .summary, .daily .cal { margin-bottom: 40px; }
+  .daily .count { margin: 0; font-family: var(--font-hand); font-size: 2.6rem; font-weight: 700; color: var(--blue-ink); line-height: 1.1; }
+  .daily .next { margin: 4px 0 16px; color: var(--ink-soft); }
+  .daily .note { margin: 16px 0 0; font-size: 0.9rem; color: var(--ink-soft); }
+  .daily .stamps { display: flex; flex-wrap: wrap; gap: 12px; margin: 0; padding: 0; list-style: none; }
+  .daily .stamp {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; width: 78px; height: 78px;
+    border: 2.5px dashed var(--ink-soft); border-radius: 50%; color: var(--ink-soft); opacity: 0.7; transform: rotate(-3deg);
+  }
+  .daily .stamp:nth-child(even) { transform: rotate(3deg); }
+  .daily .stamp-n { font-family: var(--font-hand); font-size: 1.9rem; font-weight: 700; line-height: 1; }
+  .daily .stamp-l { font-family: var(--font-pixel); font-size: 0.55rem; text-transform: uppercase; letter-spacing: 0.04em; }
+  .daily .stamp.next { opacity: 1; border-color: var(--blue-ink); color: var(--blue-ink); }
+  .daily .stamp.earned { opacity: 1; border: 3px solid var(--blue-ink); color: var(--blue-ink); background: color-mix(in srgb, var(--blue-ink) 12%, transparent); box-shadow: inset 0 0 0 3px var(--paper-2), inset 0 0 0 5px var(--blue-ink); }
+  .daily .cal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+  .daily .cal-head h2 { margin: 0; font-size: 2.2rem; }
+  .daily .cal-btn { min-width: 48px; padding: 4px 14px; }
+  .daily .cal-btn[disabled] { opacity: 0.35; cursor: default; }
+  .daily .weekdays, .daily .grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+  .daily .weekdays { margin-bottom: 6px; text-align: center; font-family: var(--font-pixel); font-size: 0.65rem; text-transform: uppercase; color: var(--ink-soft); }
+  .daily .cell {
+    position: relative; aspect-ratio: 1; min-width: 0; padding: 3px 4px; display: flex; flex-direction: column; justify-content: space-between;
+    border: 1.5px solid color-mix(in srgb, var(--ink) 30%, transparent); border-radius: 4px 6px 4px 7px / 6px 4px 7px 4px;
+  }
+  .daily .cell.blank { border: 0; }
+  .daily .cell.today { border: 2.5px solid var(--blue-ink); }
+  .daily .cell.played { background: color-mix(in srgb, var(--blue-ink) 10%, var(--paper-2)); }
+  .daily .num { font-size: 0.85rem; color: var(--ink-soft); line-height: 1; }
+  .daily .marks { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px; }
+  .daily .mark {
+    display: inline-flex; align-items: center; justify-content: center; width: min(100%, 28px); aspect-ratio: 1; overflow: hidden;
+    border-radius: 50%; border: 2px solid var(--ink); background: var(--paper); color: var(--ink); font-family: var(--font-hand); font-weight: 700; font-size: 1rem;
+  }
+  .daily .mark img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  /* Played later: outlined, a gap being filled in rather than a loss. */
+  .daily .mark.late { border: 2px dashed var(--blue-ink); background: transparent; }
+  .daily .mark.late img { opacity: 0.55; }
+  .daily .legend { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 14px 0 0; font-size: 0.9rem; color: var(--ink-soft); }
+  .daily .legend .mark { width: 18px; }
+  .daily .legend .mark i { display: block; width: 100%; height: 100%; }
+  @media (max-width: 520px) {
+    .daily .cell { padding: 2px; }
+    .daily .num { font-size: 0.7rem; }
+    .daily .mark { border-width: 1.5px; }
+  }
+</style>

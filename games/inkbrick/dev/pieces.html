@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>InkBrick: the variety pieces at phone size</title>
+<style>
+  body { margin: 0; background: #f4eddc; color: #1b1a1f; font: 600 15px/1.1 Caveat, "Comic Sans MS", cursive; }
+  h1 { font-size: 20px; margin: 8px 10px 2px; }
+  h2 { font-size: 15px; margin: 10px 10px 4px; color: #6a6258; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: flex-end; padding: 0 10px; }
+  figure { margin: 0; text-align: center; }
+  figcaption { font-size: 12px; color: #6a6258; margin-top: 2px; }
+  .stack { position: relative; }
+  .stack img { display: block; }
+  .stack img + img { position: absolute; left: 0; top: 0; }
+  img { image-rendering: auto; }
+</style>
+</head>
+<body>
+<h1>Variety pieces at 390 x 844 (board x0.72)</h1>
+<div id="sheet"></div>
+<script type="module">
+  // Every piece at the size the play scene shows it on a 390 px wide phone.
+  import { inkBrickCanvas, inkCanvas } from '../src/render/ink/index.ts';
+  import { BUMPER_DISC } from '../src/render/ink/variety.ts';
+  import { ruleIconUrl, goalIconUrl } from '../src/render/ink/ruleIcons.ts';
+  import { RULES, GOAL_NAMES } from '../src/ui/rules.ts';
+  import { RULE_CLASS, RULE_KINDS, GOAL_KINDS } from '../src/sim/types.ts';
+  const S = 390 / 540;
+  const CELL = 15;
+  const sheet = document.getElementById('sheet');
+  const img = (canvas, w, h) => { const i = new Image(); i.src = canvas.toDataURL(); i.style.width = `${w * S}px`; i.style.height = `${h * S}px`; return i; };
+  const fig = (el, label) => { const f = document.createElement('figure'); f.append(el); const c = document.createElement('figcaption'); c.textContent = label; f.append(c); return f; };
+  const group = (title, items) => { const h = document.createElement('h2'); h.textContent = title; const r = document.createElement('div'); r.className = 'row'; r.append(...items); sheet.append(h, r); };
+  const fixed = (key, w, h, label = key) => fig(img(inkCanvas(key), w, h), label);
+  const sized = (key, wc, hc, label = key) => fig(img(inkBrickCanvas(key, wc * CELL * 2, hc * CELL * 2), wc * CELL, hc * CELL), label);
+  const stack = (a, b, size, label) => { const d = document.createElement('div'); d.className = 'stack'; d.append(img(inkCanvas(a), size, size), img(inkCanvas(b), size, size)); return fig(d, label); };
+  const bump = (r) => fixed('bumper', (2 * r) / BUMPER_DISC, (2 * r) / BUMPER_DISC, `bumper r${r}`);
+  group('Bumper (buoy), and its flash', [bump(14), bump(24), fixed('bumper-lit', 48 / BUMPER_DISC, 48 / BUMPER_DISC, 'bumped')]);
+  group('Lever (2 x 2) and its flip walls (8 x 1), per link colour', [
+    sized('brick-lever-l-0', 2, 2, 'lever'), sized('brick-lever-r-0', 2, 2, 'flipped'), sized('flip-on-0', 8, 1, 'wall solid'), sized('flip-off-0', 8, 1, 'wall open'),
+    sized('brick-lever-l-1', 2, 2, 'lever b'), sized('flip-on-1', 4, 2, 'solid 4x2'), sized('flip-off-1', 4, 2, 'open 4x2'),
+    sized('brick-lever-l-2', 1, 2, '1x2'), sized('brick-lever-r-3', 3, 2, '3x2'),
+  ]);
+  group('Key and gate (3 x 1 and 2 x 2), one look per pair; the flying key', [0, 1, 2, 3].flatMap((c) => [sized(`brick-key-${c}`, 3, 1, `key ${c + 1}`), sized(`brick-gate-${c}`, 3, 1, `gate ${c + 1}`)])
+    .concat([sized('brick-key-0', 2, 2, 'key 2x2'), sized('brick-gate-1', 2, 2, 'gate 2x2'), fixed('key-fly-0', 60, 32, 'flying key')]));
+  group('Hidden brick: a glint every few seconds, the brick after its first hit', [fixed('shimmer', 18, 18, 'glint'), sized('brick-soft-1', 3, 1, 'revealed')]);
+  group('Armour (open levels, hp 3): intact, hit, nearly through; beside stone for contrast', [
+    sized('brick-armour-1', 3, 1, 'armour'), sized('brick-armour-2', 3, 1, 'hit once'), sized('brick-armour-3', 3, 1, 'hit twice'),
+    sized('brick-armour-1', 6, 2, 'armour 6x2'), sized('brick-armour-3', 1, 3, '1x3'), sized('brick-stone', 3, 1, 'stone'), sized('brick-tough-1', 3, 1, 'tough'),
+  ]);
+  group('Crab (3 x 2 box, drawn 1.5x wide): walk, walk, just hit', [1, 2, 3].map((f) => fixed(`crab-${f}`, 67.5, 47, `crab-${f}`)));
+  group('Pearls: the goal\'s, and the daily\'s hidden one', [fixed('pearl', 40, 40, 'pearl'), fixed('pearl-daily', 20, 20, 'daily pearl')]);
+  group('Rescue friends: caged, then free', ['crab', 'pup', 'puffin'].flatMap((w) => [stack(`friend-${w}`, 'cage', 62, `${w} caged`), fixed(`friend-${w}-happy`, 62, 62, `${w} free`)]));
+  group('Trap door (shutter, 6 x 1 and 3 x 2): shut, open', [sized('shutter-closed', 6, 1, 'shut'), sized('shutter-open', 6, 1, 'open'), sized('shutter-closed', 3, 2, 'shut 3x2'), sized('shutter-open', 3, 2, 'open 3x2')]);
+  group('Tide line (full width)', [fixed('tide-line', 540, 28, 'danger line')]);
+  group('Fx: chip, blast', [fixed('chip', 9, 9, 'chip'), fixed('blast', 90, 90, 'blast')]);
+  const icon = (url, label) => { const i = new Image(); i.src = url; i.style.width = '44px'; i.style.height = '44px'; return fig(i, label); };
+  group('Rule badges (44 px, as on the banner)', RULE_KINDS.map((r) => icon(ruleIconUrl(r, RULE_CLASS[r]), RULES[r].name)));
+  group('Goal badges', GOAL_KINDS.map((g) => icon(goalIconUrl(g), GOAL_NAMES[g])));
+  window.__ready = true;
+</script>
+</body>
+</html>
