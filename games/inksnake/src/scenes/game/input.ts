@@ -46,6 +46,8 @@ export class GameInput {
   private abilityWas = false;
   /** The pointer moved since the last read. */
   private moved = false;
+  /** The pointer now steering (a mouse, or a finger held down), to steer on as the camera moves under it. */
+  private steering: Phaser.Input.Pointer | null = null;
 
   constructor(scene: Phaser.Scene, private readonly hooks: InputHooks) {
     // A phone's hints speak of fingers from the start, not after the first touch.
@@ -61,6 +63,7 @@ export class GameInput {
       // A finger only steers while it's down; a mouse steers just by moving.
       if (p.wasTouch && !p.isDown) return;
       this.toward = hooks.toBoard(p);
+      this.steering = p;
       this.moved = true;
     });
     scene.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
@@ -74,6 +77,7 @@ export class GameInput {
         }
       }
       this.toward = hooks.toBoard(p);
+      this.steering = p;
       if (p.wasTouch) {
         this.down = { id: p.id, x: p.x, y: p.y, t: p.event.timeStamp };
         return;
@@ -156,12 +160,28 @@ export class GameInput {
     if (this.toward && Math.hypot(this.toward.x - head.x, this.toward.y - head.y) < reach) this.toward = null;
   }
 
+  /**
+   * The camera moved (it follows the head on a phone): a pointer still
+   * steering points at a new spot on the board, so the head keeps going the
+   * way it points instead of stopping where it first pointed.
+   */
+  track(): void {
+    const p = this.steering;
+    if (!p || !this.toward) return;
+    if (p.wasTouch && !p.isDown) {
+      this.steering = null;
+      return;
+    }
+    this.toward = this.hooks.toBoard(p);
+  }
+
   /** Forgets keys held across a pause. */
   reset(): void {
     this.held.clear();
     this.strike = false;
     this.down = null;
     this.stick = null;
+    this.steering = null;
     this.buttonHeld = false;
     this.abilityWas = false;
   }

@@ -12,6 +12,7 @@ import { makeDraw } from './kit';
 import { ART_RES, BOIL, PAPER } from './palette';
 import { makeCanvas, releaseScratch, shrink } from './pen';
 import { placeArt } from './places/index';
+import { RIM_PREFIXES, RIM_TEX } from './rim/bakeRim';
 import { isRivalArt, snakeArt } from './snakes/index';
 import { SNAKE_W, stripLength, type SpriteArt } from './types';
 
@@ -210,8 +211,9 @@ export function bakeCovers(scene: Phaser.Scene, level: LevelDef, place: Place): 
 
 /** Frees every baked board but `keep`'s: a level played again starts on the board it already has. */
 export function dropBoards(scene: Phaser.Scene, keep?: LevelDef): void {
-  const kept = keep ? [TEX.board(keep.id), TEX.covers(keep.id)] : [];
+  const kept = keep ? [TEX.board(keep.id), TEX.covers(keep.id), RIM_TEX.flat(keep.id), RIM_TEX.tall(keep.id), RIM_TEX.surround(keep.id)] : [];
+  const prefixes = ['board-', 'covers-', ...RIM_PREFIXES];
   for (const key of scene.textures.getTextureKeys()) {
-    if ((key.startsWith('board-') || key.startsWith('covers-')) && !kept.includes(key)) freeTexture(scene, key);
+    if (prefixes.some((p) => key.startsWith(p)) && !kept.includes(key)) freeTexture(scene, key);
   }
 }

@@ -12,6 +12,10 @@ import { preySpec } from '../logic/prey';
 import { blotsFor, loadProgress, recordResult } from '../logic/save';
 import { World, type WorldEvent } from '../logic/world';
 import { layGround } from './game/boardBleed';
+import { followStart, followStep, followZoom, viewExtent, wantsFollow, type Extent, type FollowState } from './game/followCam';
+import { bakeRims, bakeSurround } from '../art/rim/bakeRim';
+import { RIM_SHOW } from '../art/rim/rimKit';
+import type { Enemy } from '../logic/enemyTypes';
 import { CrittersView } from './game/crittersView';
 import { FxView } from './game/fxView';
 import { GameInput } from './game/input';
@@ -60,6 +64,8 @@ export class GameScene extends Phaser.Scene {
   private dailyView: DailyView | null = null;
   private own: ChapterView | null = null;
   private covers: Phaser.GameObjects.Image | null = null;
+  /** The phone camera (see followCam.ts): what the screen shows of the board, and where it's looking. Null on a big screen (the whole board). */
+  private follow: { readonly view: Extent; state: FollowState } | null = null;
   private over = false;
   private away = false;
   private lastTick = -1;
@@ -82,7 +88,7 @@ export class GameScene extends Phaser.Scene {
     this.add.tileSprite(-BOARD.w, -BOARD.h, BOARD.w * 3, BOARD.h * 3, TEX.paper).setOrigin(0).setDepth(0);
     // A retry keeps the board it was played on; any other level's painting goes.
     dropBoards(this, this.level);
-    layGround(this, bakeBoard(this, this.level, place), 1);
+    layGround(this, bakeBoard(this, this.level, place), bakeSurround(this, this.level, place), bakeRims(this, this.level, place), 1);
     const covers = bakeCovers(this, this.level, place);
     this.covers = covers ? this.add.image(0, 0, covers).setOrigin(0).setScale(1 / ART_RES).setDepth(5) : null;
     this.critters = new CrittersView(this);
@@ -135,18 +141,52 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * The whole board in view, as big as the screen allows, centred. On a
-   * phone held upright the board (seen from above) turns a quarter so it
-   * fills the screen instead of a strip of it.
+   * The whole board in view (and its wall), as big as the screen allows,
+   * centred. On a phone held upright the board (seen from above) turns a
+   * quarter so it fills the screen instead of a strip of it. On a small
+   * screen it's shown bigger than fits, and the camera follows the head.
    */
   private fit(): void {
     const { width, height } = viewSize(this);
     const turned = isUpright(width, height);
-    const zoom = Math.max(0.1, turned ? Math.min(width / BOARD.h, (height - UPRIGHT_HUD * 2) / BOARD.w) : Math.min(width / BOARD.w, (height - LANDSCAPE_HUD) / BOARD.h));
-    this.cameras.main.setZoom(DPR * zoom).setRotation(turned ? Math.PI / 2 : 0).centerOn(BOARD.w / 2, BOARD.h / 2 - (turned ? 0 : LANDSCAPE_HUD / 2 / zoom));
+    const bw = BOARD.w + RIM_SHOW * 2;
+    const bh = BOARD.h + RIM_SHOW * 2;
+    const whole = Math.max(0.1, turned ? Math.min(width / bh, (height - UPRIGHT_HUD * 2) / bw) : Math.min(width / bw, (height - LANDSCAPE_HUD) / bh));
+    const small = wantsFollow(width, height);
+    const zoom = small ? followZoom(whole, this.world.snake.width, width, height, turned) : whole;
+    const cam = this.cameras.main.setZoom(DPR * zoom).setRotation(turned ? Math.PI / 2 : 0);
+    if (small) {
+      const view = viewExtent(width, height, zoom, turned);
+      const state = followStart(this.world.snake.head, this.world.snake.heading, view);
+      this.follow = { view, state };
+      cam.centerOn(state.centre.x, state.centre.y);
+    } else {
+      this.follow = null;
+      cam.centerOn(BOARD.w / 2, BOARD.h / 2 - (turned ? 0 : LANDSCAPE_HUD / 2 / zoom));
+    }
     this.fx.turn = turned ? Math.PI / 2 : 0;
     // Words on the board are sized in board px: lift them where the board is drawn small.
     this.fx.textScale = Phaser.Math.Clamp(0.85 / zoom, 1, 1.7);
+  }
+
+  /** True while the phone camera follows the head (so only part of the board shows). */
+  get following(): boolean {
+    return this.follow !== null;
+  }
+
+  /** What could hurt the snake, on the board or about to come onto it: for the HUD's marks at the screen's edge. */
+  threats(): readonly Pick<Enemy, 'x' | 'y' | 'kind'>[] {
+    const w = this.world;
+    return [...w.enemies, ...(w.boss ? [w.boss] : [])].filter((e) => !e.away && !('beaten' in e && e.beaten));
+  }
+
+  /** The phone camera eases after the head. */
+  private followHead(dt: number): void {
+    const f = this.follow;
+    if (!f) return;
+    const s = this.world.snake;
+    f.state = followStep(f.state, s.head, s.heading, dt, f.view);
+    this.cameras.main.centerOn(f.state.centre.x, f.state.centre.y);
   }
 
   private levelRef(): { level: string; n: number; name: string } {
@@ -212,12 +252,14 @@ export class GameScene extends Phaser.Scene {
   update(time: number, delta: number): void {
     const dt = Math.min(delta / 1000, MAX_DT);
     const w = this.world;
+    if (this.follow) this.input2.track();
     this.input2.arrived(w.snake.head);
     const events = w.step(this.input2.read(), dt);
     this.coach.observe(events, dt);
     for (const e of events) this.react(e);
     this.critters.update(w, time);
     this.snakeView.update(time, dt);
+    this.followHead(dt);
     for (const r of this.rivals) {
       r.view.setVisible(!r.rival.away);
       if (!r.rival.away) r.view.update(time, dt);

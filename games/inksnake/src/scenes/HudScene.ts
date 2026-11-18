@@ -5,6 +5,7 @@ import { goalNotes } from './hud/goalNotes';
 import type { GameScene } from './GameScene';
 import { DPR, screenScene, screenSize, toView, uiScaleOf, viewSize } from './hidpi';
 import { HintNote } from './hud/hintNote';
+import { EdgeMarks } from './hud/edgeMarks';
 import { LevelTag } from './hud/levelTag';
 import { Meter, METER_H, METER_W } from './hud/meter';
 import { PauseCard } from './hud/pauseCard';
@@ -34,6 +35,7 @@ export class HudScene extends Phaser.Scene {
   private pauseCard: PauseCard | null = null;
   private abilityButton: AbilityButton | null = null;
   private stick!: ThumbStick;
+  private marks!: EdgeMarks;
 
   constructor() {
     super('Hud');
@@ -49,6 +51,7 @@ export class HudScene extends Phaser.Scene {
     const game = this.game2();
     // First, so it draws under the rest.
     this.stick = new ThumbStick(this);
+    this.marks = new EdgeMarks(this);
     this.tag = new LevelTag(this, game.daily ? `Hunt · ${game.level.name}` : `${this.levelNumber()} · ${game.level.name}`, game.level.par);
     this.meter = new Meter(this, game.level.snake, game.world.maxLives);
     this.hint = new HintNote(this);
@@ -173,6 +176,7 @@ export class HudScene extends Phaser.Scene {
     const w = game.world;
     if (!w) return;
     this.fadeUnderSnake(game, delta / 1000);
+    this.marks.update(this, game, this.plan.k, this.plan.upright, time, this.pauseCard !== null);
     this.meter.update(w.score, w.progress, w.lives, time);
     const left = w.timeLeft;
     this.tag.update(w.elapsed, left !== null && left < 10, goalNotes(w));
