@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { christmasEve, sampleOn, winterFarmIce } from '../dev/daily/samples';
 import { addToAlbum, parseAlbum } from '../src/daily/album';
 import { checkFits, DailyClient } from '../src/daily/client';
-import { countdown, longDate, monthGrid, msToMidnight } from '../src/daily/dates';
+import { countdown, longDate, monthGrid, msToMidnight, msUntil } from '../src/daily/dates';
 import { eventTeaser, goalLine, placeName, standingLine, winterLine } from '../src/daily/text';
 import { SNAKES } from '../src/logic/species';
 import { SNAKE_FACTS } from '../src/daily/snakeFacts';
@@ -102,6 +102,9 @@ describe('the cards\' words', () => {
     expect(longDate('2026-12-24')).toBe('Thursday, December 24');
     expect(countdown(3_723_000)).toBe('1:02:03');
     expect(msToMidnight(new Date(2026, 11, 24, 23, 0, 0))).toBe(3_600_000);
+    // The first hunt's countdown: to the player's own midnight that day, never below zero.
+    expect(msUntil('2026-11-19', new Date(2026, 10, 18, 21, 30, 0))).toBe(9_000_000);
+    expect(msUntil('2026-11-19', new Date(2026, 10, 19, 0, 0, 1))).toBe(0);
     const grid = monthGrid(2026, 11);
     expect(grid[0]!.slice(0, 2)).toEqual([null, '2026-12-01']);
     expect(grid.flat().filter(Boolean)).toHaveLength(31);

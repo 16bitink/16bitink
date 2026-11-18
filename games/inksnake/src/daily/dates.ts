@@ -31,6 +31,11 @@ export function msToMidnight(now: Date): number {
   return Math.max(0, next.getTime() - now.getTime());
 }
 
+/** Milliseconds from `now` to the start (local midnight) of `date`, YYYY-MM-DD. */
+export function msUntil(date: string, now: Date): number {
+  return Math.max(0, parse(date).getTime() - now.getTime());
+}
+
 /** "5:04:09". */
 export function countdown(ms: number): string {
   const s = Math.floor(ms / 1000);

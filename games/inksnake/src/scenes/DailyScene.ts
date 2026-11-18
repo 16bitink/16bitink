@@ -6,12 +6,14 @@ import { stampReached } from '../daily/milestones';
 import { commitProgress } from '../logic/accountSave';
 import { loadProgress } from '../logic/save';
 import { DailyClient, type DailyOutcome, type DailyStart } from '../daily/client';
+import { FIRST_HUNT } from '../daily/dates';
 import { getHost, getSound, trackOffer } from '../host';
 import { albumCard } from './daily/albumCard';
 import { calendarCard } from './daily/calendarCard';
 import { CardBuilder, SOFT_INK } from './daily/cardKit';
 import { endCard } from './daily/endCard';
 import { introCard } from './daily/introCard';
+import { soonCard } from './daily/soonCard';
 import { screenScene, screenSize, viewSize } from './hidpi';
 import { inkText } from './ui';
 import { uprightScreen } from './uiLayout';
@@ -95,6 +97,14 @@ export class DailyScene extends Phaser.Scene {
 
   /** The card before a hunt (or why there isn't one yet). */
   private async intro(date: string): Promise<void> {
+    // Before the first hunt there's nothing to load: say when it starts instead of an error.
+    if (date < FIRST_HUNT) {
+      this.show(soonCard(this, FIRST_HUNT, {
+        open: () => this.go({ mode: 'intro', date: this.client.today() }),
+        menu: () => this.menu(),
+      }));
+      return;
+    }
     const note = this.wait('Finding the trail…');
     try {
       const start = await this.client.start(date);
@@ -110,7 +120,7 @@ export class DailyScene extends Phaser.Scene {
       console.error(`[inksnake] could not load the daily for ${date}`, err);
       if (!this.scene.isActive()) return;
       const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
-      note.setText(offline ? "No connection: today's hunt needs one to start.\nTap to try again." : "Today's hunt isn't ready yet.\nTap to try again.").setAlign('center');
+      note.setText(offline ? "No connection: today's hunt needs one to start.\nTap to try again." : "Today's hunt is still on its way.\nTap to try again.").setAlign('center');
       note.setInteractive({ useHandCursor: true }).once('pointerup', () => this.go({ mode: 'intro', date }));
     }
   }
