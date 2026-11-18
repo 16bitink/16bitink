@@ -9,8 +9,9 @@ import { GOLDEN } from './params';
  * whole at the start, runners before hoppers (a mouse on the farm).
  */
 export function goldenKind(level: LevelDef): PreyKind {
-  const gape = gapeOf(SNAKE_SPECS[level.snake].width, SNAKE_SPECS[level.snake]);
-  const fits = level.prey.map((p) => p.kind).filter((k) => preySpec(k).gait !== 'still' && preySpec(k).size <= gape);
+  const spec = SNAKE_SPECS[level.snake];
+  const gape = gapeOf(spec.width, spec);
+  const fits = level.prey.map((p) => p.kind).filter((k) => preySpec(k).gait !== 'still' && preySpec(k).size <= gape && (!spec.diet || spec.diet.includes(k)));
   // Runners first (a hop's speed is its leap's, not its run's).
   const runners = fits.filter((k) => preySpec(k).gait === 'scurry');
   const kinds = runners.length ? runners : fits;

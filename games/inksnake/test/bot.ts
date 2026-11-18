@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
 import { Crow, Hen, Tomcat } from '../src/logic/enemies/index';
 import { Diver } from '../src/logic/enemies/diver';
+import { RivalSnake } from '../src/logic/enemies/rival';
 import type { BotHook } from './bots/types';
 
 /** Each chapter's bot hook, by place (test/bots/<place>.ts). */
@@ -46,6 +47,8 @@ export function botInput(w: World): SnakeInput {
     if ((e instanceof Crow || e instanceof Hen) && !e.away && e.alt < 0.3 && dist(e, h) < 140) return chase(w, e, 60);
     if (e instanceof Diver && e.mode === 'ground' && dist(e, h) < 120) return chase(w, e, 60);
   }
+  const treat = wantedTreat(w);
+  if (treat) return { toward: clear(w, treat), face: null, strike: false };
   const target = pickPrey(w);
   if (!target) return { toward: clear(w, pt(BOARD.w / 2, BOARD.h / 2)), face: null, strike: false };
   const spec = preySpec(target.kind);
@@ -67,9 +70,23 @@ function chase(w: World, e: Pt, reach: number): SnakeInput {
   return { toward: clear(w, e), face: null, strike: dist(h, e) < reach && ahead && free(w, w.snake.heading, 90) };
 }
 
-/** Where to run from danger, if any: away from a locked hawk's ring or across a crouching cat's lane. */
+/** A daily's feast on its treats: the nearest treat, while more are wanted. */
+function wantedTreat(w: World): Pt | null {
+  const g = w.level.goal;
+  const treats = w.daily?.treats;
+  if (!treats || g?.kind !== 'feast' || g.food !== treats.kind || w.feasted >= g.count) return null;
+  const h = w.snake.head;
+  return treats.list.reduce<Pt | null>((best, t) => (!best || dist(t, h) < dist(best, h) ? t : best), null);
+}
+
+/** Where to run from danger, if any: away from a locked hawk's ring, across a crouching cat's lane, or from a bigger rival's head. */
 function dodge(w: World): Pt | null {
   const h = w.snake.head;
+  for (const e of w.enemies) {
+    if (!(e instanceof RivalSnake) || e.away || e.snake.width <= w.snake.width * 1.02 || dist(e.snake.head, h) > 90) continue;
+    const a = Math.atan2(h.y - e.snake.head.y, h.x - e.snake.head.x);
+    return pt(h.x + Math.cos(a) * 200, h.y + Math.sin(a) * 200);
+  }
   for (const e of w.enemies) {
     if (e instanceof Diver && e.ring && dist(h, e.ring) < 110) {
       const a = Math.atan2(h.y - e.ring.y, h.x - e.ring.x);
@@ -93,7 +110,7 @@ function pickPrey(w: World): Prey | null {
   const list = w.prey.filter((p) => p.mode !== 'caught' && p.mode !== 'appear' && preySpec(p.kind).size <= s.coilMax && (s.spec.big === 'coil' || preySpec(p.kind).size <= s.gape));
   // A meal to coil needs room round it, and a body long enough to go round.
   const coilable = (p: Prey): boolean => s.length > 280 && roomy(w, p);
-  const score = (p: Prey): number => dist(p, s.head) - (wantEggs && p.marked ? 500 : 0) + (preySpec(p.kind).size > s.gape ? (coilable(p) ? -60 : 1e6) : 0);
+  const score = (p: Prey): number => dist(p, s.head) - (wantEggs && p.marked ? 500 : 0) - (p.gold === 'goal' ? 400 : p.gold === 'rush' ? 150 : 0) + (preySpec(p.kind).size > s.gape ? (coilable(p) ? -60 : 1e6) : 0);
   return list.reduce<Prey | null>((best, p) => (!best || score(p) < score(best) ? p : best), null);
 }
 
