@@ -131,6 +131,10 @@ The corn snake: orange with red saddles edged in black, and a black-and-white ch
 | 9 | The Barn at Night | Grow | Lights out |
 | 10 | The Old Tomcat | Boss | The farm cat stalks you |
 
+## Daily levels
+
+Today's Hunt is a free daily level, the same for everyone. Every day sets a new season, place, snake, rule, goal and layout, and events bring their own snakes. See [inksnake-daily.md](inksnake-daily.md), and [daily-playbook.md](daily-playbook.md) for the rules every game's daily shares.
+
 ## Controls
 
 - **Pointer / touch:** the head turns towards your finger or the mouse. Tap, click, or Space to strike (a tap on touch; a click with the mouse).
