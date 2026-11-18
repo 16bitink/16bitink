@@ -18,6 +18,10 @@ const GLINT_SIZE = 18;
 const REVEAL_MS = 220;
 /** The unlock moment: the key flies to its gate, turns in the lock, the door slides up. */
 const KEY_FLY_MS = 420;
+const KEY_HALO_PAD = 9;
+const KEY_HALO_TINT = 0xe2b04a;
+const KEY_GLINT_EVERY_MS = 2400;
+const KEY_GLINT_MS = 700;
 const KEY_TURN_MS = 200;
 const DOOR_MS = 320;
 const KEY_FLY_W = 60;
@@ -30,6 +34,8 @@ export class BricksView {
   private readonly levers: number[] = [];
   /** Hidden bricks not yet revealed, each with its glint. */
   private readonly hidden = new Map<number, Phaser.GameObjects.Image>();
+  /** Key bricks are small on a phone: a soft gold halo pulses behind each every couple of seconds. */
+  private readonly keyGlints = new Map<number, Phaser.GameObjects.Ellipse>();
   private clockMs = 0;
   private readonly pairs: ReadonlyMap<string, number>;
   /** Gates in their unlock moment: the sim has opened them, the door is still swinging. */
@@ -39,6 +45,11 @@ export class BricksView {
     const tide = (level.goal ?? 'clear') === 'tide';
     this.pairs = lockPairs(level.bricks);
     level.bricks.forEach((b, i) => {
+      if (b.kind === 'key' && !b.hidden) {
+        const halo = scene.add.ellipse((b.x + b.w / 2) * CELL, (b.y + b.h / 2) * CELL, b.w * CELL + KEY_HALO_PAD * 2, b.h * CELL + KEY_HALO_PAD * 2, KEY_HALO_TINT).setAlpha(0);
+        layer.add(halo);
+        this.keyGlints.set(i, halo);
+      }
       const key = brickKey(scene, brickTexture(b, i, b.hp ?? 1, b.hp ?? 1, false, false, this.pairs), b.w, b.h);
       const img = scene.add.image(b.x * CELL, b.y * CELL, key).setOrigin(0, 0).setDisplaySize(b.w * CELL, b.h * CELL);
       if (b.tint !== undefined) img.setTint(PICTURE_TINTS[b.tint % PICTURE_TINTS.length]!);
@@ -131,6 +142,8 @@ export class BricksView {
     this.shown[i] = false;
     this.images[i]?.setVisible(false);
     this.hidden.get(i)?.setVisible(false);
+    this.keyGlints.get(i)?.destroy();
+    this.keyGlints.delete(i);
   }
 
   /** The crumble: every brick left shakes before it goes. */
@@ -189,6 +202,12 @@ export class BricksView {
       const on = t < GLINT_MS;
       glint.setPosition(img.x + img.displayWidth * (0.3 + ((i * 37) % 40) / 100), img.y + img.displayHeight / 2);
       glint.setAlpha(on ? Math.sin((t / GLINT_MS) * Math.PI) * 0.55 : 0);
+    }
+    for (const [i, halo] of this.keyGlints) {
+      const img = this.images[i]!;
+      const t = (this.clockMs + i * 613) % KEY_GLINT_EVERY_MS;
+      const k = t < KEY_GLINT_MS ? Math.sin((t / KEY_GLINT_MS) * Math.PI) : 0;
+      halo.setPosition(img.x + img.displayWidth / 2, img.y + img.displayHeight / 2).setScale(1 + 0.25 * k).setAlpha(0.55 * k);
     }
   }
 }
