@@ -23,6 +23,9 @@ export const POWDER_ICE: LevelDef = {
   chapter: 2,
   layout: 'fuse',
   par: 105,
+  goal: 'stones',
+  stones: 4,
+  need: 0.6,
   tip: 'Light the first keg and the blasts run down the line.',
-  bricks: [...WALL, ...FUSE, ...BLOCK, ...TEASERS],
+  bricks: [...WALL, ...FUSE, ...BLOCK],
 };

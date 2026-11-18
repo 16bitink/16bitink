@@ -225,3 +225,14 @@ Round 4 adds, on top of round 3 below: every day has a **goal** (clear most days
 - The novice target (≥ 90% on levels 1–3) is about length: every extra minute of play is ~25 more returns, each a 1.5% chance of a lost stone.
 - Side windows are harder to hit than floor holes of the same width: give them a row more.
 - Small stone pockets (funnel steps, posts) count as **inside**: a stone brushing one fires the break-in with no payoff and the cascade reads 0%. Keep stone in long runs.
+
+## Gotchas (learned rebuilding Levels 3, 5, 6, 9 as open and layers, 2026-11-18)
+
+- **Launch screen: let the generator place it.** Run `screenLaunch(level, [], LOW_SCREEN_ROWS)` (`src/gen/screen.ts`) on the level without screens and copy the planks it adds (row 50, cheap). Hand screens either missed the bank shot off the wall or blocked other spots' shots (aim 0.5–1.4%).
+- **Gap width sets the skilled break-in.** A 3-wide floor gap ~20 rows above the raft is a sure shot for the skilled bot (in at 2–4 s). Use 2-wide gaps, or raise the floors (L9's bottom floor at row 34). A driftwood plug under a gap kills the aim window (2.4% → 0.2%).
+- **Stepped armour:** one raised plank between two lower ones leaves a 1-row notch the lab counts as inside, so the break-in fires with 0% cascade. Raise planks in pairs (every notch 5+ cells wide) and check the `:` cells on the lab board.
+- **3-hit armour drought** is the chew phase: wider planks (4–6 cells) and side teasers fix it. Bumpers right under the planks made it worse (12 → 14.5 s); bumpers go lower, in the lanes where returns fall.
+- **Novice clears on open levels are a cliff** set by the 360 s limit: on L6 three driftwood rows in the payload gave 100%, four 87%, six 50%. Change one row at a time and confirm at 30 runs.
+- **Rescue and pearls:** the bots dig the shortest way to the goal, often along the empty ceiling rows; anything off that path doesn't change the time. To make a rescue harder, block the approach along the ceiling, not the cage's underside. Multipliers in the corridor bands set the time most (an x3 every 6th cell gave 85 stones and an 11 s finish): put x3 only over the gaps.
+- **Replay pins:** `test/replay.test.ts` pins old levels' fingerprints. A rebuilt level is a new level: remove its pins and say so in the header; never touch the thresholds or other pins.
+- **Tips** are one line of at most ~56 characters (longer ones run off a 390 px phone).
