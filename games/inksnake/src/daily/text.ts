@@ -1,4 +1,4 @@
-import { addDays, EVENTS, nextEvent } from '@16bitink/game-sdk';
+import { addDays, EVENTS, nextEvent, type DailyStanding } from '@16bitink/game-sdk';
 import { CHAPTER_NAMES } from '../level/levels';
 import { TREAT_NAMES, isTreatKind } from '../level/daily';
 import { PLACES, type LevelDef, type Place } from '../level/types';
@@ -41,4 +41,14 @@ export function eventTeaser(date: string): string | null {
   const snake = EVENT_SNAKE[next.id];
   const when = next.inDays === 0 ? 'tomorrow' : `in ${next.inDays + 1} days`;
   return `${EVENTS[next.id].name} Hunt ${when}${snake ? `: the ${snakeName(snake)}` : ''}`;
+}
+
+/** "Faster than 72% of today's winners", from the host's untrusted numbers. */
+export function standingLine(s: DailyStanding | null | undefined, won: boolean, isToday: boolean): string {
+  if (s === undefined) return "Comparing with today's hunters…";
+  if (s === null) return 'Saved on this device. Standings need a connection.';
+  const players = `${s.players} ${s.players === 1 ? 'hunter' : 'hunters'} so far`;
+  const pct = s.clearBetterThan;
+  if (!won || pct === undefined || !Number.isFinite(pct)) return players;
+  return `Faster than ${Math.min(100, Math.max(0, Math.round(pct)))}% of ${isToday ? "today's" : "that day's"} winners\n${players}`;
 }

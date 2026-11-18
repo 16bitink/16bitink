@@ -3,7 +3,7 @@ import type Phaser from 'phaser';
 import { RED } from '../../art/palette';
 import { MILESTONES, type DailyOutcome, type DailyStart } from '../../daily/client';
 import { countdown, longDate, msToMidnight } from '../../daily/dates';
-import { chapterNumber, eventTeaser, placeName } from '../../daily/text';
+import { chapterNumber, eventTeaser, placeName, standingLine } from '../../daily/text';
 import { placeOf } from '../../level/levels';
 import { ruleLine } from '../../level/daily';
 import { HURTS } from '../../logic/chapters/index';
@@ -35,16 +35,6 @@ export interface EndCard {
   standing(s: DailyStanding | null): void;
   days(n: number, before: number): void;
   note(s: string): void;
-}
-
-/** "Faster than 72% of today's winners", from the host's untrusted numbers. */
-export function standingLine(s: DailyStanding | null | undefined, won: boolean, isToday: boolean): string {
-  if (s === undefined) return "Comparing with today's hunters…";
-  if (s === null) return 'Saved on this device. Standings need a connection.';
-  const players = `${s.players} ${s.players === 1 ? 'hunter' : 'hunters'} so far`;
-  const pct = s.clearBetterThan;
-  if (!won || pct === undefined || !Number.isFinite(pct)) return players;
-  return `Faster than ${Math.min(100, Math.max(0, Math.round(pct)))}% of ${isToday ? "today's" : "that day's"} winners\n${players}`;
 }
 
 function daysLine(n: number, before: number): string {
