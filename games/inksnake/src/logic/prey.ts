@@ -1,5 +1,6 @@
 import { CHAPTER_PREY } from './chapters/index';
 import type { PreyKind, PreySpec } from './preyTypes';
+import { isTreatKind, TREAT_NAMES } from '../level/daily';
 
 export * from './preyTypes';
 export { freeSpot, stepPrey } from './preyMoves';
@@ -40,6 +41,12 @@ export function isPreyKind(kind: unknown): kind is PreyKind {
 /** A prey kind's spec (a mouse's, for an unknown kind: validated levels never have one). */
 export function preySpec(kind: PreyKind): PreySpec {
   return allPrey()[kind] ?? FARM_PREY.mouse!;
+}
+
+/** A feast's food named, one or many: a prey kind, or a daily's treat. */
+export function foodName(kind: PreyKind, many: boolean): string {
+  if (isTreatKind(kind)) return many ? TREAT_NAMES[kind].many : TREAT_NAMES[kind].one;
+  return many ? preyPlural(kind) : preySpec(kind).name;
 }
 
 /** The plural of a prey kind's name. */

@@ -47,6 +47,14 @@ export class BootScene extends Phaser.Scene {
     if (getHost(this).unlocked) loading?.progress(DRAWN_AT, 'fetching the full game…');
     await Promise.all([loadPaidChapters(this), pullFromAccount(getHost(this))]);
     // Read after the account's progress is pulled in, so a player new to this device but not to the game gets the map.
+    // A challenge link opens straight onto its day's hunt.
+    const challenge = getHost(this).daily?.challenge;
+    if (challenge) {
+      loading?.progress(FETCHED_AT, 'picking up the trail…');
+      if (loading) readyOnFirstFrame(this, 'Daily', loading);
+      this.scene.start('Daily', { mode: 'intro', date: challenge.date });
+      return;
+    }
     const first = firstScreen(loadProgress(getHost(this).storage));
     loading?.progress(FETCHED_AT, first.scene === 'Game' ? 'warming up in the sun…' : 'unfolding the map…');
     if (loading) readyOnFirstFrame(this, first.scene, loading);

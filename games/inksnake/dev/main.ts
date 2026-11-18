@@ -1,4 +1,5 @@
 import { mount } from '../src/index';
+import { devDailyHost } from './daily/host';
 
 // Set by vite.config.ts from DEV_UNLOCK / DEV_ALL_LEVELS when the dev server starts.
 declare const __DEV_UNLOCK__: boolean;
@@ -18,6 +19,7 @@ const handle = mount(parent, {
   onSignIn: () => alert('Google sign-in would open here'),
   price: '$4.99',
   onExit: () => alert('Exit to catalog'),
+  daily: devDailyHost(window.localStorage, location.search, __DEV_UNLOCK__),
 });
 // Exposed for automated smoke tests only.
 (window as unknown as { __game: unknown }).__game = handle.phaser;

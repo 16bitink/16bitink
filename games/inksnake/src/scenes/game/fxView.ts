@@ -200,7 +200,8 @@ export class FxView {
   }
 
   /** A hand-lettered word that pops up and floats away. */
-  private word(text: string, x: number, y: number, size: number, color: string, alpha = 1): void {
+  /** A hand-lettered word popping up over the board. */
+  word(text: string, x: number, y: number, size: number, color: string, alpha = 1): void {
     const t = this.scene.add.text(x, y, text, {
       fontFamily: HAND, fontSize: `${size}px`, color, stroke: PAPER_STROKE, strokeThickness: 5, padding: { x: 4, y: 4 },
     }).setOrigin(0.5).setDepth(DEPTH.words).setRotation(-this.turn).setScale(0.6 * this.textScale).setAlpha(alpha);

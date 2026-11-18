@@ -5,6 +5,9 @@ import { BOARD, type LevelDef, type Place } from '../level/types';
 import { BOSS_ENTRIES } from '../logic/chapters/index';
 import type { SnakeId } from '../logic/species';
 import { CRITTER_ART, type CritterKind } from './critters/index';
+import { paintDailyCover, paintDailyGround, paintDailySolid } from './daily/decor';
+import { treatArt, treatKey } from './daily/treats';
+import type { TreatKind } from '../level/daily';
 import { makeDraw } from './kit';
 import { ART_RES, BOIL, PAPER } from './palette';
 import { makeCanvas, releaseScratch, shrink } from './pen';
@@ -103,6 +106,12 @@ export function snakeJobs(scene: Phaser.Scene, id: SnakeId | string): SliceJob[]
   return jobs;
 }
 
+/** A treat's sprite in every boil frame (baked under its critter key, see treatKey). */
+export function treatJobs(scene: Phaser.Scene, kind: TreatKind): SliceJob[] {
+  const art = treatArt(kind);
+  return Array.from({ length: BOIL }, (_, f) => () => bakeSprite(scene, TEX.critter(treatKey(kind), 'still', f), art, 'still', f, seedOf(kind)));
+}
+
 /** The critters a level needs, by kind (bosses are baked when their level starts). */
 export function levelCritters(level: LevelDef): CritterKind[] {
   const kinds = new Set<CritterKind>(level.prey.map((p) => p.kind));
@@ -129,7 +138,8 @@ export function textureJobs(scene: Phaser.Scene): SliceJob[] {
 export function bakeForLevel(scene: Phaser.Scene, level: LevelDef): void {
   const kinds = levelCritters(level);
   // Rival snakes are drawn as snakes; everything else as sprites.
-  for (const job of [...snakeJobs(scene, level.snake), ...kinds.flatMap((k) => (isRivalArt(k) ? snakeJobs(scene, k) : critterJobs(scene, k)))]) job();
+  const treats = level.treats ? treatJobs(scene, level.treats.kind) : [];
+  for (const job of [...snakeJobs(scene, level.snake), ...kinds.flatMap((k) => (isRivalArt(k) ? snakeJobs(scene, k) : critterJobs(scene, k))), ...treats]) job();
   releaseScratch();
 }
 
@@ -176,8 +186,9 @@ export function bakeBoard(scene: Phaser.Scene, level: LevelDef, place: Place): s
   ctx.scale(ART_RES, ART_RES);
   const seed = seedOf(level.id);
   art.ground(makeDraw(ctx, 600 + seed, 0, 0), level);
+  paintDailyGround(makeDraw(ctx, 620 + seed, 0, 0), level, place);
   (level.nests ?? []).forEach((n, i) => art.nest(makeDraw(ctx, 640 + i, 0, 0), n));
-  (level.solids ?? []).forEach((s, i) => art.solid(makeDraw(ctx, 700 + i + seed, 0, 0), s));
+  (level.solids ?? []).forEach((s, i) => paintDailySolid(makeDraw(ctx, 700 + i + seed, 0, 0), s, level, place, art.solid));
   releaseScratch();
   addPainted(scene, key, canvas);
   return key;
@@ -191,7 +202,7 @@ export function bakeCovers(scene: Phaser.Scene, level: LevelDef, place: Place): 
   const art = placeArt(place);
   const { canvas, ctx } = makeCanvas(BOARD.w * ART_RES, BOARD.h * ART_RES);
   ctx.scale(ART_RES, ART_RES);
-  level.cover.forEach((c, i) => art.cover(makeDraw(ctx, 800 + i, 0, 0), c));
+  level.cover.forEach((c, i) => paintDailyCover(makeDraw(ctx, 800 + i, 0, 0), c, level, place, art.cover));
   releaseScratch();
   addPainted(scene, key, canvas);
   return key;

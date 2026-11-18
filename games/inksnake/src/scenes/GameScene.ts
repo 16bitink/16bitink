@@ -16,6 +16,8 @@ import { CrittersView } from './game/crittersView';
 import { FxView } from './game/fxView';
 import { GameInput } from './game/input';
 import { NightView } from './game/nightView';
+import { DailyView } from './game/dailyView';
+import { nightOf } from '../logic/daily/look';
 import { SnakeView } from './game/snakeView';
 import { RivalSnake } from '../logic/enemies/rival';
 import { SFX_IDS } from '../audio/recipes';
@@ -23,9 +25,13 @@ import { CHAPTER_VIEWS, type ChapterView } from '../art/chapters/index';
 import { DPR, viewSize } from './hidpi';
 import type { HudScene } from './HudScene';
 import type { ResultData } from './ResultScene';
+import type { DailyStart } from '../daily/client';
+import type { DailyData } from './DailyScene';
 
 export interface GameData {
   readonly levelId?: string;
+  /** A daily hunt: its level comes with it, and it never touches the campaign's progress. */
+  readonly daily?: DailyStart;
 }
 
 /** Longest frame the simulation takes in one step (tab switches, hitches). */
@@ -41,6 +47,8 @@ const TICK_FROM = 10;
 export class GameScene extends Phaser.Scene {
   world!: World;
   level!: LevelDef;
+  /** The daily being hunted, or null on a campaign level. */
+  daily: DailyStart | null = null;
   coach!: Coach;
   input2!: GameInput;
   private snakeView!: SnakeView;
@@ -49,6 +57,7 @@ export class GameScene extends Phaser.Scene {
   private critters!: CrittersView;
   private fx!: FxView;
   private night: NightView | null = null;
+  private dailyView: DailyView | null = null;
   private own: ChapterView | null = null;
   private covers: Phaser.GameObjects.Image | null = null;
   private over = false;
@@ -60,7 +69,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   create(data: GameData): void {
-    this.level = levelById(data?.levelId) ?? loadedLevels()[0]!;
+    this.daily = data?.daily ?? null;
+    this.level = this.daily?.level ?? levelById(data?.levelId) ?? loadedLevels()[0]!;
     this.world = new World(this.level);
     this.coach = new Coach(this.level.teach ?? [], twistTexts(this.level).map((t) => t.hint));
     this.over = false;
@@ -79,7 +89,9 @@ export class GameScene extends Phaser.Scene {
     this.snakeView = new SnakeView(this, this.world.snake);
     this.rivals = this.world.enemies.filter((e): e is RivalSnake => e instanceof RivalSnake).map((rival) => ({ rival, view: new SnakeView(this, rival.snake) }));
     this.fx = new FxView(this, this.world);
-    this.night = this.level.dark ? new NightView(this) : null;
+    const night = nightOf(this.level);
+    this.night = night ? new NightView(this, night) : null;
+    this.dailyView = this.world.daily || this.level.season || this.level.event ? new DailyView(this, this.world, this.fx) : null;
     this.own = CHAPTER_VIEWS[place]?.(this, this.world) ?? null;
     this.input2 = new GameInput(this, {
       toBoard: (p) => {
@@ -99,6 +111,7 @@ export class GameScene extends Phaser.Scene {
       for (const r of this.rivals) r.view.destroy();
       this.fx.destroy();
       this.night?.destroy();
+      this.dailyView?.destroy();
       this.own?.destroy();
     });
     this.scene.launch('Hud');
@@ -137,7 +150,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private levelRef(): { level: string; n: number; name: string } {
-    return { level: this.level.id, n: levelOrder().indexOf(this.level.id) + 1, name: this.level.name };
+    return { level: this.level.id, n: this.daily ? 0 : levelOrder().indexOf(this.level.id) + 1, name: this.level.name };
   }
 
   private seconds(): number {
@@ -193,7 +206,7 @@ export class GameScene extends Phaser.Scene {
 
   restart(): void {
     this.scene.stop('Hud');
-    this.scene.restart({ levelId: this.level.id });
+    this.scene.restart(this.daily ? { daily: this.daily } : { levelId: this.level.id });
   }
 
   update(time: number, delta: number): void {
@@ -210,7 +223,8 @@ export class GameScene extends Phaser.Scene {
       if (!r.rival.away) r.view.update(time, dt);
     }
     this.fx.update(time);
-    this.night?.update(w, time, dt);
+    this.dailyView?.update(time, dt);
+    this.night?.update(w, time, dt, this.dailyView?.nightLights(time));
     this.own?.update(w, time, dt);
     if (this.covers) {
       const want = w.snake.hidden ? COVER_SEE_THROUGH : 1;
@@ -235,6 +249,7 @@ export class GameScene extends Phaser.Scene {
     const sound = getSound(this);
     this.fx.react(e);
     this.night?.react(e);
+    this.dailyView?.react(e);
     const at = 'x' in e && 'y' in e ? { at: { x: e.x, y: e.y }, view: this.cameras.main.worldView } : {};
     if (e.type === 'eat') {
       this.snakeView.gulped();
@@ -264,9 +279,20 @@ export class GameScene extends Phaser.Scene {
         ...(won ? {} : { cause: w.lostBy }),
       });
     }
+    getSound(this)?.play(won ? 'win' : 'lose');
+    const daily = this.daily;
+    if (daily) {
+      // A daily's end card: the campaign's progress is left as it is.
+      const end: DailyData = { mode: 'end', start: daily, outcome: { won, seconds: w.elapsed, livesLost, ...(w.lostBy ? { lostBy: w.lostBy } : {}) } };
+      this.time.delayedCall(END_DELAY_MS, () => {
+        this.scene.stop('Hud');
+        this.scene.pause();
+        this.scene.launch('Daily', end);
+      });
+      return;
+    }
     const saved = loadProgress(host.storage);
     if (won) commitProgress(host, recordResult(saved, this.level.id, blots, w.elapsed));
-    getSound(this)?.play(won ? 'win' : 'lose');
     const result: ResultData = {
       levelId: this.level.id, won, time: w.elapsed, blots, livesLost, score: w.score,
       length: Math.round(w.snake.length), bestCoil: w.bestCoil, eaten: Object.values(w.eaten).reduce<number>((a, b) => a + (b ?? 0), 0),

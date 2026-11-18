@@ -15,7 +15,7 @@ export type SnakeId = (typeof SNAKES)[number];
  * and its drawings too until its own are painted (art/snakes/index.ts).
  */
 export const EVENT_RELATIVE: Readonly<Record<EventSnakeId, HomeSnakeId>> = {
-  candycane: 'corn', rainbowboa: 'anaconda', goldentree: 'flying', rosyboa: 'corn',
+  candycane: 'corn', rainbowboa: 'corn', goldentree: 'flying', rosyboa: 'corn',
   greenpython: 'flying', earthsnake: 'hognose', yellowsea: 'krait', blackhognose: 'hognose',
 };
 

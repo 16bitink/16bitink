@@ -15,6 +15,9 @@ const LIFT = { x: -26, y: -44 } as const;
 /** How much bigger a flier looks high up. */
 const LIFT_SCALE = 0.22;
 const DEPTH = { ground: 2.5, prey: 2.6, air: 6, shadow: 2.4 } as const;
+/** Golden prey's wash (a daily's gold rush or golden goal). */
+const GOLD_TINT = 0xffc63a;
+
 /** How big each kind's shadow is, as a share of its frame (fliers cast a soft round one under them). */
 const SHADOW_SIZE: Partial<Record<CritterKind, number>> = { crow: 0.3, hawk: 0.36, hen: 0.36, tomcat: 0.42, rat: 0.32, mouse: 0.3 };
 const RED = 0xb3322b;
@@ -87,6 +90,9 @@ export class CrittersView {
       .setScale((pop * (1 + lift * LIFT_SCALE)) / art.res).setAlpha(p.mode === 'appear' ? p.shown : p.mode === 'hidden' ? 0 : 1).setDepth(lift > 0.08 ? DEPTH.air : DEPTH.prey);
     // A bitten one staggers, then lies asleep with a little z.
     if (p.mode === 'sleep') s.sprite.setRotation(p.heading + Math.sin(time / 600) * 0.05);
+    // Golden prey (dailies) is washed in gold.
+    if (p.gold) s.sprite.setTint(GOLD_TINT);
+    else s.sprite.clearTint();
     this.shadowUnder(s, p.x, p.y, 0, art.frame, p.mode === 'appear' ? p.shown : 1);
     if (p.marked) {
       const r = preySpec(p.kind).size * 0.95 + 6;

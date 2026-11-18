@@ -16,6 +16,23 @@ const R = { head: 220, flash: 150, moon: 140 } as const;
 const MOONBEAMS = 2;
 /** A meal lights the barn round it for this long, s. */
 const FLASH_FOR = 0.6;
+/** Fog (a daily's rule): a pale mist instead of the dark, a little thinner. */
+const FOG_HEX = 0xdfe4ea;
+const FOG_DENSITY = 0.8;
+
+/** A light some other layer adds to the night (fairy lights, fireworks), board px. */
+export interface NightLight {
+  readonly x: number;
+  readonly y: number;
+  readonly r: number;
+  readonly alpha: number;
+}
+
+export interface NightOpts {
+  /** The ring of sight round the head, as a share of the night's (fog sees further). */
+  readonly sight?: number;
+  readonly fog?: boolean;
+}
 
 /**
  * Night (levels with `dark`): a layer of dark over the board with a soft
@@ -26,7 +43,12 @@ export class NightView {
   private readonly rt: Phaser.GameObjects.RenderTexture;
   private readonly flashes: { x: number; y: number; age: number }[] = [];
 
-  constructor(scene: Phaser.Scene) {
+  private readonly sight: number;
+  private readonly fog: boolean;
+
+  constructor(scene: Phaser.Scene, opts: NightOpts = {}) {
+    this.sight = opts.sight ?? 1;
+    this.fog = opts.fog ?? false;
     makeLight(scene);
     this.rt = scene.add.renderTexture(-BLEED, -BLEED, (BOARD.w + BLEED * 2) * RES, (BOARD.h + BLEED * 2) * RES).setOrigin(0).setScale(1 / RES).setDepth(6.8);
   }
@@ -35,19 +57,20 @@ export class NightView {
     if (e.type === 'eat') this.flashes.push({ x: e.x, y: e.y, age: 0 });
   }
 
-  update(world: World, time: number, dt: number): void {
+  update(world: World, time: number, dt: number, extra: readonly NightLight[] = []): void {
     for (const f of this.flashes) f.age += dt;
     while (this.flashes.length && this.flashes[0]!.age > FLASH_FOR) this.flashes.shift();
     const rt = this.rt;
     rt.clear();
-    rt.fill(NIGHT_HEX, DARKNESS);
+    rt.fill(this.fog ? FOG_HEX : NIGHT_HEX, this.fog ? FOG_DENSITY : DARKNESS);
     const light = (x: number, y: number, r: number, alpha = 1): void => {
       rt.stamp(LIGHT_KEY, undefined, (x + BLEED) * RES, (y + BLEED) * RES, { scale: (r * RES) / LIGHT_R, alpha, blendMode: Phaser.BlendModes.ERASE });
     };
     const h = world.snake.head;
-    light(h.x, h.y, R.head * (1 + Math.sin(time / 600) * 0.02));
+    light(h.x, h.y, R.head * this.sight * (1 + Math.sin(time / 600) * 0.02));
     for (const f of this.flashes) light(f.x, f.y, R.flash, 1 - f.age / FLASH_FOR);
-    for (let i = 0; i < MOONBEAMS; i++) {
+    for (const l of extra) light(l.x, l.y, l.r, l.alpha);
+    for (let i = 0; i < (this.fog ? 0 : MOONBEAMS); i++) {
       const t = time / 1000 / (38 + i * 15) + i * 2.1;
       light(BOARD.w * (0.5 + 0.4 * Math.sin(t * 1.3 + i)), BOARD.h * (0.5 + 0.36 * Math.cos(t + i * 1.7)), R.moon, 0.5);
     }

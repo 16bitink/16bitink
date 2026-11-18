@@ -15,6 +15,10 @@ import { MapView } from './map/mapView';
 import { buildNodes, type NodeHit } from './map/nodesView';
 import { mapStates, standInIds, type ChapterSlot } from './map/states';
 import { drawBlots, HAND_FONT, inkButton, inkText } from './ui';
+import { EVENTS } from '@16bitink/game-sdk';
+import { RULE_INFO } from '../level/daily';
+import { placeName, snakeName } from '../daily/text';
+import { dailyClient } from './DailyScene';
 
 const SOFT_INK = '#4a463e';
 const PENCIL = '#8a8578';
@@ -29,6 +33,8 @@ const FIT = { w: 760, h: 560 } as const;
 /** Where the snake last waited on the map this session, so a win can be walked. */
 const SNAKE_AT = 'mapSnakeAt';
 const TOP_BAR = 64;
+/** Room under the bar kept for the Today's Hunt button: presses there aren't on the map. */
+const HUNT_ROOM = 120;
 /** A resize lays the map out again only once the screen has settled this long. */
 const RESIZE_SETTLE_MS = 220;
 
@@ -109,7 +115,7 @@ export class MenuScene extends Phaser.Scene {
     for (const hit of nodes.hits) {
       hit.zone.on('pointerup', (p: Phaser.Input.Pointer) => {
         // The top bar covers the plan: a press on it isn't on the level under it.
-        if (p.y / DPR < TOP_BAR * uiScaleFor(screen.width, screen.height)) return;
+        if (p.y / DPR < (TOP_BAR + (host.daily ? HUNT_ROOM : 0)) * uiScaleFor(screen.width, screen.height)) return;
         this.tapNode(hit);
       });
     }
@@ -297,10 +303,41 @@ export class MenuScene extends Phaser.Scene {
       this.targetY = this.clampY(this.walker.position.y - 40);
     }, { width: 110, height: 46, size: 24 });
     this.uiLayer.add([sound, exit, this.homeButton]);
+    this.huntButton(w);
     const total = chapterTally(this.progress, loadedLevels().map((l) => l.id));
     const g = this.add.graphics();
     drawBlots(g, 26, h - 30, 1, 9, 1);
     this.uiLayer.add([g, this.add.text(44, h - 30, `${total.blots} / ${total.maxBlots}`, { fontFamily: HAND_FONT, fontSize: '24px', color: BLUE, stroke: '#fffaf0', strokeThickness: 5, padding: { x: 4, y: 4 } }).setOrigin(0, 0.5)]);
+  }
+
+  /**
+   * Today's Hunt, first thing under the bar: the day's place, snake and
+   * rule once the host has the level (it opens the card before the hunt).
+   */
+  private huntButton(w: number): void {
+    const client = dailyClient(this);
+    if (!client) return;
+    // Phones draw the map's interface small: the hunt's button is drawn bigger there, as wide as the screen allows.
+    const phone = screenSize(this).width < 600;
+    const bw = Math.min(w - 24, phone ? 640 : 420);
+    const bh = phone ? 100 : 72;
+    const y = TOP_BAR + 10 + bh / 2;
+    const open = (): void => {
+      if (this.card) return;
+      this.scene.start('Daily', { mode: 'intro', date: client.today() });
+    };
+    const button = inkButton(this, w / 2, y, "Today's Hunt", open, { width: bw, height: bh, size: phone ? 46 : 32, kind: 'leaf' });
+    const label = button.list[1] as Phaser.GameObjects.Text;
+    label.setY(-bh * 0.17);
+    const sub = inkText(this, 0, bh * 0.25, 'a new hunt every day', phone ? 28 : 19, '#fffaf0');
+    button.add(sub);
+    this.uiLayer.add(button);
+    void client.level(client.today()).then((level) => {
+      if (!this.scene.isActive() || !sub.active) return;
+      const bits = [placeName(placeOf(level)), snakeName(level.snake), ...(level.rule ? [RULE_INFO[level.rule].name] : [])];
+      sub.setText(bits.join(' · '));
+      if (level.event) label.setText(`${EVENTS[level.event].name} Hunt`);
+    }).catch((err: unknown) => console.warn('[inksnake] could not load today\'s hunt', err));
   }
 
   /** The caption follows the chapter in view; the Snake button shows when the snake is off screen. */

@@ -49,7 +49,7 @@ export class HudScene extends Phaser.Scene {
     const game = this.game2();
     // First, so it draws under the rest.
     this.stick = new ThumbStick(this);
-    this.tag = new LevelTag(this, `${this.levelNumber()} · ${game.level.name}`, game.level.par);
+    this.tag = new LevelTag(this, game.daily ? `Hunt · ${game.level.name}` : `${this.levelNumber()} · ${game.level.name}`, game.level.par);
     this.meter = new Meter(this, game.level.snake, game.world.maxLives);
     this.hint = new HintNote(this);
     this.pauseButton = roundButton(this, 0, 0, 'pause', () => this.togglePause());

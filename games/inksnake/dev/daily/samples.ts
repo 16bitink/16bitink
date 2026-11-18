@@ -52,11 +52,11 @@ export const reefRival: Sample = (date) => {
   };
 };
 
-/** The golden chase in the barrens: catch the golden toad three times. */
+/** The golden chase in the barrens: catch the golden frog three times. */
 export const barrensGolden: Sample = (date) => {
   const base = CHAPTER_2[0]!;
   return {
-    ...base, id: dailyId(date), name: 'The Golden Toad', place: 'barrens', season: 'autumn', rule: 'looseKnots',
+    ...base, id: dailyId(date), name: 'The Golden Frog', place: 'barrens', season: 'autumn', rule: 'looseKnots',
     goal: { kind: 'golden', count: 3 }, target: 360, par: 60, teach: [],
     cover: [...(base.cover ?? []), { look: 'blueberry', x: 300, y: 430, r: 50 }, { look: 'fern', x: 860, y: 300, r: 48 }],
     tomorrow: { place: 'heath', snake: 'adder', rule: 'fog' },
@@ -65,7 +65,7 @@ export const barrensGolden: Sample = (date) => {
 
 /** New Year's Eve: the rainbow boa at night, fireworks lighting the farm, confetti stars. */
 export const newYearsEve: Sample = (date) => {
-  const base = farm(8);
+  const base = farm(2);
   return {
     ...base, id: dailyId(date), name: "New Year's Eve", snake: 'rainbowboa', place: 'farm', season: 'winter', rule: 'night', event: 'newYearsEve', dark: true,
     prey: [{ kind: 'mouse', count: 4 }, { kind: 'rat', count: 1 }], target: 380, par: 60, goal: { kind: 'feast', food: 'confetti', count: 6 },

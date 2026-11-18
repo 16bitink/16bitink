@@ -8,6 +8,7 @@ import { GameScene } from './scenes/GameScene';
 import { HudScene } from './scenes/HudScene';
 import { MenuScene } from './scenes/MenuScene';
 import { ResultScene } from './scenes/ResultScene';
+import { DailyScene } from './scenes/DailyScene';
 import { DPR } from './scenes/hidpi';
 import { GAME_VERSION } from './version';
 
@@ -37,7 +38,7 @@ export function mount(parent: HTMLElement, host: GameHost): GameHandle & { reado
     },
     input: { activePointers: 3 },
     audio: { noAudio: true },
-    scene: [BootScene, MenuScene, GameScene, HudScene, ResultScene],
+    scene: [BootScene, MenuScene, GameScene, HudScene, ResultScene, DailyScene],
   });
   game.registry.set(REG.host, host);
   // Sound effects are synthesized by our own SoundBoard (audio/), as in InkGecko; Phaser's audio stays off.
