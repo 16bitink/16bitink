@@ -154,3 +154,70 @@ The flow is InkBrick's (`src/gen`, `npm run gen -- --from 2026-11-22 --days 60`,
 3. **Website** (in 2): one line in `daily.server.ts`, the slug and blurb in `data/dailies.ts`, and the package export `./daily`.
 4. **Later event snakes** (Sonnet, one per snake from the candy cane worked example): golden tree snake and rosy boa by January 15, the rest 30 days before their date.
 5. **Owner review:** the contact sheet, then a playtest.
+
+## Engine notes
+
+Built 2026-11-18 (build plan step 1). Numbers are board px and seconds, from `games/inksnake/src/logic/daily/params.ts`.
+
+### What the generator writes
+
+- **Fields:** everything in "Level fields (contract)", plus one more: `tomorrow: { place, snake, rule, event? }` for the end card's teaser (validated like the rest). Without it the teaser just says "A new hunt every day".
+- **Ids:** `daily-YYYY-MM-DD`, a real date. `DailyClient` refuses a level whose id isn't the requested date's.
+- **Data rules** are only labels to the engine: write their effect into the fields (`night` → `dark: true`, `oneLife` → `lives: 1`, and so on). **`fog` does not need `dark`:** the rule alone shows a pale mist with sight ×2.2. Leave `dark` unset on fog days.
+- **`rival`:** the rule alone adds one rival (no `enemies` entry needed). A `{ kind: 'rival' }` enemy is also registered, if you want two or a later `from`.
+- **Feast on treats:** `goal: { kind: 'feast', food: <treat kind>, count }` is valid only with `treats.kind` equal to `food`. Treats count towards `w.feasted`.
+- **Golden goal:** the quarry is chosen by the engine: the level's quickest *runner* (gait `scurry`) the snake can swallow at its start width (it keeps to the snake's diet), else the quickest hopper. Farm: mouse. Barrens' first board: frog. Savanna: weaver eggs (the egg-eater's diet). Put the place's fast runner in `prey`, and give it some cover to hide in.
+- **Solid look `present`:** painted as a wrapped present in any place (Christmas days). No snow lands on presents.
+- **`DailyPlay.shells`** is sent as 0 (the field is InkBrick's).
+
+### Rule parameters as built
+
+| Rule | As built |
+|---|---|
+| `lure` | Prey and treats within 90 px of the head drift towards it at 30 px/s (not birds in the air, frozen or sleeping prey) |
+| `looseKnots` | The head crossing the body never ties a knot |
+| `goldRush` | Every 4th prey to arrive (the level's start counts) is golden: growth ×3, points ×3, lives ×1.15 faster |
+| `ice` | Turn rate ×0.55; speed eases to its target with a 0.4 s time constant (a strike's lunge builds up instead of jumping) |
+| `blizzard` | A 40 px/s push on the head. The direction is random at the start, then turns by 90–270° every 8–12 s, eased in over 1.5 s. Snow streaks show the wind |
+| `fog` | The night layer, pale mist (0xdfe4ea at 0.8), sight ×2.2, no moonbeams |
+| `hotDay` | Snake speed ×1.25; every prey animal's step (and timers) runs ×1.25 |
+| `rival` | Arrives after 4 s from a board edge: the player's species, width ×0.9, speed ×0.75, length ×0.9 of the start length. It eats prey up to its gape and grows; heads meeting, the wider snake bites (cause `bitten`) |
+| Treats | 9 px pickup reach past the head's edge, +12 px growth, no lump, 5 points; back 1–2 s after one is taken, at least 150 px from the head |
+| Golden goal | One golden prey at a time, at least 260 px from the head. Fear radius ×1.5, lives ×1.2 faster; it runs for cover within 260 px (not towards the snake) and sits tight there until the head is within 70 px. The next one comes 1.4 s after a catch. The last catch showers sparkles along the body (`goldenDone`). The target length is still required |
+
+### The bot
+
+`test/bot.ts` keys its place hooks by `level.place` (campaign levels by their id prefix). It now goes for treats on a treat feast, prefers golden prey (−400 on its score; gold rush prey −150), and backs off a bigger rival's head (within 90 px). It ignores fog (it sees everything) and does nothing special for ice or wind.
+
+Measured on every place's level 1 with the rule added, 3 seeds, 300 s cap (`MEASURE=1 npx vitest run test/dailyMeasure.test.ts`), as wins/3 and mean win time:
+
+| place (golden quarry) | none | lure | looseKnots | goldRush | ice | blizzard | fog | hotDay | rival | golden ×3 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| farm (mouse) | 3/3 15s | 3/3 12s | 3/3 11s | 3/3 11s | 3/3 16s | 3/3 18s | 3/3 11s | 3/3 10s | 3/3 13s | 3/3 21s |
+| barrens (frog) | 3/3 14s | 3/3 14s | 3/3 11s | 3/3 10s | 3/3 14s | 3/3 18s | 3/3 11s | 3/3 12s | 3/3 15s | 3/3 23s |
+| dunes (side-lizard) | 3/3 28s | 3/3 32s | 3/3 46s | 3/3 31s | 3/3 43s | 3/3 79s | 3/3 46s | 3/3 37s | 3/3 35s | 3/3 66s |
+| savanna (weaver-egg) | 3/3 15s | 3/3 15s | 3/3 16s | 3/3 12s | **0/3** | 3/3 15s | 3/3 16s | 3/3 13s | 2/3 18s | 3/3 16s |
+| rainforest (gecko) | 3/3 24s | 2/3 16s | 3/3 29s | 2/3 14s | 3/3 36s | 3/3 23s | 3/3 28s | 3/3 21s | 3/3 26s | 3/3 51s |
+| reef (goby) | 3/3 19s | 3/3 17s | 3/3 16s | 3/3 11s | 3/3 35s | 3/3 15s | 2/3 17s | 3/3 13s | 3/3 23s | 3/3 86s |
+| mountains (agama) | 3/3 44s | 3/3 36s | 3/3 41s | 3/3 63s | 3/3 80s | 3/3 67s | 3/3 41s | 3/3 59s | 3/3 45s | 3/3 40s |
+| heath (common-lizard) | 3/3 45s | 3/3 27s | 3/3 35s | 3/3 22s | 3/3 42s | 3/3 119s | 3/3 32s | 3/3 30s | 3/3 31s | 3/3 45s |
+| jungle (skink) | 3/3 26s | 3/3 19s | 3/3 27s | 3/3 23s | 3/3 31s | 3/3 28s | 3/3 30s | 3/3 23s | 3/3 18s | 3/3 107s |
+| flooded (piranha) | 3/3 19s | 3/3 15s | 3/3 16s | 3/3 12s | 3/3 26s | 3/3 23s | 3/3 16s | 3/3 14s | 3/3 20s | 3/3 51s |
+
+What the bot can't play well: the **egg-eater on ice** (0/3; ice is winter-only, and the savanna isn't a winter place, but a winter guest egg-eater would fail), **blizzard** on the heath and the dunes (slow: 79–119 s), **golden** on boards without cover or with prey that hides in water (reef 86 s, jungle 107 s). Fog and hot day times are the bot's, not a player's: a player sees less in fog. Bot hooks for a place assume the place's own snake; a guest snake runs another snake's hook (check guests with the bot like any day). The bot ignores goldRush's extra growth beyond its preference.
+
+### Art looks
+
+| Place | `season: 'winter'` | Notes |
+|---|---|---|
+| farm, barrens, mountains, heath | Snow over the ground (thaw holes show the place's ground; water zones stay clear), drifts and sparkle, snow caps on solids, hoarfrost dusting on cover. Heath is frost (thinner) | Other places keep their campaign look in any season |
+| any | `rule: 'ice'`: a frozen pond over the open middle (glossy, cracked, dusted, a snow bank round it) | Drawn under the solids |
+| any | `event` Christmas Eve, Christmas Day, Boxing Day: fairy lights (a garland along the top, a ring round every round solid of r ≥ 14) that twinkle and glow at night; `present` solids | |
+| any | `event` New Year's Eve, New Year's Day: fireworks bursts every 1.6–3.2 s that light the night layer | Best with `dark` |
+| any winter day or blizzard | Falling snow (streaks in a blizzard) | |
+
+Event snakes: `candycane` and `rainbowboa` are painted (recoloured from the corn snake's painting, `art/snakes/eventSnakes.ts`). The other six wear their relative's drawings for now (`EVENT_RELATIVE` in `logic/species.ts`, TODO in `art/snakes/index.ts`): goldentree and greenpython → paradise flying snake, rosyboa → corn snake, earthsnake and blackhognose → eastern hognose, yellowsea → sea krait. Abilities come from the relative: goldentree glides, yellowsea swims, blackhognose plays dead; the rest have none (corn-like coil where `big: 'coil'`). Treat sprites: cookie, candy cane and confetti star are painted; envelope, heart, coin, painted egg and candy show a wrapped sweet in their colour.
+
+### In the game
+
+Menu: a "Today's Hunt" button under the bar (bigger on phones) shows place, snake and rule once the host has the day. A challenge link opens straight onto the card before the hunt. The end card records through `host.daily.record` once per play, adds the snake to the album (`inksnake.album.v1` in the host's storage), and never touches campaign progress. Dev: `pnpm dev`, then `?hunt=ice|xmas|rival|golden|newyear` picks today's sample (earlier days take the next ones round), `?beat=75` fakes a challenge; `node dev/tools/dailyshots.mjs <url> <out> <hunt...>` screenshots the card, the board and the end card (`PHONE=1`, `EXTRA=1` for the calendar, album and menu).
