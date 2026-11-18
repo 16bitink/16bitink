@@ -1,17 +1,17 @@
 import type { TreatKind } from '../../level/daily';
 import { createRng } from '../../logic/rng';
 import { blob } from '../groundKit';
-import { bezier, edge, glint, oval, pt, ribbon, shade, skin, TAU, tint, type Draw } from '../kit';
+import { bezier, edge, glint, pt, ribbon, shade, skin, TAU, tint, type Draw } from '../kit';
 import { PAPER_FILL } from '../palette';
 import type { Pt } from '../pen';
 import type { SpriteArt } from '../types';
+import { coin, envelope, halloweenCandy, heart, paintedEgg } from './eventTreats';
 
 /**
  * The dailies' treats, painted from above as little still lifes: paper,
  * a wash, shadow-side hatching, a glint and a pen contour, like the
  * critters. Cookies, candy canes and confetti stars have their own
- * paintings; the other treats share a wrapped sweet in their colours
- * until theirs are painted.
+ * paintings.
  */
 
 const FRAME = 30;
@@ -77,33 +77,11 @@ function confettiStar(d: Draw): void {
   edge(d, shape, 1.3);
 }
 
-const SWEETS: Readonly<Record<TreatKind, string>> = {
-  cookie: '#c98a4b', candycane: '#c8283a', confetti: '#f2c14e',
-  envelope: '#c8283a', heart: '#e0607a', coin: '#e3b23c', paintedegg: '#7fb6d9', candy: '#9a62c9',
-};
-
-/** A wrapped sweet with twisted ends, in a treat's colour (the stand-in for treats not painted yet). */
-function sweet(colour: string) {
-  return (d: Draw): void => {
-    const body = oval(0, 0, 7.5, 6, 22);
-    const ends = [[pt(-7, 0), pt(-13, -5), pt(-13, 5)], [pt(7, 0), pt(13, -5), pt(13, 5)]] as const;
-    for (const e of ends) {
-      skin(d, e, colour, 0.5);
-      edge(d, e, 1.1);
-    }
-    tint(d, body.map((p) => pt(p.x + 1.4, p.y + 2)), d.ink, 0.16);
-    skin(d, body, colour, 0.82);
-    shade(d, body, 0.3);
-    glint(d, [pt(-3, -3), pt(1, -4)], 1.2, 0.85);
-    edge(d, body, 1.3);
-  };
-}
-
-const PAINTED: Partial<Record<TreatKind, (d: Draw) => void>> = { cookie, candycane: candyCane, confetti: confettiStar };
+const PAINTED: Readonly<Record<TreatKind, (d: Draw) => void>> = { cookie, candycane: candyCane, confetti: confettiStar, envelope, heart, coin, paintedegg: paintedEgg, candy: halloweenCandy };
 
 /** A treat's sprite (one pose, 'still'). */
 export function treatArt(kind: TreatKind): SpriteArt<'still'> {
-  const paint = PAINTED[kind] ?? sweet(SWEETS[kind]);
+  const paint = PAINTED[kind];
   return { frame: FRAME, res: RES, poses: ['still'], draw: (d) => paint(d) };
 }
 

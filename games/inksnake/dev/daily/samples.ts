@@ -1,3 +1,4 @@
+import { eventOn, seasonOf } from '@16bitink/game-sdk';
 import { CHAPTER_1 } from '../../src/level/chapter1';
 import { CHAPTER_2 } from '../../src/level/chapter2';
 import { CHAPTER_6 } from '../../src/level/chapter6';
@@ -83,10 +84,14 @@ export const SAMPLES: readonly { readonly key: string; readonly make: Sample }[]
   { key: 'newyear', make: newYearsEve },
 ];
 
-/** The sample for `date` when sample `first` is today's: today gets `first`, yesterday the next, and so on round the list. */
+/**
+ * The sample for `date` when sample `first` is today's: today gets `first`, yesterday the next, and so on round the list.
+ * Stamped for the date it's served for: its season is the date's, and its event stays only when the date is that event's.
+ */
 export function sampleOn(date: string, today: string, first: number): LevelDef | null {
   const back = Math.round((Date.parse(today) - Date.parse(date)) / 86_400_000);
   if (back < 0) return null;
-  const s = SAMPLES[(first + back) % SAMPLES.length]!;
-  return JSON.parse(JSON.stringify(s.make(date))) as LevelDef;
+  const level = JSON.parse(JSON.stringify(SAMPLES[(first + back) % SAMPLES.length]!.make(date))) as LevelDef;
+  const { event, ...rest } = level;
+  return { ...rest, season: seasonOf(date), ...(event && event === eventOn(date) ? { event } : {}) };
 }

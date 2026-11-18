@@ -87,11 +87,11 @@ The shared event calendar is in [the playbook](daily-playbook.md#events-shared).
 | Event | Snake (real) | Place (by season) | Look | Treats | Rule |
 |---|---|---|---|---|---|
 | Christmas Eve (Dec 24) | **candy cane corn snake** (corn snake morph, red on white) | farm, winter | snow, presents as solids, fairy lights | cookies | `ice` |
-| Christmas Day (Dec 25) | candy cane corn snake | barrens, winter | snowy pines, presents | candy canes | `night` (fairy lights glow) |
-| Boxing Day (Dec 26) | candy cane corn snake | farm, winter | snow | cookies | `plenty` |
+| Christmas Day (Dec 25) | candy cane corn snake | barrens, winter | snowy pines, presents | candy canes | `lure` (the cookies come to you) |
+| Boxing Day (Dec 26) | candy cane corn snake | mountains, winter | snow | cookies | `plenty` |
 | New Year's Eve (Dec 31) | **rainbow boa** (iridescent) | farm, winter, night | fireworks light the board in bursts | confetti stars | `night` |
 | New Year's Day (Jan 1) | rainbow boa | mountains, winter | fireworks | confetti stars | `goldRush` |
-| Lunar New Year (2027: Feb 6; 2028: Jan 26) | **golden tree snake** (*Chrysopelea ornata*: green, cross-hatched black, with gold accents) | mountains, winter | red lanterns | red envelopes | `goldRush` |
+| Lunar New Year (2027: Feb 6; 2028: Jan 26) | **golden tree snake** (*Chrysopelea ornata*: green, cross-hatched black, with gold accents) | mountains, winter (no winter place has tree zones, so it doesn't glide here) | red lanterns | red envelopes | `goldRush` |
 | Valentine's Day (Feb 14) | **rosy boa** | heath, winter (frost) | hearts | heart candies | `looseKnots` |
 | World Wildlife Day (Mar 3) | the place's own | farm, spring | | | `plenty`, with prey from every place |
 | St Patrick's Day (Mar 17) | **green tree python** | rainforest, spring | clovers | gold coins | `goldRush` |
@@ -138,7 +138,7 @@ readonly treats?: { readonly kind: TreatKind; readonly count: number };
 
 ## Generator
 
-The flow is InkBrick's (`src/gen`, `npm run gen -- --from 2026-11-22 --days 60`, frozen to `content/daily/YYYY-MM.json`, exported by `content/daily.ts` as `inksnakeDaily(date)`):
+The flow is InkBrick's (`src/gen`, `npm run gen -- --from 2026-11-19 --days 74`, frozen to `content/daily/YYYY-MM.json`, exported by `content/daily.ts` as `inksnakeDaily(date)`):
 
 1. `seed = hash('inksnake:' + date)`.
 2. **Plan the day:** the event (if any), then the season and weekday, then the place, snake, goal and rule. The last 14 days' memory decides among what's left.
@@ -220,14 +220,16 @@ Event snakes: `candycane` and `rainbowboa` are painted (recoloured from the corn
 
 ### In the game
 
-Menu: a "Today's Hunt" button under the bar (bigger on phones) shows place, snake and rule once the host has the day. A challenge link opens straight onto the card before the hunt. The end card records through `host.daily.record` once per play, adds the snake to the album (`inksnake.album.v1` in the host's storage), and never touches campaign progress. Dev: `pnpm dev`, then `?hunt=ice|xmas|rival|golden|newyear` picks today's sample (earlier days take the next ones round), `?beat=75` fakes a challenge; `node dev/tools/dailyshots.mjs <url> <out> <hunt...>` screenshots the card, the board and the end card (`PHONE=1`, `EXTRA=1` for the calendar, album and menu).
+Menu: a "Today's Hunt" button under the bar (bigger on phones) shows place, snake and rule once the host has the day. A challenge link opens straight onto the card before the hunt. The end card records through `host.daily.record` once per play, adds the snake to the album, and never touches campaign progress except for the album and stamps below. Dev: `pnpm dev`, then `?hunt=ice|xmas|rival|golden|newyear` picks today's sample (earlier days take the next ones round), `?beat=75` fakes a challenge; `node dev/tools/dailyshots.mjs <url> <out> <hunt...>` screenshots the card, the board and the end card (`PHONE=1`, `EXTRA=1` for the calendar, album and menu).
+
+**Album and milestones sync to the account** inside the campaign's progress save (`Progress.album`, `Progress.stamps`; `logic/save.ts` and `accountSave.ts`, `daily/album.ts`, `daily/milestones.ts`). Merge is a union: a snake stays, the earlier first-played date wins; a stamp (days played, date reached) keeps its earliest date. Saved data is validated (unknown snakes, events, days and malformed dates are dropped). The old browser-only key `inksnake.album.v1` is read into the save on load and never written again. Reaching 3/7/14/30/50/100 days gives the album a frame tier (1-6, `scenes/daily/albumFrame.ts`, from the host's total, so it follows the player across games), a gold rosette on that day in the calendar, and "N days played: a new album page!" on the end card. Dev: `?days=6` adds six played days elsewhere.
 
 ## Generator notes
 
 Built 2026-11-18 (build plan steps 2 and 3). Code in `games/inksnake/src/gen` (pure: the chapters and the bot are passed in, so `src/` never imports the paid chapters or test code), the CLI in `dev/gen.mjs` with its pure side in `dev/genDays.ts`, frozen months in `content/daily/YYYY-MM.json`, served by `content/daily.ts` (`inksnakeDaily(date)`, package export `./daily`).
 
 ```
-npm run gen -- --from 2026-11-22 --days 71   # freeze the days not yet frozen (--force to remake them)
+npm run gen -- --from 2026-11-19 --days 74   # freeze the days not yet frozen (--force to remake them)
 npm run gen -- --redo 2026-12-09             # vetoed day: new board and cast, same place, snake, rule and goal
 npm run gen -- --audit                       # the variety audit below
 npm run gen -- --tomorrow                    # rewrite every day's teaser from the day after it
@@ -249,37 +251,54 @@ npm run gen -- --tomorrow                    # rewrite every day's teaser from t
 
 From the engine notes: plain level 1s run 11–45 s, hard rules to ~80 s. Ice and blizzard are kept off Monday and Tuesday (a mountain blizzard missed Tuesday's band at 42 s with the shortest target).
 
-### The first freeze (2026-11-22 to 2027-01-31, 71 days)
+### The first freeze (2026-11-19 to 2027-01-31, 74 days)
 
-All 71 days met their band, the bot winning 3/3 on every one. 608 candidates composed: 4% failed the cheap checks; of the 584 the bot played, 7% lost on 2+ seeds and 10% stayed off the band after tuning; 975 bot plays; an alternate layout was needed on 1 day. 90 s on 7 workers.
+The first hunt is **2026-11-19**. 11-22 to 2027-01-31 (71 days) were frozen first; 11-19, 11-20 and 11-21 were added on 2026-11-18, planned against the later frozen days (place, rule and layout windows) and with 11-21's teaser matching the frozen 11-22. Nothing from 11-22 on changed. The three: 11-19 Moonlit Dunes (dunes, sidewinder, rush, Long Night, bot 28 s), 11-20 Long Tail in the Pinewoods (barrens, hognose, grow, Long Tail, 41 s), 11-21 The Golden Common Lizard (heath, corn, golden, Plenty, 37 s). All 74 days met their band; the numbers below are the first 71 days' run.
+
+All 71 days met their band, the bot winning 3/3 on every one. 608 candidates composed: 4% failed the cheap checks; of the 584 the bot played, 7% lost on 2+ seeds and 10% stayed off the band after tuning; 975 bot plays; an alternate layout was needed on 1 day. 90 s on 7 workers. After the density remake (below): 600 composed, 1% failed the cheap checks, 9% lost 2+ seeds, 9% off the band after tuning, 975 bot plays, alternates on 2 days.
 
 | week of | days | places | snakes | goals | rules | layouts | guests | bands met |
 |---|---|---|---|---|---|---|---|---|
-| 2026-11-16 | 1 | 1 | 1 | 1 | 1 | 1 | 0 | 1/1 |
+| 2026-11-16 | 4 | 4 | 3 | 4 | 4 | 4 | 1 | 4/4 |
 | 2026-11-23 | 7 | 6 | 6 | 5 | 7 | 7 | 2 | 7/7 |
 | 2026-11-30 | 7 | 5 | 5 | 5 | 7 | 7 | 1 | 7/7 |
 | 2026-12-07 | 7 | 4 | 4 | 5 | 7 | 7 | 1 | 7/7 |
 | 2026-12-14 | 7 | 4 | 4 | 5 | 7 | 7 | 1 | 7/7 |
-| 2026-12-21 | 7 | 4 | 5 | 3 | 7 | 7 | 1 | 7/7 |
-| 2026-12-28 | 7 | 4 | 4 | 5 | 7 | 7 | 2 | 7/7 |
+| 2026-12-21 | 7 | 4 | 4 | 3 | 7 | 7 | 1 | 7/7 |
+| 2026-12-28 | 7 | 4 | 4 | 5 | 6 | 7 | 2 | 7/7 |
 | 2027-01-04 | 7 | 4 | 3 | 5 | 7 | 7 | 2 | 7/7 |
 | 2027-01-11 | 7 | 4 | 3 | 5 | 7 | 7 | 2 | 7/7 |
 | 2027-01-18 | 7 | 4 | 4 | 4 | 7 | 7 | 1 | 7/7 |
 | 2027-01-25 | 7 | 4 | 4 | 5 | 7 | 7 | 2 | 7/7 |
 
-- **Shortest repeats:** layout never; layout family 16 days; a rule 7 days on ordinary days (6 days only between the Christmas Day and New Year's Eve nights, both set by the event table); a place 2 days only round Christmas (farm on Dec 24 and 26, from the table).
-- **Totals:** places farm 17, mountains 17, barrens 17, heath 16, jungle 2, dunes 2 (the last autumn week). Snakes corn 17, spidertail 15, hognose 15, adder 14, candycane 3, sidewinder 2, cobra 2, rainbowboa 2, krait 1. Goals feast 20, grow 16, rush 16, boss 11, golden 8. All 14 winter-possible rules used, 4–7 times each. Layouts: 43 remixes, 28 patterns (ring 9, rooms 5, spiral 4, lanes 4, scatter 4, islands 2).
+- **Shortest repeats:** layout never (67 days at the closest); layout family 15 days; a rule 7 days on ordinary days (4 days only between the Dec 28 Monday and New Year's Day's Gold Rush, 3 days around Christmas Day's Lure, set by the event table); a place 2 days only round New Year (mountains on Dec 30 and Jan 1, from the table).
+- **Totals:** places farm 17, mountains 17, barrens 17, heath 16, jungle 2, dunes 2 (the last autumn week). Snakes corn 18, hognose 15, spidertail 14, adder 14, candycane 3, sidewinder 2, cobra 2, rainbowboa 2, krait 1. Goals feast 20, grow 16, rush 16, boss 11, golden 8. All 14 winter-possible rules used, 3–7 times each. Layouts: 35 remixes, 36 patterns (ring 8, spiral 7, lanes 6, islands 5, rooms 5, scatter 5).
 - **Checks:** no out-of-season place, every event on its date, no broken teaser.
 - Patterns for the places not in this range (reef, flooded, rainforest, savanna, jungle, dunes) were tried on 6 candidates per shape: 80–100% pass the cheap checks and the bot, except savanna `lanes` (half have no acacia left after the start is cleared, so no eggs; the cheap check drops them).
+
+### Dev harness and the date check
+
+The dev DailyHost (`dev/daily/host.ts`) serves the real frozen days and nothing for dates without one (the archive is empty before 2026-11-19, as on the site). `?date=YYYY-MM-DD` pretends today is that date (default: the real date; no frozen day = no hunt today). `?hunt=ice|xmas|rival|golden|newyear` serves the hand-written samples instead, stamped for the served date (its season, and its event only on that event's date). `dev/tools/dailyshots.mjs` takes `date:YYYY-MM-DD` or a sample name.
+
+The game never shows a hunt whose theme doesn't fit its date: `DailyClient.level` (`checkFits`) refuses a level whose id isn't `daily-<date>`, whose event differs from `eventOn(date)` (either way), or whose season differs from `seasonOf(date)`. The calendar leaves days before `FIRST_HUNT` (`src/daily/dates.ts`, tested against the first frozen day) and future days untappable, with no event star.
 
 ### For the owner on the contact sheet
 
 Open `dev/contact.html` (`pnpm dev`, then `/contact.html`).
 
 - **The four winter places carry all of December–February.** Variety then comes from the snake, rule, goal and board, but there are only 4 places a week. If it feels samey in play, add a winter look to another place (the doc's pools allow it).
-- **Christmas boards are sparse** (3–5 solids, half wrapped as presents): the remixes come from early campaign boards. Redo one if it looks bare.
+- **Christmas boards** used to be sparse (3–5 solids); the density floor below filled them (presents wrap half the pieces). Redo one if it still looks bare.
 - **Guests in winter** are corn, hognose and the horned viper only (the adder needs its sun patches). The horned viper on the farm (Dec 19, Jan 9) lures birds the farm doesn't have; the bot wins, but check it looks right.
 - **Golden days with Plenty** have long targets (Jan 2: 130 → 793 px). The bot wins in 22 s, but the number is big on the card.
 - **Boss days** are tuned by the boss's strikes, so the barrens fox can be 4 strikes.
-- **Later events:** the golden tree snake's Lunar New Year (Feb 6) is on the mountains, where it has no trees to glide from, so it moves at its forest-floor speed. Move it to the rainforest or give it its own ability before the February freeze. A day the bot can't win on any layout is still frozen (`ok: false` in the JSON, red on the sheet); redo it.
-- **Redo** keeps place, snake, rule and goal and draws new layouts. It checks the 60-day layout limit against earlier days only.
+- **Later events:** the golden tree snake's Lunar New Year (Feb 6) stays on the mountains (no winter place has tree zones), so it doesn't glide there and moves at its forest-floor speed. Decided 2026-11-18; the table row says so. A day the bot can't win on any layout is still frozen (`ok: false` in the JSON, red on the sheet); redo it.
+- **Redo** keeps place, snake, rule and goal (an event day takes the event table's) and draws new layouts. It checks the 60-day layout limit and the 14-day family limit against the frozen days on both sides, and the place and rule windows against the frozen days after it. `--force` plans days afresh, ignoring yesterday's teaser (not the frozen days after).
+
+### Density floor (2026-11-18)
+
+Owner's rule: no empty floor to just walk, so never shrink a board, fill it. Every daily board (remix or pattern) must have **at least 7 solids and cover together** and **at most 15% of the floor farther than 200 px** from any solid, cover or round zone (checks.ts `densityOk`; the rainforest, reef and flooded forest lay their own ground and are exempt). A layout short of it is filled by `densify` (layouts.ts): the place's own solids and cover (its campaign looks; presents on Christmas days) dropped on the emptiest floor, off the start's ring and the way ahead and off holes and nests; the reachability check still runs after.
+
+- **Before:** 31 of the 71 frozen days (44%) failed it: 29 for too few pieces (4–6; Christmas Eve, Boxing Day and New Year's Eve among them, and 7 of them also over 15% empty), 2 for empty floor alone (ring patterns at 16–17%).
+- **Remade (34 days):** the 31 plus Christmas Day (rule changed to `lure`), Boxing Day (moved to the mountains; it was also failing) and, to keep limits, Dec 27 and 28 (planned afresh with `--force`: Dec 27 became the farm boss, Dec 28 the heath Monday) and Jan 18 and Jan 21 (family repeats). Neighbours' teasers were rewritten. All 71 now pass the check; every band met, bot 3/3.
+- **Event plan changes:** Christmas Day rule `night` to `lure`; Boxing Day farm to mountains.
+- **Generator fixes found on the way:** redo checked only earlier days for the 60-day layout limit (now both sides); the 14-day family limit read only each day's first layout, not the alternate that was played (now every planned layout counts); a plan's place and rule windows ignored frozen days after it (now they count).

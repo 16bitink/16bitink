@@ -6,6 +6,7 @@ import type { GameScene } from '../GameScene';
 import { clock, inkButton, inkText } from '../ui';
 import { freePaper, GROOVE, paperCard, roundButton, softenBoard, UI_RES, UI_TEX, VineBar, type RoundButton } from '../uiPaint';
 import { cardFit, type Size } from '../uiLayout';
+import { isPhone, sizer, type Sizer } from '../uiSizes';
 
 const CARD = { w: 420, h: 470 } as const;
 const SEED = 77;
@@ -15,6 +16,9 @@ const PENCIL = '#8a8578';
 export interface PauseCardOpts {
   readonly game: GameScene;
   readonly view: Size;
+  /** The screen, CSS px, and the HUD's interface scale. */
+  readonly css: Size;
+  readonly uiScale: number;
   readonly upright: boolean;
   readonly touch: boolean;
   readonly title: { readonly n: number; readonly name: string };
@@ -35,6 +39,10 @@ export class PauseCard {
 
   constructor(private readonly scene: Phaser.Scene, o: PauseCardOpts) {
     const { width, height } = o.view;
+    const phone = isPhone(o.css);
+    const fit = cardFit(o.view, CARD, o.upright ? 1.45 : 1, phone);
+    // Text and buttons at least the phone minimums at the size the card draws (see uiSizes).
+    const z = sizer(phone, o.uiScale * fit);
     const shade = scene.add.rectangle(0, 0, width, height, PAPER_HEX, 0.5).setOrigin(0).setInteractive();
     this.unblur = softenBoard(scene);
     const top = -CARD.h / 2;
@@ -42,16 +50,16 @@ export class PauseCard {
     const body = scene.add.zone(0, 0, CARD.w, CARD.h).setInteractive();
     card.add([body, paperCard(scene, 0, 0, CARD.w, CARD.h, SEED, { tapes: ['tl', 'tr'], rule: true, leaf: true })]);
     card.add(inkText(scene, 0, top + 56, 'Paused', 50, BLUE));
-    card.add(inkText(scene, 0, top + 100, `Level ${o.title.n} · ${o.title.name}`, 23, SOFT_INK));
-    this.standing(card, o.game, top + 140);
-    card.add(inkButton(scene, 0, top + 306, 'Resume', o.onResume, { width: 240, height: 60, size: 33, kind: 'leaf' }));
-    card.add(inkButton(scene, -88, top + 378, 'Start over', () => o.game.restart(), { width: 160, height: 50, size: 25 }));
-    card.add(inkButton(scene, 88, top + 378, 'Level map', () => o.game.quit(), { width: 160, height: 50, size: 25 }));
+    card.add(inkText(scene, 0, top + 100, `Level ${o.title.n} · ${o.title.name}`, z.text(23, 'body'), SOFT_INK));
+    this.standing(card, o.game, top + 140, z);
+    card.add(inkButton(scene, 0, top + 306, 'Resume', o.onResume, { width: 240, height: z.tap(60), size: 33, kind: 'leaf' }));
+    const small = z.tap(50);
+    card.add(inkButton(scene, -88, top + 378 + (small - 50) / 2, 'Start over', () => o.game.restart(), { width: 160, height: small, size: z.text(25, 'body') }));
+    card.add(inkButton(scene, 88, top + 378 + (small - 50) / 2, 'Level map', () => o.game.quit(), { width: 160, height: small, size: z.text(25, 'body') }));
     if (!o.touch) card.add(inkText(scene, 0, top + 432, 'Esc or P to resume  ·  M for sound', 18, PENCIL));
-    this.sound = roundButton(scene, CARD.w / 2 - 50, top + 52, getSound(scene)?.muted ? 'muted' : 'sound', o.onSound, 46);
+    this.sound = roundButton(scene, CARD.w / 2 - 50, top + 52, getSound(scene)?.muted ? 'muted' : 'sound', o.onSound, z.tap(46));
     card.add(this.sound.root);
     this.root = scene.add.container(0, 0, [shade, card]).setDepth(50);
-    const fit = cardFit(o.view, CARD, o.upright ? 1.45 : 1);
     shade.setAlpha(0);
     card.setScale(fit * 0.94).setAlpha(0).setY(height / 2 + 14);
     scene.tweens.add({ targets: shade, alpha: 1, duration: 160 });
@@ -60,12 +68,12 @@ export class PauseCard {
   }
 
   /** Points and the goal, lives, and the clock against par. */
-  private standing(card: Phaser.GameObjects.Container, game: GameScene, y: number): void {
+  private standing(card: Phaser.GameObjects.Container, game: GameScene, y: number, z: Sizer): void {
     const s = this.scene;
     const w = game.world;
     const left = -GROOVE.w / 2;
     card.add(inkText(s, left, y, `${w.score} points`, 24, BLUE).setOrigin(0, 0.5));
-    card.add(inkText(s, -left, y, `${Math.round(w.snake.length)} of ${game.level.target} long`, 20, SOFT_INK).setOrigin(1, 0.5));
+    card.add(inkText(s, -left, y, `${Math.round(w.snake.length)} of ${game.level.target} long`, z.text(20), SOFT_INK).setOrigin(1, 0.5));
     const bar = new VineBar(s, left, y + 30);
     bar.set(w.progress);
     card.add(bar.root);
@@ -75,11 +83,11 @@ export class PauseCard {
       card.add(s.add.image(x, row + 1, UI_TEX.socket).setScale(1.15 / UI_RES));
       if (i < w.lives) card.add(lifeIcon(s, game.level.snake, x, row, i % 3, 1.15));
     }
-    card.add(inkText(s, left + 2, row + 28, w.lives === 1 ? '1 life left' : `${w.lives} lives left`, 18, SOFT_INK).setOrigin(0, 0.5));
+    card.add(inkText(s, left + 2, row + 28, w.lives === 1 ? '1 life left' : `${w.lives} lives left`, z.text(18), SOFT_INK).setOrigin(0, 0.5));
     const late = w.elapsed > game.level.par;
     const time = inkText(s, -left, row, clock(w.elapsed), 26, BLUE).setOrigin(1, 0.5);
     card.add([s.add.image(-left - time.width - 8, row + 1, UI_TEX.icon('clock')).setScale(0.75 / UI_RES), time]);
-    card.add(inkText(s, -left, row + 28, late ? `past par ${clock(game.level.par)}` : `par ${clock(game.level.par)}`, 18, SOFT_INK).setOrigin(1, 0.5));
+    card.add(inkText(s, -left, row + 28, late ? `past par ${clock(game.level.par)}` : `par ${clock(game.level.par)}`, z.text(18), SOFT_INK).setOrigin(1, 0.5));
   }
 
   setMuted(muted: boolean): void {

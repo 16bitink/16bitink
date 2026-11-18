@@ -28,6 +28,18 @@ The rules every game's daily level follows, and what we've learnt making them. I
 | Day milestones | 3, 7, 14, 30, 50, 100 days played. Dailies from every game count. Each milestone gives a cosmetic and a stamp on the calendar |
 | Collection | Something that only grows, made from dailies: InkBrick's looks, InkSnake's snake album, and the event stamps |
 
+**Phones:** daily screens (the button, the before and end cards, the calendar, the collection) follow the game's phone minimums: targets of 44 css px with 8 px gaps, and text of at least 16 px body and 12–14 px secondary for a plain font. See InkSnake's [Phone UI sizes](inksnake-design.md#phone-ui-sizes).
+
+## Where the daily lives on screen (all games)
+
+The daily is a separate mission, so it must never look like the current level's title or a level node. The owner's InkSnake review (2026-11-18): a full-width "Today's Hunt" banner under the top bar read as the map's title. Other games put the daily outside the progression path. Microsoft Solitaire, Slay the Spire and Spelunky make it a separate menu mode. Candy Crush and Royal Match use a floating icon on the map's side rail. NYT Games uses its own tile.
+
+- **On a title or menu screen** (InkBrick): its own button next to Play, in its own colour, with the date on it ("Daily · Nov 22").
+- **On a map screen** (InkSnake): a **fixed floating side button** that doesn't scroll with the map. It's a painted **calendar page** (the month on a coloured header, today's day number big) with the label under it. On phones it sits on the right rail in thumb reach, at least 64 css px. Its colour is one no level node uses.
+- **Status:** a small dot and a gentle idle pulse while today's daily is unplayed, then a check once it's played. Never use streak or "don't miss it" wording.
+- **On an event day,** the button shows the event's motif.
+- **The top bar stays for the current chapter and level only.** Tapping the button opens the before-level card: the date, the day's dials, a countdown to the next one, Play, Calendar, and the collection.
+
 ## Seasons (shared)
 
 All games use **meteorological seasons, northern hemisphere** (most players are in the US and Europe). The daily is the same level worldwide, so it can't follow each player's own hemisphere.

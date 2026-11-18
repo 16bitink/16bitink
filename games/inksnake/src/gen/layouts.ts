@@ -13,6 +13,7 @@ import {
   between, clamp, inBoard, mirrorCover, mirrorHeading, mirrorPt, mirrorSolid, mirrorZone, pickOne, round, skeleton, solidGap, solidsMeet, spread,
   type Line, type Shape, type Transform,
 } from './geometry';
+import { emptyPoints, emptyShare, EMPTY_SHARE, MIN_PIECES } from './checks';
 import type { PlaceInfo } from './places';
 
 export type LayoutChoice =
@@ -275,8 +276,53 @@ function canopyPattern(shape: Shape, src: LevelDef, t: Transform, rng: Rng): Lay
   return { start: first, heading, solids: [], cover: [], zones, spots: centres.slice(0, 6), base: src };
 }
 
+const FILL_TRIES = 14;
+const FILL_CANDIDATES = 40;
+
+/**
+ * The density floor for a layout that falls short (checks.ts densityOk):
+ * the place's own solids and cover, dropped one at a time on the emptiest
+ * floor, until there are enough pieces and little empty floor. The start's
+ * ring and the way ahead stay clear, holes and nests keep their space.
+ */
+export function densify(layout: Layout, info: PlaceInfo, rng: Rng): Layout {
+  if (info.place === 'rainforest' || info.place === 'reef' || info.place === 'flooded') return layout;
+  let solids = [...layout.solids];
+  let cover = [...layout.cover];
+  const marks = [...(layout.spots ?? []), ...(layout.nests ?? [])];
+  const ahead = [0, 40, 80, 120, 160].map((d) => ({ x: layout.start.x + Math.cos(layout.heading) * d, y: layout.start.y + Math.sin(layout.heading) * d }));
+  const clearOfStart = (s: SolidDef) => ahead.every((p, i) => solidGap(p, s) > (i === 0 ? 70 : 40));
+  const needs = () => solids.length + cover.length < MIN_PIECES || emptyShare({ solids, cover, zones: layout.zones }) > EMPTY_SHARE;
+  for (let n = 0; n < FILL_TRIES && needs(); n++) {
+    const spots = emptyPoints({ solids, cover, zones: layout.zones }).sort((a, b) => b.d - a.d).slice(0, FILL_CANDIDATES);
+    let placed = false;
+    for (const p of spots) {
+      if (!inBoard(p, 60)) continue;
+      const wantSolid = info.solidKit.length > 0 && (info.coverKit.length === 0 || rng() < 0.6);
+      if (wantSolid) {
+        const s = solidAt(pickOne(rng, info.solidKit), p);
+        if (!inBoard(centre(s), STAMP_MARGIN) || solids.some((o) => solidsMeet(o, s, 6)) || !clearOfStart(s) || marks.some((m) => solidGap(m, s) < 24)) continue;
+        if (cover.some((c) => solidGap(c, s) < 0)) continue;
+        solids = [...solids, s];
+      } else {
+        const k = pickOne(rng, info.coverKit);
+        if (solids.some((o) => solidGap(p, o) < k.r * 0.7) || Math.hypot(layout.start.x - p.x, layout.start.y - p.y) < 120) continue;
+        cover = [...cover, { ...k, x: round(p.x), y: round(p.y) }];
+      }
+      placed = true;
+      break;
+    }
+    if (!placed) break;
+  }
+  return { ...layout, solids, cover };
+}
+
 /** The board for a choice: deterministic in the choice and the rng. */
 export function buildLayout(info: PlaceInfo, choice: LayoutChoice, rng: Rng): Layout {
+  return densify(buildBare(info, choice, rng), info, rng);
+}
+
+function buildBare(info: PlaceInfo, choice: LayoutChoice, rng: Rng): Layout {
   if (choice.kind === 'remix') return remix(boardById(info, choice.board), choice.t, rng);
   const src = boardById(info, choice.source);
   if (info.place === 'reef') return reefPattern(info, choice.shape, src, choice.t, rng);

@@ -1,11 +1,13 @@
 // Screenshots levels mid-play: node dev/tools/levelshots.mjs <url> <outDir> <seconds> <levelId...>
 // Starts each level through the dev page's exposed Phaser game and reports page errors.
+// PHONE=1 shoots an upright phone (390×844), PHONE=wide one held sideways (844×390).
 import { chromium } from 'playwright-core';
 
 const [url, out, seconds, ...ids] = process.argv.slice(2);
 const browser = await chromium.launch({ channel: 'chrome' });
 try {
-  const page = await browser.newPage({ viewport: { width: 1280, height: 760 } });
+  const viewport = process.env.PHONE === 'wide' ? { width: 844, height: 390 } : process.env.PHONE ? { width: 390, height: 844 } : { width: 1280, height: 760 };
+  const page = await browser.newPage({ viewport, deviceScaleFactor: process.env.PHONE ? 2 : 1 });
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));

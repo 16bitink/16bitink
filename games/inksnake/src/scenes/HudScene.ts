@@ -5,8 +5,9 @@ import { goalNotes } from './hud/goalNotes';
 import type { GameScene } from './GameScene';
 import { DPR, screenScene, screenSize, toView, uiScaleOf, viewSize } from './hidpi';
 import { HintNote } from './hud/hintNote';
+import { EdgeMarks } from './hud/edgeMarks';
 import { LevelTag } from './hud/levelTag';
-import { Meter, METER_H } from './hud/meter';
+import { Meter, METER_H, METER_W } from './hud/meter';
 import { PauseCard } from './hud/pauseCard';
 import { AbilityButton } from './hud/abilityButton';
 import { ThumbStick } from './hud/thumbStick';
@@ -16,7 +17,7 @@ import { STICK } from '../logic/joystick';
 import { ROUND, roundButton, type RoundButton } from './uiPaint';
 
 const MARGIN = 14;
-const SIZES = { button: ROUND, margin: MARGIN, meterH: METER_H } as const;
+const SIZES = { button: ROUND, margin: MARGIN, meterH: METER_H, meterW: METER_W } as const;
 
 /**
  * Over the board: the level's paper tag with the clock, the meter (score,
@@ -34,6 +35,7 @@ export class HudScene extends Phaser.Scene {
   private pauseCard: PauseCard | null = null;
   private abilityButton: AbilityButton | null = null;
   private stick!: ThumbStick;
+  private marks!: EdgeMarks;
 
   constructor() {
     super('Hud');
@@ -49,6 +51,7 @@ export class HudScene extends Phaser.Scene {
     const game = this.game2();
     // First, so it draws under the rest.
     this.stick = new ThumbStick(this);
+    this.marks = new EdgeMarks(this);
     this.tag = new LevelTag(this, game.daily ? `Hunt · ${game.level.name}` : `${this.levelNumber()} · ${game.level.name}`, game.level.par);
     this.meter = new Meter(this, game.level.snake, game.world.maxLives);
     this.hint = new HintNote(this);
@@ -104,11 +107,13 @@ export class HudScene extends Phaser.Scene {
 
   private layout(): void {
     const view = viewSize(this);
-    this.plan = hudPlan(view, screenSize(this), uiScaleOf(this), false, SIZES);
+    this.plan = hudPlan(view, screenSize(this), uiScaleOf(this), false, { ...SIZES, tagW: this.tag.width });
     const { k } = this.plan;
-    this.tag.root.setPosition(this.plan.tag.x, this.plan.tag.y).setScale(k);
-    this.meter.root.setPosition(this.plan.meter.x, this.plan.meter.y).setScale(k);
+    this.tag.root.setPosition(this.plan.tag.x, this.plan.tag.y).setScale(this.plan.tag.k);
+    this.meter.root.setPosition(this.plan.meter.x, this.plan.meter.y).setScale(this.plan.meter.k);
     [this.pauseButton, this.soundButton].forEach((b, i) => b.root.setPosition(this.plan.buttons[i]!.x, this.plan.buttons[i]!.y).setScale(k));
+    // A long hint wraps to two lines on a narrow screen rather than running off it.
+    this.hint.setMaxWidth((view.width - SIZES.margin * 2) / k);
     this.hint.root.setPosition(view.width / 2, this.plan.hintY).setScale(k);
     // The ability's button in the corner a thumb reaches: bottom right, above the meter on an upright phone.
     const ab = AbilityButton.size;
@@ -152,7 +157,7 @@ export class HudScene extends Phaser.Scene {
   private openCard(): PauseCard {
     const game = this.game2();
     return new PauseCard(this, {
-      game, view: viewSize(this), upright: this.plan.upright, touch: game.input2.touch || !this.sys.game.device.os.desktop,
+      game, view: viewSize(this), css: screenSize(this), uiScale: uiScaleOf(this), upright: this.plan.upright, touch: game.input2.touch || !this.sys.game.device.os.desktop,
       title: { n: this.levelNumber(), name: game.level.name },
       onResume: () => this.resume(),
       onSound: () => this.toggleSound(),
@@ -171,6 +176,7 @@ export class HudScene extends Phaser.Scene {
     const w = game.world;
     if (!w) return;
     this.fadeUnderSnake(game, delta / 1000);
+    this.marks.update(this, game, this.plan.k, this.plan.upright, time, this.pauseCard !== null);
     this.meter.update(w.score, w.progress, w.lives, time);
     const left = w.timeLeft;
     this.tag.update(w.elapsed, left !== null && left < 10, goalNotes(w));

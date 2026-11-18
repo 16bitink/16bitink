@@ -27,8 +27,9 @@ export function generateDay(plan: DayPlan, o: GenOptions = {}): DailyEntry {
   return generateWith(plan, BOOK, playLevel, o);
 }
 
-/** What a day must keep: a redo keeps its own place, snake, rule and goal; any day keeps what the day before promised. */
-function keepFor(date: string, frozen: Readonly<Record<string, DailyEntry>>, redo: boolean): KeepPlan | undefined {
+/** What a day must keep: a redo keeps its own place, snake, rule and goal; any day keeps what the day before promised (a forced day, `fresh`, is planned afresh). */
+function keepFor(date: string, frozen: Readonly<Record<string, DailyEntry>>, redo: boolean, fresh: boolean): KeepPlan | undefined {
+  if (fresh) return undefined;
   const own = frozen[date];
   if (redo && own) return { place: own.plan.place, snake: own.plan.snake, rule: own.plan.rule, goal: own.plan.goal };
   const promised: TomorrowDef | undefined = frozen[addDays(date, -1)]?.level.tomorrow;
@@ -41,7 +42,7 @@ function keepFor(date: string, frozen: Readonly<Record<string, DailyEntry>>, red
  * their frozen dials, with their salt.
  */
 export function planDates(
-  dates: readonly string[], frozen: Readonly<Record<string, DailyEntry>>, salts: Readonly<Record<string, number>> = {}, redo: ReadonlySet<string> = new Set(),
+  dates: readonly string[], frozen: Readonly<Record<string, DailyEntry>>, salts: Readonly<Record<string, number>> = {}, redo: ReadonlySet<string> = new Set(), fresh = false,
 ): DayPlan[] {
   if (dates.length === 0) return [];
   const sorted = [...dates].sort();
@@ -55,6 +56,8 @@ export function planDates(
     }
     return out;
   };
+  // Frozen days that stay, up to 60 days after: a redo's layouts must not repeat theirs either.
+  const laterFrozen = (d: string): DayPlan[] => Array.from({ length: HISTORY_DAYS }, (_, i) => addDays(d, i + 1)).filter((x) => !want.has(x) && frozen[x]).map((x) => frozen[x]!.plan);
   const first = sorted[0]!;
   const last = sorted[sorted.length - 1]!;
   const out: DayPlan[] = [];
@@ -66,7 +69,7 @@ export function planDates(
     }
     // A gap between frozen days is planned as it will be; days before the first wanted one without a frozen day are none.
     if (!want.has(d) && d < first) continue;
-    const plan = planDay(d, BOOK, history(d), salts[d] ?? 0, keepFor(d, frozen, redo.has(d)));
+    const plan = planDay(d, BOOK, history(d), salts[d] ?? 0, keepFor(d, frozen, redo.has(d), fresh && want.has(d)), laterFrozen(d));
     known.set(d, plan);
     if (want.has(d)) out.push(plan);
   }

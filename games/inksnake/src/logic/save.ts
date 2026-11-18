@@ -1,4 +1,6 @@
 import type { KeyValueStore } from '@16bitink/game-sdk';
+import { coversAlbum, loadLegacyAlbum, mergeAlbum, parseAlbum, type Album } from '../daily/album';
+import { coversStamps, mergeStamps, parseStamps, type Stamps } from '../daily/milestones';
 
 /** Best result in one level. */
 export interface LevelRecord {
@@ -11,7 +13,18 @@ export interface LevelRecord {
 /** Saved progress, keyed by level id (ids are permanent). */
 export interface Progress {
   readonly levels: Readonly<Record<string, LevelRecord>>;
+  /** The snake album of the daily hunts (only grows). Absent: none yet. */
+  readonly album?: Album;
+  /** Day milestones reached: days played → the date it was reached. Absent: none yet. */
+  readonly stamps?: Stamps;
 }
+
+/** Progress with the daily parts attached only when they hold something. */
+const withDaily = (levels: Progress['levels'], album: Album, stamps: Stamps): Progress => ({
+  levels,
+  ...(Object.keys(album).length ? { album } : {}),
+  ...(Object.keys(stamps).length ? { stamps } : {}),
+});
 
 export const EMPTY_PROGRESS: Progress = { levels: {} };
 const KEY = 'inksnake.progress.v1';
@@ -37,10 +50,11 @@ const isRecord = (v: unknown): v is LevelRecord => {
 /** Untrusted saved data to progress: anything malformed is dropped, never thrown. */
 export function parseProgress(raw: unknown): Progress {
   if (typeof raw !== 'object' || raw === null) return EMPTY_PROGRESS;
-  const levels = (raw as { levels?: unknown }).levels;
-  if (typeof levels !== 'object' || levels === null) return EMPTY_PROGRESS;
+  const { levels, album, stamps } = raw as { levels?: unknown; album?: unknown; stamps?: unknown };
+  const daily = [parseAlbum(album), parseStamps(stamps)] as const;
+  if (typeof levels !== 'object' || levels === null) return withDaily({}, ...daily);
   const kept = Object.entries(levels as Record<string, unknown>).filter(([id, r]) => /^[a-z0-9-]{1,64}$/.test(id) && !(id in Object.prototype) && isRecord(r)).slice(0, MAX_LEVELS);
-  return { levels: Object.fromEntries(kept) as Record<string, LevelRecord> };
+  return withDaily(Object.fromEntries(kept) as Record<string, LevelRecord>, ...daily);
 }
 
 /** Keeps the better of the old and new results for a level. */
@@ -62,12 +76,12 @@ export function mergeProgress(a: Progress, b: Progress): Progress {
     const prev = acc[id];
     return { ...acc, [id]: prev ? { blots: Math.max(prev.blots, r.blots), bestTime: Math.min(prev.bestTime, r.bestTime) } : r };
   }, a.levels);
-  return { levels };
+  return withDaily(levels, mergeAlbum(a.album ?? {}, b.album ?? {}), mergeStamps(a.stamps ?? {}, b.stamps ?? {}));
 }
 
 /** Whether `a` already holds everything in `b` (so saving `b` over `a` would add nothing). */
 export function coversProgress(a: Progress, b: Progress): boolean {
-  return Object.entries(b.levels).every(([id, r]) => {
+  return coversAlbum(a.album ?? {}, b.album ?? {}) && coversStamps(a.stamps ?? {}, b.stamps ?? {}) && Object.entries(b.levels).every(([id, r]) => {
     const mine = a.levels[id];
     return mine !== undefined && mine.blots >= r.blots && mine.bestTime <= r.bestTime;
   });
@@ -95,7 +109,10 @@ export function firstScreen(p: Progress): FirstScreen {
 export function loadProgress(store: KeyValueStore | undefined): Progress {
   try {
     const raw = store?.getItem(KEY);
-    return raw ? parseProgress(JSON.parse(raw)) : EMPTY_PROGRESS;
+    const p = raw ? parseProgress(JSON.parse(raw)) : EMPTY_PROGRESS;
+    // An album from before it was synced is folded in here, then travels with the save.
+    const old = loadLegacyAlbum(store);
+    return Object.keys(old).length ? mergeProgress(p, withDaily({}, old, {})) : p;
   } catch (err) {
     console.warn('[inksnake] could not read saved progress', err);
     return EMPTY_PROGRESS;

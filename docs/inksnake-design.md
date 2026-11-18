@@ -141,9 +141,27 @@ Today's Hunt is a free daily level, the same for everyone. Every day sets a new 
 - **Keyboard:** arrow keys or WASD steer (the head turns towards the direction held); Space strikes; the chapter's ability is on E (or its round button on touch).
 - **Pause:** Esc, P or the ❚❚ button. **Sound:** M or ♪.
 
+### Phone UI sizes
+
+The owner's phone playtest (2026-11-18): "UI elements on the mobile screen should be bigger" and "the map can be zoomed in". The numbers live in `src/scenes/uiSizes.ts`, and every screen uses them. `test/uiSizes.test.ts` checks them at 360×640, 390×844 and 844×390. A phone is any screen whose short side is under 500 css px. Desktop layouts don't change.
+
+| What | Minimum on a phone | Source |
+|---|---|---|
+| Touch target | 44 × 44 css px | Apple HIG (44 pt), WCAG 2.5.5 (44 px, AAA); Material asks 48 dp, WCAG 2.5.8 at least 24 px (AA) |
+| Gap between targets | 8 css px | Material (8 dp) |
+| Body text | 18 css px | The usual mobile floor is 16 px. Caveat's small x-height needs 2 px more |
+| Secondary text (captions) | 14 css px | The usual floor is 12–14 px, plus Caveat's 2 px |
+
+- **Interface scale:** phones lay the HUD and cards out for a 420-unit short side (0.86 at 360 px, never under 0.8). Before, they drew at the laptop design's 0.55.
+- **Cards** fill the phone's width. Text and buttons are raised to the minimums at the size the card actually draws. A daily card taller than the screen scrolls (drag or wheel) rather than drawing smaller than 0.72 css px per unit.
+- **Phones keep only the essentials:** the album shows 3 snakes a page in one column, the calendar drops the milestone number inside its rosette, and a phone on its side drops the before-hunt card's board picture.
+- **Map:** zoom 0.8 or more on phones. Nests are then 48 css px and names 18 px. The map pans sideways too, centred on the current level and clamped to the plan's 760-px width. A tap on a nest still opens its card.
+
 ## The map
 
 A vertical scroll as in InkGecko: a field guide's route map that climbs from the farm (chapter 1) to the flooded forest (chapter 10), a pocket for each level along a winding snake track. Chapters not built yet are pencil drafts; the full game's chapters are painted but locked until bought.
+
+The daily hunt isn't on the trail. It's a painted calendar page fixed on the right (`scenes/map/dailyButton.ts`): today's month on a plum header (no nest uses plum), the day big, the day's snake in the corner and "Daily hunt" under it. On phones it sits low on the right rail above the Snake button, 64 css px or more; on a laptop it sits under the bar. While today is unplayed it has a red dot and pulses gently every few seconds; once played it shows a green check. Christmas days get a candy-cane corner, other events a red star. A tap opens the card before the hunt: the date, place, snake, rule, "New hunt in …", Hunt!, Calendar, Album and Map. The top bar shows only the chapter and its progress.
 
 ## Art
 
@@ -152,6 +170,14 @@ The house ballpoint notebook style (blue ink lines, watercolour washes, paper), 
 - **The snake:** a tube drawn along the body's path every frame from baked pieces: a head sprite (eyes, nostrils, the species' head scales), a patterned body strip that repeats along the length (saddles, bands, blotches), and a tail tip. Lumps swell the tube. The tongue flicks.
 - **Prey and enemies:** baked sprites in the line-boil frames, seen from above, with a few walking poses.
 - **Boards:** each place painted once per level onto a board texture, with cover and obstacles drawn on top so the snake passes under the cover.
+
+### Border, surround and phone camera
+
+From the owner's playtest (2026-11-18): players couldn't see where the board ended, because the ground past the edge was a mirrored copy of the board, and on phones the snake was about 11 css px wide.
+
+- **Border** (`src/art/rim/`): every place has its own wall along the board's edge, where the head already stops. The farm has a post-and-rail fence. The Barrens have fallen pine logs with a stump at each corner. The dunes have a boulder ridge. The savanna has a thorn boma. The rainforest has buttress trunks with lianas. The reef has a coral crest. The mountains have a two-row rock wall. The heath has a dry-stone wall with gorse. The jungle has a bamboo thicket. The flooded forest has a root tangle between drowned trunks. The wall's centre line is 9 px outside the edge, so its inner face meets the edge. It is painted into four strips at ART_RES (each 34 px outside the edge to 8 px inside), in two small textures of 2056×168 and 168×1048 px. A soft shade band under each wall gives it weight. In winter (on the farm, Barrens, mountains and heath) the pieces get snow caps. The whole-board view keeps 20 px of wall on screen past each edge.
+- **Surround** (`bakeSurround`, after InkGecko's): it reaches 240 px past the left and right edges and 150 px past the top and bottom, at 1 texture px per board px (1440×840, about 4.8 MB). It is the place's own ground painted once more, with no solids, cover, nests or zones, scaled about 1.56× so one painting covers the whole ring. In winter it gets the snow look. On top go up to 14 solids and 12 cover patches, using the level's own looks (or the place's), placed at least 46 px off the edges. The layout is seeded by the level's id, so it is the same on every retry. A wash fades it to paper (0.24 halfway out, 0.9 at the far edge), and paper lies beyond. It is never mirrored.
+- **Phone camera** (`src/scenes/game/followCam.ts`): a screen whose short side is under 600 css px gets a follow camera. Zoom shows the body at least 18 css px wide, but never less than 55% of the board's short side, and never further out than the whole board. On a 390×844 phone with a 15-px snake, that is 1.2 css px per board px, showing about 60% × 73% of the board. The camera looks ahead 22% of the view's short side in the heading, catches up at rate 5/s and swings its look-ahead at 2.4/s. It is clamped to 64 px past the board's edges, so the wall and a strip of the place show but never paper. A finger held down keeps steering as the camera moves under it. Red arrows at the screen's edge (20 px in, 64 px from the top and bottom on an upright phone) point at enemies, bosses and rival snakes out of sight. Desktops and tablets keep the whole-board view.
 
 ## Sound
 

@@ -1,7 +1,10 @@
 import type { DailyStanding } from '@16bitink/game-sdk';
 import Phaser from 'phaser';
 import { PAPER, PAPER_HEX } from '../art/palette';
-import { addToAlbum, loadAlbum, saveAlbum } from '../daily/album';
+import { addToAlbum } from '../daily/album';
+import { stampReached } from '../daily/milestones';
+import { commitProgress } from '../logic/accountSave';
+import { loadProgress } from '../logic/save';
 import { DailyClient, type DailyOutcome, type DailyStart } from '../daily/client';
 import { getHost, getSound, trackOffer } from '../host';
 import { albumCard } from './daily/albumCard';
@@ -70,7 +73,7 @@ export class DailyScene extends Phaser.Scene {
     if (data.mode === 'intro') void this.intro(data.date);
     else if (data.mode === 'end') void this.end(data.start, data.outcome);
     else if (data.mode === 'calendar') void this.calendar(data.month);
-    else this.album(data.page ?? 0);
+    else void this.album(data.page ?? 0);
     const relayout = (): void => {
       this.scene.restart(data);
     };
@@ -117,7 +120,8 @@ export class DailyScene extends Phaser.Scene {
     const host = getHost(this);
     const before = (this.registry.get(TOTAL) as number | undefined) ?? 0;
     const store = host.storage;
-    saveAlbum(store, addToAlbum(loadAlbum(store), start.level.snake, start.date, start.level.event));
+    const mine = loadProgress(store);
+    commitProgress(host, { ...mine, album: addToAlbum(mine.album ?? {}, start.level.snake, start.date, start.level.event) });
     const card = endCard(this, {
       start, outcome, isToday: start.date === this.client.today(), owned: host.unlocked, price: host.price ?? null,
       canShare: typeof navigator !== 'undefined' && typeof navigator.share === 'function', totalDays: before,
@@ -143,6 +147,9 @@ export class DailyScene extends Phaser.Scene {
     if (!this.scene.isActive()) return;
     this.registry.set(TOTAL, total);
     card.days(total, before);
+    const now = loadProgress(store);
+    const stamps = stampReached(now.stamps ?? {}, before, total, start.date);
+    if (stamps !== (now.stamps ?? {})) commitProgress(host, { ...now, stamps });
   }
 
   private async share(date: string, seconds: number, note: (s: string) => void): Promise<void> {
@@ -170,7 +177,7 @@ export class DailyScene extends Phaser.Scene {
     if (!this.scene.isActive()) return;
     note.destroy();
     this.registry.set(TOTAL, total);
-    this.show(calendarCard(this, { today, ...m, days, totalDays: total, owned: host.unlocked }, {
+    this.show(calendarCard(this, { today, ...m, days, totalDays: total, owned: host.unlocked, stamps: loadProgress(host.storage).stamps ?? {} }, {
       play: (date) => this.go({ mode: 'intro', date }),
       locked: () => {
         trackOffer(this, 'locked');
@@ -184,8 +191,12 @@ export class DailyScene extends Phaser.Scene {
     }));
   }
 
-  private album(page: number): void {
-    this.show(albumCard(this, loadAlbum(getHost(this).storage), page, {
+  private async album(page: number): Promise<void> {
+    const progress = loadProgress(getHost(this).storage);
+    const total = await this.client.totalDays((this.registry.get(TOTAL) as number | undefined) ?? 0);
+    if (!this.scene.isActive()) return;
+    this.registry.set(TOTAL, total);
+    this.show(albumCard(this, progress.album ?? {}, total, page, {
       page: (n) => this.go({ mode: 'album', page: Math.max(0, n) }),
       back: () => this.menu(),
     }));

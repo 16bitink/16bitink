@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { ART_RES } from '../art/palette';
+import { interfaceScale, isPhone } from './uiSizes';
 
 /**
  * Device pixels per CSS pixel the canvas renders at. Capped at the resolution
@@ -8,10 +9,6 @@ import { ART_RES } from '../art/palette';
  */
 export const DPR = typeof window === 'undefined' ? 1 : Math.min(ART_RES, Math.max(1, window.devicePixelRatio || 1));
 
-/** The screen size the interface is laid out for; smaller screens (phones) draw it smaller, as InkFish's uiScale does. */
-const UI_DESIGN = { w: 760, h: 560 } as const;
-/** Never smaller than this, so buttons stay big enough for a finger. */
-const MIN_UI = 0.55;
 /** Scenes drawn at a reduced interface scale (see screenScene). */
 const uiScales = new WeakMap<Phaser.Scene, number>();
 
@@ -25,9 +22,14 @@ export function screenSize(scene: Phaser.Scene): { width: number; height: number
   return { width: scene.scale.width / DPR, height: scene.scale.height / DPR };
 }
 
-/** How big the interface draws on a screen of this CSS size: 1 on a laptop, less on a phone. */
+/** How big the interface draws on a screen of this CSS size: 1 on a laptop, near full size on a phone (see interfaceScale). */
 export function uiScaleFor(width: number, height: number): number {
-  return Phaser.Math.Clamp(Math.min(width / UI_DESIGN.w, height / UI_DESIGN.h), MIN_UI, 1);
+  return interfaceScale({ width, height });
+}
+
+/** Whether the screen is a phone's (held either way): the interface keeps the essentials and draws them bigger. */
+export function phoneScreen(scene: Phaser.Scene): boolean {
+  return isPhone(screenSize(scene));
 }
 
 /**

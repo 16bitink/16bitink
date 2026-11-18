@@ -7,6 +7,8 @@ import { BUILT_CHAPTERS, CHAPTER_NAMES, CHAPTER_PLACES, CHAPTER_SNAKES, levelByI
 import { chapterTally, loadProgress, type Progress } from '../logic/save';
 import { loadPaidChapters } from './BootScene';
 import { crispText, DPR, screenSize, uiCamera, uiScaleFor } from './hidpi';
+import { DAILY_PAGE, isPhone, mapZoom, sizer, type Sizer } from './uiSizes';
+import { DailyButton } from './map/dailyButton';
 import { SnakeWalker } from './map/snakeWalker';
 import { computeMapLayout, MAP, regionAt, type MapLayout, type MapNode } from './map/layout';
 import { MapCard } from './map/levelCard';
@@ -15,9 +17,6 @@ import { MapView } from './map/mapView';
 import { buildNodes, type NodeHit } from './map/nodesView';
 import { mapStates, standInIds, type ChapterSlot } from './map/states';
 import { drawBlots, HAND_FONT, inkButton, inkText } from './ui';
-import { EVENTS } from '@16bitink/game-sdk';
-import { RULE_INFO } from '../level/daily';
-import { placeName, snakeName } from '../daily/text';
 import { dailyClient } from './DailyScene';
 
 const SOFT_INK = '#4a463e';
@@ -33,8 +32,6 @@ const FIT = { w: 760, h: 560 } as const;
 /** Where the snake last waited on the map this session, so a win can be walked. */
 const SNAKE_AT = 'mapSnakeAt';
 const TOP_BAR = 64;
-/** Room under the bar kept for the Today's Hunt button: presses there aren't on the map. */
-const HUNT_ROOM = 120;
 /** A resize lays the map out again only once the screen has settled this long. */
 const RESIZE_SETTLE_MS = 220;
 
@@ -59,7 +56,11 @@ export class MenuScene extends Phaser.Scene {
   private zoom = 1;
   private focusY = 0;
   private targetY = 0;
-  private drag: { y: number; target: number; moved: boolean; lastY: number; lastT: number; vel: number } | null = null;
+  /** Across: a phone's zoomed-in map pans sideways too (on a laptop it stays on the middle). */
+  private focusX: number = MAP.mid;
+  private targetX: number = MAP.mid;
+  private pans = false;
+  private drag: { x: number; y: number; target: number; targetX: number; moved: boolean; lastY: number; lastT: number; vel: number } | null = null;
   private card: MapCard | null = null;
   private caption!: Phaser.GameObjects.Text;
   private tally!: Phaser.GameObjects.Text;
@@ -71,6 +72,7 @@ export class MenuScene extends Phaser.Scene {
   private uiLayer!: Phaser.GameObjects.Layer;
   private ui = { width: 0, height: 0 };
   private following = false;
+  private daily: DailyButton | null = null;
 
   constructor() {
     super('Menu');
@@ -81,6 +83,7 @@ export class MenuScene extends Phaser.Scene {
     this.card = null;
     this.drag = null;
     this.region = -1;
+    this.daily = null;
     const host = getHost(this);
     this.progress = loadProgress(host.storage);
     const chapters = loadedChapters();
@@ -97,7 +100,9 @@ export class MenuScene extends Phaser.Scene {
     this.currentNode = this.layout.nodes.find((n) => n.levelId === current) ?? this.layout.nodes[0]!;
 
     const screen = screenSize(this);
-    this.zoom = Phaser.Math.Clamp(Math.min(screen.width / FIT.w, screen.height / FIT.h), 0.5, 1.5);
+    // A phone zooms in (nests big enough to tap, names to read) and pans sideways; see uiSizes.
+    this.zoom = mapZoom(screen, FIT);
+    this.pans = isPhone(screen) && screen.width / this.zoom < FIT.w;
     const cam = this.cameras.main.setZoom(this.zoom * DPR).setBackgroundColor('#f5f0e1');
     const textRes = DPR * Math.max(1, this.zoom);
     const paint = this.add.layer();
@@ -115,7 +120,11 @@ export class MenuScene extends Phaser.Scene {
     for (const hit of nodes.hits) {
       hit.zone.on('pointerup', (p: Phaser.Input.Pointer) => {
         // The top bar covers the plan: a press on it isn't on the level under it.
-        if (p.y / DPR < (TOP_BAR + (host.daily ? HUNT_ROOM : 0)) * uiScaleFor(screen.width, screen.height)) return;
+        // Nor is a press on the daily's page.
+        const s = uiScaleFor(screen.width, screen.height);
+        const u = { x: p.x / DPR / s, y: p.y / DPR / s };
+        const d = this.daily?.box;
+        if (u.y < TOP_BAR || (d && u.x >= d.x0 && u.x <= d.x1 && u.y >= d.y0 && u.y <= d.y1)) return;
         this.tapNode(hit);
       });
     }
@@ -136,7 +145,9 @@ export class MenuScene extends Phaser.Scene {
 
     this.focusY = this.clampY(data.focusY ?? start.y - 40);
     this.targetY = this.focusY;
-    cam.centerOn(MAP.mid, this.focusY);
+    this.focusX = this.clampX(start.x);
+    this.targetX = this.focusX;
+    cam.centerOn(this.focusX, this.focusY);
     this.view.update(this.focusY - this.halfView(), this.focusY + this.halfView(), true);
     if (walkFrom) this.time.delayedCall(450, () => this.walkOn());
     this.bindInput();
@@ -173,9 +184,12 @@ export class MenuScene extends Phaser.Scene {
 
   update(_t: number, delta: number): void {
     const dt = Math.min(0.05, delta / 1000);
-    if (this.following) this.targetY = this.clampY(this.walker.position.y - 40);
-    if (!this.drag?.moved) this.focusY += (this.targetY - this.focusY) * Math.min(1, dt * GLIDE);
-    this.cameras.main.centerOn(MAP.mid, this.focusY);
+    if (this.following) this.lookAtSnake();
+    if (!this.drag?.moved) {
+      this.focusY += (this.targetY - this.focusY) * Math.min(1, dt * GLIDE);
+      this.focusX += (this.targetX - this.focusX) * Math.min(1, dt * GLIDE);
+    }
+    this.cameras.main.centerOn(this.focusX, this.focusY);
     const half = this.halfView();
     this.view.update(this.focusY - half, this.focusY + half);
     this.walker.update(_t, dt);
@@ -185,6 +199,19 @@ export class MenuScene extends Phaser.Scene {
   /** Half the world height the view shows. */
   private halfView(): number {
     return screenSize(this).height / this.zoom / 2;
+  }
+
+  /** Across, kept within the plan's width (the middle when the screen shows all of it). */
+  private clampX(x: number): number {
+    if (!this.pans) return MAP.mid;
+    const half = screenSize(this).width / this.zoom / 2;
+    return Phaser.Math.Clamp(x, MAP.mid - FIT.w / 2 + half, MAP.mid + FIT.w / 2 - half);
+  }
+
+  /** Sends the view to the snake. */
+  private lookAtSnake(): void {
+    this.targetY = this.clampY(this.walker.position.y - 40);
+    this.targetX = this.clampX(this.walker.position.x);
   }
 
   private clampY(y: number): number {
@@ -282,6 +309,9 @@ export class MenuScene extends Phaser.Scene {
     const w = screen.width / s;
     const h = screen.height / s;
     this.ui = { width: w, height: h };
+    // Buttons and text at least the phone minimums (see uiSizes).
+    const z = sizer(isPhone(screen), s);
+    const tap = z.tap(44);
     const bar = this.add.graphics();
     bar.fillStyle(PAPER_HEX, 0.88).fillRect(0, 0, w, TOP_BAR);
     bar.lineStyle(1.5, 0x27408b, 0.5).lineBetween(0, TOP_BAR, w, TOP_BAR);
@@ -289,7 +319,7 @@ export class MenuScene extends Phaser.Scene {
     const narrow = w < 640;
     if (!narrow) this.uiLayer.add(inkText(this, 90, TOP_BAR / 2, 'InkSnake', 36));
     this.caption = inkText(this, w / 2, TOP_BAR / 2 - 10, '', 26);
-    this.tally = inkText(this, w / 2, TOP_BAR / 2 + 16, '', 18, SOFT_INK);
+    this.tally = inkText(this, w / 2, TOP_BAR / 2 + 16, '', z.text(18), SOFT_INK);
     this.uiLayer.add([this.caption, this.tally]);
     const host = getHost(this);
     const sound = inkButton(this, w - 34, TOP_BAR / 2, getSound(this)?.muted ? '♪̸' : '♪', () => {
@@ -297,13 +327,11 @@ export class MenuScene extends Phaser.Scene {
       if (!sb) return;
       sb.setMuted(!sb.muted);
       (sound.list[1] as Phaser.GameObjects.Text).setText(sb.muted ? '♪̸' : '♪');
-    }, { width: 46, height: 44, size: 24 });
-    const exit = inkButton(this, narrow ? 50 : w - 112, TOP_BAR / 2, 'Exit', () => host.onExit(), { width: 84, height: 44, size: 24 });
-    this.homeButton = inkButton(this, w - 70, h - 40, 'Snake', () => {
-      this.targetY = this.clampY(this.walker.position.y - 40);
-    }, { width: 110, height: 46, size: 24 });
+    }, { width: Math.max(46, tap), height: tap, size: 24 });
+    const exit = inkButton(this, narrow ? 50 : w - 112, TOP_BAR / 2, 'Exit', () => host.onExit(), { width: 84, height: tap, size: 24 });
+    this.homeButton = inkButton(this, w - 70, h - 8 - z.tap(46) / 2, 'Snake', () => this.lookAtSnake(), { width: 110, height: z.tap(46), size: 24 });
     this.uiLayer.add([sound, exit, this.homeButton]);
-    this.huntButton(w);
+    this.dailyButton(w, h, z, tap);
     const total = chapterTally(this.progress, loadedLevels().map((l) => l.id));
     const g = this.add.graphics();
     drawBlots(g, 26, h - 30, 1, 9, 1);
@@ -311,33 +339,33 @@ export class MenuScene extends Phaser.Scene {
   }
 
   /**
-   * Today's Hunt, first thing under the bar: the day's place, snake and
-   * rule once the host has the level (it opens the card before the hunt).
+   * The daily hunt's calendar page, fixed on the right (it doesn't scroll
+   * with the map): on a phone low on the rail above the Snake button, in
+   * thumb reach; on a laptop under the bar. It opens the card before the hunt.
    */
-  private huntButton(w: number): void {
+  private dailyButton(w: number, h: number, z: Sizer, tap: number): void {
     const client = dailyClient(this);
     if (!client) return;
-    // Phones draw the map's interface small: the hunt's button is drawn bigger there, as wide as the screen allows.
-    const phone = screenSize(this).width < 600;
-    const bw = Math.min(w - 24, phone ? 640 : 420);
-    const bh = phone ? 100 : 72;
-    const y = TOP_BAR + 10 + bh / 2;
+    const pw = z.phone ? DAILY_PAGE.phoneCss.w / z.scale : DAILY_PAGE.desk.w;
+    const ph = z.phone ? DAILY_PAGE.phoneCss.h / z.scale : DAILY_PAGE.desk.h;
+    const label = z.text(20);
+    // Far enough in that its label (wider than the page) stays on screen.
+    const x = w - 14 - Math.max(pw / 2, label * 2.8);
+    const y = z.phone ? h - 8 - tap - 22 - label * 1.6 - ph / 2 : TOP_BAR + 16 + ph / 2;
+    const today = client.today();
     const open = (): void => {
       if (this.card) return;
-      this.scene.start('Daily', { mode: 'intro', date: client.today() });
+      this.scene.start('Daily', { mode: 'intro', date: today });
     };
-    const button = inkButton(this, w / 2, y, "Today's Hunt", open, { width: bw, height: bh, size: phone ? 46 : 32, kind: 'leaf' });
-    const label = button.list[1] as Phaser.GameObjects.Text;
-    label.setY(-bh * 0.17);
-    const sub = inkText(this, 0, bh * 0.25, 'a new hunt every day', phone ? 28 : 19, '#fffaf0');
-    button.add(sub);
-    this.uiLayer.add(button);
-    void client.level(client.today()).then((level) => {
-      if (!this.scene.isActive() || !sub.active) return;
-      const bits = [placeName(placeOf(level)), snakeName(level.snake), ...(level.rule ? [RULE_INFO[level.rule].name] : [])];
-      sub.setText(bits.join(' · '));
-      if (level.event) label.setText(`${EVENTS[level.event].name} Hunt`);
+    const button = new DailyButton(this, { x, y, w: pw, h: ph, label, date: today, onOpen: open });
+    this.daily = button;
+    this.uiLayer.add(button.root);
+    void client.level(today).then((level) => {
+      if (this.scene.isActive()) button.setLevel(level);
     }).catch((err: unknown) => console.warn('[inksnake] could not load today\'s hunt', err));
+    void client.history().then((days) => {
+      if (this.scene.isActive()) button.setPlayed(days.some((d) => d.date === today));
+    }).catch((err: unknown) => console.warn('[inksnake] could not load the hunts played', err));
   }
 
   /** The caption follows the chapter in view; the Snake button shows when the snake is off screen. */
@@ -359,17 +387,19 @@ export class MenuScene extends Phaser.Scene {
   private bindInput(): void {
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
       if (this.card) return;
-      this.drag = { y: p.y, target: this.targetY, moved: false, lastY: p.y, lastT: p.event.timeStamp, vel: 0 };
+      this.drag = { x: p.x, y: p.y, target: this.targetY, targetX: this.targetX, moved: false, lastY: p.y, lastT: p.event.timeStamp, vel: 0 };
       this.following = false;
     });
     this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
       const d = this.drag;
       if (!d || !p.isDown || this.card) return;
-      if (Math.abs(p.y - d.y) > DRAG_THRESHOLD * DPR) d.moved = true;
+      if (Math.abs(p.y - d.y) > DRAG_THRESHOLD * DPR || (this.pans && Math.abs(p.x - d.x) > DRAG_THRESHOLD * DPR)) d.moved = true;
       if (!d.moved) return;
       const scale = this.cameras.main.zoom;
       this.targetY = this.clampY(d.target - (p.y - d.y) / scale);
       this.focusY = this.targetY;
+      this.targetX = this.clampX(d.targetX - (p.x - d.x) / scale);
+      this.focusX = this.targetX;
       const dt = Math.max(1, p.event.timeStamp - d.lastT);
       d.vel = d.vel * 0.6 + ((-(p.y - d.lastY) / scale) / dt) * 1000 * 0.4;
       d.lastY = p.y;
@@ -401,7 +431,11 @@ export class MenuScene extends Phaser.Scene {
     kb?.on('keydown-DOWN', () => go(KEY_STEP));
     kb?.on('keydown-PAGE_UP', () => go(-page()));
     kb?.on('keydown-PAGE_DOWN', () => go(page()));
-    kb?.on('keydown-HOME', () => go(this.walker.position.y - 40 - this.targetY));
+    kb?.on('keydown-HOME', () => {
+      if (this.card) return;
+      this.following = false;
+      this.lookAtSnake();
+    });
     kb?.on('keydown-ENTER', () => {
       if (this.card || this.walker.walking) return;
       const level = levelById(this.currentNode.levelId);

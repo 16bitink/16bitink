@@ -1,4 +1,6 @@
 import { CRITTER_ART, type CritterKind } from '../src/art/critters/index';
+import { treatArt } from '../src/art/daily/treats';
+import type { TreatKind } from '../src/level/daily';
 import { makeDraw } from '../src/art/kit';
 import { BOIL } from '../src/art/palette';
 import { makeCanvas } from '../src/art/pen';
@@ -168,6 +170,17 @@ function boards(): void {
   }
 }
 
+const TREATS: TreatKind[] = ['cookie', 'candycane', 'confetti', 'envelope', 'heart', 'coin', 'paintedegg', 'candy'];
+
+/** The dailies' treats at game size (x1.35 over a 3x bake, on 1x) and big. ?only=treats */
+function treats(): void {
+  const row = section('treats', 'treats');
+  if (!row) return;
+  for (const k of TREATS) show(row, k, bakeSprite(treatArt(k), 'still', 0, 50), 30 * scale * 1.5, 30 * scale * 1.5);
+  for (const k of TREATS) show(row, `${k} (game)`, bakeSprite(treatArt(k), 'still', 0, 50), 40, 40);
+}
+
 snakes();
 critters();
+treats();
 boards();

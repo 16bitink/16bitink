@@ -4,6 +4,7 @@ import type { LevelDef, Place } from '../../level/types';
 import type { LevelRecord } from '../../logic/save';
 import { clock, drawBlots, HAND_FONT, inkButton, inkText } from '../ui';
 import { freePaper, paperCard } from '../uiPaint';
+import { phoneScreen } from '../hidpi';
 import { boardPreview, dropPreview } from './thumb';
 import { playLine } from './levelInfo';
 import { twistTexts } from '../../level/twistText';
@@ -12,6 +13,8 @@ const SOFT_INK = '#4a463e';
 const CARD_W = 440;
 const THUMB = { w: 360, h: 203 } as const;
 const CARD_SEED = 61;
+/** The close cross's side on a phone, units (≥ 44 CSS px at the card's smallest phone size). */
+const PHONE_CLOSE = 58;
 /** Notes under the picture wrap to this width (the card less its margins). */
 const NOTE_W = CARD_W - 80;
 const NOTE_GAP = 6;
@@ -63,7 +66,9 @@ export class MapCard {
       fired = true;
       act();
     } : null;
-    card.add(inkButton(scene, CARD_W / 2 - 28, top + 28, '×', () => this.close(), { width: 40, height: 40, size: 30 }));
+    // The close cross: a full finger's target on a phone (see uiSizes), tucked in the corner.
+    const x = phoneScreen(scene) ? PHONE_CLOSE : 40;
+    card.add(inkButton(scene, CARD_W / 2 - 8 - x / 2, top + 8 + x / 2, '×', () => this.close(), { width: x, height: x, size: 30 + (x - 40) / 2 }));
     this.root = scene.add.container(0, 0, [shade, card]);
     layer.add(this.root);
     card.setScale(fit * 0.92).setAlpha(0);

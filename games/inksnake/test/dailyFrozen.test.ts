@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { inksnakeDaily, inksnakeDailyDates } from '../content/daily';
 import { DAILY_MONTHS } from '../content/daily/index';
 import { SEASON_PLACES } from '../src/gen/places';
+import { checkFits } from '../src/daily/client';
+import { FIRST_HUNT } from '../src/daily/dates';
 import { dailyDate } from '../src/level/daily';
 import { parseLevel } from '../src/level/validate';
 
@@ -36,5 +38,10 @@ describe('frozen dailies', () => {
       const next = all.get(addDays(date, 1));
       if (next) expect(level.tomorrow, date).toEqual({ place: next.place, snake: next.snake, rule: next.rule, ...(next.event ? { event: next.event } : {}) });
     }
+  });
+
+  it('every frozen day fits its date (id, event, season), and the first one is the calendar\'s first hunt', () => {
+    for (const [date, e] of DAYS) expect(() => checkFits(parseLevel(e.level), date), date).not.toThrow();
+    expect(inksnakeDailyDates()[0]).toBe(FIRST_HUNT);
   });
 });

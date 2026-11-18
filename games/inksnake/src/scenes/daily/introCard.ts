@@ -3,12 +3,13 @@ import type Phaser from 'phaser';
 import { RED } from '../../art/palette';
 import { bakeForLevel } from '../../art/textures';
 import type { DailyStart } from '../../daily/client';
-import { longDate } from '../../daily/dates';
+import { countdown, longDate, msToMidnight } from '../../daily/dates';
 import { goalLine, placeName, snakeName, winterLine } from '../../daily/text';
 import { placeOf } from '../../level/levels';
 import { ruleLine } from '../../level/daily';
 import { boardPreview } from '../map/thumb';
 import { clock } from '../ui';
+import { screenSize } from '../hidpi';
 import { CardBuilder, GOLD_INK, SOFT_INK } from './cardKit';
 
 export interface IntroActs {
@@ -33,12 +34,23 @@ export function introCard(scene: Phaser.Scene, s: DailyStart, isToday: boolean, 
   c.text(`${isToday ? "Today's Hunt" : 'Hunt'} · ${longDate(s.date)}`, 22, SOFT_INK, 2);
   if (level.event) c.text(EVENTS[level.event].name, 34, RED, 0);
   c.text(`${placeName(place)} · the ${snakeName(level.snake)}`, level.event ? 26 : 32, undefined, 8);
-  c.block(THUMB.h, (cy) => boardPreview(scene, level, place, THUMB.w, THUMB.h).setY(cy), 12);
+  // A phone on its side has no height to spare: the essentials (the rule, the goal, Hunt!) go without the picture.
+  const css = screenSize(scene);
+  if (!(c.phone && css.width > css.height)) c.block(THUMB.h, (cy) => boardPreview(scene, level, place, THUMB.w, THUMB.h).setY(cy), 12);
   if (level.rule) c.text(ruleLine(level.rule), 30, RED, 4);
   c.text(goalLine(level), 22, SOFT_INK, 4);
   const aside = winterLine(level);
   if (aside) c.text(aside, 19, SOFT_INK, 4);
   if (s.beat !== null) c.text(`A friend's time to beat: ${clock(s.beat)}`, 24, GOLD_INK, 4);
+  if (isToday) {
+    // When the next hunt opens: something to look forward to, not a deadline.
+    const next = c.text('', 19, SOFT_INK, 4);
+    const tick = (): void => {
+      if (next.active) next.setText(`New hunt in ${countdown(msToMidnight(new Date()))}`);
+    };
+    tick();
+    scene.time.addEvent({ delay: 1000, loop: true, callback: tick });
+  }
   c.y += 6;
   c.buttons([{ label: 'Hunt!', run: a.play, kind: 'leaf' }], 62, 34);
   c.buttons([{ label: 'Calendar', run: a.calendar }, { label: 'Album', run: a.album }, { label: 'Map', run: a.menu }], 48, 23);
