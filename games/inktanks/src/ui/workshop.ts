@@ -119,7 +119,7 @@ function statsHtml(p: Progress): string {
 
 function html(p: Progress, tab: Tab, note: string, backLabel: string, rise: boolean): string {
   const rank = rankOf(p.xp);
-  const tabs = SLOTS.map((s) => `<button class="btn small${s.slot === tab ? ' gold' : ''}" data-act="tab" data-slot="${s.slot}">${s.name}: ${esc(famName(p.loadout[s.slot].family))}</button>`).join('')
+  const tabs = SLOTS.map((s) => `<button class="btn small${s.slot === tab ? ' gold' : ''}" data-act="tab" data-slot="${s.slot}">${s.name}<span class="tabfam">: ${esc(famName(p.loadout[s.slot].family))}</span></button>`).join('')
     + `<button class="btn small${tab === 'gadgets' ? ' gold' : ''}" data-act="tab" data-slot="gadgets">Gadgets</button>`
     + `<button class="btn small${tab === 'wingmen' ? ' gold' : ''}" data-act="tab" data-slot="wingmen">Wingmen</button>`;
   const cards = tab === 'wingmen' ? WINGMAN_NAMES.map((_, i) => wingmanCard(p, i)).join('') : tab === 'gadgets' ? GADGETS.map((g) => gadgetCard(p, g)).join('') : SLOTS.find((s) => s.slot === tab)!.families.filter((f) => listed(p, f)).map((f) => famCard(p, f)).join('');

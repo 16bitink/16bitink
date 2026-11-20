@@ -12,6 +12,22 @@ const ACCEL = 420;
 const REVERSE = 0.6;
 /** Beyond this angle off the heading, a pointing stick backs up instead of turning round. */
 const BACK_UP = 2.4;
+/**
+ * A player already backing keeps backing while the stick points anywhere
+ * behind the tank's sides (more than this off the nose), so steering the
+ * tail doesn't flip it into a turn round (owner's playtest, 2026-11-20).
+ * Bots keep the plain BACK_UP rule their levels were tuned on, and the lab's
+ * stand-in player (playerBot) keeps turning round as it was tuned to.
+ */
+const KEEP_BACKING = Math.PI / 2;
+
+/** Whether a pointing stick `off` the heading backs the tank up. */
+function backsUp(m: Match, t: Tank, off: number): boolean {
+  const a = Math.abs(off);
+  if (!t.isPlayer) return a > BACK_UP;
+  if (m.cfg.playerBot) return false;
+  return a > BACK_UP || (t.speed < -1 && a > KEEP_BACKING);
+}
 export const CARRY_SLOW = 0.8;
 /**
  * Levels after this one let a wedged tank drive out (moveBy). Chapters 1–2 keep
@@ -70,7 +86,7 @@ export function driveTank(m: Match, t: Tank, input: TankInput, dt: number): void
     throttle = clamp(mv.throttle, -1, 1);
   } else if (mv?.kind === 'point' && mv.mag > 0) {
     const off = wrapAngle(mv.angle - t.heading);
-    if (Math.abs(off) > BACK_UP && !t.isPlayer) {
+    if (backsUp(m, t, off)) {
       // Back up towards the point: aim the tail at it.
       t.heading = turnTowards(t.heading, wrapAngle(mv.angle + Math.PI), s.turn * roll * dt);
       throttle = -mv.mag * Math.max(0, Math.cos(wrapAngle(mv.angle + Math.PI - t.heading)));

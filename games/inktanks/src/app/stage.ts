@@ -1,19 +1,15 @@
 import Phaser from 'phaser';
 import { ChapterMapScene, MAP_KEY, type MapHooks } from '../scenes/map/ChapterMapScene';
 import type { MissionScene } from '../scenes/mission/MissionScene';
+import { stageSize, type StageSize } from './stageSize';
+
+export { NATIVE_HEIGHT, stageSize } from './stageSize';
 
 /**
- * The game's one Phaser instance: the chapter map's land, or a mission.
- * Pixel art at density C: the native view stays about 540 px tall (2 device
- * px per art px on a 1080p screen), as dev/boot.ts, and follows the parent's
+ * The game's one Phaser instance: the chapter map's land, or a mission, at
+ * the size stageSize picks (zoomed in on a phone), following the parent's
  * size. The DOM screens and HUD sit over it.
  */
-export const NATIVE_HEIGHT = 540;
-
-export function stageSize(cssW: number, cssH: number, dpr: number): { width: number; height: number; zoom: number } {
-  const scale = Math.max(1, Math.round((cssH * dpr) / NATIVE_HEIGHT));
-  return { width: Math.ceil((cssW * dpr) / scale), height: Math.ceil((cssH * dpr) / scale), zoom: scale / dpr };
-}
 
 export class Stage {
   readonly game: Phaser.Game;
@@ -36,7 +32,7 @@ export class Stage {
     this.resizer.observe(parent);
   }
 
-  private size(): { width: number; height: number; zoom: number } {
+  private size(): StageSize {
     return stageSize(this.parent.clientWidth || innerWidth, this.parent.clientHeight || innerHeight, devicePixelRatio || 1);
   }
 

@@ -1,7 +1,7 @@
 import { CHAPTERS, medalCount, TOTAL_LEVELS } from '../logic/campaign';
 import { rankOf } from '../logic/rank';
 import type { Progress } from '../logic/workshop';
-import { esc, render } from './dom';
+import { esc, render, soundLabel } from './dom';
 import { tankCanvas } from './tankArt';
 import { rankLine } from './rankArt';
 
@@ -28,7 +28,7 @@ export function showMenu(root: HTMLElement, d: MenuData, a: MenuActions): void {
   const rank = rankOf(d.progress.xp);
   render(root, 'menu dim', `
     <div class="corner left"><button class="btn small" data-act="exit">Exit</button></div>
-    <div class="corner right"><button class="btn small" data-act="sound">Sound: ${d.sound ? 'on' : 'off'}</button></div>
+    <div class="corner right"><button class="btn small" data-act="sound">${soundLabel(d.sound)}</button></div>
     <div class="wordmark rise">InkTanks</div>
     <div class="panel chaptercard rise">
       <div class="pic"></div>

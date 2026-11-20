@@ -523,11 +523,14 @@ The engine pass for Deepwood is done; levels 41 and 45 are built as the worked e
 ## Controls
 
 - **Desktop:** WASD or arrows drive in the direction pressed (diagonals too). The hull turns that way and rolls once it lines up, as the left stick does. The mouse aims the turret, clicking or holding fires, E swaps and Q uses a repair kit.
+- **Backing up (Nov 20):** a direction more than ~137° off the nose backs the tank up instead of turning it round, and the tail steers towards it. Once backing, the tank keeps backing while the direction points anywhere behind its sides, so steering the tail doesn't flip it into a turn. Reverse is 0.6× top speed. Only a human's input does this. Enemy bots keep their old rule, and the lab's stand-in player (`playerBot`) still turns round as it was tuned to (`logic/match/movement.ts`, `test/reverse.test.ts`).
+- **Sound:** a toggle on the menu, on the map (top right) and on the pause card. M toggles it in a mission. It is saved.
 - **Phone:**
   - The left thumbstick drives, steering towards where you point.
   - The right thumbstick aims, and fires while held past the dead zone.
   - The swap button only shows on a part. The repair button sits by the right stick.
-  - Bigger buttons, only essential UI, and the HUD kept clear of the sticks (see the mobile rule).
+  - **Zoomed in (Nov 20):** an art px is a whole number of device px and at least 0.9 CSS px (`src/app/stageSize.ts`), instead of the laptop's ~540-px-tall view. On a phone on its side that shows about 360–430 art px of field, 1.5× closer than before.
+  - **Sizes:** [mobile-playbook.md](mobile-playbook.md) in `src/ui/phoneCss.ts`, loaded last and for phones only. Ark Pixel is 24 px for main lines and buttons and 18 px for captions, every target is 44 px or more, and key caps are hidden. The map's title panel is hidden (the chips show the chapter), and the workshop's tabs show only the slot.
 - **HUD:** pickups read "+5 [blueprint icon] blueprints (Cannon, Wheels)", and the first time a player ever picks blueprints up a tip says to spend them in the Workshop (saved, so once per player). The results list blueprints per family with part icons and highlight "Upgrade ready: Cannon Mk II". The objective line top centre with an edge arrow to the next target, the minimap top right, HP and part icons bottom centre, and the timer top right when a level has one.
 
 ## Performance budget

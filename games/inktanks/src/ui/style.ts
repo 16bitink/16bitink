@@ -1,5 +1,6 @@
 import arkPixelUrl from '../art/pixel/ui/ark-pixel-12.woff2?url';
 import { HUD_CSS } from './hudCss';
+import { PHONE_CSS } from './phoneCss';
 import { SCREENS_CSS } from './screensCss';
 
 /**
@@ -14,7 +15,7 @@ export function injectStyles(doc: Document = document): void {
   if (doc.getElementById(STYLE_ID)) return;
   const s = doc.createElement('style');
   s.id = STYLE_ID;
-  s.textContent = HUD_CSS + SCREENS_CSS;
+  s.textContent = HUD_CSS + SCREENS_CSS + PHONE_CSS;
   doc.head.appendChild(s);
 }
 

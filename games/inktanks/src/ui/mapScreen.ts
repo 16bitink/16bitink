@@ -3,13 +3,15 @@ import { CHAPTERS, gate, medalCount, nextLevel, spotState, type GateContext } fr
 import { rankOf } from '../logic/rank';
 import type { Progress } from '../logic/workshop';
 import { workshopButton } from './blueprint';
-import { esc, medalsHtml, render } from './dom';
+import { esc, medalsHtml, render, soundLabel } from './dom';
 import { rankLine } from './rankArt';
 
 export interface MapData {
   readonly progress: Progress;
   /** The chapter shown, 0-based. */
   readonly chapter: number;
+  /** Whether sound is on (the corner's toggle). */
+  readonly sound: boolean;
   readonly gate: GateContext;
   /** Level names by number, for the spots' labels. */
   readonly names: (n: number) => string | null;
@@ -23,6 +25,8 @@ export interface MapActions {
   readonly chapter: (index: number) => void;
   readonly workshop: () => void;
   readonly menu: () => void;
+  /** Turns sound on or off; returns whether it's on now. */
+  readonly toggleSound: () => boolean;
   /** Once level 50 is won: back to the victory screen. */
   readonly ending: (() => void) | null;
 }
@@ -57,7 +61,7 @@ export function showMap(root: HTMLElement, d: MapData, a: MapActions): () => voi
     ${spots}
     <div class="panel top"><span class="t12 dimt">Chapter ${ch.index + 1}</span> <span class="gold">${esc(ch.name)}</span> <span class="t12">${rankLine(rank)}</span></div>
     <div class="corner left"><button class="btn small" data-act="menu">Menu</button>${a.ending ? '<button class="btn small gold" data-act="ending">Victory</button>' : ''}</div>
-    <div class="corner right">${workshopButton(d.progress, 'small')}</div>
+    <div class="corner right"><button class="btn small" data-act="sound">${soundLabel(d.sound)}</button>${workshopButton(d.progress, 'small')}</div>
     <div class="chapters">${chips}</div>`, {
     level: (el) => a.level(Number(el.dataset.n)),
     chapter: (el) => {
@@ -66,6 +70,9 @@ export function showMap(root: HTMLElement, d: MapData, a: MapActions): () => voi
     },
     workshop: a.workshop,
     menu: a.menu,
+    sound: (el) => {
+      el.textContent = soundLabel(a.toggleSound());
+    },
     ending: () => a.ending?.(),
   });
   const place = (): void => {

@@ -27,3 +27,6 @@ export const medalsHtml = (m: readonly boolean[] | undefined, pop: readonly bool
   [0, 1, 2].map((i) => `<span class="medal${m?.[i] ? ' on' : ''}${pop[i] ? ' pop' : ''}" style="animation-delay:${0.3 + i * 0.35}s"></span>`).join('');
 
 export const clock = (s: number): string => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+
+/** The sound toggle's label, the same on the menu, the map and the pause card. */
+export const soundLabel = (on: boolean): string => `Sound: ${on ? 'on' : 'off'}`;
