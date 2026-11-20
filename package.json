@@ -6,7 +6,9 @@
     "build": "pnpm --filter @16bitink/web build",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
-    "start": "pnpm --filter @16bitink/web start"
+    "start": "pnpm --filter @16bitink/web start",
+    "invoices": "pnpm --filter @16bitink/web invoices:download",
+    "invoices:backfill": "pnpm --filter @16bitink/web invoices:backfill"
   },
   "engines": {
     "node": ">=24.22.1 <25"

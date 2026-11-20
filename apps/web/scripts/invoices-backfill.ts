@@ -13,7 +13,7 @@
  */
 import Stripe from 'stripe';
 import { isPaidSession } from '../src/lib/fulfil';
-import { BACKFILL_KEY, backfillStripeInvoice } from '../src/lib/invoices/issue';
+import { BACKFILL_KEY, backfillStripeInvoice, findBackfillInvoice } from '../src/lib/invoices/issue';
 
 async function main(): Promise<void> {
   const key = process.env.STRIPE_SECRET_KEY;
@@ -25,10 +25,15 @@ async function main(): Promise<void> {
   for await (const s of stripe.checkout.sessions.list({ status: 'complete', limit: 100 })) {
     if (s.livemode && isPaidSession(s) && s.metadata?.game && !s.invoice) todo.push(s);
   }
-  console.info(`${todo.length} paid checkouts without a Stripe invoice${apply ? '' : ' (dry run)'}`);
+  console.info(`${todo.length} paid checkouts from before Checkout made invoices${apply ? '' : ' (dry run)'}`);
 
   for (const s of todo.sort((a, b) => a.created - b.created)) {
     const label = `${new Date(s.created * 1000).toISOString().slice(0, 10)} ${s.metadata?.game} ${s.amount_total} ${s.currency} ${s.customer_details?.address?.country ?? '??'}`;
+    const done = await findBackfillInvoice(stripe, s);
+    if (done) {
+      console.info(`  already ${done.number}: ${label}`);
+      continue;
+    }
     if (!apply) {
       console.info(`  would number: ${label}`);
       continue;
