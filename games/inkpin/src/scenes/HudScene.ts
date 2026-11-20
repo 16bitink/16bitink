@@ -17,6 +17,7 @@ import { TitleCard } from './hud/titleCard';
 import { HUD_INSETS_KEY } from './levelCamera';
 import { tipHoldMs, touchPlan, type Insets } from '../logic/touchLayout';
 import { lossText } from './lossLines';
+import { NO_SAFE_AREA, safeAreaIn, type SafeArea } from './safeArea';
 import { bakeUi, freePaper, paintedButton, roundButton, type PaintedButton } from './uiPaint';
 
 /** How to play on a touch screen: shown on the first level, and on levels without a tip of their own. */
@@ -57,6 +58,12 @@ export class HudScene extends Phaser.Scene {
   private goalShown = false;
   private info: LevelInfo | null = null;
   private shownHearts = HEARTS;
+  /**
+   * The notch and home bar's reach into the screen. The interface is laid out
+   * in the rest (its camera scrolls by the top-left corner), while the board
+   * behind it fills the whole screen.
+   */
+  private safe: SafeArea = NO_SAFE_AREA;
 
   constructor() {
     super('hud');
@@ -126,15 +133,25 @@ export class HudScene extends Phaser.Scene {
   }
 
   private layout(): void {
-    const { width, height } = screenSize(this.scale);
-    this.cameras.main.setSize(this.scale.width, this.scale.height);
+    this.safe = safeAreaIn(this.game.canvas);
+    this.cameras.main.setSize(this.scale.width, this.scale.height).setScroll(-this.safe.left, -this.safe.top);
+    const { width, height } = this.area();
     if (this.touch) this.layoutTouch(width, height);
     else this.layoutDesktop(width, height);
     if (this.card) this.card.setPosition(width / 2, this.cardY(this.card.getData('h') as number));
   }
 
-  /** Tells the camera how far in the interface reaches, when that changes. */
-  private setInsets(insets: Insets): void {
+  /** The room the interface is laid out in, CSS px: the screen less the notch and home bar. */
+  private area(): { width: number; height: number } {
+    const { width, height } = screenSize(this.scale);
+    const { top, right, bottom, left } = this.safe;
+    return { width: Math.max(0, width - left - right), height: Math.max(0, height - top - bottom) };
+  }
+
+  /** Tells the camera how far in the interface reaches from the screen's edges, when that changes. */
+  private setInsets(within: Insets): void {
+    const { top, right, bottom, left } = this.safe;
+    const insets: Insets = { ...within, top: within.top + top, right: within.right + right, bottom: within.bottom + bottom, left: within.left + left };
     const was = this.registry.get(HUD_INSETS_KEY) as Insets | undefined;
     if (was && JSON.stringify(was) === JSON.stringify(insets)) return;
     this.registry.set(HUD_INSETS_KEY, insets);
@@ -159,7 +176,9 @@ export class HudScene extends Phaser.Scene {
     this.hintButton.setPosition(plan.hint.x, plan.hint.y).setVisible(playing);
     this.stick.place(plan.stick.x, plan.stick.y);
     this.stick.setVisible(playing);
-    this.registry.set(STICK_REST, playing ? this.stick.restAt : null);
+    // The board hears fingers in screen px; the stick sits in the interface's room.
+    const rest = this.stick.restAt;
+    this.registry.set(STICK_REST, playing ? { x: rest.x + this.safe.left, y: rest.y + this.safe.top } : null);
     this.jumpButton.setPosition(plan.jump.x, plan.jump.y).setVisible(playing);
     this.tip.place(plan.tip.x, plan.tip.y, Math.min(plan.tip.maxW, 460), true, true);
     this.leave.root.setPosition(plan.leave.x, plan.leave.y);
@@ -200,7 +219,7 @@ export class HudScene extends Phaser.Scene {
   }
 
   private cardY(h: number): number {
-    const { height } = screenSize(this.scale);
+    const { height } = this.area();
     return Math.max(h / 2 + 70, height * 0.38);
   }
 
@@ -319,7 +338,8 @@ export class HudScene extends Phaser.Scene {
   }
 
   private onStick(hold: StickHold | null): void {
-    this.stick.update(hold);
+    // The board says where the thumb is in screen px: into the interface's room.
+    this.stick.update(hold && { ...hold, x: hold.x - this.safe.left, y: hold.y - this.safe.top });
   }
 
   /** How much further the camera zooms each way: a button at its limit fades. */
@@ -344,7 +364,7 @@ export class HudScene extends Phaser.Scene {
     this.levelTip = false;
     this.tip.hide();
     if (r.offer) trackOffer('free_end');
-    const { width } = screenSize(this.scale);
+    const { width } = this.area();
     const card = resultCard(this, r, this.info?.level, width, {
       again: () => this.game.events.emit('cmd:restart'),
       map: () => this.game.events.emit('cmd:map'),

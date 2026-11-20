@@ -6,6 +6,7 @@ import { getFullError, getHost, trackOffer } from '../host';
 import { BUILT_CHAPTERS, CHAPTER_NAMES, CHAPTERS, FREE_CHAPTERS, LEVELS, LEVELS_PER_CHAPTER } from '../level';
 import { loadPaidChapters } from './BootScene';
 import { DPR, screenSize } from './hidpi';
+import { NO_SAFE_AREA, safeAreaIn, type SafeArea } from './safeArea';
 import { computeMapLayout, MAP, regionAt, type MapLayout, type MapNode } from './map/layout';
 import { ChapterCard } from './map/chapterCard';
 import { LevelCard } from './map/levelCard';
@@ -66,6 +67,8 @@ export class MenuScene extends Phaser.Scene {
   private currentNode!: MapNode;
   private uiLayer!: Phaser.GameObjects.Layer;
   private ui = { width: 0, height: 0 };
+  /** The notch and home bar's reach: the map runs under them, the bar's buttons and tags keep out. */
+  private safe: SafeArea = NO_SAFE_AREA;
   private following = false;
 
   constructor() {
@@ -97,6 +100,7 @@ export class MenuScene extends Phaser.Scene {
     const lockedIds = (c: number): string[] => Array.from({ length: LEVELS_PER_CHAPTER }, (_, i) => `locked-${c + 1}-${i + 1}`);
     // The page grows to the screen's width, so no table shows either side of it.
     const screen = screenSize(this.scale);
+    this.safe = safeAreaIn(this.game.canvas);
     const touch = !isDesktop();
     const fit = touch ? TOUCH_FIT : FIT;
     this.zoom = Phaser.Math.Clamp(Math.min(screen.width / fit.w, screen.height / fit.h), 0.45, touch ? MAX_ZOOM.touch : MAX_ZOOM.desk);
@@ -140,7 +144,7 @@ export class MenuScene extends Phaser.Scene {
     const nodes = buildNodes(this, this.layout, world, states, names, this.progress, textRes);
     for (const hit of nodes.hits) {
       hit.zone.on('pointerup', (p: Phaser.Input.Pointer) => {
-        if (p.y / DPR < TOP_BAR) return;
+        if (p.y / DPR < this.barBottom) return;
         this.tapNode(hit);
       });
     }
@@ -155,9 +159,11 @@ export class MenuScene extends Phaser.Scene {
     this.walker = new NibWalker(this, this.layout, this.layout.nodeS[at.index]!, world);
     this.registry.set(NIB_AT, this.currentNode.levelId);
 
-    this.buildUi(screen);
+    const { top, right, bottom, left } = this.safe;
+    this.buildUi({ width: screen.width - left - right, height: screen.height - top - bottom });
     cam.ignore(this.uiLayer);
-    this.cameras.add(0, 0, this.scale.width, this.scale.height).setZoom(DPR).setOrigin(0).ignore([table, paint, world]);
+    // The bar and tags are laid out in the safe room; their camera scrolls by its top-left corner.
+    this.cameras.add(0, 0, this.scale.width, this.scale.height).setZoom(DPR).setOrigin(0).setScroll(-left, -top).ignore([table, paint, world]);
 
     this.focusY = this.clampY(at.y - 40);
     this.targetY = this.focusY;
@@ -192,9 +198,14 @@ export class MenuScene extends Phaser.Scene {
     return screenSize(this.scale).height / this.zoom / 2;
   }
 
+  /** Where the bar ends, from the screen's top (CSS px). */
+  private get barBottom(): number {
+    return TOP_BAR + this.safe.top;
+  }
+
   private clampY(y: number): number {
     const half = this.halfView();
-    return Phaser.Math.Clamp(y, half - TOP_BAR / this.zoom, this.layout.height - half);
+    return Phaser.Math.Clamp(y, half - this.barBottom / this.zoom, this.layout.height - half);
   }
 
   private walkOn(): void {
@@ -281,9 +292,11 @@ export class MenuScene extends Phaser.Scene {
     const h = screen.height;
     this.ui = { width: w, height: h };
     bakeUi(this);
-    // The bar: a strip of old map paper torn along its bottom, running off both sides and the top.
-    const barW = Math.ceil((w + 40) / 64) * 64;
-    this.uiLayer.add(paperCard(this, w / 2, TOP_BAR / 2 - 8, barW, TOP_BAR + 16, 31, { radius: 2, rough: 1.8, shadow: 0.6, tint: 'parchment' }));
+    // The bar: a strip of old map paper torn along its bottom, running off both sides and the top (under a notch too).
+    const { top, right, left } = this.safe;
+    const barW = Math.ceil((w + left + right + 40) / 64) * 64;
+    const barH = TOP_BAR + top + 16;
+    this.uiLayer.add(paperCard(this, (w + right - left) / 2, TOP_BAR - barH / 2, barW, barH, 31, { radius: 2, rough: 1.8, shadow: 0.6, tint: 'parchment' }));
     const text = (x: number, y: number, s: string, size: number, color = INK): Phaser.GameObjects.Text =>
       this.add.text(x, y, s, { fontFamily: FONT, fontSize: `${size}px`, fontStyle: '700', color, padding: { x: 6, y: 3 } }).setOrigin(0.5).setResolution(DPR * 1.5);
     const narrow = w < 640;

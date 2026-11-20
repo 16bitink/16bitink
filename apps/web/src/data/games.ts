@@ -61,6 +61,11 @@ export interface CatalogGame {
   readonly icon?: string;
   /** Screen orientation once installed. */
   readonly orientation?: 'any' | 'landscape' | 'portrait';
+  /**
+   * The game draws edge to edge, under a notch and the home bar, and keeps its own controls
+   * clear of them (env(safe-area-inset-*)). Unset: the play page insets the stage by the safe areas.
+   */
+  readonly fullBleed?: boolean;
   readonly fonts?: GameFonts;
   readonly features?: readonly string[];
   readonly controls?: readonly string[];
@@ -280,6 +285,7 @@ export const GAMES: readonly CatalogGame[] = [
   {
     slug: 'inkpin',
     title: 'InkPin',
+    fullBleed: true,
     tagline: 'Pull the pins. Get the gold. Get out.',
     kind: 'pin puzzle game',
     fansOf: {
