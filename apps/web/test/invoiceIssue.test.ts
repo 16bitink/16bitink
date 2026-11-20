@@ -1,6 +1,6 @@
 import type Stripe from 'stripe';
 import { describe, expect, it, vi } from 'vitest';
-import { BACKFILL_KEY, backfillStripeInvoice, invoiceForBackfill, invoiceForCheckout } from '../src/lib/invoices/issue';
+import { BACKFILL_KEY, backfillStripeInvoice, invoiceForBackfill, invoiceForCheckout, invoiceFromStripe } from '../src/lib/invoices/issue';
 
 const paid = {
   id: 'cs_live_1', object: 'checkout.session', status: 'complete', payment_status: 'paid', amount_total: 499, currency: 'usd',
@@ -108,5 +108,22 @@ describe('saving a backfilled invoice when Stripe reports it paid', () => {
     expect(await invoiceForBackfill(stripe, { id: 'in_c', number: 'X-1', metadata: { game: 'inkfish' } } as unknown as Stripe.Invoice)).toBeNull();
     const unpaid = fakeStripe({ session: { payment_status: 'unpaid' } });
     expect(await invoiceForBackfill(unpaid.stripe, { id: 'in_b', number: 'X-1', metadata: { [BACKFILL_KEY]: 'cs_live_1' } } as unknown as Stripe.Invoice)).toBeNull();
+  });
+});
+
+describe('rebuilding an invoice from Stripe (the download script)', () => {
+  it('uses the invoice Checkout made', async () => {
+    const { stripe } = fakeStripe();
+    expect((await invoiceFromStripe(stripe, { ...paid, invoice: 'in_9' } as Stripe.Checkout.Session))?.number).toBe('ABCD1234-0007');
+  });
+
+  it('finds the backfilled one for an old checkout', async () => {
+    const { stripe } = fakeStripe({ invoices: [{ id: 'in_other', number: 'X-9', metadata: {} }, { id: 'in_b', number: 'ABCD1234-0002', metadata: { [BACKFILL_KEY]: 'cs_live_1' } }] });
+    expect(await invoiceFromStripe(stripe, paid)).toMatchObject({ number: 'ABCD1234-0002', stripeInvoiceId: 'in_b' });
+  });
+
+  it('has none before the backfill ran', async () => {
+    const { stripe } = fakeStripe();
+    expect(await invoiceFromStripe(stripe, paid)).toBeNull();
   });
 });

@@ -30,6 +30,28 @@ export async function invoiceForCheckout(stripe: Stripe, session: Stripe.Checkou
 /** Metadata that ties a backfilled Stripe invoice to the checkout it stands for. */
 export const BACKFILL_KEY = 'checkout_session';
 
+/** The paid backfill invoice of a checkout from before invoice creation, if the backfill has run. Read-only. */
+export async function findBackfillInvoice(stripe: Stripe, session: Stripe.Checkout.Session): Promise<Stripe.Invoice | null> {
+  const customer = idOf(session.customer);
+  if (!customer) return null;
+  for await (const inv of stripe.invoices.list({ customer, status: 'paid', limit: 100 })) {
+    if (inv.metadata?.[BACKFILL_KEY] === session.id) return inv;
+  }
+  return null;
+}
+
+/**
+ * The invoice of any paid checkout, rebuilt from Stripe: the same record the
+ * webhook saved (both are made from the checkout and its Stripe invoice).
+ * Null when it has no Stripe invoice yet (backfill not run).
+ */
+export async function invoiceFromStripe(stripe: Stripe, session: Stripe.Checkout.Session): Promise<InvoiceRecord | null> {
+  const own = await invoiceForCheckout(stripe, session);
+  if (own) return own;
+  const backfilled = await findBackfillInvoice(stripe, session);
+  return backfilled?.id ? invoiceFromCheckout(session, { id: backfilled.id, number: backfilled.number }) : null;
+}
+
 /**
  * A Stripe invoice for a checkout paid before invoices were created at
  * checkout: made now and marked paid out of band, so it takes the next
