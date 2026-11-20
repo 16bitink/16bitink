@@ -8,7 +8,7 @@ import { Hud } from '../scenes/mission/hud';
 import { paintLandMap } from '../scenes/mission/landMap';
 import { MissionScene } from '../scenes/mission/MissionScene';
 import { showCard } from '../ui/cards';
-import { clear } from '../ui/dom';
+import { clear, soundLabel } from '../ui/dom';
 import type { Stage } from './stage';
 
 /** A touch screen held upright: the game asks to be turned (the same query as screensCss's .turn). */
@@ -21,6 +21,9 @@ export interface MissionExits {
   readonly over: (report: MatchReport) => void;
   readonly retry: () => void;
   readonly map: () => void;
+  /** Whether sound is on, and its toggle (returns whether it's on now): the pause card's button and the M key. */
+  readonly soundOn: () => boolean;
+  readonly toggleSound: () => boolean;
 }
 
 /**
@@ -56,6 +59,11 @@ export class MissionRun {
         e.preventDefault();
         if (this.paused) this.resume();
         else this.pause();
+      } else if ((e.key === 'm' || e.key === 'M') && !e.repeat) {
+        const on = this.exits.toggleSound();
+        // The pause card's sound button is its first (showPause).
+        const btn = this.paused ? this.cardRoot.querySelector<HTMLElement>('[data-act="b0"]') : null;
+        if (btn) btn.textContent = soundLabel(on);
       }
     }, { signal: this.off.signal });
     // Leaving the tab pauses, so a phone call doesn't lose the mission.
@@ -94,7 +102,16 @@ export class MissionRun {
     this.board?.setMusicLevel(MUSIC_LEVEL.paused);
     this.controls.release();
     this.controls.enabled = false;
+    this.showPause();
+  }
+
+  /** The pause card: the objective, sound, and the ways out. */
+  private showPause(): void {
     showCard(this.cardRoot, 'Paused', [this.match.objective.title], [
+      // Relabelled in place, so the card doesn't replay its entrance.
+      { label: soundLabel(this.exits.soundOn()), run: (btn) => {
+        btn.textContent = soundLabel(this.exits.toggleSound());
+      } },
       { label: 'Map', run: () => this.exits.map() },
       { label: 'Retry', run: () => this.exits.retry() },
       { label: 'Resume', run: () => this.resume(), kind: 'go' },

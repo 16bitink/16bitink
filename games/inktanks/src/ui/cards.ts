@@ -2,7 +2,8 @@ import { esc, render } from './dom';
 
 export interface CardButton {
   readonly label: string;
-  readonly run: () => void;
+  /** Runs on a click, with the button (to relabel it in place). */
+  readonly run: (button: HTMLElement) => void;
   readonly kind?: 'go' | 'gold';
 }
 
@@ -12,7 +13,7 @@ export interface CardButton {
  * screen's error. A tap outside the panel runs `dismiss`, when given.
  */
 export function showCard(root: HTMLElement, title: string, lines: readonly string[], buttons: readonly CardButton[], dismiss?: () => void): void {
-  const acts: Record<string, () => void> = {};
+  const acts: Record<string, (el: HTMLElement) => void> = {};
   const btns = buttons.map((b, i) => {
     acts[`b${i}`] = b.run;
     return `<button class="btn${b.kind ? ` ${b.kind}` : ''}" data-act="b${i}">${esc(b.label)}</button>`;

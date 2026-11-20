@@ -179,6 +179,14 @@ export class App {
     this.sound.setMusicLevel(screen === 'mission' ? MUSIC_LEVEL.mission : MUSIC_LEVEL.screens);
   }
 
+  /** Sound on or off, saved; returns whether it's on now. Menu, map and the pause card share it. */
+  private toggleSound(): boolean {
+    this.save = { ...this.save, sound: !this.save.sound };
+    this.sound.setMuted(!this.save.sound);
+    this.persist();
+    return this.save.sound;
+  }
+
   menu(): void {
     this.music('menu');
     const p = this.save.progress;
@@ -188,9 +196,7 @@ export class App {
         this.map();
       },
       toggleSound: () => {
-        this.save = { ...this.save, sound: !this.save.sound };
-        this.sound.setMuted(!this.save.sound);
-        this.persist();
+        this.toggleSound();
         this.menu();
       },
       exit: () => {
@@ -206,7 +212,7 @@ export class App {
     this.mapChapter = chapter;
     this.stage.map.showChapter(chapter);
     this.show(() => showMap(this.screen, {
-      progress: this.save.progress, chapter, gate: this.gateCtx,
+      progress: this.save.progress, chapter, gate: this.gateCtx, sound: this.save.sound,
       names: (n) => levelFor(n)?.def.name ?? null,
       project: (x, y) => this.stage.map.toScreen(x, y),
     }, {
@@ -215,6 +221,7 @@ export class App {
       chapter: (i) => (hasLevel(CHAPTERS[i]!.first) && gate(CHAPTERS[i]!.first, this.gateCtx) !== 'paywall' ? this.map(i) : this.open(CHAPTERS[i]!.first)),
       workshop: () => this.workshop(() => this.map(), 'Map'),
       menu: () => this.menu(),
+      toggleSound: () => this.toggleSound(),
       ending: wonTheWar(this.save.progress.medals) ? () => this.ending() : null,
     }));
   }
@@ -282,6 +289,8 @@ export class App {
         this.track({ ...ref, type: 'level_end', result: 'quit', seconds: Math.round(m.t) });
         this.map();
       },
+      soundOn: () => this.save.sound,
+      toggleSound: () => this.toggleSound(),
     }, { seen: this.save.seenBlueprints, mark: () => this.markBlueprintsSeen() }, this.sound);
   }
 

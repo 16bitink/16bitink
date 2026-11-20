@@ -251,3 +251,6 @@ export {
   addDays, daysBetween, eventOn, EVENT_IDS, EVENTS, isDate, missingMovingDates, MOVING_DATES, MOVING_EVENTS, nextEvent, seasonOf, SEASONS,
   type EventId, type EventInfo, type MovingEvent, type Season,
 } from './calendar';
+export {
+  isPhone, minTextPx, PHONE_MEDIA, PHONE_SIDE, PHONE_WORLD_CSS_MIN, PIXEL_TEXT_MIN, STICK_MIN, TEXT_MIN, TOUCH, type ScreenSize,
+} from './phone';
