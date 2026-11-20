@@ -1,7 +1,9 @@
 import type { APIRoute } from 'astro';
 import type Stripe from 'stripe';
 import { db } from '../../lib/db';
+import { saveInvoice } from '../../lib/db/invoiceRepo';
 import { savePurchase, setPaymentStatus } from '../../lib/db/purchaseRepo';
+import { invoiceForBackfill, invoiceForCheckout } from '../../lib/invoices/issue';
 import { requireEnv } from '../../lib/env';
 import { purchaseFromSession } from '../../lib/purchases';
 import { stripeClient } from '../../lib/stripe';
@@ -15,10 +17,28 @@ async function apply(event: Stripe.Event): Promise<void> {
   switch (event.type) {
     case 'checkout.session.completed':
     case 'checkout.session.async_payment_succeeded': {
-      const purchase = purchaseFromSession(event.data.object);
+      const session = event.data.object;
+      const purchase = purchaseFromSession(session);
       if (purchase) {
         await savePurchase(purchase);
         console.info('[webhook] purchase saved', { event: event.id, session: purchase.sessionId, game: purchase.game });
+        // A failure throws: the event answers 500 and Stripe retries (both saves are idempotent).
+        const invoice = await invoiceForCheckout(stripeClient(), session);
+        if (invoice) {
+          await saveInvoice(invoice);
+          console.info('[webhook] invoice issued', { event: event.id, number: invoice.number });
+        } else {
+          console.warn('[webhook] paid checkout has no Stripe invoice', { event: event.id, session: purchase.sessionId });
+        }
+      }
+      return;
+    }
+    case 'invoice.paid': {
+      // Only invoices made by the backfill script (purchases from before Checkout created invoices).
+      const invoice = await invoiceForBackfill(stripeClient(), event.data.object);
+      if (invoice) {
+        await saveInvoice(invoice);
+        console.info('[webhook] backfilled invoice issued', { event: event.id, number: invoice.number });
       }
       return;
     }

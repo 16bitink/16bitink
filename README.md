@@ -84,6 +84,7 @@ Connect it in claude.ai: Settings → Connectors → Add custom connector → `h
    - `charge.refunded`
    - `charge.dispute.created`
    - `charge.dispute.closed`
+   - `invoice.paid` (saves invoices the backfill makes: `pnpm --filter @16bitink/web invoices:backfill`)
 5. **Google:** add `https://16bit.ink/auth/google/callback` to the OAuth client's redirect URIs.
 6. **Domain:** point `16bit.ink` at the app (App Platform issues the certificate).
 

@@ -28,6 +28,14 @@ export function checkoutParams(i: CheckoutInput): Stripe.Checkout.SessionCreateP
     customer_email: i.user.email,
     client_reference_id: i.user.userId,
     automatic_tax: { enabled: i.automaticTax },
+    // A tax invoice names the buyer's country and address; businesses can add their tax ID.
+    billing_address_collection: 'required',
+    tax_id_collection: { enabled: true },
+    // Stripe numbers an invoice for every payment: our PDF invoice carries that number.
+    invoice_creation: {
+      enabled: true,
+      invoice_data: { description: `${i.title} full game (one-time purchase)`, metadata: { game: i.game } },
+    },
     allow_promotion_codes: true,
     custom_text: { submit: { message: ONE_TIME_NOTE } },
     payment_intent_data: {

@@ -38,4 +38,14 @@ describe('checkout session parameters', () => {
     expect(checkoutParams(base).automatic_tax).toEqual({ enabled: false });
     expect(checkoutParams({ ...base, automaticTax: true }).automatic_tax).toEqual({ enabled: true });
   });
+
+  it('asks for the billing address and tax ID a tax invoice needs, and has Stripe number an invoice', () => {
+    const p = checkoutParams(base);
+    expect(p.billing_address_collection).toBe('required');
+    expect(p.tax_id_collection).toEqual({ enabled: true });
+    expect(p.invoice_creation).toEqual({
+      enabled: true,
+      invoice_data: { description: 'InkFish full game (one-time purchase)', metadata: { game: 'inkfish' } },
+    });
+  });
 });

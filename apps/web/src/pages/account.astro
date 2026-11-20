@@ -6,6 +6,11 @@ import { currentUser } from '../lib/owner';
 import { formatPlayerId } from '../lib/playerId';
 import { signInPageUrl } from '../lib/buyFlow';
 import { sundayReader } from '../lib/sunday';
+import { findPurchasesFor } from '../lib/db/purchaseRepo';
+import { findInvoicesForSessions } from '../lib/db/invoiceRepo';
+import { invoiceDate, money } from '../lib/invoices/format';
+import { isLocalHost } from '../lib/devUnlock';
+import type { InvoiceRecord } from '../lib/invoices/invoice';
 
 export const prerender = false;
 
@@ -21,6 +26,15 @@ try {
   playerId = formatPlayerId(await ensurePlayerId(session.userId));
 } catch (err) {
   console.error('[account] could not load the player id', err);
+}
+// Tax invoices for the games this account bought (test-mode ones only on localhost).
+let invoices: InvoiceRecord[] = [];
+try {
+  const purchases = await findPurchasesFor(session.userId);
+  const allowTest = isLocalHost(Astro.url.hostname);
+  invoices = (await findInvoicesForSessions(purchases.map((p) => p.sessionId))).filter((i) => i.livemode || allowTest);
+} catch (err) {
+  console.error('[account] could not load invoices', err);
 }
 // The Sunday email: on or off, from here as easily as it was joined (one tap).
 const reader = await sundayReader(session);
@@ -50,6 +64,19 @@ const sundayOutcome = SUNDAY_MESSAGES[Astro.url.searchParams.get('sunday') ?? ''
       Need help with a game? Send us this ID instead of your email.
       It identifies your account to us but says nothing about who you are.
     </p>
+    {invoices.length > 0 && (
+      <div class="invoices">
+        <p class="pixel-label">Invoices</p>
+        <ul>
+          {invoices.map((inv) => (
+            <li>
+              <span>{inv.items[0]?.description ?? inv.game}<br /><small>{invoiceDate(inv.issuedAt)} · {money(inv.total, inv.currency)}</small></span>
+              <a class="btn" href={`/account/invoices/${inv.number}`} target="_blank" rel="noopener">Invoice {inv.number}</a>
+            </li>
+          ))}
+        </ul>
+      </div>
+    )}
     {reader && (
       <div id="sunday" class="sunday-setting">
         <p class="pixel-label">Sunday email</p>
@@ -106,6 +133,11 @@ const sundayOutcome = SUNDAY_MESSAGES[Astro.url.searchParams.get('sunday') ?? ''
   .player-id .btn { padding: 8px 16px; font-size: 1.2rem; }
   .player-id-error { color: var(--red-ink); }
   .player-id-note { color: var(--ink-soft); }
+  .invoices { margin-top: 28px; padding-top: 22px; border-top: 2px dashed var(--ink-faint); }
+  .invoices ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+  .invoices li { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; text-align: left; }
+  .invoices small { color: var(--ink-soft); }
+  .invoices .btn { padding: 8px 16px; font-size: 1.2rem; min-height: 44px; display: inline-flex; align-items: center; }
   .sunday-setting { margin-top: 28px; padding-top: 22px; border-top: 2px dashed var(--ink-faint); overflow-wrap: anywhere; }
   .sunday-setting p { margin: 0 0 12px; }
   .sunday-outcome { font-family: var(--font-hand); font-size: 1.5rem; color: var(--blue-ink); }
