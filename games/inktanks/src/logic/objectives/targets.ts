@@ -34,13 +34,16 @@ export function raid(m: Match, def: Extract<ObjectiveDef, { kind: 'raid' }>): Ob
   };
 }
 
-/** Freed crews ride a small cart this fast, and are this tough. */
-export const CREW = { speed: 120, radius: 12, hp: 200, homeRadius: 130, gap: 46, duck: 380 } as const;
+/**
+ * Freed crews ride a small cart this fast, and are this tough. They follow `gap` px behind,
+ * `warGap` while an enemy is within `duck` (the stand-in clears those first).
+ */
+export const CREW = { speed: 120, radius: 12, hp: 200, homeRadius: 130, gap: 46, warGap: 160, duck: 380 } as const;
 
 /**
  * Rescue: break the cages (tagged structures); each frees a crew that
- * follows you in a line (and stays down while enemies are within
- * CREW.duck). Bring them home; crews can be hit, and losing one fails.
+ * follows you in a line at once (further back while enemies are close).
+ * Bring them home; crews can be hit, and losing one fails.
  */
 export function rescue(m: Match, def: Extract<ObjectiveDef, { kind: 'rescue' }>): Objective {
   const cages = m.structs.filter((s) => s.def.tag === def.tag);
@@ -111,10 +114,13 @@ export function rescue(m: Match, def: Extract<ObjectiveDef, { kind: 'rescue' }>)
       const line = following();
       const ahead = line[line.indexOf(t) - 1] ?? m.player;
       const d = dist(t, ahead);
-      // A crew keeps its head down while enemies are close, and follows once it's clear.
+      // A freed crew comes after you at once, fight or no fight: one that stayed down by its cage
+      // while a guard was near looked stuck (level 6, owner, Nov 20). With enemies close it keeps
+      // further back, out of the shots aimed at you (enemies never aim at crews).
       const danger = m.tanks.some((o) => o.alive && o.team !== 0 && o.role !== 'bossTurret' && dist(o, t) < CREW.duck);
-      if (d < CREW.gap || danger) return { move: null, aim: null, fire: false, swap: false, repair: false };
-      return { move: { kind: 'point', angle: navAngle(m, t, ahead), mag: Math.min(1, (d - CREW.gap) / 60) }, aim: null, fire: false, swap: false, repair: false };
+      const gap = danger ? CREW.warGap : CREW.gap;
+      if (d < gap) return { move: null, aim: null, fire: false, swap: false, repair: false };
+      return { move: { kind: 'point', angle: navAngle(m, t, ahead), mag: Math.min(1, (d - gap) / 60) }, aim: null, fire: false, swap: false, repair: false };
     },
     marks: () => (saved >= need ? [] : [{ kind: 'pickup', x: home.x, y: home.y, r: CREW.homeRadius }]),
     props: () => [{ kind: 'truck', x: truck.x, y: truck.y, heading: truck.heading }],

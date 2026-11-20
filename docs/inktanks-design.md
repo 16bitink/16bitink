@@ -265,7 +265,7 @@ Every level has a short briefing, one **main objective** and two **bonus objecti
 | **Escort** | Get a supply truck to a point | The truck follows a road; enemies hunt it, not only you |
 | **Hold** | Hold a zone for N seconds | Waves arrive from marked directions |
 | **Ace** | Destroy a named enemy ace | Aces carry rare tech (prototype parts) found nowhere else |
-| **Rescue** | Break the cages and bring the captured crews home | Freed crews follow you on foot or in a truck; they can be hit (they stay down while enemies are close, and enemies don't aim at them: losing one fails) |
+| **Rescue** | Break the cages and bring the captured crews home | Freed crews follow you on foot at once, keeping further back (160 px) while enemies are close; they can be hit (enemies don't aim at them: losing one fails). A standing cage shows its otter inside |
 | **Ambush** | Stop a convoy before it leaves the map | Pick where to cut it off; it doesn't wait for you |
 | **Salvage** | Take a crashed prototype to the pick-up | Carrying it slows you and every enemy comes for it |
 | **Breakout** | Reach the exit before the timer | A gauntlet: artillery marks, hazards, a race against time |

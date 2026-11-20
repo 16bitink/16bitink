@@ -17,6 +17,8 @@ const PROP = Object.values(artJson)[0]?.props ?? {};
 const A_TO_C = 2;
 const OVER = 5000;
 const NEAR = 700;
+/** The caged crew: the freed crew's south-facing standing frame, lifted so its feet sit on the cage floor. */
+const PRISONER = { frame: 'crew/crew-s-0', dy: -8 } as const;
 
 type Piece = { key: string; over: boolean };
 function pieces(kind: string, state: number): Piece[] {
@@ -126,9 +128,22 @@ export class StructLayer {
       v.objs.push(img);
       if (p.roof || p.sortY >= 999) v.over.push(img);
     }
+    const prisoner = this.prisoner(s);
+    if (prisoner) v.objs.push(prisoner);
     const r = w.art.roofFade[String(artState(w.art, s.state))];
     if (r) this.fades.set(s.def.id, { x: s.def.x - ax + r[0], y: s.def.y - ay + r[1], w: r[2], h: r[3] });
     return v;
+  }
+
+  /**
+   * The otter crew inside a standing rescue cage, between its back and its front bars, so
+   * you can see who to free. Once the cage breaks the crew is a tank of its own (tankView).
+   */
+  private prisoner(s: StructRt): Phaser.GameObjects.Image | null {
+    if (s.def.kind !== 'cage' || s.state === 0) return null;
+    const key = worldKey(PRISONER.frame);
+    if (!this.scene.textures.exists(key)) return null;
+    return this.scene.add.image(s.def.x, s.def.y + PRISONER.dy, key).setDepth(footDepth(s.def.y));
   }
 
   /** A flat placeholder: footprint, a south facade and a top lifted by its height. */

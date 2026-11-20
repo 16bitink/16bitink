@@ -157,6 +157,21 @@ describe('raid and rescue', () => {
     expect(m.over?.passed).toBe(true);
     expect(Math.hypot(m.objective.props()[0]!.x - truck.x, m.objective.props()[0]!.y - truck.y)).toBeGreaterThan(150);
   });
+  it('rescue: a freed crew follows you even with an enemy close (level 6: every cage sits by a guard)', () => {
+    const level = load(fixture({ kind: 'rescue', tag: 'cage', home: 'a' }, [{ role: 'guard', clan: 'boars', tank: 'machinegun1/light1/wheels1', at: 'b' }], { structures: [{ kind: 'cage', x: 1500, y: 450, tag: 'cage' }] }));
+    const m = make(level);
+    freeze(m);
+    const p = m.player!;
+    put(p, { x: 1200, y: 450 });
+    m.structs.forEach((s, i) => s.def.tag === 'cage' && breakStructure(m, i));
+    m.step(1 / 30);
+    const crew = m.tanks.find((t) => t.role === 'crew')!;
+    const guard = m.tanks.find((t) => t.team !== 0)!;
+    expect(Math.hypot(crew.x - guard.x, crew.y - guard.y)).toBeLessThan(CREW.duck);
+    const d0 = Math.hypot(crew.x - p.x, crew.y - p.y);
+    steps(m, 2);
+    expect(Math.hypot(crew.x - p.x, crew.y - p.y)).toBeLessThan(d0 - 100);
+  });
   it('rescue: losing a crew fails', () => {
     const m = make(rescueLevel);
     m.structs.forEach((s, i) => s.def.tag === 'cage' && breakStructure(m, i));
