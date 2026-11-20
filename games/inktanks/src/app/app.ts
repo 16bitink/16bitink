@@ -13,7 +13,7 @@ import { AccountSync } from '../logic/accountSave';
 import { parseSave, SAVE_KEY, serializeSave, type SaveData } from '../logic/save';
 import type { Progress } from '../logic/workshop';
 import { showBriefing } from '../ui/briefing';
-import { showBoot, showCard } from '../ui/cards';
+import { showCard } from '../ui/cards';
 import { clear } from '../ui/dom';
 import { showEnding } from '../ui/ending';
 import { showMap } from '../ui/mapScreen';
@@ -78,13 +78,9 @@ export class App {
     this.root.addEventListener('click', (e) => {
       if ((e.target as Element | null)?.closest?.('button')) this.sound.click();
     });
-    const bar = showBoot(this.screen);
     this.host.loading?.progress(0, 'rolling out the tanks…');
     this.stage = new Stage(this.surface, {
-      onProgress: (f) => {
-        bar(f);
-        this.host.loading?.progress(f * 0.9, 'rolling out the tanks…');
-      },
+      onProgress: (f) => this.host.loading?.progress(f * 0.9, 'rolling out the tanks…'),
       onLoadError: (what) => console.error(`[inktanks] could not load ${what}`),
       onReady: () => void this.booted(),
     });

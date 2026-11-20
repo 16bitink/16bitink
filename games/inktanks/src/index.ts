@@ -15,7 +15,8 @@ export const GAME_ID = 'inktanks';
 export function mount(parent: HTMLElement, host: GameHost): GameHandle & { readonly app: Promise<App> } {
   injectStyles(parent.ownerDocument);
   let destroyed = false;
-  // The pixel font first, so the boot screen's wordmark is drawn in it (it is small: about 14 KB).
+  // The pixel font first, so the first screen is drawn in it (it is small: about 14 KB). The site's
+  // loading screen covers the game until App calls host.loading.ready().
   const app = loadUiFont().then(() => {
     if (destroyed) throw new Error('destroyed before it mounted');
     return new App(parent, host);

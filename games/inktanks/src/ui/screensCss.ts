@@ -132,8 +132,6 @@ export const SCREENS_CSS = `
 .ikt .briefing .wingpics { display: flex; gap: 4px; align-items: center; }
 .ikt .promo { text-align: center; padding: 10px; background: #3a2c14; box-shadow: inset 0 0 0 2px var(--gold); animation: ikt-pop 0.8s steps(6) both; }
 .ikt .modal { width: min(520px, 94vw); text-align: center; display: flex; flex-direction: column; gap: 12px; align-items: center; }
-.ikt .boot { flex-direction: column; gap: 16px; }
-.ikt .boot .bar { width: min(360px, 70vw); }
 /* The ending (after level 50): the victory painting full screen under the title, then the war in numbers over it dimmed. */
 .ikt .screen.ending.hero { background: var(--ink); padding: 0; }
 .ikt .endhero { position: absolute; inset: 0; cursor: pointer; animation: ikt-rise 0.6s steps(6) both; }
