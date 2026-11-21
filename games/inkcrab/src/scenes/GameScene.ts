@@ -45,7 +45,7 @@ import { shellSeenId } from '../guide/catalog';
 import { START_SHELL } from '../level/goal';
 import { wrackAt } from '../logic/kelp';
 import type { Box } from '../logic/hintFade';
-import { DPR, screenZoom, viewSize } from './hidpi';
+import { DPR, screenToView, screenZoom, viewSize } from './hidpi';
 import type { ResultData } from './ResultScene';
 import { HAND_FONT, inkText } from './ui';
 
@@ -332,12 +332,13 @@ export class GameScene extends Phaser.Scene {
     this.drawPointer(time);
   }
 
-  /** Where the crab is on screen, in CSS pixels: for the HUD to keep its notes from hiding it. */
+  /** Where the crab is on screen, in the interface's CSS pixels (see screenSize): for the HUD to keep its notes from hiding it. */
   crabOnScreen(): Box {
     const cam = this.cameras.main;
     const z = screenZoom(cam);
     const b = this.beach.crab.body;
-    return { x: (b.x - cam.worldView.x) * z, y: (b.y - cam.worldView.y) * z, w: b.w * z, h: b.h * z };
+    const at = screenToView((b.x - cam.worldView.x) * z, (b.y - cam.worldView.y) * z);
+    return { x: at.x, y: at.y, w: b.w * z, h: b.h * z };
   }
 
   /** The kelp heap the crab is down in thins out; the fog clears round the crab. */

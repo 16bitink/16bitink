@@ -26,7 +26,7 @@ import { SnakeView } from './game/snakeView';
 import { RivalSnake } from '../logic/enemies/rival';
 import { SFX_IDS } from '../audio/recipes';
 import { CHAPTER_VIEWS, type ChapterView } from '../art/chapters/index';
-import { DPR, viewSize } from './hidpi';
+import { DPR, safeCentreShift, viewSize } from './hidpi';
 import type { HudScene } from './HudScene';
 import type { ResultData } from './ResultScene';
 import type { DailyStart } from '../daily/client';
@@ -140,6 +140,9 @@ export class GameScene extends Phaser.Scene {
     return this.scene.get('Hud') as HudScene | undefined;
   }
 
+  /** The camera's turn (radians): a quarter on a phone held upright. */
+  private turn = 0;
+
   /**
    * The whole board in view (and its wall), as big as the screen allows,
    * centred. On a phone held upright the board (seen from above) turns a
@@ -154,15 +157,16 @@ export class GameScene extends Phaser.Scene {
     const whole = Math.max(0.1, turned ? Math.min(width / bh, (height - UPRIGHT_HUD * 2) / bw) : Math.min(width / bw, (height - LANDSCAPE_HUD) / bh));
     const small = wantsFollow(width, height);
     const zoom = small ? followZoom(whole, this.world.snake.width, width, height, turned) : whole;
-    const cam = this.cameras.main.setZoom(DPR * zoom).setRotation(turned ? Math.PI / 2 : 0);
+    this.turn = turned ? Math.PI / 2 : 0;
+    const cam = this.cameras.main.setZoom(DPR * zoom).setRotation(this.turn);
     if (small) {
       const view = viewExtent(width, height, zoom, turned);
       const state = followStart(this.world.snake.head, this.world.snake.heading, view);
       this.follow = { view, state };
-      cam.centerOn(state.centre.x, state.centre.y);
+      this.centreOn(state.centre.x, state.centre.y);
     } else {
       this.follow = null;
-      cam.centerOn(BOARD.w / 2, BOARD.h / 2 - (turned ? 0 : LANDSCAPE_HUD / 2 / zoom));
+      this.centreOn(BOARD.w / 2, BOARD.h / 2 - (turned ? 0 : LANDSCAPE_HUD / 2 / zoom));
     }
     this.fx.turn = turned ? Math.PI / 2 : 0;
     // Words on the board are sized in board px: lift them where the board is drawn small.
@@ -186,7 +190,22 @@ export class GameScene extends Phaser.Scene {
     if (!f) return;
     const s = this.world.snake;
     f.state = followStep(f.state, s.head, s.heading, dt, f.view);
-    this.cameras.main.centerOn(f.state.centre.x, f.state.centre.y);
+    this.centreOn(f.state.centre.x, f.state.centre.y);
+  }
+
+  /**
+   * Puts board point (x, y) in the middle of the safe area, which the board is
+   * framed for (viewSize): off the screen's middle by the notch and home bar,
+   * back through the camera's turn and zoom into board px.
+   */
+  private centreOn(x: number, y: number): void {
+    const cam = this.cameras.main;
+    const zoom = cam.zoom / DPR;
+    const shift = safeCentreShift();
+    const turn = this.turn;
+    const dx = (shift.x * Math.cos(turn) + shift.y * Math.sin(turn)) / zoom;
+    const dy = (-shift.x * Math.sin(turn) + shift.y * Math.cos(turn)) / zoom;
+    cam.centerOn(x - dx, y - dy);
   }
 
   private levelRef(): { level: string; n: number; name: string } {

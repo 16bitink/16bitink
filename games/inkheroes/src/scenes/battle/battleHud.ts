@@ -101,9 +101,10 @@ export class BattleHud {
 
   /** Lays the interface out for the canvas as it is now (call after the cameras refit). */
   layout(): void {
-    // Room under the world, device pixels, for the bar at a zoom that fits its row of buttons.
-    const below = this.scene.scale.height - this.worldBottomDevice();
-    const barK = Math.max(1, Math.floor(this.scene.scale.width / BAR_W));
+    // Room under the world, device pixels, for the bar at a zoom that fits its row of buttons (in the safe area).
+    const safe = this.cams.safeRect();
+    const below = safe.height - this.worldBottomDevice();
+    const barK = Math.max(1, Math.floor(safe.width / BAR_W));
     this.turnHint.img.setVisible(false);
     if (below >= BAR_H * barK) this.layoutBar(barK);
     else this.layoutSides();
@@ -113,7 +114,7 @@ export class BattleHud {
     if (this.card) this.card.close();
   }
 
-  /** The world's bottom edge on the canvas, device pixels. */
+  /** The world's bottom edge below the safe area's top, device pixels. */
   private worldBottomDevice(): number {
     const o = this.cams.worldToUi(0, WORLD.h);
     return o.y * this.cams.uiSize().k;

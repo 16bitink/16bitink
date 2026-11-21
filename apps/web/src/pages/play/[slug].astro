@@ -40,7 +40,7 @@ const fontFamilies = ['family=Silkscreen', game.fonts?.googleCss].filter(Boolean
     <link href={`https://fonts.googleapis.com/css2?${fontFamilies}&display=swap`} rel="stylesheet" />
   </head>
   <body style={`--paper:${theme.paper};--ink:${theme.ink};--accent:${theme.accent}`}>
-    <div id="stage" class:list={{ 'full-bleed': game.fullBleed }} aria-label={`${game.title} game`} data-game={game.slug} data-title={game.title} data-price={game.price ?? ''} data-fonts={JSON.stringify(game.fonts?.await ?? [])}>
+    <div id="stage" aria-label={`${game.title} game`} data-game={game.slug} data-title={game.title} data-price={game.price ?? ''} data-fonts={JSON.stringify(game.fonts?.await ?? [])}>
       <div id="splash">
         <p class="brand"><span class="bits">16bit</span><span class="ink">.ink</span></p>
         <!-- What you're about to play, while there's room for it (not on a phone held sideways). Usually cached from the home page. -->
@@ -93,20 +93,17 @@ const fontFamilies = ['family=Silkscreen', game.fonts?.googleCss].filter(Boolean
 
     <style is:global>
       html, body { margin: 0; height: 100%; overflow: hidden; background: var(--paper); overscroll-behavior: none; }
-      /* Inset by the safe areas so a notch or home bar never covers the HUD; the paper fills behind them (unless .full-bleed). */
+      /* The whole screen, under a notch and the home bar too: every game keeps its own controls clear of them (game-sdk safeAreaIn). */
       #stage {
-        position: fixed;
-        top: env(safe-area-inset-top); right: env(safe-area-inset-right); left: env(safe-area-inset-left);
-        height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+        position: fixed; inset: 0; height: 100dvh;
         touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
         background: var(--paper);
       }
-      /* A game that keeps its own controls clear of the notch and home bar fills the whole screen. */
-      #stage.full-bleed { inset: 0; height: 100dvh; }
       #stage canvas { display: block; }
       #splash {
         position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
-        gap: 8px; padding: 0 16px; text-align: center;
+        gap: 8px; text-align: center;
+        padding: env(safe-area-inset-top, 0px) max(16px, env(safe-area-inset-right, 0px)) env(safe-area-inset-bottom, 0px) max(16px, env(safe-area-inset-left, 0px));
         font-family: 'Caveat', cursive; color: var(--ink); z-index: 2;
         /* Covers the game's canvas while it boots underneath, then fades out. */
         background: var(--paper); transition: opacity 0.32s ease-out;
@@ -182,7 +179,7 @@ const fontFamilies = ['family=Silkscreen', game.fonts?.googleCss].filter(Boolean
       #refresh-go:active { transform: translate(2px, 3px); box-shadow: none; }
       #refresh-go:focus-visible { outline: 3px dashed var(--accent); outline-offset: 5px; }
       .version {
-        position: absolute; right: 14px; bottom: 10px; margin: 0;
+        position: absolute; right: calc(14px + env(safe-area-inset-right, 0px)); bottom: calc(10px + env(safe-area-inset-bottom, 0px)); margin: 0;
         font-family: 'Silkscreen', monospace; font-size: 0.7rem; color: var(--ink); opacity: 0.55;
       }
     </style>

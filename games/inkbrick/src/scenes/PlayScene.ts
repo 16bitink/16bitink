@@ -1,3 +1,4 @@
+import { safeAreaIn } from '@16bitink/game-sdk';
 import Phaser from 'phaser';
 import type { SoundBoard } from '../audio/sound';
 import { boardLayout, type BoardLayout } from '../render/layout';
@@ -156,7 +157,10 @@ export class PlayScene extends Phaser.Scene {
     const dpr = this.dpr;
     const w = this.scale.width;
     const h = this.scale.height;
-    this.cssLayout = boardLayout(w / dpr, h / dpr);
+    // The site's play page lets the board's surround fill the screen: the board and its HUD keep clear of a notch and the home bar.
+    const safe = safeAreaIn(this.game.canvas);
+    const inSafe = boardLayout(w / dpr - safe.left - safe.right, h / dpr - safe.top - safe.bottom);
+    this.cssLayout = { ...inSafe, x: inSafe.x + safe.left, y: inSafe.y + safe.top };
     const l = this.cssLayout;
     this.board.setPosition(l.x * dpr, l.y * dpr).setScale(l.scale * dpr);
     if (this.backdrop instanceof Phaser.GameObjects.Image) {

@@ -218,13 +218,14 @@ export class Hud {
     // Pops stay under the goal line and inside the screen (a boss near the top edge used to push its pop into the goal).
     const top = this.goal.offsetTop + this.goal.offsetHeight + 18;
     const width = this.root.clientWidth;
+    const toHud = this.toHud();
     this.popList = this.popList.filter((p) => {
       const k = (m.t - p.at) / POP_S;
       if (k >= 1) {
         p.el.remove();
         return false;
       }
-      const s = project(p.x, p.y);
+      const s = toHud(project(p.x, p.y));
       const half = p.el.offsetWidth / 2 + 8;
       const x = width > half * 2 ? Math.min(width - half, Math.max(half, s.x)) : s.x;
       const y = Math.max(top, s.y - 78 - k * 36);
@@ -402,15 +403,22 @@ export class Hud {
     c.restore();
   }
 
+  /** From the page's viewport (where `project` puts a world point) to the HUD's own box, which keeps to the safe area. */
+  private toHud(): (p: { x: number; y: number }) => { x: number; y: number } {
+    const r = this.root.getBoundingClientRect();
+    return (p) => ({ x: p.x - r.left, y: p.y - r.top });
+  }
+
   /** An arrow at the screen edge pointing to an off-screen target. */
   private drawArrow(target: { x: number; y: number } | null, project: Project): void {
     if (!target) {
       this.arrow.style.display = 'none';
       return;
     }
-    const sp = project(target.x, target.y);
-    const w = innerWidth;
-    const h = innerHeight;
+    // Within the HUD's box: the safe area, clear of a notch and the home bar.
+    const sp = this.toHud()(project(target.x, target.y));
+    const w = this.root.clientWidth;
+    const h = this.root.clientHeight;
     const on = sp.x > ARROW_MARGIN && sp.x < w - ARROW_MARGIN && sp.y > ARROW_MARGIN && sp.y < h - ARROW_MARGIN;
     this.arrow.style.display = on ? 'none' : 'block';
     if (on) return;

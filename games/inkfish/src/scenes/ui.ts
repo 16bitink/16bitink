@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { getSound } from '../host';
 import { INK } from '../art/pen';
 import { createRng } from '../logic/rng';
-import { toView, viewSize } from './hidpi';
+import { fullViewSize, toView, viewSize } from './hidpi';
 
 export const HAND_FONT = '"Caveat", "Patrick Hand", "Comic Sans MS", cursive';
 export const INK_HEX = 0x1b1a1f;
@@ -78,9 +78,9 @@ export function inkButton(
   return c;
 }
 
-/** Paper background that fills the current viewport. */
+/** Paper background that fills the whole screen, under the notch too. */
 export function paperBackdrop(scene: Phaser.Scene): Phaser.GameObjects.TileSprite {
-  const { width, height } = viewSize(scene);
+  const { width, height } = fullViewSize(scene);
   return scene.add.tileSprite(0, 0, width, height, 'paper').setOrigin(0).setScrollFactor(0);
 }
 
