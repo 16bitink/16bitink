@@ -139,6 +139,31 @@ const SHORTS: Readonly<Record<string, () => Promise<Short>>> = {
     const { createBadger, BADGER_CREDIT } = await import('./badger/render');
     return withCredit(createBadger(ctx), ctx, PAPER_ON_DARK, BADGER_CREDIT);
   },
+  gulpcapy: async () => {
+    await loadCaptionFont();
+    const { createGulpCapy } = await import('./gulpcapy/render');
+    return createGulpCapy(ctx);
+  },
+  gulpcaiman: async () => {
+    await loadCaptionFont();
+    const { createGulpCaiman } = await import('./gulpcaiman/render');
+    return createGulpCaiman(ctx);
+  },
+  gulppython: async () => {
+    await loadCaptionFont();
+    const { createGulpPython } = await import('./gulppython/render');
+    return createGulpPython(ctx);
+  },
+  gulpmoray: async () => {
+    await loadCaptionFont();
+    const { createGulpMoray } = await import('./gulpmoray/render');
+    return createGulpMoray(ctx);
+  },
+  secretary: async () => {
+    await loadCaptionFont();
+    const { createSecretary } = await import('./secretary/render');
+    return createSecretary(ctx);
+  },
 };
 
 const name = params.get('short') ?? 'kit';

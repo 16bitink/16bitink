@@ -9,6 +9,8 @@ import { createKit } from './foodchain/kit';
 import { createFoodchain } from './foodchain/render';
 import { createSeamonstersKit } from './seamonsters/kit';
 import { createSeamonsters } from './seamonsters/render';
+import { createSharksizeKit } from './sharksize/kit';
+import { createSharksize } from './sharksize/render';
 import { createSwallowedKit } from './swallowed/kit';
 import { createSwallowed } from './swallowed/render';
 import { createSwallowyou } from './swallowyou/render';
@@ -26,7 +28,7 @@ import { createSurvival } from './survival/render';
  * seamonsters ("sea monsters size comparison… but every one is real") or
  * seamonsters-kit (its new drawings), bitecomp ("bite force comparison… but
  * every number is real") or bitecomp-kit (its heads), swallowed ("swallowed whole
- * size comparison… but every meal is real") or swallowed-kit (its swallows), survival ("100 fish enter a survival tournament… only one can win") or survival-kit (its cast and faces), everysize ("how long you'd last at every size in the ocean") or everysize-kit (its new drawings). Plays live; ?t=95 freezes one moment.
+ * size comparison… but every meal is real") or swallowed-kit (its swallows), survival ("100 fish enter a survival tournament… only one can win") or survival-kit (its cast and faces), everysize ("how long you'd last at every size in the ocean") or everysize-kit (its new drawings), sharksize ("shark size comparison… but every shark is real") or sharksize-kit (every shark at one scale; &only=<id> one big with the contract's guides). Plays live; ?t=95 freezes one moment.
  * `pnpm promo -- --only long` (dev/promo/record.mjs) records it frame by frame.
  */
 const canvas = document.getElementById('promo') as HTMLCanvasElement;
@@ -96,6 +98,14 @@ const VIDEOS: Readonly<Record<string, () => Promise<Short>>> = {
   'everysize-kit': async () => {
     await loadCaptionFont();
     return createEverysizeKit(ctx, params.get('only'));
+  },
+  sharksize: async () => {
+    await loadCaptionFont();
+    return createSharksize(ctx);
+  },
+  'sharksize-kit': async () => {
+    await loadCaptionFont();
+    return createSharksizeKit(ctx, params.get('only'));
   },
 };
 

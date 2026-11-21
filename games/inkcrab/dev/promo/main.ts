@@ -88,6 +88,11 @@ const SHORTS: Readonly<Record<string, () => Promise<Short>>> = {
   birdsnatch: narrated(createBirdSnatch),
   // Its credit waits for the invitation at the end and names the short link.
   heroncrab: narrated(createHeronCrab, false, { text: 'InkCrab · 16bit.ink/crab', inAt: (HERONCRAB_AT.ctaStart + 0.3) / HERONCRAB_LOOP_S }),
+  heronrat: async () => {
+    await loadCaptionFont();
+    const { createHeronRat } = await import('./heronrat/render');
+    return createHeronRat(ctx);
+  },
 };
 
 const name = params.get('short') ?? 'kit';

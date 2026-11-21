@@ -624,6 +624,16 @@ const SHORTS: Readonly<Record<string, () => Promise<Short>>> = {
     const { createSeastar } = await import('./seastar/render');
     return withCredit(createSeastar(ctx), ctx, PAPER_ON_DARK);
   },
+  otterpocket: async () => {
+    await loadCaptionFont();
+    const { createOtterPocket } = await import('./otterpocket/render');
+    return createOtterPocket(ctx);
+  },
+  orcahat: async () => {
+    await loadCaptionFont();
+    const { createOrcaHat } = await import('./orcahat/render');
+    return createOrcaHat(ctx);
+  },
 };
 
 const name = params.get('short') ?? 'chain';
