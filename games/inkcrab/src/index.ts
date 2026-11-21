@@ -10,7 +10,7 @@ import { GuideScene } from './scenes/GuideScene';
 import { HudScene } from './scenes/HudScene';
 import { MenuScene } from './scenes/MenuScene';
 import { ResultScene } from './scenes/ResultScene';
-import { DPR } from './scenes/hidpi';
+import { DPR, measureSafeArea } from './scenes/hidpi';
 import { GAME_VERSION } from './version';
 
 /** Mounts InkCrab into `parent`, filling it completely and tracking its size. */
@@ -20,6 +20,7 @@ export function mount(parent: HTMLElement, host: GameHost): GameHandle & { reado
     height: parent.clientHeight || window.innerHeight,
   });
   const { width, height } = cssSize();
+  measureSafeArea(parent);
   // Same setup as InkFish: a device-pixel canvas shown at 1/DPR zoom for sharp lines on phones.
   const game = new Phaser.Game({
     type: Phaser.WEBGL,
@@ -49,6 +50,8 @@ export function mount(parent: HTMLElement, host: GameHost): GameHandle & { reado
     const next = cssSize();
     const w = Math.round(next.width * DPR);
     const h = Math.round(next.height * DPR);
+    // Before the resize: the scenes lay out again in its handlers.
+    measureSafeArea(parent);
     if (w !== game.scale.width || h !== game.scale.height) game.scale.resize(w, h);
   });
   resizer.observe(parent);

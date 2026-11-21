@@ -1,3 +1,4 @@
+import { NO_SAFE_AREA, safeAreaIn, type SafeArea } from '@16bitink/game-sdk';
 import Phaser from 'phaser';
 import { INK } from '../art/palette';
 import { PENCIL } from '../art/atlas';
@@ -6,7 +7,6 @@ import { getFullError, getHost, trackOffer } from '../host';
 import { BUILT_CHAPTERS, CHAPTER_NAMES, CHAPTERS, FREE_CHAPTERS, LEVELS, LEVELS_PER_CHAPTER } from '../level';
 import { loadPaidChapters } from './BootScene';
 import { DPR, screenSize } from './hidpi';
-import { NO_SAFE_AREA, safeAreaIn, type SafeArea } from './safeArea';
 import { computeMapLayout, MAP, regionAt, type MapLayout, type MapNode } from './map/layout';
 import { ChapterCard } from './map/chapterCard';
 import { LevelCard } from './map/levelCard';

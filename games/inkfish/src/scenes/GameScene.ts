@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { crispText, DPR, screenZoom, viewSize } from './hidpi';
+import { crispText, DPR, screenToView, screenZoom, viewSize } from './hidpi';
 import { ART_RES, BOIL_FPS, BOIL_FRAMES, boilKey, ensureBossTextures, ensureFishTextures, jellyGlowKey, releaseFishTextures, weedKey } from '../art/textures';
 import { getChapters, getHost, getSound, trackGame } from '../host';
 import type { LevelDef, SpeciesId } from '../levels/types';
@@ -384,12 +384,13 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  /** Where the player's fish is on screen, in CSS pixels: for the HUD to keep its banners from hiding it. */
+  /** Where the player's fish is on screen, in the HUD's layout pixels (see viewSize): for it to keep its banners from hiding it. */
   playerOnScreen(): Box {
     const cam = this.cameras.main;
     const z = screenZoom(cam);
     const b = this.player.sprite.getBounds();
-    return { x: (b.x - cam.worldView.x) * z, y: (b.y - cam.worldView.y) * z, w: b.width * z, h: b.height * z };
+    const at = screenToView((b.x - cam.worldView.x) * z, (b.y - cam.worldView.y) * z);
+    return { x: at.x, y: at.y, w: b.width * z, h: b.height * z };
   }
 
   private zoomFor(size: number): number {

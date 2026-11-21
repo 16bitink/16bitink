@@ -8,7 +8,7 @@ import { BUILT_CHAPTERS, CHAPTER_NAMES, CHAPTER_PLACES, levelById, levelOrder, l
 import { colourHex, COLOURS } from '../logic/colours';
 import { chapterTally, loadProgress, type Progress } from '../logic/save';
 import { loadPaidChapters } from './BootScene';
-import { crispText, DPR, screenSize, uiCamera, uiScaleFor } from './hidpi';
+import { DPR, crispText, fullScreenSize, screenSize, toView, uiCamera, uiScaleFor } from './hidpi';
 import { GeckoWalker } from './map/geckoWalker';
 import { computeMapLayout, MAP, regionAt, type MapLayout, type MapNode } from './map/layout';
 import { MapCard } from './map/levelCard';
@@ -111,7 +111,7 @@ export class MenuScene extends Phaser.Scene {
     for (const hit of nodes.hits) {
       hit.zone.on('pointerup', (p: Phaser.Input.Pointer) => {
         // The top bar covers the plan: a press on it isn't on the level under it.
-        if (p.y / DPR < TOP_BAR * uiScaleFor(screen.width, screen.height)) return;
+        if (toView(p.x, p.y).y < TOP_BAR * uiScaleFor(screen.width, screen.height)) return;
         this.tapNode(hit);
       });
     }
@@ -178,9 +178,9 @@ export class MenuScene extends Phaser.Scene {
     this.updateUi(half);
   }
 
-  /** Half the world height the view shows. */
+  /** Half the world height the view shows (the map runs under the notch too). */
   private halfView(): number {
-    return screenSize(this).height / this.zoom / 2;
+    return fullScreenSize(this).height / this.zoom / 2;
   }
 
   private clampY(y: number): number {

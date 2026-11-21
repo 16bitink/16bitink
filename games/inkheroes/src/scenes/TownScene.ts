@@ -247,6 +247,12 @@ export class TownScene extends Phaser.Scene {
   }
 
   /** Whether screen point (`x`, `y`), UI pixels, is on the open townscape (not the strip, the rail or a room). */
+  /** A pointer in UI pixels: the camera draws from the safe area's corner (see pixelUiCamera). */
+  private uiAt(p: Phaser.Input.Pointer): { x: number; y: number } {
+    const cam = this.cameras.main;
+    return { x: (p.x - cam.x) / this.size.k, y: (p.y - cam.y) / this.size.k };
+  }
+
   private onTown(x: number, y: number): boolean {
     return !!this.bar && x < this.bar.viewW && y < this.bar.top && !this.screen;
   }
@@ -257,15 +263,15 @@ export class TownScene extends Phaser.Scene {
    */
   private wirePan(): void {
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
-      const x = p.x / this.size.k;
-      const y = p.y / this.size.k;
+      const { x, y } = this.uiAt(p);
       this.press = this.onTown(x, y) ? { x, y, panX: this.panX, panY: this.panY } : null;
       this.dragged = false;
     });
     this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
       if (!this.press || !p.isDown) return;
-      const dx = p.x / this.size.k - this.press.x;
-      const dy = p.y / this.size.k - this.press.y;
+      const at = this.uiAt(p);
+      const dx = at.x - this.press.x;
+      const dy = at.y - this.press.y;
       if (!this.dragged && Math.hypot(dx, dy) < DRAG) return;
       this.dragged = true;
       this.panX = this.clampPan(this.press.panX + dx);
@@ -276,7 +282,8 @@ export class TownScene extends Phaser.Scene {
       this.press = null;
     });
     this.input.on('wheel', (p: Phaser.Input.Pointer, _over: unknown, dx: number, dy: number) => {
-      if (this.press || !this.onTown(p.x / this.size.k, p.y / this.size.k)) return;
+      const at = this.uiAt(p);
+      if (this.press || !this.onTown(at.x, at.y)) return;
       this.panX = this.clampPan(this.panX - dx / this.size.k);
       this.panY = this.clampPanY(this.panY - dy / this.size.k);
       this.placeView();

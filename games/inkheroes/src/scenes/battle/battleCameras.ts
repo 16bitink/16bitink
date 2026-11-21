@@ -1,6 +1,6 @@
 import type Phaser from 'phaser';
 import { BACKDROP } from '../../art/palette';
-import { DPR, uiCamera } from '../hidpi';
+import { DPR, safeDeviceRect, uiCamera } from '../hidpi';
 import { fitWorld, WORLD, type WorldFit } from './pixelLayout';
 
 /** Device pixels per CSS pixel, rounded: the least zoom for a native or UI pixel (1 at a laptop's 125%, 2 on a phone). */
@@ -30,7 +30,7 @@ export interface ScreenRect {
 export class BattleCameras {
   readonly world: Phaser.GameObjects.Layer;
   readonly hud: Phaser.GameObjects.Container;
-  /** The pixel UI, in UI pixels from the canvas's top-left. */
+  /** The pixel UI, in UI pixels from the safe area's top-left (clear of a notch and the home bar). */
   readonly ui: Phaser.GameObjects.Container;
   private readonly worldCam: Phaser.Cameras.Scene2D.Camera;
   private readonly hudCam: Phaser.Cameras.Scene2D.Camera;
@@ -38,6 +38,8 @@ export class BattleCameras {
   private fit: WorldFit = fitWorld(WORLD.w, WORLD.h);
   /** Device pixels per UI pixel. */
   private uiK = 1;
+  /** The canvas's safe part, device pixels: the field and the UI keep inside it, the backdrop runs to the edges. */
+  private safe = { x: 0, y: 0, width: 1, height: 1 };
 
   constructor(private readonly scene: Phaser.Scene) {
     this.worldCam = scene.cameras.main;
@@ -57,33 +59,51 @@ export class BattleCameras {
   /** Fits the world to the canvas as it is now (call on resize). */
   refit(): void {
     const { width, height } = this.scene.scale;
+    const r = safeDeviceRect(this.scene.scale);
+    this.safe = r;
     // A wide screen stands the field on its bottom edge (the spare height is sky); a tall one centres it, room below for the bar.
     // A native pixel never under a CSS pixel: a phone fills its screen at a fractional zoom instead.
-    this.fit = fitWorld(width, height, width >= height ? 'bottom' : 'center', MIN_K);
-    const { k, x, y } = this.fit;
+    // The field fits the safe area; its corner is then on the canvas, past the notch.
+    const inSafe = fitWorld(r.width, r.height, r.width >= r.height ? 'bottom' : 'center', MIN_K);
+    const k = inSafe.k;
+    const x = inSafe.x + r.x;
+    const y = inSafe.y + r.y;
+    const beyond = { right: width - r.x - r.width, bottom: height - r.y - r.height };
+    this.fit = {
+      k, x, y,
+      margin: {
+        left: inSafe.margin.left + Math.ceil(r.x / k), right: inSafe.margin.right + Math.ceil(beyond.right / k),
+        top: inSafe.margin.top + Math.ceil(r.y / k), bottom: inSafe.margin.bottom + Math.ceil(beyond.bottom / k),
+      },
+    };
     // The camera fills the canvas; the world's corner lands on (x, y) and the extended background covers the rest.
     this.worldCam.setViewport(0, 0, width, height).setZoom(k).setScroll(-x / k, -y / k);
-    this.hudCam.setSize(width, height);
+    // The HUD camera follows the safe area itself (uiCamera).
     this.setUiZoom(Math.floor(k));
   }
 
   /** Device pixels per UI pixel (a whole number, never a UI pixel under a CSS one); the world's own zoom unless the layout wants bigger. */
   setUiZoom(z: number): void {
     this.uiK = Math.max(MIN_K, Math.round(z));
-    const { width, height } = this.scene.scale;
-    this.uiCam.setViewport(0, 0, width, height).setZoom(this.uiK).setScroll(0, 0);
+    const r = this.safe;
+    this.uiCam.setViewport(r.x, r.y, r.width, r.height).setZoom(this.uiK).setScroll(0, 0);
   }
 
-  /** The canvas in UI pixels (whole ones; a part pixel at the right or bottom edge is left out). */
+  /** The safe area in UI pixels (whole ones; a part pixel at the right or bottom edge is left out). */
   uiSize(): { w: number; h: number; k: number } {
-    const { width, height } = this.scene.scale;
+    const { width, height } = this.safe;
     return { w: Math.floor(width / this.uiK), h: Math.floor(height / this.uiK), k: this.uiK };
+  }
+
+  /** The safe area, device pixels on the canvas. */
+  safeRect(): { readonly x: number; readonly y: number; readonly width: number; readonly height: number } {
+    return this.safe;
   }
 
   /** A native world point in UI pixels: whole when the UI shares the world's zoom. */
   worldToUi(x: number, y: number): { x: number; y: number } {
     const { k, x: ox, y: oy } = this.fit;
-    return { x: (ox + x * k) / this.uiK, y: (oy + y * k) / this.uiK };
+    return { x: (ox - this.safe.x + x * k) / this.uiK, y: (oy - this.safe.y + y * k) / this.uiK };
   }
 
   /** Whether a UI pixel is exactly a world pixel (the UI is on the art's grid). */
@@ -91,7 +111,7 @@ export class BattleCameras {
     return this.uiK === this.fit.k;
   }
 
-  /** Native pixels of canvas beyond each edge of the world. */
+  /** Native pixels of canvas beyond each edge of the world, to the canvas's own edges (under a notch too). */
   margin(): WorldFit['margin'] {
     return this.fit.margin;
   }

@@ -6,7 +6,7 @@ import { getFullError, getHost, getSound, trackOffer } from '../host';
 import { BUILT_CHAPTERS, CHAPTER_NAMES, CHAPTER_PLACES, CHAPTER_SNAKES, levelById, levelOrder, loadedChapters, loadedLevels, placeOf, PLANNED_CHAPTERS } from '../level/levels';
 import { chapterTally, loadProgress, type Progress } from '../logic/save';
 import { loadPaidChapters } from './BootScene';
-import { crispText, DPR, screenSize, uiCamera, uiScaleFor } from './hidpi';
+import { DPR, crispText, fullScreenSize, screenSize, toView, uiCamera, uiScaleFor } from './hidpi';
 import { DAILY_PAGE, isPhone, mapZoom, sizer, type Sizer } from './uiSizes';
 import { DailyButton } from './map/dailyButton';
 import { SnakeWalker } from './map/snakeWalker';
@@ -122,7 +122,8 @@ export class MenuScene extends Phaser.Scene {
         // The top bar covers the plan: a press on it isn't on the level under it.
         // Nor is a press on the daily's page.
         const s = uiScaleFor(screen.width, screen.height);
-        const u = { x: p.x / DPR / s, y: p.y / DPR / s };
+        const css = toView(p.x, p.y);
+        const u = { x: css.x / s, y: css.y / s };
         const d = this.daily?.box;
         if (u.y < TOP_BAR || (d && u.x >= d.x0 && u.x <= d.x1 && u.y >= d.y0 && u.y <= d.y1)) return;
         this.tapNode(hit);
@@ -196,15 +197,15 @@ export class MenuScene extends Phaser.Scene {
     this.updateUi(half);
   }
 
-  /** Half the world height the view shows. */
+  /** Half the world height the view shows (the map runs under the notch too). */
   private halfView(): number {
-    return screenSize(this).height / this.zoom / 2;
+    return fullScreenSize(this).height / this.zoom / 2;
   }
 
   /** Across, kept within the plan's width (the middle when the screen shows all of it). */
   private clampX(x: number): number {
     if (!this.pans) return MAP.mid;
-    const half = screenSize(this).width / this.zoom / 2;
+    const half = fullScreenSize(this).width / this.zoom / 2;
     return Phaser.Math.Clamp(x, MAP.mid - FIT.w / 2 + half, MAP.mid + FIT.w / 2 - half);
   }
 

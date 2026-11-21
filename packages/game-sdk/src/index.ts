@@ -246,6 +246,7 @@ export function isGameModule(value: unknown): value is GameModule {
   return typeof value === 'object' && value !== null && typeof (value as GameModule).mount === 'function';
 }
 
+export { NO_SAFE_AREA, safeAreaIn, type SafeArea } from './safeArea';
 export { runInSlices, yieldToBrowser, type SliceJob, type SliceOptions } from './slices';
 export {
   addDays, daysBetween, eventOn, EVENT_IDS, EVENTS, isDate, missingMovingDates, MOVING_DATES, MOVING_EVENTS, nextEvent, seasonOf, SEASONS,

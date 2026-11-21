@@ -1,3 +1,4 @@
+import { NO_SAFE_AREA, safeAreaIn, type SafeArea } from '@16bitink/game-sdk';
 import Phaser from 'phaser';
 import { ART_RES } from '../art/palette';
 
@@ -20,9 +21,36 @@ export function uiScaleOf(scene: Phaser.Scene): number {
   return uiScales.get(scene) ?? 1;
 }
 
-/** The screen in CSS pixels, whatever scale the scene's interface draws at. */
-export function screenSize(scene: Phaser.Scene): { width: number; height: number } {
+/**
+ * How far the notch, rounded corners and home bar reach into the game. The
+ * site's play page lets the game fill the whole screen: the world runs under
+ * them, while every layout here keeps out of them.
+ */
+let safe: SafeArea = NO_SAFE_AREA;
+
+/** Measures the safe area again: call before the game is resized (mount does). */
+export function measureSafeArea(parent: Element): void {
+  safe = safeAreaIn(parent);
+}
+
+/** The safe part of a canvas of this size (device pixels), whole device pixels: where the interface goes. */
+export function safeDeviceRect(scale: { width: number; height: number }): { x: number; y: number; width: number; height: number } {
+  const x = Math.round(safe.left * DPR);
+  const y = Math.round(safe.top * DPR);
+  const right = Math.round(safe.right * DPR);
+  const bottom = Math.round(safe.bottom * DPR);
+  return { x, y, width: Math.max(1, scale.width - x - right), height: Math.max(1, scale.height - y - bottom) };
+}
+
+/** The whole canvas in CSS pixels, notch and home bar included: for what must cover the screen. */
+export function fullScreenSize(scene: Phaser.Scene): { width: number; height: number } {
   return { width: scene.scale.width / DPR, height: scene.scale.height / DPR };
+}
+
+/** The screen in CSS pixels that the interface is laid out in (the safe part), whatever scale it draws at. */
+export function screenSize(scene: Phaser.Scene): { width: number; height: number } {
+  const full = fullScreenSize(scene);
+  return { width: Math.max(0, full.width - safe.left - safe.right), height: Math.max(0, full.height - safe.top - safe.bottom) };
 }
 
 /** How big the interface draws on a screen of this CSS size: 1 on a laptop, less on a phone. */
@@ -37,13 +65,14 @@ export function uiScaleFor(width: number, height: number): number {
  */
 export function viewSize(scene: Phaser.Scene): { width: number; height: number } {
   const s = uiScales.get(scene) ?? 1;
-  return { width: scene.scale.width / DPR / s, height: scene.scale.height / DPR / s };
+  const { width, height } = screenSize(scene);
+  return { width: width / s, height: height / s };
 }
 
 /** A screen position (pointer x/y, downX/downY) in CSS pixels, or in `scene`'s layout units when given. */
 export function toView(x: number, y: number, scene?: Phaser.Scene): { x: number; y: number } {
   const s = (scene && uiScales.get(scene)) ?? 1;
-  return { x: x / DPR / s, y: y / DPR / s };
+  return { x: (x / DPR - safe.left) / s, y: (y / DPR - safe.top) / s };
 }
 
 /** Camera zoom as seen on screen, without the device-pixel factor. */
@@ -51,8 +80,20 @@ export function screenZoom(cam: Phaser.Cameras.Scene2D.Camera): number {
   return cam.zoom / DPR;
 }
 
-/** A fixed overlay camera: CSS-pixel coordinates from the top-left, drawn at device resolution. */
+/**
+ * A fixed overlay camera: CSS-pixel coordinates from the safe area's top-left
+ * (see screenSize), drawn at device resolution. Its viewport is the safe area,
+ * following the screen as it resizes or turns.
+ */
 export function uiCamera(cam: Phaser.Cameras.Scene2D.Camera): Phaser.Cameras.Scene2D.Camera {
+  const { scene } = cam;
+  const follow = (): void => {
+    const r = safeDeviceRect(scene.scale);
+    cam.setViewport(r.x, r.y, r.width, r.height);
+  };
+  follow();
+  scene.scale.on('resize', follow);
+  scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => scene.scale.off('resize', follow));
   return cam.setOrigin(0).setZoom(DPR);
 }
 
@@ -78,8 +119,10 @@ export function screenScene(scene: Phaser.Scene, scaled = false): void {
     uiCamera(scene.cameras.main);
     return;
   }
+  uiCamera(scene.cameras.main);
   const apply = (): void => {
-    const s = uiScaleFor(scene.scale.width / DPR, scene.scale.height / DPR);
+    const { width, height } = screenSize(scene);
+    const s = uiScaleFor(width, height);
     uiScales.set(scene, s);
     scene.cameras.main.setOrigin(0).setZoom(DPR * s);
   };

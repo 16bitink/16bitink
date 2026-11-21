@@ -3,7 +3,7 @@
  * and dev/mission.html: the HUD root has class ikt-hud. Injected once.
  */
 export const HUD_CSS = `
-.ikt-hud { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+.ikt-hud { position: absolute; inset: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px); pointer-events: none; z-index: 2; }
 .ikt-hud .feed { position: absolute; left: 12px; top: 10px; display: flex; flex-direction: column; gap: 3px; }
 .ikt-hud .feed div { background: rgba(20, 18, 14, 0.62); padding: 3px 8px; border-radius: 4px; }
 .ikt-hud .feed i { color: #e0b040; font-style: normal; }

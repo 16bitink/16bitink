@@ -19,7 +19,7 @@ import { BossView } from './game/bossView';
 import { twistTexts } from '../level/twistText';
 import { BOSS_KINDS } from '../level/types';
 import { freeBoss } from '../art/textures';
-import { DPR, screenSize, uiScaleFor } from './hidpi';
+import { DPR, safeCentreShift, screenSize, uiScaleFor } from './hidpi';
 import { levelBox, type Box } from '../logic/framing';
 import { stagePlan, type Stage } from './uiLayout';
 import type { HudScene } from './HudScene';
@@ -149,7 +149,13 @@ export class GameScene extends Phaser.Scene {
   private fit(): void {
     const st = this.stage();
     const { zoom, x, y } = st.framing;
-    this.cameras.main.setZoom(DPR * zoom).setRotation(st.turned ? Math.PI / 2 : 0).centerOn(x, y - st.shiftY / zoom);
+    const turn = st.turned ? Math.PI / 2 : 0;
+    // The plan frames the board in the safe area, whose middle is off the screen's by the notch and home bar: the
+    // camera's middle moves the other way, back through its turn into board px.
+    const shift = safeCentreShift();
+    const dx = (shift.x * Math.cos(turn) + shift.y * Math.sin(turn)) / zoom;
+    const dy = (-shift.x * Math.sin(turn) + shift.y * Math.cos(turn)) / zoom;
+    this.cameras.main.setZoom(DPR * zoom).setRotation(turn).centerOn(x - dx, y - st.shiftY / zoom - dy);
     this.fx.turn = st.turned ? Math.PI / 2 : 0;
     // Words on the board are sized in board px: lift them where the board is drawn small.
     this.fx.textScale = Phaser.Math.Clamp(0.85 / zoom, 1, 1.7);

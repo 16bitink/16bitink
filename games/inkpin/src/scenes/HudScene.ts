@@ -1,3 +1,4 @@
+import { NO_SAFE_AREA, safeAreaIn, type SafeArea } from '@16bitink/game-sdk';
 import Phaser from 'phaser';
 import type { SoundBoard } from '../audio/sfx';
 import { getHost, trackOffer } from '../host';
@@ -17,7 +18,6 @@ import { TitleCard } from './hud/titleCard';
 import { HUD_INSETS_KEY } from './levelCamera';
 import { tipHoldMs, touchPlan, type Insets } from '../logic/touchLayout';
 import { lossText } from './lossLines';
-import { NO_SAFE_AREA, safeAreaIn, type SafeArea } from './safeArea';
 import { bakeUi, freePaper, paintedButton, roundButton, type PaintedButton } from './uiPaint';
 
 /** How to play on a touch screen: shown on the first level, and on levels without a tip of their own. */

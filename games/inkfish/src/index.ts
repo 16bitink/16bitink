@@ -8,7 +8,7 @@ import { GuideScene } from './scenes/GuideScene';
 import { HudScene } from './scenes/HudScene';
 import { MenuScene } from './scenes/MenuScene';
 import { ResultScene } from './scenes/ResultScene';
-import { DPR } from './scenes/hidpi';
+import { DPR, measureSafeArea } from './scenes/hidpi';
 import { GAME_VERSION } from './version';
 
 export { DEMO_CHAPTER } from './levels/demo';
@@ -21,6 +21,7 @@ export function mount(parent: HTMLElement, host: GameHost): GameHandle & { reado
     height: parent.clientHeight || window.innerHeight,
   });
   const { width, height } = cssSize();
+  measureSafeArea(parent);
   const game = new Phaser.Game({
     type: Phaser.WEBGL,
     parent,
@@ -56,6 +57,8 @@ export function mount(parent: HTMLElement, host: GameHost): GameHandle & { reado
     const next = cssSize();
     const w = Math.round(next.width * DPR);
     const h = Math.round(next.height * DPR);
+    // Before the resize: the scenes lay out again in its handlers.
+    measureSafeArea(parent);
     if (w !== game.scale.width || h !== game.scale.height) game.scale.resize(w, h);
   });
   resizer.observe(parent);

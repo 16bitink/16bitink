@@ -12,8 +12,8 @@ let probe: HTMLElement | null = null;
 
 /**
  * How far the screen's unsafe edges (CSS env(safe-area-inset-*)) reach into
- * `el`. The site's play page lets InkPin fill the whole screen (fullBleed),
- * so the board runs under the notch and the controls keep out of it; where a
+ * `el`. The site's play page lets every game fill the whole screen: a game
+ * draws its world under the notch and keeps its controls out of this; where a
  * host already insets the game, nothing is left over. Zero where there is no
  * notch, and outside a browser.
  */

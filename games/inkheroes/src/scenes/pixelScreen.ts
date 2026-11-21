@@ -1,5 +1,5 @@
 import type Phaser from 'phaser';
-import { DPR } from './hidpi';
+import { DPR, safeDeviceRect } from './hidpi';
 
 /**
  * The pixel size the map, its HUD, the cards and the menu draw at: device
@@ -21,15 +21,17 @@ export function uiSizeAt(scale: { width: number; height: number }, k: number): {
 }
 
 /**
- * Sets a scene's main camera to draw the pixel UI: UI pixels from the
- * canvas's top-left at the whole zoom, following resizes. `onResize` runs
- * after each (re)fit with the new size in UI pixels.
+ * Sets a scene's main camera to draw the pixel UI: UI pixels from the safe
+ * area's top-left (clear of a notch and the home bar) at the whole zoom,
+ * following resizes. `onResize` runs after each (re)fit with the new size in
+ * UI pixels. A pointer's UI pixel is (p.x - camera.x) / k.
  */
 export function pixelUiCamera(scene: Phaser.Scene, onResize?: (size: { w: number; h: number; k: number }) => void): () => { w: number; h: number; k: number } {
   const fit = (): { w: number; h: number; k: number } => {
     const k = pixelZoom(scene.scale);
-    scene.cameras.main.setOrigin(0).setRoundPixels(true).setZoom(k).setScroll(0, 0);
-    return { ...uiSizeAt(scene.scale, k), k };
+    const r = safeDeviceRect(scene.scale);
+    scene.cameras.main.setViewport(r.x, r.y, r.width, r.height).setOrigin(0).setRoundPixels(true).setZoom(k).setScroll(0, 0);
+    return { ...uiSizeAt(r, k), k };
   };
   const onResizeEvent = (): void => onResize?.(fit());
   fit();
