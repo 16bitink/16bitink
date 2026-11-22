@@ -1,8 +1,9 @@
 import type { CoverDef, LevelDef, SolidDef } from './types';
 
 /**
- * Chapter 1, The Farm (free): the corn snake in a farmyard garden. Each
- * level brings one new thing (see docs/inksnake-design.md): crows, the
+ * Chapter 1, The Farm (free): the corn snake in a farmyard garden. Level 1
+ * starts on a laying hen's eggs (food that sits still), then each level
+ * brings one new thing (see docs/inksnake-design.md): crows, the
  * coil, the hawk, the clock, the hen's eggs, one life, a remix, night,
  * and the Old Tomcat.
  */
@@ -24,7 +25,9 @@ function fence(x0: number, x1: number, y: number, gap = 60): SolidDef[] {
 export const CHAPTER_1: readonly LevelDef[] = [
   {
     id: 'farm-1', name: 'Corn Crib', snake: 'corn', start: { x: 180, y: 285 }, heading: 0, length: 128, target: 340, par: 30,
-    prey: [{ kind: 'mouse', count: 4 }, { kind: 'frog', count: 2 }],
+    prey: [{ kind: 'egg', count: 3 }, { kind: 'mouse', count: 1 }],
+    nests: [{ x: 400, y: 300 }, { x: 520, y: 175 }, { x: 600, y: 420 }, { x: 730, y: 275 }],
+    enemies: [{ kind: 'laying-hen' }],
     solids: [{ kind: 'rect', look: 'crib', x: 615, y: 68, w: 170, h: 102 }, bale(225, 420), rock(795, 390)],
     cover: [grass(105, 98, 60)],
     teach: ['steer', 'eat', 'strike'],

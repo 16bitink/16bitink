@@ -5,6 +5,7 @@ import { DailyRun, type DailyCtx, type DailyEvent } from './daily/run';
 import { pushOffBody } from './bodyBlock';
 import { findLoop, loopHint, ringRadius, ringTargets, SQUEEZE_TIME, SWALLOW_TIME, type Loop } from './coil';
 import { makeBoss, makeEnemies } from './enemies/index';
+import { isLayer } from './enemies/layingHen';
 import type { Boss, Enemy, EnemyCtx, EnemyEvent, HurtCause } from './enemyTypes';
 import { catchable, freeSpot, makePrey, preySpec, stepPrey, type Prey, type PreyKind, type PreyWorld } from './prey';
 import { STAGGER_TIME } from './preyMoves';
@@ -517,7 +518,9 @@ export class World {
       const nests = this.level.nests ?? [];
       const free = nests.filter((n) => !this.prey.some((p) => p.nest && dist(p.nest, n) < 1));
       if (!free.length) return null;
-      const nest = free[Math.floor(this.rng() * free.length)]!;
+      // A laying hen settled at an empty nest lays the egg there (farm level 1).
+      const laid = this.enemies.filter(isLayer).map((h) => h.layAt).find((at) => at && free.includes(at));
+      const nest = laid ?? free[Math.floor(this.rng() * free.length)]!;
       const egg = makePrey(this.nextId++, kind, nest, this.rng, nest, marked);
       this.prey.push(egg);
       return egg;

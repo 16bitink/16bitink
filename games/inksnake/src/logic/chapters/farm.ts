@@ -2,6 +2,7 @@ import { BOARD } from '../../level/types';
 import { Crow } from '../enemies/pecker';
 import { Hawk } from '../enemies/diver';
 import { Hen } from '../enemies/hen';
+import { LayingHen } from '../enemies/layingHen';
 import { Tomcat } from '../enemies/tomcat';
 import type { ChapterRules } from '../enemyTypes';
 
@@ -36,6 +37,13 @@ export const FARM_RULES: ChapterRules = {
         return new Hen(id, home);
       },
       text: { name: 'A hen guarding her eggs', card: 'The hen guards her eggs', hint: 'The hen is watching her eggs', tip: 'Strike at the hen to send her flapping, then take an egg while she\'s away.' },
+    },
+    'laying-hen': {
+      make: (id, _def, level) => {
+        const first = level.nests?.[0];
+        return new LayingHen(id, first ? { x: first.x + 40, y: first.y - 30 } : { x: BOARD.w / 2, y: BOARD.h / 2 });
+      },
+      text: { name: 'A hen laying eggs', card: 'A hen lays eggs for you', hint: 'The hen is laying eggs', tip: 'Eggs sit still: the easiest meal on the farm. Mice run, so creep up close before you strike.' },
     },
   },
   bosses: {
