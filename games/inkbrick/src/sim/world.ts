@@ -5,7 +5,7 @@
 import {
   BALL_R, BALL_SPEED, BIG_STONE_MUL, BOSS_DEFAULT, LAUNCH_X, PADDLE_W, PADDLE_Y, SLOW_MUL, SPEEDY_MUL, START_LIVES,
 } from './constants';
-import { buildLayers, cellIndex, grow, insideMask, wallMask, type Layer } from './grid';
+import { buildLayers, cellIndex, grow, insideOf, wallMask, type Layer } from './grid';
 import {
   CELL, COLS, CRAB_H, CRAB_W, RESCUE_SIZE, ROWS, type BrickDef, type BrickKind, type GoalKind, type LevelDef, type PickupKind,
   type RescueWho, type RuleKind, type SimEvent, type SimPhase,
@@ -198,7 +198,7 @@ export function ruleNumbers(level: LevelDef): { radius: number; speedMul: number
 export function createWorld(level: LevelDef): World {
   const { layers, layerOf } = buildLayers(level);
   const walls = wallMask(level);
-  const inside = insideMask(walls);
+  const inside = insideOf(level);
   const bricks = makeBricks(level, layerOf);
   const gatesOf = new Map<string, number[]>();
   for (const b of bricks) if (b.kind === 'gate' && b.def.link) gatesOf.set(b.def.link, [...(gatesOf.get(b.def.link) ?? []), b.index]);

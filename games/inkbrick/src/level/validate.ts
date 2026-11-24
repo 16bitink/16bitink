@@ -18,7 +18,7 @@ export const MAX_BRICKS = 2000;
 export const BOUNDS = {
   id: 64, name: 80, tip: 240, layout: 32, link: 32,
   number: 50, chapter: 5, par: 3600, hp: 9, tint: 63,
-  floes: 16, shutters: 16, spinners: 8, whirlpools: 8, bumpers: 12, flips: 16, crabs: 6, pearls: 5,
+  floes: 16, shutters: 16, spinners: 8, whirlpools: 8, bumpers: 12, flips: 16, crabs: 6, pearls: 5, zones: 4,
   /** Cells a floe may slide, seconds a cycle may take, Brumm's hits and speed. */
   floeSlide: COLS, period: 120, bossHits: 200, bossSpeed: 40,
 } as const;
@@ -53,6 +53,9 @@ function brickProblem(b: unknown, i: number): string | null {
 
 /** undefined, or a list of at most `max` items each passing `each`. */
 const listOf = (x: unknown, max: number, each: (e: unknown) => boolean): boolean => x === undefined || (Array.isArray(x) && x.length <= max && x.every(each));
+
+/** A rectangle of cells on the grid. */
+const isZone = (z: unknown): boolean => isObj(z) && intIn(z.x, 0, COLS - 1) && intIn(z.y, 0, ROWS - 1) && intIn(z.w, 1, COLS - (z.x as number)) && intIn(z.h, 1, ROWS - (z.y as number));
 
 const P = BOUNDS.period;
 const isFloe = (f: unknown): boolean => isObj(f) && strUpTo(f.id, BOUNDS.link) && inRange(f.dx, -BOUNDS.floeSlide, BOUNDS.floeSlide) && inRange(f.dy, -ROWS, ROWS) && inRange(f.period, 0, P);
@@ -104,6 +107,7 @@ export function checkLevel(x: unknown): Checked<LevelDef> {
     const p = brickProblem(x.bricks[i], i);
     if (p) return { ok: false, problem: `level ${id}: ${p}` };
   }
+  if (!listOf(x.inside, BOUNDS.zones, isZone)) return { ok: false, problem: `level ${id}: bad inside zone` };
   const shape = piecesProblem(x) ?? goalProblem(x);
   if (shape) return { ok: false, problem: `level ${id}: ${shape}` };
   // Shape checked: the JSON's fields are the LevelDef's. Then what the Sim would refuse.

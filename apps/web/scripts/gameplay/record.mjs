@@ -54,6 +54,9 @@ const PRESETS = {
   // as a tank crosses the bridge and drops its intel, at the game's own 960×540
   // view (dpr 1.5 makes it render at ×2). The camera holds still, so it loops clean.
   inktanks: { port: 5179, path: 'mission.html?level=4&bot=1&mute=1&seed=7&t=15', dpr: 1.5, level: null, zoom: 1, skip: 1, seconds: 22, from: 10.5, to: 20.5 },
+  // The Brick Whale (free), the engine's bot on the raft (?bot=skilled): the stones are in,
+  // multiply on the x3 bricks and eat the whale down to scraps; the camera keeps on them.
+  inkbrick: { port: 5180, path: '?level=8&bot=skilled', level: null, zoom: 2, skip: 14, seconds: 16, from: 5, to: 15 },
 };
 
 const args = process.argv.slice(2).filter((a) => a !== '--');

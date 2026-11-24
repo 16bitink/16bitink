@@ -92,6 +92,8 @@ It composes ~80 candidates from the daily generator's parts with **only the piec
 
 ## Worked examples (copy these)
 
+Chapter 1's rows are from before its 2026-11-24 rebuild (easier levels, wide gaps): read the files, not these numbers.
+
 | Level | File | What it shows | Lab (30 runs) |
 |---|---|---|---|
 | 1 | `src/level/ch1/vault.ts` | Floor hole by the wall, empty chimney, band under the roof: the novice-friendly vault | 11/11 |
@@ -132,7 +134,7 @@ Boss levels keep their own targets. Open levels (armour, no stone): the aim wind
 
 ### Rules (`rule`, at most one; `ruleDir` ±1 for `current`)
 
-Measured on Level 1 (The Sandcastle Vault, aim window 4.9%):
+Measured on the old Level 1 (The Sandcastle Vault with a 3-wide floor hole, aim window 4.9%; rebuilt 2026-11-24):
 
 | Rule | Aim window | Notes |
 |---|---|---|
@@ -186,7 +188,7 @@ No stone at all; the way in is breakable armour:
 
 ## Rules for level agents
 
-1. **Targets by kind of level** (the lab picks them from the level's number): levels 1–3 novice clears ≥ 90%; chapter 1 levels 4–9 (the free chapter, every new player's first look) novice clears 70–95% (`CH1_NOVICE_CLEAR`); paid levels novice clears 55–85%. Everything else as the design's table: aim window 2–8%, break-in novice 20–60 s and skilled 8–25 s, cascade ≥ 35% (of at most 120 inside bricks), drought ≤ 10 s, skilled clear 60–120 s, hunt ≤ 15 s, luck CV ≤ 0.5.
+1. **Targets by kind of level** (the lab picks them from the level's number): **chapter 1 has its own, for beginners** (`ch1Targets()`; design doc "Chapter 1 is for beginners": gaps ≥ 8 cells, Level 1 without stone, a declared `inside` zone, a beginner bot in the lab); paid levels novice clears 55–85%. Everything else as the design's table: aim window 2–8%, break-in novice 20–60 s and skilled 8–25 s, cascade ≥ 35% (of at most 120 inside bricks), drought ≤ 10 s, skilled clear 60–120 s, hunt ≤ 15 s, luck CV ≤ 0.5.
    **Boss levels (10, 20, …)** have their own targets (`bossTargets()` in `src/sim/targets.ts`): no cascade and no last-brick hunt; instead **boss hits needed 15–40**, novice clears **45–75%**, skilled clear **60–120 s**, drought **≤ 12 s** (a hit on Brumm counts as activity); aim window, break-in, luck, bricks and balls as normal.
 2. **Never lower a target to pass.** A level that can't pass stays a MISS in your report with its numbers.
 3. Aim for ≥ 10/11 at 30 runs; a 1-point miss at 20 runs is noise, don't chase it.
@@ -220,7 +222,7 @@ Round 4 fixes (2026-11-18, after the first freeze put nine days at 0–40% novic
 
 ## Gotchas (learned tuning chapter 1)
 
-- **The novice bot shoots near-vertical** (about ±12°) from wherever the stone lands. Holes novices find are **floor holes**; side windows need bank shots only the decent and skilled bots make. Levels 1–3 and most of chapter 1 should use floor holes.
+- **The novice bot shoots near-vertical** (about ±12°) from wherever the stone lands. Holes novices find are **floor holes**; side windows need bank shots only the decent and skilled bots make. (Chapter 1 has no narrow holes at all since 2026-11-24.)
 - **A stone that comes in through a hole and hits a breakable brick goes straight back out.** Leave an empty **chimney** above the hole (hole width + 1 or 2) up to a **band of 3 empty rows under the roof**, with the bricks beside the chimney: the stone climbs, comes off the roof at an angle (the 11.5° rule) and rattles along the tops of the bricks. Level 1 is the pattern.
 - **Payoffs with hundreds of bricks need x3 shells where the stone first arrives** (the chimney's side, the row facing the band), not at the far end.
 - **Two holes facing each other at one height make a shooting gallery**: the stone flies in one and out the other.
@@ -241,6 +243,7 @@ Round 4 fixes (2026-11-18, after the first freeze put nine days at 0–40% novic
 - **Novice clears on open levels are a cliff** set by the 360 s limit: on L6 three driftwood rows in the payload gave 100%, four 87%, six 50%. Change one row at a time and confirm at 30 runs.
 - **Rescue and pearls:** the bots dig the shortest way to the goal, often along the empty ceiling rows; anything off that path doesn't change the time. To make a rescue harder, block the approach along the ceiling, not the cage's underside. Multipliers in the corridor bands set the time most (an x3 every 6th cell gave 85 stones and an 11 s finish): put x3 only over the gaps.
 - **Replay pins:** `test/replay.test.ts` pins old levels' fingerprints. A rebuilt level is a new level: remove its pins and say so in the header; never touch the thresholds or other pins.
+- **Never tint a piece:** a brick with `tint` is drawn as a plain picture brick, so a tinted keg, x3 or pickup is invisible (chapter 1's test checks it).
 - **Tips** are one line of at most ~56 characters (longer ones run off a 390 px phone).
 
 ## Learned building L33 hidden bricks (2026-11-18)

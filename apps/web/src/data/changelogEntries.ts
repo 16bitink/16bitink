@@ -494,6 +494,16 @@ export const GAME_ENTRIES: Readonly<Record<string, readonly ChangelogEntry[]>> =
   ],
   inkbrick: [
     {
+      date: "2026-11-24",
+      title: "An easier first chapter",
+      changes: [
+        "Rebuilt all 10 levels of chapter 1 to be easier: wide ways in instead of narrow holes, and shorter levels. Level 1 has no unbreakable blocks.",
+        "Levels 3 and 6 have an open way to the top, so you can break them from above instead of chewing through from below.",
+        "Brumm's shield on Level 10 is smaller, and his banks hold pickups.",
+        "Fixed barrels that looked like ordinary bricks on Level 7.",
+      ],
+    },
+    {
       date: "2026-11-22",
       title: "InkBrick launches",
       changes: [

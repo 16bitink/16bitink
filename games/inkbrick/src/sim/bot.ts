@@ -1,5 +1,5 @@
 /**
- * Bots that play the Sim: novice (follows the ball, hits at a random offset, slow to react),
+ * Bots that play the Sim: beginner (a first-time player: a slower novice who often misses), novice (follows the ball, hits at a random offset, slow to react),
  * decent (predicts the landing and aims for the aim window, with noise), skilled (aims exactly).
  * Each is seeded; bots are tooling, not play, so they may use Math.atan2.
  */
@@ -9,7 +9,7 @@ import { mulberry32, type Rng } from './rng';
 import type { Aimer } from './trace';
 import { BOARD_W, CELL, STEP, type BallState, type SimInput, type SimState } from './types';
 
-export type BotKind = 'novice' | 'decent' | 'skilled';
+export type BotKind = 'beginner' | 'novice' | 'decent' | 'skilled';
 
 interface BotSkill {
   /** Max raft speed, px/s. */
@@ -20,12 +20,20 @@ interface BotSkill {
   readonly noise: number;
   readonly think: number;
   readonly predicts: boolean;
+  /** The chance per returning stone of misjudging it entirely (at the start speed). */
+  readonly lapse: number;
 }
 
+/** The novice's chance per returning stone of misjudging it entirely (at the start speed). */
+export const NOVICE_LAPSE = 0.015;
+/** A first-time player's: about one return in 20. */
+export const BEGINNER_LAPSE = 0.05;
+
 export const BOT_SKILL: Readonly<Record<BotKind, BotSkill>> = {
-  novice: { speed: 900, replan: 0.06, noise: 0.35, think: 1.0, predicts: false },
-  decent: { speed: 900, replan: 0.08, noise: 5, think: 0.6, predicts: true },
-  skilled: { speed: 1400, replan: 0, noise: 3.5, think: 0.3, predicts: true },
+  beginner: { speed: 700, replan: 0.12, noise: 0.5, think: 1.2, predicts: false, lapse: BEGINNER_LAPSE },
+  novice: { speed: 900, replan: 0.06, noise: 0.35, think: 1.0, predicts: false, lapse: NOVICE_LAPSE },
+  decent: { speed: 900, replan: 0.08, noise: 5, think: 0.6, predicts: true, lapse: 0 },
+  skilled: { speed: 1400, replan: 0, noise: 3.5, think: 0.3, predicts: true, lapse: 0 },
 };
 
 const BRICK_ZONE_BOTTOM = 765;
@@ -41,8 +49,6 @@ const RUN_STEP_DEG = 0.5;
 const RUN_GAP_DEG = 0.51;
 const STUCK_SECONDS = 6;
 const EDGE_MARGIN = 0.5;
-/** The novice's chance per returning stone of misjudging it entirely (at the start speed). */
-export const NOVICE_LAPSE = 0.015;
 const LAPSE_PX = 40;
 
 interface Run { readonly lo: number; readonly hi: number }
@@ -166,9 +172,13 @@ export class Bot {
   /** The level's inside is made (in part) of armour. */
   private readonly armoured: boolean;
 
+  /** Beginner and novice: they follow the stone and hit it anywhere, aiming at nothing. */
+  private readonly casual: boolean;
+
   constructor(readonly kind: BotKind, seed: number, private readonly aim: Aimer | null) {
     this.rng = mulberry32(seed);
     this.skill = BOT_SKILL[kind];
+    this.casual = kind === 'beginner' || kind === 'novice';
     const goal = aim?.level.goal;
     this.goalAim = aim && (goal === 'rescue' || goal === 'pearls') ? new GoalAimer(aim.level) : null;
     this.goalInside = this.goalAim && aim ? insideTest(aim) : () => false;
@@ -181,7 +191,7 @@ export class Bot {
 
   /** The angle this bot wants from a hit at x. */
   private chooseAngle(x: number, s: SimState): number {
-    if (this.kind === 'novice') return this.gauss() * this.skill.noise * MAX_BOUNCE_DEG * 0.6;
+    if (this.casual) return this.gauss() * this.skill.noise * MAX_BOUNCE_DEG * 0.6;
     // Rescue and pearls: a clear shot at the friend or a pearl beats everything.
     if (this.goalAim) {
       this.goalAim.sync(s);
@@ -271,12 +281,12 @@ export class Bot {
     const mouths = this.aim?.mouths ?? [];
     let pool = alive;
     const spots = this.goalAim ? GoalAimer.spots(s) : [];
-    if (this.kind !== 'novice' && this.tideDanger(s)) {
+    if (!this.casual && this.tideDanger(s)) {
       // Rising Tide: clear the lowest bricks before they reach the line.
       pool = [...alive].sort((p, q) => q.y + q.h - (p.y + p.h)).slice(0, this.kind === 'skilled' ? 3 : 6);
       return this.angleAt(x, pool);
     }
-    if (this.kind !== 'novice' && spots.length > 0 && (s.breakIn || mouths.length === 0)) {
+    if (!this.casual && spots.length > 0 && (s.breakIn || mouths.length === 0)) {
       // Rescue and pearls: dig toward what's left to take.
       const d = (b: (typeof alive)[number]) => Math.min(...spots.map((m) => Math.abs(b.x + b.w / 2 - m.x) + Math.abs(b.y + b.h / 2 - m.y)));
       pool = [...alive].sort((p, q) => d(p) - d(q)).slice(0, this.kind === 'skilled' ? 2 : 6);
@@ -284,8 +294,8 @@ export class Bot {
     }
     // A closed gate: the key is the way in.
     const keys = this.gatesOpen(s) ? [] : (this.aim?.keys ?? []).flatMap((i) => (s.bricks[i]?.alive ? [s.bricks[i]!] : []));
-    if (keys.length > 0 && this.kind !== 'novice') pool = keys;
-    else if (!s.breakIn && mouths.length > 0 && this.kind !== 'novice') {
+    if (keys.length > 0 && !this.casual) pool = keys;
+    else if (!s.breakIn && mouths.length > 0 && !this.casual) {
       const d = (b: (typeof alive)[number]) => Math.min(...mouths.map((m) => Math.abs(b.x + b.w / 2 - m.x) + Math.abs(b.y + b.h / 2 - m.y)));
       // Armour (open levels): chew at the armour a shot can reach, nearest the middle of the raft's reach.
       const dig = this.armoured ? alive.filter((b) => b.def.armour && exposed(b, alive)) : [];
@@ -318,7 +328,7 @@ export class Bot {
     if (b !== this.tracked || (b.vy > 0 && !this.descending)) {
       this.tracked = b;
       this.settled = false;
-      this.lapse = this.kind === 'novice' && this.rng() < NOVICE_LAPSE * (s.speed / BALL_SPEED) ** 2;
+      this.lapse = this.casual && this.rng() < this.skill.lapse * (s.speed / BALL_SPEED) ** 2;
       this.wantDeg = this.chooseAngle(x, s);
     } else if (b.y > BRICK_ZONE_BOTTOM && !this.settled && b.vy > 0) {
       // Below the bricks the landing is certain: aim again from the exact spot.

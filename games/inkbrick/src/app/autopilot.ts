@@ -4,7 +4,7 @@ import { Aimer } from '../sim/trace';
 import type { LevelDef, SimInput } from '../sim/types';
 
 /** Dev autoplay: the engine's bot drives the raft from the sim state (loaded on demand, dev only). */
-const KINDS: readonly BotKind[] = ['novice', 'decent', 'skilled'];
+const KINDS: readonly BotKind[] = ['beginner', 'novice', 'decent', 'skilled'];
 const SEED = 7;
 
 export function makeAutopilot(kind: string, level: LevelDef): (port: SimPort) => SimInput {

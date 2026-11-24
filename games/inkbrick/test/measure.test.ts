@@ -67,9 +67,9 @@ describe('chapter 1 novice band', () => {
     return [t.lo, t.hi];
   };
 
-  it('asks 90%+ on levels 1-3, 70-95% on levels 4-9 and 55-85% on paid levels', () => {
-    expect(noviceBand(1, 3)).toEqual([0.9, 1]);
-    for (const n of [4, 7, 9]) expect(noviceBand(1, n)).toEqual([0.7, 0.95]);
+  it('asks 95%+ on levels 1-3, 90%+ on levels 4-9 and 55-85% on paid levels', () => {
+    expect(noviceBand(1, 3)).toEqual([0.95, 1]);
+    for (const n of [4, 7, 9]) expect(noviceBand(1, n)).toEqual([0.9, 1]);
     expect(noviceBand(2, 14)).toEqual([0.55, 0.85]);
     expect(noviceBand(5, 47)).toEqual([0.55, 0.85]);
   });
@@ -77,7 +77,7 @@ describe('chapter 1 novice band', () => {
 
 describe('boss targets', () => {
   const boss: LevelDef = {
-    ...BASE, number: 10, bricks: [stone(0, 12, 14, 1), stone(20, 12, 16, 1)],
+    ...BASE, chapter: 2, number: 20, bricks: [stone(0, 12, 14, 1), stone(20, 12, 16, 1)],
     boss: { hits: 26, shieldW: 6, speed: 8 },
   };
 

@@ -93,6 +93,9 @@ export interface BrickDef {
   readonly armour?: boolean;
 }
 
+/** A rectangle of cells. */
+export interface ZoneDef { readonly x: number; readonly y: number; readonly w: number; readonly h: number }
+
 export interface LevelDef {
   readonly id: string;
   readonly name: string;
@@ -120,6 +123,11 @@ export interface LevelDef {
   readonly dark?: boolean;
   /** Seconds, for the third shell. */
   readonly par: number;
+  /**
+   * The break-in zone, declared (cells): reaching it is the break-in. For levels whose way in is too
+   * wide to count as a hole (chapter 1); without it the walls decide (grid.ts insideMask).
+   */
+  readonly inside?: readonly ZoneDef[];
   /** One line shown before the level. */
   readonly tip?: string;
   /** Which layout it is (vault, wall, hourglass, ...), for variety checks. */

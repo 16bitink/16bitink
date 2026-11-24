@@ -116,6 +116,17 @@ export function insideMask(walls: Uint8Array): Uint8Array {
   return inside;
 }
 
+/** The level's inside: its declared zone (minus walls) when it has one, else what its walls enclose. */
+export function insideOf(level: LevelDef, armour = true): Uint8Array {
+  const walls = wallMask(level, armour);
+  if (!level.inside) return insideMask(walls);
+  const inside = new Uint8Array(COLS * ROWS);
+  for (const z of level.inside) forEachCell({ ...z, kind: 'stone' }, (x, y) => {
+    if (!walls[cellIndex(x, y)]) inside[cellIndex(x, y)] = 1;
+  });
+  return inside;
+}
+
 /** The mask grown by r cells (8-neighbour), minus walls: "near the hole". */
 export function grow(mask: Uint8Array, r: number, walls: Uint8Array): Uint8Array {
   const out = new Uint8Array(COLS * ROWS);

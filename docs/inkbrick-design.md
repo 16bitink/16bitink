@@ -112,11 +112,11 @@ export type SimEvent =
 // class Sim { constructor(level: LevelDef); step(input: SimInput): void; readonly state: SimState; drainEvents(): SimEvent[] }
 ```
 
-`breakIn` fires the first time a ball reaches a cell enclosed by stone (a vault inside) or above the topmost wall row (behind the wall). The renderer celebrates it (slow-mo 0.3 s, a shout, a shake): it is the moment the whole game is built around.
+`breakIn` fires the first time a ball reaches a cell enclosed by stone (a vault inside) or above the topmost wall row (behind the wall), or the level's declared zone (`inside`, chapter 1). The renderer celebrates it (slow-mo 0.3 s, a shout, a shake): it is the moment the whole game is built around.
 
 ## Bots, lab and measurements
 
-- **Bots** (`src/sim/bot.ts`): novice (follows the ball, hits at a random offset), decent (aims for the aim window with noise), skilled (aims exactly). Each is seeded.
+- **Bots** (`src/sim/bot.ts`): beginner (a first-time player: slower, misjudges about one return in 20), novice (follows the ball, hits at a random offset), decent (aims for the aim window with noise), skilled (aims exactly). Each is seeded.
 - **Measures per level** (`src/sim/measure.ts`), 20 runs per bot:
 
 | Measure | Target |
@@ -126,10 +126,18 @@ export type SimEvent =
 | Cascade: share of bricks broken within 8 s after the break-in | ≥ 35% |
 | Longest drought (no break and no near miss within one ball width of the hole) | ≤ 10 s |
 | Clear time, skilled | 60–120 s |
-| Novice clears it with 3 hearts | 55–85% (chapter 1 levels 1–3: ≥ 90%; boss levels: 45–75%) |
+| Novice clears it with 3 hearts | 55–85% (chapter 1: below; boss levels: 45–75%) |
 | Last-brick hunt (time from 95% broken to clear) | ≤ 15 s |
 | Luck: spread of the decent bot's clear times | coefficient of variation ≤ 0.5 |
 | Budget | ≤ 1,500 bricks; ≤ 300 balls |
+
+**Chapter 1 is for beginners** (owner, 2026-11-24, after playing it: Level 1's stone vault with a 3-wide hole was too hard to hit, Levels 3 and 6 took about five minutes to chew through). Every level of it was rebuilt:
+
+- **No narrow entrances:** no gap in or beside stone under 8 of the 36 columns (`CH1_MIN_GAP`, pinned by `test/chapter1.test.ts`). **Level 1 has nothing unbreakable.**
+- **Always an open way to the top** (a lane in the middle or down the sides), and no full-width beds of bricks that can only be chewed from below.
+- **Its own targets** (`ch1Targets()` in `src/sim/targets.ts`): aim window ≥ 8%, break-in novice ≤ 30 s and skilled ≤ 15 s, cascade ≥ 15%, skilled clear 15–90 s, novice clears ≥ 95% (levels 1–3), ≥ 90% (4–9), ≥ 80% (Brumm), and the **beginner** bot clears ≥ 90% / 80% / 60% with a median clear ≤ 120 / 150 / 180 s.
+- **The break-in zone is declared** (`LevelDef.inside`, cell rectangles): gaps this wide no longer count as holes, so the level says where the break-in is (over the top, inside the room).
+- The old chapter for comparison: the beginner bot cleared Level 1 in 13 of 20 runs, Level 4 in 1, Levels 3 and 6 in none. After, at 40 runs: 31–40 of 40 on every level.
 
 **Per goal** (2026-11-18, `goalTargets()` in `src/sim/targets.ts`; everything not named is as above):
 
@@ -288,8 +296,8 @@ The engine's inside map counts the armour **as it starts** (alive or not), toget
 
 | Ch | Lv | Layout | Goal | New piece introduced | Change |
 |---|---|---|---|---|---|
-| 1 | 1 | vault | clear | | keep (box 1) |
-| 1 | 2 | wall | clear | | keep |
+| 1 | 1 | vault | clear | | rebuilt easier 2026-11-24, as all of chapter 1 (above): no stone |
+| 1 | 2 | wall | clear | | a short wall, open both sides |
 | 1 | 3 | **open** | clear | x3 inside driftwood armour | rebuild (was a stone core) |
 | 1 | 4 | fuse | clear | | keep |
 | 1 | 5 | **layers** | **pearls** | | rebuild (was a vault) |

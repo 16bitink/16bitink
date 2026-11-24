@@ -7,6 +7,7 @@ import { INKBRICK_PAID_LEVELS } from '../content/paid';
 import { CH1_LEVELS } from '../src/level/ch1/index';
 import { ASCII_LEGEND, asciiBoard } from '../src/sim/ascii';
 import { formatValue, judge, measureLevel, type RunResult } from '../src/sim/measure';
+import type { BotKind } from '../src/sim/bot';
 import { dailyTargets, levelTargets } from '../src/sim/targets';
 import type { LevelDef } from '../src/sim/types';
 import { checkLevel } from '../src/level/validate';
@@ -100,7 +101,9 @@ export async function main(args: readonly string[], fileModule?: Record<string, 
   if (!checked.ok) return `INVALID ${checked.problem} (the game would refuse to load the paid levels)`;
   const runs = Number(flag('--runs') ?? 20);
   const t0 = performance.now();
-  const m = measureLevel(level, { runs });
+  const beginners = level.chapter === 1 && !DATE.test(query);
+  const bots: readonly BotKind[] = [...(beginners ? ['beginner' as const] : []), 'novice', 'decent', 'skilled'];
+  const m = measureLevel(level, { runs, bots });
   const targets = DATE.test(query) ? dailyTargets(weekday(query), level) : levelTargets(level);
   const verdicts = judge(m.metrics, targets);
   const out: string[] = [];
@@ -109,7 +112,7 @@ export async function main(args: readonly string[], fileModule?: Record<string, 
   out.push(goalLine(level));
   if (!args.includes('--quiet')) out.push(asciiBoard(level), ASCII_LEGEND, '');
   out.push(`bot      ${GOAL_DONE[level.goal ?? 'clear']!.padStart(6)}  hearts  break-in(n)  ${(level.goal === 'rescue' || level.goal === 'pearls' ? 'done' : 'clear').padStart(6)}  drought  balls  goal`);
-  for (const b of ['novice', 'decent', 'skilled']) out.push(botRow(b, m.runs, level));
+  for (const b of bots) out.push(botRow(b, m.runs, level));
   out.push('', 'target             value      want            verdict');
   for (const v of verdicts) {
     const want = `${formatValue(v.target, v.target.lo)}–${formatValue(v.target, v.target.hi)}`;

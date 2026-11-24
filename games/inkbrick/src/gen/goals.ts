@@ -5,7 +5,7 @@
  * generator applies itself (goldRush, kegDay).
  */
 import { BRICK_ROW_MAX, LAUNCH_X, TIDE_FLOOR_ROW } from '../sim/constants';
-import { cellIndex, forEachCell, insideMask, wallMask } from '../sim/grid';
+import { cellIndex, forEachCell, insideOf } from '../sim/grid';
 import { minus } from '../sim/kit';
 import { pick, randInt, type Rng } from '../sim/rng';
 import {
@@ -82,7 +82,7 @@ function cellsOf(spots: readonly Spot[], size = 1): BrickDef[] {
 
 /** The friend: a 2 x 2 spot deep inside (among the deepest), its bricks taken away. */
 export function placeRescue(level: LevelDef, rng: Rng, cageHp = CAGE_HP): { bricks: BrickDef[]; rescue: RescueDef } | null {
-  const inside = insideMask(wallMask(level));
+  const inside = insideOf(level);
   const depth = insideDepth(inside);
   const stone = stoneCells(level);
   const spots: { x: number; y: number; d: number }[] = [];
@@ -126,7 +126,7 @@ function cage(bricks: readonly BrickDef[], s: Spot, stone: Uint8Array, hp: numbe
 
 /** Cells a pearl may take: not stone, on the brick rows, away from the straight launch line low down. */
 function pearlCandidates(level: LevelDef): { inside: Spot[]; outside: Spot[] } {
-  const inside = insideMask(wallMask(level));
+  const inside = insideOf(level);
   const stone = stoneCells(level);
   const ins: Spot[] = [];
   const out: Spot[] = [];
@@ -168,7 +168,7 @@ export function placePearls(level: LevelDef, rng: Rng, avoid: readonly Spot[]): 
  * deep inside or high in the field, far from the launch column, never on a goal pearl or the friend.
  */
 export function placeDailyPearl(level: LevelDef, rng: Rng, avoid: readonly Spot[]): { bricks: BrickDef[]; pearl: CellPoint } | null {
-  const inside = insideMask(wallMask(level));
+  const inside = insideOf(level);
   const depth = insideDepth(inside);
   const c = pearlCandidates(level);
   const far = (s: Spot) => Math.abs(s.x - LAUNCH_COL) >= 8 && avoid.every((a) => Math.max(Math.abs(a.x - s.x), Math.abs(a.y - s.y)) >= 4);

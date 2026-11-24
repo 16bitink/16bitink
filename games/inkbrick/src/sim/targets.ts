@@ -5,7 +5,7 @@ import type { LevelDef } from './types';
 export type MetricKey =
   | 'aimWindow' | 'breakInNovice' | 'breakInSkilled' | 'cascade' | 'drought' | 'clearSkilled'
   | 'noviceClear' | 'hunt' | 'luckCV' | 'bricks' | 'peakBalls' | 'bossHits'
-  | 'shareSkilled' | 'floods' | 'pearlFound';
+  | 'beginnerClear' | 'beginnerTime' | 'shareSkilled' | 'floods' | 'pearlFound';
 
 export interface Target {
   readonly key: MetricKey;
@@ -91,22 +91,39 @@ function withOverrides(overrides: Overrides): Target[] {
 }
 
 /**
- * Novice clears for chapter 1's levels 4-9: the free chapter is every new player's first look,
- * so beginners should clear it most of the time (the designer's call, 2026-11-18).
+ * Chapter 1 (free: every new player's first look). The owner's call, 2026-11-24: no narrow
+ * entrances (no gap in or beside stone under CH1_MIN_GAP cells; test/chapter1.test.ts), no
+ * unbreakable bricks on Level 1, and nothing that takes five minutes to chew through. So the way in
+ * is wide, the break-in comes early, and the level is judged on a beginner too.
  */
-export const CH1_NOVICE_CLEAR: readonly [number, number] = [0.7, 0.95];
+export const CH1_MIN_GAP = 8;
+const CH1_BASE: Overrides = { aimWindow: [0.08, 1], breakInNovice: [0, 30], breakInSkilled: [0, 15], cascade: [0.15, 1], clearSkilled: [15, 90] };
+/** The share of novices and beginners who clear it, and the beginner's median clear in seconds. */
+interface Ease { readonly novice: number; readonly beginner: number; readonly seconds: number }
+/** Levels 1-3, 4-9 and Brumm. */
+const CH1_EASE: readonly [Ease, Ease, Ease] = [
+  { novice: 0.95, beginner: 0.9, seconds: 120 }, { novice: 0.9, beginner: 0.8, seconds: 150 }, { novice: 0.8, beginner: 0.6, seconds: 180 },
+];
 
-/**
- * Targets for a campaign level: levels 1-3 easier for the novice, the rest of chapter 1 a little
- * easier than paid levels, boss levels harder.
- */
+function ch1Targets(level: LevelDef): Target[] {
+  const ease = CH1_EASE[level.boss ? 2 : level.number <= 3 ? 0 : 1];
+  const o: Overrides = { ...CH1_BASE, noviceClear: [ease.novice, 1] };
+  const base = (level.boss ? bossTargets() : goalTargets(BASE, level)).map((t) => {
+    const r = o[t.key];
+    return r ? { ...t, lo: r[0], hi: r[1] } : t;
+  });
+  return [
+    ...base,
+    { key: 'beginnerClear', label: 'beginner clears', lo: ease.beginner, hi: 1, unit: '%' },
+    { key: 'beginnerTime', label: 'beginner clear', lo: 0, hi: ease.seconds, unit: 's' },
+  ];
+}
+
+/** Targets for a campaign level: chapter 1 for beginners (ch1Targets), boss levels harder. */
 export function levelTargets(level: LevelDef): Target[] {
-  const local = ((level.number - 1) % 10) + 1;
+  if (level.chapter === 1) return ch1Targets(level);
   if (level.boss) return bossTargets();
-  const o: Overrides = {};
-  if (level.chapter === 1 && local <= 3) o.noviceClear = [0.9, 1];
-  else if (level.chapter === 1) o.noviceClear = CH1_NOVICE_CLEAR;
-  return goalTargets(withOverrides(o), level);
+  return goalTargets(BASE, level);
 }
 
 /**

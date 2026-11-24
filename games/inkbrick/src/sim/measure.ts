@@ -4,7 +4,7 @@ import { CRUMBLE_SHARE } from './constants';
 import { Sim } from './sim';
 import type { MetricKey, Target } from './targets';
 import { Aimer, aimWindow } from './trace';
-import { cellIndex, insideMask, wallMask } from './grid';
+import { cellIndex, insideOf } from './grid';
 import { STEP, type LevelDef } from './types';
 
 export const CASCADE_WINDOW = 8;
@@ -39,7 +39,7 @@ export interface RunResult {
 
 /** Breakable bricks with a cell inside (all breakable bricks when none is). */
 export function insideBricks(level: LevelDef): readonly number[] {
-  const inside = insideMask(wallMask(level));
+  const inside = insideOf(level);
   const breakable = level.bricks.map((b, i) => ({ b, i })).filter(({ b }) => b.kind !== 'stone' && b.kind !== 'gate');
   const ins = breakable.filter(({ b }) => {
     for (let y = b.y; y < b.y + b.h; y++) for (let x = b.x; x < b.x + b.w; x++) if (inside[cellIndex(x, y)]) return true;
@@ -104,6 +104,7 @@ function cv(xs: readonly number[]): number | null {
 
 export interface MeasureOptions {
   readonly runs?: number;
+  /** Default: novice, decent, skilled (chapter 1's lab adds the beginner). */
   readonly bots?: readonly BotKind[];
   readonly seed?: number;
   readonly directions?: number;
@@ -112,7 +113,7 @@ export interface MeasureOptions {
 
 /** True when the level has an inside (a vault, behind a wall, or inside armour): its break-in is measured. */
 export function hasInside(level: LevelDef): boolean {
-  return insideMask(wallMask(level)).some((v) => v === 1);
+  return insideOf(level).some((v) => v === 1);
 }
 
 /**
@@ -120,7 +121,7 @@ export function hasInside(level: LevelDef): boolean {
  * level's way in is breakable, so its aim window reads n/a (docs/inkbrick-design.md).
  */
 export function hasStoneInside(level: LevelDef): boolean {
-  return insideMask(wallMask(level, false)).some((v) => v === 1);
+  return insideOf(level, false).some((v) => v === 1);
 }
 
 export function summarize(level: LevelDef, runs: readonly RunResult[], aim: number): Metrics {
@@ -129,6 +130,7 @@ export function summarize(level: LevelDef, runs: readonly RunResult[], aim: numb
   const hasHole = hasInside(level);
   const bi = (k: BotKind) => (hasHole ? median(of(k).filter((r) => r.breakInAt >= 0).map((r) => r.breakInAt)) : null);
   const decent = of('decent');
+  const beginner = of('beginner');
   const novice = of('novice');
   const boss = level.boss;
   const goal = level.goal ?? 'clear';
@@ -145,6 +147,8 @@ export function summarize(level: LevelDef, runs: readonly RunResult[], aim: numb
     drought: median(decent.map((r) => r.drought)),
     clearSkilled: timed ? median(skilled.filter((r) => r.cleared).map((r) => r.time)) : null,
     noviceClear: novice.length ? novice.filter((r) => r.cleared).length / novice.length : null,
+    beginnerClear: beginner.length ? beginner.filter((r) => r.cleared).length / beginner.length : null,
+    beginnerTime: timed ? median(beginner.filter((r) => r.cleared).map((r) => r.time)) : null,
     hunt: hunts ? median(decent.filter((r) => r.hunt >= 0).map((r) => r.hunt)) : null,
     bossHits: boss ? boss.hits : null,
     luckCV: timed ? cv(decent.filter((r) => r.cleared).map((r) => r.time)) : null,
