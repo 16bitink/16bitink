@@ -50,7 +50,7 @@ type Event =
 /** Where a buy was tapped: one of the game's own offers, the game's page, the home page, or a game too old to say. */
 export type BuyPlace = OfferPlace | 'page' | 'home' | 'unknown';
 /** Where a sign-in was tapped: a game's "save your progress", the site header, or "Bought it already?"; then, on the sign-in page, the way chosen. */
-export type SignInPlace = 'save' | 'header' | 'restore' | 'google' | 'email';
+export type SignInPlace = 'save' | 'header' | 'restore' | 'google' | 'apple' | 'email';
 
 /** Which part of a home page game card was clicked. */
 export type HomeClickTarget = 'cover' | 'title' | 'play' | 'about';

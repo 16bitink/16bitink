@@ -12,6 +12,7 @@ export const GET: APIRoute = async ({ url, cookies, redirect }) => {
     const flow = {
       v: 1, state: randomToken(), nonce: randomToken(), verifier: randomToken(),
       ret: safeReturnPath(url.searchParams.get('return')),
+      ...(url.searchParams.get('app') === '1' ? { app: true } : {}),
       exp: Math.floor(Date.now() / 1000) + FLOW_MAX_AGE,
     } as const;
     cookies.set(FLOW_COOKIE, await signFlow(flow, requireSecret('ENTITLEMENT_SECRET')), {

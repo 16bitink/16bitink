@@ -8,7 +8,9 @@ import { EMAIL_FLOW_COOKIE, verifyEmailFlow } from '../lib/session';
 import { parseUserAgent } from '../lib/userAgent';
 
 /**
- * Where every "Sign in" leads: Google, or a code and link by email. In the
+ * Where every "Sign in" leads: Google, or a code and link by email, and in
+ * the iOS app Apple too (the app's bridge offers it; see lib/appSignIn.ts).
+ * The app opens Google's link in the system sign-in sheet itself. In the
  * Facebook, Instagram and TikTok apps Google refuses to sign anyone in, so
  * there the email comes first, and its code is typed back here: the player
  * never leaves the app, and this browser's saves move into the account.
@@ -59,6 +61,7 @@ Astro.response.headers.set('cache-control', 'private, no-store');
       {inApp ? (
         <p class="signin-small">Google sign-in doesn't work inside this app. Use email, or open 16bit.ink in your browser to sign in with Google.</p>
       ) : (
+        <button type="button" class="btn btn-apple" data-apple hidden>{'\uF8FF'} Sign in with Apple</button>
         <a class="btn" href={googleSignInUrl(ret)} data-google>Sign in with Google</a>
       )}
     </div>
@@ -114,6 +117,31 @@ Astro.response.headers.set('cache-control', 'private, no-store');
     };
 
     root.querySelector('[data-google]')?.addEventListener('click', () => trackSignIn('google'));
+    // Sign in with Apple: only inside the iOS app, whose bridge runs Apple's sheet and then opens the page that signs this view in.
+    interface AppleReply {
+      readonly error?: string;
+      readonly cancelled?: boolean;
+    }
+    const bridge = (window as unknown as { InkApp?: { signInWithApple?: (ret: string) => Promise<AppleReply | undefined> } }).InkApp;
+    const apple = root.querySelector<HTMLButtonElement>('[data-apple]');
+    if (apple && typeof bridge?.signInWithApple === 'function') {
+      const signInWithApple = bridge.signInWithApple;
+      apple.hidden = false;
+      apple.addEventListener('click', async () => {
+        trackSignIn('apple');
+        showError(null);
+        apple.disabled = true;
+        try {
+          // On success the app moves this view on to finish signing in; only a failure comes back here.
+          const reply = await signInWithApple(ret);
+          if (reply?.error) showError(reply.error);
+        } catch {
+          showError('Sign in with Apple failed. Please try again.');
+        } finally {
+          apple.disabled = false;
+        }
+      });
+    }
 
     emailForm.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -161,6 +189,8 @@ Astro.response.headers.set('cache-control', 'private, no-store');
   .signin-error { color: var(--red-ink); margin-top: 12px; }
   .signin-small { font-size: 0.92rem; color: var(--ink-soft); }
   .signin-or { margin-top: 26px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .btn-apple { background: #000; color: #fff; border-color: #000; }
+  .btn-apple[hidden] { display: none; }
   .signin-or > span { font-family: var(--font-hand); font-size: 1.4rem; color: var(--ink-soft); }
   .signin-or[hidden], .signin form[hidden], .signin-error[hidden] { display: none; }
   .signin-link {

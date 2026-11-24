@@ -4,7 +4,8 @@ import { requireEnv, requireSecret } from '../../../lib/env';
 import { CALLBACK_PATH, GOOGLE_TOKEN_URL, checkIdToken, decodeJwtPayload } from '../../../lib/google';
 import { signInPageUrl } from '../../../lib/buyFlow';
 import { FLOW_COOKIE, verifyFlow } from '../../../lib/session';
-import { finishSignIn } from '../../../lib/signIn';
+import { appCallbackUrl } from '../../../lib/appSignIn';
+import { finishSignIn, issueHandoff } from '../../../lib/signIn';
 
 export const prerender = false;
 
@@ -20,6 +21,9 @@ Astro.cookies.delete(FLOW_COOKIE, { path: '/auth/google' });
 
 let error: string | null = null;
 let ret = '/';
+// Started from the app: hand the sign-in back to it (lib/appSignIn.ts), whatever happens.
+const app = flow?.app === true;
+let handoff: string | null = null;
 
 if (params.get('error')) {
   error = 'Sign-in was cancelled. Nothing changed.';
@@ -48,12 +52,17 @@ if (params.get('error')) {
     if (!user) {
       error = 'Google could not confirm a verified email for that account.';
     } else {
-      await finishSignIn(Astro.cookies, Astro.url, { kind: 'google', user }, new Date(nowSec * 1000));
+      if (app) handoff = await issueHandoff({ kind: 'google', user }, ret, new Date(nowSec * 1000));
+      else await finishSignIn(Astro.cookies, Astro.url, { kind: 'google', user }, new Date(nowSec * 1000));
     }
   } catch (err) {
     console.error('[auth/google/callback] sign-in failed', err);
     error = 'Something went wrong signing you in. Please try again.';
   }
+}
+if (app) {
+  const to = handoff ? appCallbackUrl({ token: handoff }) : appCallbackUrl({ error: error ?? 'Something went wrong signing you in. Please try again.' });
+  return new Response(null, { status: 303, headers: { location: to, 'cache-control': 'no-store', 'referrer-policy': 'no-referrer' } });
 }
 if (!error) return Astro.redirect(ret, 303);
 ---

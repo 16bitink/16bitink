@@ -4,7 +4,7 @@ import { Purchase } from '../src/lib/db/purchaseModel';
 import { User } from '../src/lib/db/userModel';
 import { OAuthToken } from '../src/lib/db/oauthModel';
 import { findAccessToken, issueTokens } from '../src/lib/db/oauthRepo';
-import { countNewUsers, ensurePlayerId, findRole, listPlayerAccounts, listUsers, signInEmailUser, signInGoogleUser, syncAdminRoles } from '../src/lib/db/userRepo';
+import { countNewUsers, ensurePlayerId, findRole, listPlayerAccounts, listUsers, signInAppleUser, signInEmailUser, signInGoogleUser, syncAdminRoles } from '../src/lib/db/userRepo';
 import { Grant } from '../src/lib/db/grantModel';
 import { grantedGames, grantedGamesFor, grantGame, revokeGame } from '../src/lib/db/grantRepo';
 import { isUserId } from '../src/lib/userId';
@@ -107,6 +107,42 @@ describe.skipIf(!uri)('signing in by email (MongoDB)', () => {
     expect(await findRole(id)).toBe('admin');
     await signInEmailUser('admin-test@example.com', 'user', at);
     expect(await findRole(id)).toBe('user');
+  });
+});
+
+describe.skipIf(!uri)('signing in with Apple (MongoDB)', () => {
+  const at = new Date('2026-11-24T00:00:00Z');
+  const apple = { appleId: '001234.abcdef', email: 'user-test@example.com', name: 'Ink' };
+
+  beforeEach(async () => {
+    await User.deleteMany({});
+  });
+
+  it('creates a user on first sign-in and finds the same one by Apple id, even after the email changes', async () => {
+    const id = await signInAppleUser(apple, 'user', at);
+    expect(await User.findById(id).lean().exec()).toMatchObject({ appleId: apple.appleId, email: apple.email, name: 'Ink' });
+    expect(await signInAppleUser({ ...apple, email: 'relay@privaterelay.appleid.com', name: '' }, 'user', at)).toBe(id);
+    // Apple says the name only the first time: an empty one later keeps it.
+    expect(await User.findById(id).lean().exec()).toMatchObject({ email: 'relay@privaterelay.appleid.com', name: 'Ink' });
+  });
+
+  it('names a user Apple gave no name from the email', async () => {
+    const id = await signInAppleUser({ ...apple, email: 'ink.crab@example.com', name: '' }, 'user', at);
+    expect((await User.findById(id).lean().exec())?.name).toBe('Ink');
+  });
+
+  it('joins the account with that email, Google or email, and keeps one user per Apple account', async () => {
+    const googleUser = await signInGoogleUser(google, 'user', at);
+    expect(await signInAppleUser(apple, 'user', at)).toBe(googleUser);
+    expect(await User.findById(googleUser).lean().exec()).toMatchObject({ googleId: google.googleId, appleId: apple.appleId });
+    // That account is taken by this Apple account now: another Apple account with the same email gets its own.
+    expect(await signInAppleUser({ ...apple, appleId: 'someone-else' }, 'user', at)).not.toBe(googleUser);
+  });
+
+  it('survives two first sign-ins at once', async () => {
+    const [a, b] = await Promise.all([signInAppleUser(apple, 'user', at), signInAppleUser(apple, 'user', at)]);
+    expect(a).toBe(b);
+    expect(await User.countDocuments({ appleId: apple.appleId })).toBe(1);
   });
 });
 

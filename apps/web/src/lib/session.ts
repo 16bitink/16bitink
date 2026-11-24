@@ -29,6 +29,8 @@ export interface SignInFlow {
   readonly verifier: string;
   /** Path to return to afterwards */
   readonly ret: string;
+  /** Started from the app: the callback hands back to it (lib/appSignIn.ts) instead of setting a cookie. */
+  readonly app?: boolean;
   readonly exp: number;
 }
 

@@ -1,0 +1,52 @@
+---
+import Base from '../../../layouts/Base.astro';
+import { signInPageUrl } from '../../../lib/buyFlow';
+import { db } from '../../../lib/db';
+import { collectHandoff } from '../../../lib/db/appHandoffRepo';
+import { hashSecret } from '../../../lib/emailSignIn';
+import { finishSignIn } from '../../../lib/signIn';
+
+/**
+ * The app's web view lands here once Google's or Apple's sheet has proven
+ * who the player is (lib/appSignIn.ts): the one-time token in `t` signs this
+ * web view in, with its own cookies, so its saves and purchases move into the
+ * account as in any browser.
+ */
+export const prerender = false;
+
+// The token in the address bar is a bearer credential: keep it out of Referer and caches.
+Astro.response.headers.set('referrer-policy', 'no-referrer');
+Astro.response.headers.set('cache-control', 'no-store');
+
+const token = Astro.url.searchParams.get('t');
+let error: string | null = null;
+let ret = '/';
+if (!token || token.length > 100) {
+  error = 'That sign-in has expired. Please try again.';
+} else {
+  try {
+    const now = new Date();
+    await db();
+    const got = await collectHandoff(await hashSecret(token), now);
+    if (!got) {
+      error = 'That sign-in has expired. Please try again.';
+    } else {
+      ret = got.ret;
+      await finishSignIn(Astro.cookies, Astro.url, got.who, now);
+    }
+  } catch (err) {
+    console.error('[auth/app/redeem] sign-in failed', err);
+    error = 'Something went wrong signing you in. Please try again.';
+  }
+}
+if (!error) return Astro.redirect(ret, 303);
+---
+<Base title="Sign in" description="Finish signing in">
+  <meta name="referrer" content="no-referrer" slot="head" />
+  <meta name="robots" content="noindex" slot="head" />
+  <section class="paper-card narrow">
+    <h1>Not signed in</h1>
+    <p>{error}</p>
+    <a class="btn" href={signInPageUrl(ret)}>Try again</a>
+  </section>
+</Base>

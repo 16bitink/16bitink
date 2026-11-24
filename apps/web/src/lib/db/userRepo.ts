@@ -1,4 +1,5 @@
 import type { Role } from '../admins';
+import type { AppleUser } from '../apple';
 import { nameFromEmail } from '../emailSignIn';
 import type { GoogleUser } from '../google';
 import { generatePlayerId, normalizePlayerId } from '../playerId';
@@ -43,6 +44,37 @@ export async function signInGoogleUser(g: GoogleUser, role: Role, now: Date): Pr
     // Two first sign-ins at once: one created the user, so the retry finds it.
     if (!isDuplicateKey(err)) throw err;
     return upsertGoogleUser(g, role, now);
+  }
+}
+
+async function upsertAppleUser(a: AppleUser, role: Role, now: Date): Promise<UserId> {
+  const set = { email: a.email, lastSignInAt: now, role, ...(a.name ? { name: a.name } : {}) };
+  const own = await User.findOneAndUpdate({ appleId: a.appleId }, { $set: set }, { projection: ID_ONLY }).lean().exec();
+  if (own) return own._id.toHexString();
+  // As with Google: an account with this (Apple-verified) email and no Apple account yet is the same person's.
+  const joined = await User.findOneAndUpdate(
+    { email: a.email, appleId: { $exists: false } },
+    { $set: { ...set, appleId: a.appleId } },
+    { sort: OLDEST_FIRST, projection: ID_ONLY },
+  ).lean().exec();
+  if (joined) return joined._id.toHexString();
+  const user = await User.findOneAndUpdate(
+    { appleId: a.appleId },
+    { $set: set, $setOnInsert: { appleId: a.appleId, ...(a.name ? {} : { name: nameFromEmail(a.email) }) } },
+    { upsert: true, returnDocument: 'after', projection: ID_ONLY },
+  ).lean().exec();
+  if (!user) throw new Error('User upsert returned nothing');
+  return user._id.toHexString();
+}
+
+/** The user for this Apple account (or the account with its email it joins), created on first sign-in, with `role` as of now. */
+export async function signInAppleUser(a: AppleUser, role: Role, now: Date): Promise<UserId> {
+  try {
+    return await upsertAppleUser(a, role, now);
+  } catch (err) {
+    // Two first sign-ins at once: one created the user, so the retry finds it.
+    if (!isDuplicateKey(err)) throw err;
+    return upsertAppleUser(a, role, now);
   }
 }
 
