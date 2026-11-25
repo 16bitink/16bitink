@@ -634,6 +634,26 @@ const SHORTS: Readonly<Record<string, () => Promise<Short>>> = {
     const { createOrcaHat } = await import('./orcahat/render');
     return createOrcaHat(ctx);
   },
+  gulplobster: async () => {
+    await loadCaptionFont();
+    const { createGulpLobster } = await import('./gulplobster/render');
+    return createGulpLobster(ctx);
+  },
+  monkseal: async () => {
+    await loadCaptionFont();
+    const { createMonkSeal } = await import('./monkseal/render');
+    return createMonkSeal(ctx);
+  },
+  inky: async () => {
+    await loadCaptionFont();
+    const { createInky } = await import('./inky/render');
+    return createInky(ctx);
+  },
+  crows: async () => {
+    await loadCaptionFont();
+    const { createCrows } = await import('./crows/render');
+    return createCrows(ctx);
+  },
 };
 
 const name = params.get('short') ?? 'chain';

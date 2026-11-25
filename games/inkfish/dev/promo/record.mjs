@@ -151,6 +151,10 @@ const VARIANTS = [
   { name: 'inkfish-penguin-mouth', query: '&short=penguin', start: 0 },
   { name: 'inkfish-otter-pockets', query: '&short=otterpocket', start: 0 },
   { name: 'inkfish-orca-salmon-hat', query: '&short=orcahat', start: 0 },
+  { name: 'inkfish-how-did-that-fit-lobster', query: '&short=gulplobster', start: 0 },
+  { name: 'inkfish-monk-seal-eel', query: '&short=monkseal', start: 0 },
+  { name: 'inkfish-inky-octopus-escape', query: '&short=inky', start: 0 },
+  { name: 'inkroad-crows-traffic', query: '&short=crows', start: 0 },
   // Long-form (16:9, not looping): recorded once from 0 to the end, its sound brought up to YouTube's -14 LUFS.
   // Only with --only (it takes ~25 minutes): a plain `pnpm promo` re-records the shorts.
   { name: 'inkfish-long-descent', page: 'longform.html', query: '&video=descent', start: 0, audioFilter: 'loudnorm=I=-14:TP=-1.5:LRA=11', onlyByName: true },

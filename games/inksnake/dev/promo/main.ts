@@ -164,6 +164,26 @@ const SHORTS: Readonly<Record<string, () => Promise<Short>>> = {
     const { createSecretary } = await import('./secretary/render');
     return createSecretary(ctx);
   },
+  gulpturtle: async () => {
+    await loadCaptionFont();
+    const { createGulpTurtle } = await import('./gulpturtle/render');
+    return createGulpTurtle(ctx);
+  },
+  gulptoad: async () => {
+    await loadCaptionFont();
+    const { createGulpToad } = await import('./gulptoad/render');
+    return createGulpToad(ctx);
+  },
+  roadrunner: async () => {
+    await loadCaptionFont();
+    const { createRoadrunner } = await import('./roadrunner/render');
+    return createRoadrunner(ctx);
+  },
+  titanoboa: async () => {
+    await loadCaptionFont();
+    const { createTitanoboa } = await import('./titanoboa/render');
+    return createTitanoboa(ctx);
+  },
 };
 
 const name = params.get('short') ?? 'kit';
