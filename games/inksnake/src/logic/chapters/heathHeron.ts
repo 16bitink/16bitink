@@ -1,6 +1,7 @@
 import type { LevelDef } from '../../level/types';
 import { EnemyBase } from '../enemies/base';
-import { edgePoint, type EnemyCtx } from '../enemyTypes';
+import { edgePoint, type EnemyCtx, type StrikeMark } from '../enemyTypes';
+import type { Snake } from '../snake';
 import { clamp, dist, pt, type Pt } from '../vec';
 
 type HeronMode = 'away' | 'fly' | 'stand' | 'wade' | 'raise' | 'stab' | 'rest' | 'flee';
@@ -78,6 +79,11 @@ export class Heron extends EnemyBase<HeronMode> {
     ctx.emit({ type: 'scared', kind: this.kind, x: this.x, y: this.y });
     this.flyOff(ctx, from);
     return true;
+  }
+
+  /** Open to a strike: bill down after a stab. */
+  override strikeMark(snake: Snake): StrikeMark | null {
+    return this.m === 'rest' ? this.openWithin(snake, STRIKE_REACH) : null;
   }
 
   step(ctx: EnemyCtx, dt: number): void {

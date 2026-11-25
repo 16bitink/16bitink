@@ -1,4 +1,5 @@
-import type { EnemyCtx } from '../enemyTypes';
+import type { EnemyCtx, StrikeMark } from '../enemyTypes';
+import type { Snake } from '../snake';
 import { dist, pt, type Pt } from '../vec';
 import { EnemyBase } from './base';
 
@@ -25,6 +26,11 @@ export class Hen extends EnemyBase<HenMode> {
 
   get away(): boolean {
     return false;
+  }
+
+  /** A strike sends her off, unless she is already on her way. */
+  override strikeMark(snake: Snake): StrikeMark | null {
+    return this.m !== 'scared' && this.m !== 'back' ? this.openWithin(snake, SCARE_REACH, false) : null;
   }
 
   step(ctx: EnemyCtx, dt: number): void {

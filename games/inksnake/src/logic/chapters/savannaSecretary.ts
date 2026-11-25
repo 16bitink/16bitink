@@ -1,5 +1,6 @@
-import { edgePoint, type Boss, type EnemyCtx, type Ringed } from '../enemyTypes';
+import { edgePoint, type Boss, type EnemyCtx, type Ringed, type StrikeMark } from '../enemyTypes';
 import { EnemyBase } from '../enemies/base';
+import type { Snake } from '../snake';
 import { clamp, dist, pt, type Pt } from '../vec';
 
 type SecretaryMode = 'enter' | 'walk' | 'raise' | 'stamp' | 'down' | 'startle' | 'retreat' | 'gone';
@@ -72,6 +73,11 @@ export class SecretaryBird extends EnemyBase<SecretaryMode> implements Boss, Rin
   /** How far through the raise it is, 0..1 (the ring tightens). */
   get ringT(): number {
     return this.m === 'raise' ? Math.min(1, this.age / (this.aim + HOLD)) : this.m === 'stamp' ? 1 : 0;
+  }
+
+  /** Open to a strike: its foot is down after a stamp. */
+  override strikeMark(snake: Snake): StrikeMark | null {
+    return this.m === 'down' ? this.openWithin(snake, STRIKE_REACH) : null;
   }
 
   step(ctx: EnemyCtx, dt: number): void {

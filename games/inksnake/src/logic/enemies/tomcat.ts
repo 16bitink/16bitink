@@ -1,4 +1,5 @@
-import { edgePoint, type EnemyCtx } from '../enemyTypes';
+import { edgePoint, type EnemyCtx, type StrikeMark } from '../enemyTypes';
+import type { Snake } from '../snake';
 import { clamp, dist, pt, type Pt } from '../vec';
 import { EnemyBase } from './base';
 
@@ -51,6 +52,11 @@ export class Tomcat extends EnemyBase<CatMode> {
 
   get beaten(): boolean {
     return this.hp <= 0;
+  }
+
+  /** Open to a strike: off balance after a missed pounce. */
+  override strikeMark(snake: Snake): StrikeMark | null {
+    return this.m === 'dazed' ? this.openWithin(snake, STRIKE_REACH) : null;
   }
 
   step(ctx: EnemyCtx, dt: number): void {

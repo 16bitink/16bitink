@@ -1,4 +1,5 @@
-import type { Enemy, EnemyCtx } from '../enemyTypes';
+import type { Enemy, EnemyCtx, StrikeMark } from '../enemyTypes';
+import type { Snake } from '../snake';
 import { clamp, dist, pt, type Pt } from '../vec';
 
 /** What every enemy shares: where it is, its mode and how long it has been in it. */
@@ -29,6 +30,16 @@ export abstract class EnemyBase<M extends string> implements Enemy {
   abstract get away(): boolean;
 
   abstract step(ctx: EnemyCtx, dt: number): void;
+
+  /** Not open to a strike, unless its kind says when (the same moments its step checks `struckBy`). */
+  strikeMark(_snake: Snake): StrikeMark | null {
+    return null;
+  }
+
+  /** A mark for the moments `struckBy` would count, with the same reach. */
+  protected openWithin(snake: Snake, reach: number, moment = true): StrikeMark {
+    return { x: this.x, y: this.y, r: reach + snake.width / 2, moment };
+  }
 
   protected go(mode: M, seconds = 0): void {
     this.m = mode;

@@ -47,6 +47,14 @@ export type EnemyEvent =
   | { readonly type: 'lock' | 'dive' | 'miss' | 'land'; readonly kind: string; readonly x: number; readonly y: number }
   | { readonly type: 'crouch' | 'pounce' | 'dazed' | 'startle' | 'bossHit' | 'bossBeaten' | 'growl'; readonly x: number; readonly y: number };
 
+/** Where a strike lands on an enemy right now. */
+export interface StrikeMark extends Pt {
+  /** A striking head this close to the mark hits, px. */
+  readonly r: number;
+  /** It's open only for a moment (off balance after an attack): worth showing from anywhere on the board. */
+  readonly moment: boolean;
+}
+
 /** Every enemy, whatever kind: it lives on the board and steps itself. */
 export interface Enemy {
   readonly id: number;
@@ -76,6 +84,8 @@ export interface Enemy {
   frighten?(ctx: EnemyCtx, from: Pt): boolean;
   /** Frozen still for `seconds` (a king cobra's hood). Optional. */
   freeze?(seconds: number): void;
+  /** Where a strike would work on it now (hurt it, or send it off), or null: the view rings it in green. Optional: without it, a strike never works. */
+  strikeMark?(snake: Snake): StrikeMark | null;
 }
 
 /** A point just off a random edge of the board, where fliers come and go. */

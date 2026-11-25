@@ -1,6 +1,6 @@
 import type { ZoneKind } from '../../level/types';
-import { edgePoint, type EnemyCtx } from '../enemyTypes';
-import type { Cloak } from '../snake';
+import { edgePoint, type EnemyCtx, type StrikeMark } from '../enemyTypes';
+import type { Cloak, Snake } from '../snake';
 import { clamp, dist, pt, type Pt } from '../vec';
 import { EnemyBase } from './base';
 
@@ -31,6 +31,8 @@ export interface ChaserSpec {
   readonly unmoved?: boolean;
 }
 
+/** A strike lands on it this much further off than it bites, px. */
+const STRIKE_EXTRA = 16;
 const BITE_REST = 1.6;
 const FLEE_TIME = 3.2;
 /** Fooled by a snake playing dead (or gone to ground) while it chased: it loses interest this long, s. */
@@ -108,6 +110,11 @@ export class Chaser extends EnemyBase<ChaserMode> {
     return this.here();
   }
 
+  /** A strike sends most off while they hunt; a prickly one is best left alone. */
+  override strikeMark(snake: Snake): StrikeMark | null {
+    return this.spec.scared === 'strike' && (this.m === 'prowl' || this.m === 'chase') ? this.openWithin(snake, this.spec.reach + STRIKE_EXTRA, false) : null;
+  }
+
   step(ctx: EnemyCtx, dt: number): void {
     const done = this.tick(dt);
     const s = ctx.snake;
@@ -141,7 +148,7 @@ export class Chaser extends EnemyBase<ChaserMode> {
       default:
         break;
     }
-    if (this.spec.scared !== 'never' && s.striking && dist(s.head, this) < this.spec.reach + 16 + s.width / 2) {
+    if (this.spec.scared !== 'never' && s.striking && dist(s.head, this) < this.spec.reach + STRIKE_EXTRA + s.width / 2) {
       if (this.spec.scared === 'prickly') {
         ctx.nip(28, this.here());
         ctx.emit({ type: 'say', text: 'Prickly!', x: this.x, y: this.y - 20, danger: true });

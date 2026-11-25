@@ -1,6 +1,7 @@
 import type { LevelDef } from '../../level/types';
-import { edgePoint, type Boss, type EnemyCtx } from '../enemyTypes';
+import { edgePoint, type Boss, type EnemyCtx, type StrikeMark } from '../enemyTypes';
 import { EnemyBase } from '../enemies/base';
+import type { Snake } from '../snake';
 import { clamp, dist, pt, type Pt } from '../vec';
 
 type EagleMode = 'enter' | 'perch' | 'lift' | 'lock' | 'swoop' | 'climb' | 'settle' | 'open' | 'startle' | 'leave' | 'gone';
@@ -77,6 +78,11 @@ export class SerpentEagle extends EnemyBase<EagleMode> implements Boss {
   /** On a crown after a miss: open to a strike. */
   get open(): boolean {
     return this.m === 'open';
+  }
+
+  /** Open to a strike: on a crown after a miss. */
+  override strikeMark(snake: Snake): StrikeMark | null {
+    return this.open ? this.openWithin(snake, STRIKE_REACH) : null;
   }
 
   step(ctx: EnemyCtx, dt: number): void {

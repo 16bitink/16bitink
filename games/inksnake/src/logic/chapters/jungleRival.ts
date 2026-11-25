@@ -1,6 +1,6 @@
 import { BOARD } from '../../level/types';
 import type { AbilityCtx } from '../abilities/types';
-import { edgePoint, type EnemyCtx } from '../enemyTypes';
+import { edgePoint, type EnemyCtx, type StrikeMark } from '../enemyTypes';
 import { RivalSnake, type RivalSpec } from '../enemies/rival';
 import { catchable } from '../preyTypes';
 import type { Snake } from '../snake';
@@ -34,6 +34,8 @@ export interface JungleRivalSpec extends RivalSpec {
 /** Bitten, it slows over this long, then sleeps this long, s. */
 const STAGGER_TIME = 2;
 const SLEEP_TIME = 8;
+/** A strike lands this much wider than the head, px. */
+const TOUCH_EXTRA = 8;
 /** Scared off by a strike, or turning away after a bite, it keeps away this long, s. */
 const FLEE_TIME = 3;
 const BITE_REST = 1.4;
@@ -138,6 +140,26 @@ export class JungleRival extends RivalSnake {
     return false;
   }
 
+  /** A strike works on it now: venom on a sleepy one too wide to swallow, a fright for one that hunts. Anywhere along its body: the mark is where that's nearest the head. */
+  strikeMark(me: Snake): StrikeMark | null {
+    if (!this.strikeWorks(me)) return null;
+    const s = this.snake;
+    const pts = s.trail.pts;
+    let at = pts[0]!;
+    for (let i = 2; i < s.trail.count; i += 2) if (dist(pts[i]!, me.head) < dist(at, me.head)) at = pts[i]!;
+    return { x: at.x, y: at.y, r: (me.width + TOUCH_EXTRA + s.width) / 2, moment: false };
+  }
+
+  /** Whether a strike would do anything to it: put it to sleep, or send it off. */
+  private strikeWorks(me: Snake): boolean {
+    if (this.phase === 'stagger' || this.phase === 'sleep') return false;
+    return this.venomWorks(me) || (this.dangerTo(me) && this.phase !== 'flee');
+  }
+
+  private venomWorks(me: Snake): boolean {
+    return this.own.sleepy && !this.edibleBy(me);
+  }
+
   /** Swallowed by the cobra: off the board, back after a while. */
   swallowed(): void {
     this.phase = 'eaten';
@@ -194,13 +216,13 @@ export class JungleRival extends RivalSnake {
   /** A strike landing on it: venom puts a sleepy one to sleep; a bigger one is sent off. */
   private struck(ctx: EnemyCtx): void {
     const me = ctx.snake;
-    if (!me.striking || this.phase === 'stagger' || this.phase === 'sleep' || !this.touchedBy(me.head, me.width + 8)) return;
+    if (!me.striking || !this.strikeWorks(me) || !this.touchedBy(me.head, me.width + TOUCH_EXTRA)) return;
     const s = this.snake;
-    if (this.own.sleepy && !this.edibleBy(me)) {
+    if (this.venomWorks(me)) {
       this.go('stagger', STAGGER_TIME);
       this.still = 0;
       ctx.emit({ type: 'say', text: 'Bite!', x: s.head.x, y: s.head.y - 26, danger: true });
-    } else if (this.dangerTo(me) && this.phase !== 'flee') {
+    } else {
       this.fleeFrom(ctx, me.head, FLEE_TIME);
       this.biteRest = Math.max(this.biteRest, 0.8);
       ctx.emit({ type: 'scared', kind: this.kind, x: s.head.x, y: s.head.y });

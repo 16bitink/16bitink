@@ -1,4 +1,4 @@
-import { edgePoint, type Boss, type EnemyCtx, type Prompt } from '../enemyTypes';
+import { edgePoint, type Boss, type EnemyCtx, type Prompt, type StrikeMark } from '../enemyTypes';
 import type { Snake } from '../snake';
 import { EnemyBase } from '../enemies/base';
 import { clamp, dist, pt, type Pt } from '../vec';
@@ -93,6 +93,11 @@ export class Fox extends EnemyBase<FoxMode> implements Boss {
       default:
         return null;
     }
+  }
+
+  /** Open to a strike: nose down over a snake playing dead. */
+  override strikeMark(snake: Snake): StrikeMark | null {
+    return this.m === 'sniff' ? this.openWithin(snake, STRIKE_REACH) : null;
   }
 
   step(ctx: EnemyCtx, dt: number): void {

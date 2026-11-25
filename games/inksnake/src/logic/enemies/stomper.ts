@@ -1,6 +1,10 @@
-import { edgePoint, type EnemyCtx } from '../enemyTypes';
+import { edgePoint, type EnemyCtx, type StrikeMark } from '../enemyTypes';
+import type { Snake } from '../snake';
 import { clamp, dist, pt, type Pt } from '../vec';
 import { EnemyBase } from './base';
+
+/** A strike lands on it this close while it rests, px. */
+const STRIKE_REACH = 40;
 
 type StomperMode = 'away' | 'walk' | 'raise' | 'stomp' | 'rest' | 'flee';
 
@@ -59,6 +63,11 @@ export class Stomper extends EnemyBase<StomperMode> {
     return true;
   }
 
+  /** Open to a strike: foot down after a stomp. */
+  override strikeMark(snake: Snake): StrikeMark | null {
+    return this.m === 'rest' ? this.openWithin(snake, STRIKE_REACH) : null;
+  }
+
   step(ctx: EnemyCtx, dt: number): void {
     const done = this.tick(dt);
     const s = ctx.snake;
@@ -99,7 +108,7 @@ export class Stomper extends EnemyBase<StomperMode> {
         }
         return;
       case 'rest':
-        if (this.struckBy(ctx, 40)) {
+        if (this.struckBy(ctx, STRIKE_REACH)) {
           ctx.emit({ type: 'scared', kind: this.kind, x: this.x, y: this.y });
           this.flee(ctx, s.head);
           return;

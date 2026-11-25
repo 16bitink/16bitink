@@ -1,5 +1,6 @@
-import { edgePoint, type Boss, type EnemyCtx, type Ringed } from '../enemyTypes';
+import { edgePoint, type Boss, type EnemyCtx, type Ringed, type StrikeMark } from '../enemyTypes';
 import { EnemyBase } from '../enemies/base';
+import type { Snake } from '../snake';
 import { clamp, dist, pt, type Pt } from '../vec';
 
 type MongooseMode = 'enter' | 'circle' | 'feint' | 'wobble' | 'crouch' | 'dart' | 'stare' | 'struck' | 'retreat' | 'gone';
@@ -89,6 +90,11 @@ export class Mongoose extends EnemyBase<MongooseMode> implements Boss, Ringed {
     this.heading = Math.atan2(from.y - this.y, from.x - this.x);
     this.go('stare', STARE_TIME);
     ctx.emit({ type: 'say', text: '…?!', x: this.x, y: this.y - 30 });
+  }
+
+  /** Open to a strike: off balance, or staring at the hood. */
+  override strikeMark(snake: Snake): StrikeMark | null {
+    return this.open ? this.openWithin(snake, STRIKE_REACH) : null;
   }
 
   step(ctx: EnemyCtx, dt: number): void {

@@ -1,5 +1,6 @@
-import { edgePoint, type Boss, type EnemyCtx } from '../enemyTypes';
+import { edgePoint, type Boss, type EnemyCtx, type StrikeMark } from '../enemyTypes';
 import { EnemyBase } from '../enemies/base';
+import type { Snake } from '../snake';
 import { clamp, dist, nearestOnSegment, pt, type Pt } from '../vec';
 
 export type RoadrunnerMode = 'enter' | 'watch' | 'aim' | 'dash' | 'skid' | 'startle' | 'retreat' | 'gone';
@@ -79,6 +80,11 @@ export class Roadrunner extends EnemyBase<RoadrunnerMode> implements Boss {
   /** Whether it's open to a strike now: skidding, off balance. */
   get open(): boolean {
     return this.m === 'skid';
+  }
+
+  /** Open to a strike: skidding (while it only watches, a strike just makes it hop back). */
+  override strikeMark(snake: Snake): StrikeMark | null {
+    return this.open ? this.openWithin(snake, STRIKE_REACH) : null;
   }
 
   step(ctx: EnemyCtx, dt: number): void {

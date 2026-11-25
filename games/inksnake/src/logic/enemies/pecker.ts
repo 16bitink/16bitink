@@ -1,5 +1,6 @@
-import { edgePoint, type EnemyCtx } from '../enemyTypes';
+import { edgePoint, type EnemyCtx, type StrikeMark } from '../enemyTypes';
 import type { ZoneKind } from '../../level/types';
+import type { Snake } from '../snake';
 import { dist, pt, type Pt } from '../vec';
 import { EnemyBase } from './base';
 
@@ -48,6 +49,11 @@ export class Pecker extends EnemyBase<PeckerMode> {
 
   get away(): boolean {
     return this.m === 'away';
+  }
+
+  /** A strike scares it off, once it has landed. */
+  override strikeMark(snake: Snake): StrikeMark | null {
+    return this.m === 'hop' || this.m === 'peck' ? this.openWithin(snake, this.spec.scareReach, false) : null;
   }
 
   step(ctx: EnemyCtx, dt: number): void {

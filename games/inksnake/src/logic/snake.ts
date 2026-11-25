@@ -152,6 +152,11 @@ export class Snake {
     return Math.ceil((this.width * 4) / SPACING) + 1;
   }
 
+  /** How far a strike carries the head, px. */
+  get lunge(): number {
+    return this.spec.speed * this.speedScale * this.speedRule * STRIKE.boost * STRIKE.time;
+  }
+
   /** Current speed, px/s. */
   get speed(): number {
     if (this.mode !== 'move' || (this.hold && !this.striking)) return 0;

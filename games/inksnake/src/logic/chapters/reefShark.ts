@@ -1,5 +1,6 @@
-import { edgePoint, type Boss, type EnemyCtx } from '../enemyTypes';
+import { edgePoint, type Boss, type EnemyCtx, type StrikeMark } from '../enemyTypes';
 import { EnemyBase } from '../enemies/base';
+import type { Snake } from '../snake';
 import { clamp, dist, nearestOnSegment, pt, turnTowards, type Pt } from '../vec';
 
 type SharkMode = 'enter' | 'circle' | 'tell' | 'charge' | 'turn' | 'struck' | 'retreat' | 'gone';
@@ -25,6 +26,8 @@ const TURN_RATE = 0.9;
 /** Its snout is this far ahead of its middle, px; a strike this close to it lands. */
 export const SNOUT = 36;
 const STRIKE_REACH = 38;
+/** A strike this close to its middle lands too, px. */
+const SIDE_REACH = STRIKE_REACH + 6;
 /** It bites a head this close to its jaws while charging, px; the body gets a nip. */
 const BITE = 30;
 const NIP = 18;
@@ -85,6 +88,11 @@ export class Shark extends EnemyBase<SharkMode> implements Boss {
     return pt(this.x + Math.cos(this.heading) * SNOUT, this.y + Math.sin(this.heading) * SNOUT);
   }
 
+  /** Open to a strike: turning slowly after a charge. The mark is its snout (a strike on its side lands too). */
+  override strikeMark(snake: Snake): StrikeMark | null {
+    return this.open ? { ...this.openWithin(snake, STRIKE_REACH), ...this.snout } : null;
+  }
+
   step(ctx: EnemyCtx, dt: number): void {
     const done = this.tick(dt);
     const s = ctx.snake;
@@ -123,7 +131,7 @@ export class Shark extends EnemyBase<SharkMode> implements Boss {
         const want = Math.atan2(s.head.y - this.y, s.head.x - this.x);
         this.heading = turnTowards(this.heading, want, TURN_RATE * dt);
         this.swim(ctx, this.ahead(60), 22, dt, false);
-        if (s.striking && (dist(s.head, this.snout) < STRIKE_REACH + s.width / 2 || dist(s.head, this) < STRIKE_REACH + 6 + s.width / 2)) {
+        if (s.striking && (dist(s.head, this.snout) < STRIKE_REACH + s.width / 2 || dist(s.head, this) < SIDE_REACH + s.width / 2)) {
           this.hit(ctx);
           return;
         }

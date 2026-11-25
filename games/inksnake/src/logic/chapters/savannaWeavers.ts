@@ -1,5 +1,6 @@
-import { edgePoint, type EnemyCtx } from '../enemyTypes';
+import { edgePoint, type EnemyCtx, type StrikeMark } from '../enemyTypes';
 import { EnemyBase } from '../enemies/base';
+import type { Snake } from '../snake';
 import { clamp, dist, pt, type Pt } from '../vec';
 
 type WeaverMode = 'away' | 'home' | 'perch' | 'mob' | 'dart' | 'flee';
@@ -66,6 +67,11 @@ export class Weaver extends EnemyBase<WeaverMode> {
     if (this.m === 'away' || this.m === 'flee') return false;
     this.flee(ctx);
     return true;
+  }
+
+  /** A strike sends it off while it mobs. */
+  override strikeMark(snake: Snake): StrikeMark | null {
+    return this.m === 'mob' || this.m === 'dart' ? this.openWithin(snake, this.spec.scareReach, false) : null;
   }
 
   step(ctx: EnemyCtx, dt: number): void {

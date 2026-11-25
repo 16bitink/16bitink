@@ -6,6 +6,7 @@ import { Tomcat } from '../../logic/enemies/index';
 import { Charger } from '../../logic/enemies/charger';
 import { Lurker } from '../../logic/enemies/lurker';
 import { isRinged, type Ringed } from '../../logic/enemyTypes';
+import { openings, type Opening } from '../../logic/openings';
 import { HURTS } from '../../logic/chapters/index';
 import { preySpec } from '../../logic/prey';
 import type { World, WorldEvent } from '../../logic/world';
@@ -14,6 +15,11 @@ import { dottedRing } from './crittersView';
 
 const BLUE = 0x27408b;
 const RED = 0xb3322b;
+/** Open to a strike: a green bright enough to stand off grass and leaves, on a paper-white edge. */
+const GREEN = 0x1f9d3f;
+const PAPER = 0xfffaf0;
+/** Between the dots of an open enemy's ring, px. */
+const OPEN_DOT_GAP = 12;
 const INK = '#27408b';
 const RED_INK = '#b3322b';
 const PAPER_STROKE = '#fffaf0';
@@ -26,7 +32,8 @@ const GULP_MS = 160;
  * The board's effects: meals sliding into the mouth, hand-lettered words
  * popping up (points, "Squeeze!", "Shoo!"), and the warnings that make
  * every attack readable: the hawk's red ring tightening, the cat's dotted
- * pounce lane, and a blue dotted ring when a coil is about to close.
+ * pounce lane, and a blue dotted ring when a coil is about to close. A green
+ * ring round an enemy says a strike works on it now.
  */
 export class FxView {
   /** The camera's turn (upright phones), so words stay upright. */
@@ -105,8 +112,9 @@ export class FxView {
     // The coil about to close: a blue ring round what it holds.
     const hint = w.hint;
     if (hint) for (const p of hint.prey) dottedRing(g, p.x, p.y, preySpec(p.kind).size * 0.6 + 14 + Math.sin(time / 90) * 2, BLUE, 0.8, 1.8);
-    for (const e of [...w.enemies, ...(w.boss ? [w.boss] : [])]) if (isRinged(e) && e.ring) this.aimRing(e, time);
     const all = [...w.enemies, ...(w.boss ? [w.boss] : [])];
+    if (w.state === 'play') for (const o of openings(all, w.snake)) this.openRing(o, time);
+    for (const e of all) if (isRinged(e) && e.ring) this.aimRing(e, time);
     const cat = w.boss;
     if (cat instanceof Tomcat && cat.lane && (cat.mode === 'crouch' || cat.mode === 'pounce')) this.lane(cat, time);
     for (const e of all) {
@@ -130,6 +138,27 @@ export class FxView {
       this.warn.lineBetween(ring.x - r * 0.4, ring.y, ring.x + r * 0.4, ring.y);
       this.warn.lineBetween(ring.x, ring.y - r * 0.4, ring.x, ring.y + r * 0.4);
     }
+  }
+
+  /** An enemy open to a strike: a green dotted ring, solid once a strike straight ahead would land. */
+  private openRing(o: Opening, time: number): void {
+    const g = this.warn;
+    const r = o.r + Math.sin(time / 110) * 1.5;
+    if (!o.ready) {
+      // Both inks share one set of dots, so each green dot sits in its white edge.
+      const n = Math.max(12, Math.round((r * Math.PI * 2) / OPEN_DOT_GAP));
+      for (const [colour, alpha, dot] of [[PAPER, 0.9, 3.9], [GREEN, 1, 2.8]] as const) {
+        g.fillStyle(colour, alpha);
+        for (let i = 0; i < n; i++) {
+          const a = (i / n) * Math.PI * 2;
+          g.fillCircle(o.x + Math.cos(a) * r, o.y + Math.sin(a) * r, dot);
+        }
+      }
+      return;
+    }
+    g.fillStyle(GREEN, 0.14).fillCircle(o.x, o.y, r);
+    g.lineStyle(6, PAPER, 0.8).strokeCircle(o.x, o.y, r);
+    g.lineStyle(3.2, GREEN, 1).strokeCircle(o.x, o.y, r);
   }
 
   /** The cat's pounce lane: dotted from its paws to a ring where it will land. */

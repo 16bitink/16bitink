@@ -1,9 +1,9 @@
-import { edgePoint, type EnemyCtx } from '../enemyTypes';
+import { edgePoint, type EnemyCtx, type StrikeMark } from '../enemyTypes';
 import { dist, pt, type Pt } from '../vec';
 import { EnemyBase } from './base';
 
 import type { ZoneKind } from '../../level/types';
-import type { Cloak } from '../snake';
+import type { Cloak, Snake } from '../snake';
 
 type DiverMode = 'away' | 'circle' | 'lock' | 'dive' | 'ground' | 'rise';
 
@@ -40,6 +40,8 @@ export const HAWK: DiverSpec = {
   awayTime: [6, 9], cause: 'snatched',
 };
 const RISE_TIME = 0.7;
+/** A strike lands on it this close while it's on the ground, px. */
+const GROUND_REACH = 30;
 
 /**
  * A diver (the red-tailed hawk, eagles, the buzzard): its shadow circles over the board, then a
@@ -90,6 +92,11 @@ export class Diver extends EnemyBase<DiverMode> {
   /** How far through the lock it is, 0..1 (the ring tightens and reddens). */
   get lockProgress(): number {
     return this.m === 'lock' ? Math.min(1, this.age / (this.spec.lockTime + this.spec.stoop)) : this.m === 'dive' ? 1 : 0;
+  }
+
+  /** Open to a strike: on the ground after a miss. */
+  override strikeMark(snake: Snake): StrikeMark | null {
+    return this.m === 'ground' ? this.openWithin(snake, GROUND_REACH) : null;
   }
 
   step(ctx: EnemyCtx, dt: number): void {
@@ -150,7 +157,7 @@ export class Diver extends EnemyBase<DiverMode> {
       return;
     }
     if (this.m === 'ground') {
-      if (this.struckBy(ctx, 30)) {
+      if (this.struckBy(ctx, GROUND_REACH)) {
         ctx.emit({ type: 'scared', kind: this.kind, x: this.x, y: this.y });
         this.leave(ctx, this.awayRoll(ctx) + 3);
         return;

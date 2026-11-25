@@ -1,5 +1,6 @@
-import { edgePoint, type Boss, type EnemyCtx } from '../enemyTypes';
+import { edgePoint, type Boss, type EnemyCtx, type StrikeMark } from '../enemyTypes';
 import { EnemyBase } from '../enemies/base';
+import type { Snake } from '../snake';
 import { clamp, dist, nearestOnSegment, pt, pushOut, type Pt, type Shape } from '../vec';
 
 type BoarMode = 'enter' | 'root' | 'paw' | 'charge' | 'dazed' | 'skid' | 'startle' | 'retreat' | 'gone';
@@ -66,6 +67,11 @@ export class WildBoar extends EnemyBase<BoarMode> implements Boss {
   /** How far through the tell it is, 0..1 (the lane darkens). */
   get pawing(): number {
     return this.m === 'paw' ? Math.min(1, this.age / PAW_TIME) : this.m === 'charge' ? 1 : 0;
+  }
+
+  /** Open to a strike: dazed by a rock. */
+  override strikeMark(snake: Snake): StrikeMark | null {
+    return this.m === 'dazed' ? this.openWithin(snake, STRIKE_REACH) : null;
   }
 
   step(ctx: EnemyCtx, dt: number): void {

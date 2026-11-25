@@ -15,7 +15,7 @@ Started Oct 24, 2026. Sixth game on 16bit.ink, due Sunday Nov 1.
 1. **Snake, but alive.** The body is a smooth pen-drawn tube that follows the head's exact path, with scales, a flicking tongue and a lump for every meal. Your own body is the main obstacle, as in Snake.
 2. **Eat small, coil big.** Prey narrower than your mouth goes down whole on contact. Bigger prey must be circled: close a loop of your body round it and you squeeze, then swallow. You can't move while you squeeze, so it's always a risk.
 3. **Every snake hunts its own way.** A new species each chapter brings one ability true to life (play dead, bury in sand, glide, hold its breath, lure with its tail…), taught on its own before it's mixed with the rest.
-4. **Readable threat.** Every attack is told before it lands: a shadow circling, a cat's wiggle, a dotted lane, a red ring. A loss is always your fault, never a surprise.
+4. **Readable threat.** Every attack is told before it lands: a shadow circling, a cat's wiggle, a dotted lane, a red ring. A loss is always your fault, never a surprise. The other way round, a green ring round an enemy says a strike works on it now: dotted while it's open, solid once a strike straight ahead would land. Bosses and stunned hunters show it from anywhere; enemies a strike always scares show it only within a lunge. Each enemy says when and where in its `strikeMark`, with the same reach its step checks (`test/openings.test.ts` keeps the two true).
 5. **No lost progress.** Three lives a level; a failed level is retried on the spot.
 
 ## Rules

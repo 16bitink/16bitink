@@ -1,6 +1,7 @@
 import { sunnyAt } from '../abilities/adder';
 import { EnemyBase } from '../enemies/base';
-import type { Boss, EnemyCtx } from '../enemyTypes';
+import type { Boss, EnemyCtx, StrikeMark } from '../enemyTypes';
+import type { Snake } from '../snake';
 import { dist, pt, type Pt } from '../vec';
 
 type BadgerMode = 'under' | 'rumble' | 'emerge' | 'lunge' | 'sniff' | 'startle' | 'dive' | 'gone';
@@ -79,6 +80,11 @@ export class Badger extends EnemyBase<BadgerMode> implements Boss {
   /** Every sett, for the view. */
   get holes(): readonly Pt[] {
     return this.setts;
+  }
+
+  /** Open to a strike: out of its sett, sniffing about. */
+  override strikeMark(snake: Snake): StrikeMark | null {
+    return this.m === 'sniff' ? this.openWithin(snake, STRIKE_REACH) : null;
   }
 
   step(ctx: EnemyCtx, dt: number): void {

@@ -1,6 +1,7 @@
 import type { LevelDef } from '../../level/types';
-import { edgePoint, type Boss, type EnemyCtx, type Ringed } from '../enemyTypes';
+import { edgePoint, type Boss, type EnemyCtx, type Ringed, type StrikeMark } from '../enemyTypes';
 import { EnemyBase } from '../enemies/base';
+import type { Snake } from '../snake';
 import { clamp, dist, pt, pushOut, type Pt, type Shape } from '../vec';
 import { inZone } from '../zones';
 import { bankSpots, boardWater } from './floodedBanks';
@@ -127,6 +128,11 @@ export class Jaguar extends EnemyBase<JaguarMode> implements Boss, Ringed {
 
   private wet(ctx: EnemyCtx, p: Pt = this.here()): boolean {
     return ctx.inZone(p, 'water');
+  }
+
+  /** Open to a strike: drinking or looking up, and only to a snake that comes from under the water. */
+  override strikeMark(snake: Snake): StrikeMark | null {
+    return (this.m === 'drink' || this.m === 'look') && this.sinceUnder <= AMBUSH ? this.openWithin(snake, STRIKE_REACH) : null;
   }
 
   step(ctx: EnemyCtx, dt: number): void {
