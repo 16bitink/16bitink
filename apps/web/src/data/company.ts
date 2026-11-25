@@ -20,4 +20,4 @@ export const INVOICE_SELLER = {
 /** The date the legal documents were last changed (the privacy policy's own date, when newer, below). */
 export const LEGAL_UPDATED = 'October 24, 2026';
 /** The privacy policy's last change: signed-in statistics linked to the account. */
-export const PRIVACY_UPDATED = 'November 9, 2026';
+export const PRIVACY_UPDATED = 'November 25, 2026';

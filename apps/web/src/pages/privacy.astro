@@ -21,7 +21,7 @@ const mail = `mailto:${COMPANY.email}`;
   <p>Nothing that identifies you. Your game progress, scores, settings and the fish you've discovered are saved in your browser's local storage, on your device only. We never receive them. Clearing your browser's site data deletes them.</p>
 
   <h3>When you buy a game</h3>
-  <p>To buy a game, you sign in first, with Google or with your email. Checkout then happens on Stripe's secure payment page. Stripe collects your payment details, email address and billing details. We never see or store your full card number. Once the payment succeeds, we save a purchase record with:</p>
+  <p>To buy a game, you sign in first, with Google, with Apple (in our iPhone and iPad app) or with your email. Checkout then happens on Stripe's secure payment page. Stripe collects your payment details, email address and billing details. We never see or store your full card number. Once the payment succeeds, we save a purchase record with:</p>
   <ul>
     <li>the game you bought, the price paid, the currency and the date;</li>
     <li>the email address you were signed in with, which is also where your receipt goes;</li>
@@ -32,6 +32,12 @@ const mail = `mailto:${COMPANY.email}`;
 
   <h3>When you sign in with Google</h3>
   <p>You don't need to sign in to play the free part of a game. You do need to sign in to buy a game, and to play it on another device. Google tells us your name, your email address and your Google account ID. We don't receive your Google password or access anything else in your Google account. We save them on your account on our server, with the dates you joined and last signed in and a random player ID you can share instead of your email, and keep a signed cookie in your browser for up to 30 days, so the site knows who you are. Your Google account ID is also saved in the record of each purchase you make.</p>
+
+  <h3>When you sign in with Apple</h3>
+  <p>In our iPhone and iPad app, you can also sign in with Apple. Apple tells us your Apple account ID for our app and an email address, which may be a private relay address if you chose "Hide My Email". The first time only, it also tells us the first name you shared. We don't receive your Apple ID password or anything else in your Apple account. We save them on your account on our server like a Google sign-in, with a signed cookie for up to 30 days. If your account already has that email address, signing in with Apple uses the same account, and a later change to the address Apple shares doesn't change your account's email. Apple's own privacy policy covers what Apple does with your data.</p>
+
+  <h3>When you sign in from our app</h3>
+  <p>Google and Apple sign you in outside the app's game view, so we pass the result back to it. While that happens, the game view keeps a random code in a cookie (<code>ink_app_bind</code>) for up to 12 minutes, so only it can finish the sign-in. On our server we keep, for up to 2 minutes, a record with a scrambled (hashed) copy of that code and of a one-time sign-in code, your Google or Apple account ID, your email address and name, and the page you were signing in from. It works once and is then deleted automatically. For an Apple sign-in, we also keep a hashed copy of the one-time value we gave Apple, for up to 10 minutes, so the same sign-in can't be used twice.</p>
 
   <h3>When you sign in with your email</h3>
   <p>Instead of Google, you can sign in with just your email address. We email you a 6-digit code and a sign-in link, which work once, for 15 minutes. We save your address, the page you were signing in from, and a scrambled (hashed) copy of the code and link, so we can check them; this record is deleted automatically after 15 minutes. Signing in saves your email address and a first name taken from it on your account. If you later sign in with Google using the same address, it's the same account. We use the address to sign you in and to find your purchases, never for marketing.</p>
@@ -76,6 +82,7 @@ const mail = `mailto:${COMPANY.email}`;
       <tr><td><code>ink_own_&lt;game&gt;</code></td><td>Proves this browser bought a game. It holds a signed purchase reference, not your name or email.</td><td>5 years</td></tr>
       <tr><td><code>ink_user</code></td><td>Keeps you signed in. It holds your account ID, name and email, signed so it can't be altered.</td><td>30 days, or until you sign out</td></tr>
       <tr><td><code>ink_signin</code></td><td>Protects a Google sign-in while it is in progress.</td><td>10 minutes</td></tr>
+      <tr><td><code>ink_app_bind</code></td><td>In our app only: a random code, so only the game view that started a Google or Apple sign-in can finish it.</td><td>12 minutes, or until the sign-in finishes</td></tr>
       <tr><td><code>ink_email</code></td><td>Remembers which sign-in email this browser asked for, so the code typed here is checked against it. It holds the email address, signed so it can't be altered.</td><td>15 minutes</td></tr>
       <tr><td>Local storage</td><td>Game progress, settings and discoveries, on your device only.</td><td>Until you clear your browser's site data</td></tr>
       <tr><td><code>16bitink:visitor</code> (local storage)</td><td>A random ID, so our statistics count a returning visitor once and, when you're signed in, link them to your account.</td><td>13 months, or until you clear your browser's site data</td></tr>
@@ -89,6 +96,7 @@ const mail = `mailto:${COMPANY.email}`;
   <ul>
     <li><strong>Stripe</strong> processes payments, sends your receipt, and screens payments for fraud. See the <a href="https://stripe.com/privacy">Stripe Privacy Policy</a>.</li>
     <li><strong>Google</strong> provides sign-in and web fonts. See the <a href="https://policies.google.com/privacy">Google Privacy Policy</a>.</li>
+    <li><strong>Apple</strong> provides Sign in with Apple in our app. See <a href="https://www.apple.com/legal/privacy/">Apple's Privacy Policy</a>.</li>
     <li><strong>DigitalOcean</strong> hosts the website and its servers.</li>
     <li><strong>Amazon Web Services</strong> (Amazon SES) delivers the sign-in emails. See the <a href="https://aws.amazon.com/privacy/">AWS Privacy Notice</a>.</li>
     <li><strong>Our database provider</strong> stores purchase records, the Sunday email list and our visit statistics on our behalf.</li>
@@ -108,7 +116,8 @@ const mail = `mailto:${COMPANY.email}`;
   <h2>How long we keep data</h2>
   <ul>
     <li><strong>Purchase records:</strong> while you own the game, so we can restore it for you, and for as long as tax and accounting law requires us to keep sales records.</li>
-    <li><strong>Your account</strong> (name, email, Google account ID, player ID, game progress): until you ask us to delete it. The sign-in cookie lasts up to 30 days.</li>
+    <li><strong>Your account</strong> (name, email, Google or Apple account ID, player ID, game progress): until you ask us to delete it. The sign-in cookie lasts up to 30 days.</li>
+    <li><strong>Sign-ins from our app:</strong> the record that passes a sign-in back to the app, up to 2 minutes; the record that stops an Apple sign-in being used twice, up to 10 minutes. Both are deleted automatically.</li>
     <li><strong>Server logs:</strong> briefly, as kept by our hosting provider.</li>
     <li><strong>Sunday email list:</strong> until you unsubscribe.</li>
     <li><strong>Visit statistics:</strong> about two years, then deleted automatically. The link between a browser and your account goes about two years after you were last signed in on it, or when your account is deleted, whichever comes first.</li>

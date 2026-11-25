@@ -35,7 +35,11 @@ export interface AppleKey {
 
 const text = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
 
-/** A signed, expiring nonce for the app to pass to Apple; Apple puts it in the token, so a token can't be replayed later. */
+/**
+ * A signed, expiring nonce for the app to pass to Apple. Apple puts it in the
+ * token, so a token is good only while its nonce is, and only once:
+ * /auth/apple uses the nonce up (db/appleNonceRepo.ts).
+ */
 export async function newAppleNonce(secret: string, nowSec: number): Promise<string> {
   const n = Array.from(crypto.getRandomValues(new Uint8Array(12)), (b) => b.toString(16).padStart(2, '0')).join('');
   return signToken({ v: 1, n, exp: nowSec + APPLE_NONCE_MAX_AGE_SEC }, secret, NONCE_PURPOSE);
@@ -114,12 +118,17 @@ export function checkAppleClaims(c: Record<string, unknown>, o: CheckOptions): A
 }
 
 let cachedKeys: { keys: readonly AppleKey[]; at: number } | null = null;
+/** When we last asked Apple, cache or not: a token naming an unknown key refetches at most this often. */
+let lastFetchAt = 0;
+let inFlight: Promise<readonly AppleKey[]> | null = null;
 const KEYS_TTL_MS = 60 * 60 * 1000;
+export const KEYS_REFETCH_MIN_MS = 60 * 1000;
+const KEYS_TIMEOUT_MS = 5000;
 
-/** Apple's signing keys, cached for an hour; `fresh` skips the cache (a token named a key we hadn't seen: Apple rotated them). */
-export async function appleKeys(fresh = false): Promise<readonly AppleKey[]> {
-  if (!fresh && cachedKeys && Date.now() - cachedKeys.at < KEYS_TTL_MS) return cachedKeys.keys;
-  const res = await fetch(APPLE_KEYS_URL, { headers: { accept: 'application/json' } });
+async function fetchAppleKeys(): Promise<readonly AppleKey[]> {
+  lastFetchAt = Date.now();
+  // A hung request must not stall the sign-in.
+  const res = await fetch(APPLE_KEYS_URL, { headers: { accept: 'application/json' }, signal: AbortSignal.timeout(KEYS_TIMEOUT_MS) });
   if (!res.ok) throw new Error(`Apple keys request failed (${res.status})`);
   const body = (await res.json()) as { keys?: unknown };
   const keys = Array.isArray(body.keys)
@@ -128,8 +137,31 @@ export async function appleKeys(fresh = false): Promise<readonly AppleKey[]> {
       return typeof o?.kid === 'string' && typeof o.n === 'string' && typeof o.e === 'string' && typeof o.kty === 'string';
     })
     : [];
-  cachedKeys = { keys, at: Date.now() };
-  return keys;
+  // An empty list is a bad answer, not Apple's keys: keep what we had, and ask again next time.
+  if (keys.length) cachedKeys = { keys, at: Date.now() };
+  return keys.length ? keys : cachedKeys?.keys ?? [];
+}
+
+/**
+ * Apple's signing keys, cached for an hour. `fresh` (a token named a key we
+ * don't have: Apple may have rotated them) refetches, but at most once a
+ * minute, so made-up key ids can't send every sign-in to Apple. Sign-ins at
+ * the same moment share one request.
+ */
+export async function appleKeys(fresh = false): Promise<readonly AppleKey[]> {
+  const now = Date.now();
+  const cacheGood = cachedKeys !== null && now - cachedKeys.at < KEYS_TTL_MS;
+  const mayRefetch = now - lastFetchAt >= KEYS_REFETCH_MIN_MS;
+  if (cachedKeys && (fresh ? !mayRefetch : cacheGood)) return cachedKeys.keys;
+  inFlight ??= fetchAppleKeys().finally(() => { inFlight = null; });
+  return inFlight;
+}
+
+/** For tests: forgets the cached keys and when they were fetched. */
+export function resetAppleKeys(): void {
+  cachedKeys = null;
+  lastFetchAt = 0;
+  inFlight = null;
 }
 
 /** Checks an identity token end to end: Apple's signature (refetching keys once if it names one we don't have), then its claims. */

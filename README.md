@@ -66,7 +66,7 @@ Connect it in claude.ai: Settings → Connectors → Add custom connector → `h
    - Build command: `pnpm install --frozen-lockfile && pnpm build`
    - Run command: `node apps/web/dist/server/entry.mjs`
    - HTTP port: `8080`, health check path `/`
-   - Plain variables: `HOST=0.0.0.0`, `PORT=8080`, `STRIPE_AUTOMATIC_TAX=false`, `GOOGLE_CLIENT_ID`, `SMTP_HOST` (e.g. `email-smtp.us-east-1.amazonaws.com`), `SMTP_PORT=587`, `SMTP_FROM` (e.g. `16bit.ink <signin@16bit.ink>`, on a domain verified in Amazon SES)
+   - Plain variables: `HOST=0.0.0.0`, `PORT=8080`, `STRIPE_AUTOMATIC_TAX=false`, `GOOGLE_CLIENT_ID`, `SMTP_HOST` (e.g. `email-smtp.us-east-1.amazonaws.com`), `SMTP_PORT=587`, `SMTP_FROM` (e.g. `16bit.ink <signin@16bit.ink>`, on a domain verified in Amazon SES), and optionally `APPLE_CLIENT_ID`: the iOS app's bundle id, which Sign in with Apple tokens must name (defaults to `ink.sixteenbit.games`)
 
    Then fill in the encrypted variables:
    - `STRIPE_SECRET_KEY`

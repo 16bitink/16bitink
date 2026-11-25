@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { appCallbackUrl, isBindHash } from '../../lib/appSignIn';
+import { appErrorResponse, appState, isBindHash } from '../../lib/appSignIn';
 import { requireEnv, requireSecret } from '../../lib/env';
 import { CALLBACK_PATH, googleAuthUrl, pkceChallenge, randomToken, safeReturnPath } from '../../lib/google';
 import { FLOW_COOKIE, FLOW_MAX_AGE, signFlow } from '../../lib/session';
@@ -8,19 +8,15 @@ export const prerender = false;
 
 /** Starts Google sign-in: remembers state, nonce and PKCE verifier in a short-lived cookie, then leaves for Google. */
 export const GET: APIRoute = async ({ url, cookies, redirect }) => {
+  // From the app, every outcome goes back to it: the player is in its sign-in sheet (lib/appSignIn.ts).
+  const app = url.searchParams.get('app') === '1';
   try {
     const clientId = requireEnv('GOOGLE_CLIENT_ID');
-    const app = url.searchParams.get('app') === '1';
     const bind = url.searchParams.get('bind');
-    // From the app, the sign-in must name the web view that will redeem it (lib/appSignIn.ts).
-    if (app && !isBindHash(bind)) {
-      return new Response(null, {
-        status: 303,
-        headers: { location: appCallbackUrl({ error: 'That sign-in has expired. Please try again.' }), 'cache-control': 'no-store' },
-      });
-    }
+    // From the app, the sign-in must name the web view that will redeem it.
+    if (app && !isBindHash(bind)) return appErrorResponse('That sign-in has expired. Please try again.');
     const flow = {
-      v: 1, state: randomToken(), nonce: randomToken(), verifier: randomToken(),
+      v: 1, state: app ? appState(randomToken()) : randomToken(), nonce: randomToken(), verifier: randomToken(),
       ret: safeReturnPath(url.searchParams.get('return')),
       ...(app ? { app: true, bind: bind! } : {}),
       exp: Math.floor(Date.now() / 1000) + FLOW_MAX_AGE,
@@ -36,6 +32,7 @@ export const GET: APIRoute = async ({ url, cookies, redirect }) => {
     }), 302);
   } catch (err) {
     console.error('[auth/google] could not start sign-in', err);
+    if (app) return appErrorResponse('Sign-in is unavailable right now. Please try again.');
     return new Response('Sign-in is unavailable right now.', { status: 503, headers: { 'cache-control': 'no-store' } });
   }
 };

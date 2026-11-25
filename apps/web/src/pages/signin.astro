@@ -61,7 +61,7 @@ Astro.response.headers.set('cache-control', 'private, no-store');
       {inApp ? (
         <p class="signin-small">Google sign-in doesn't work inside this app. Use email, or open 16bit.ink in your browser to sign in with Google.</p>
       ) : (
-        <button type="button" class="btn btn-apple" data-apple hidden>{'\uF8FF'} Sign in with Apple</button>
+        <button type="button" class="btn btn-apple" data-apple hidden><span aria-hidden="true">{'\uF8FF'}</span> Sign in with Apple</button>
         <a class="btn" href={googleSignInUrl(ret)} data-google>Sign in with Google</a>
       )}
     </div>
@@ -136,20 +136,30 @@ Astro.response.headers.set('cache-control', 'private, no-store');
     };
 
     const google = root.querySelector<HTMLAnchorElement>('[data-google]');
+    // As the Apple button: one start at a time. A second tap would replace the bind cookie,
+    // and the sign-in the first tap opened would then come back "expired".
+    let startingGoogle = false;
     google?.addEventListener('click', async (e) => {
-      trackSignIn('google');
-      if (!bridge?.isApp) return;
+      if (!bridge?.isApp) return trackSignIn('google');
       e.preventDefault();
+      if (startingGoogle) return;
+      startingGoogle = true;
+      google.setAttribute('aria-disabled', 'true');
+      trackSignIn('google');
       showError(null);
-      const bind = await newBind();
-      // The app catches this link and opens it in the system sheet, query and all.
-      if (bind) location.href = `${google.href}&bind=${encodeURIComponent(bind)}`;
+      try {
+        const bind = await newBind();
+        // The app catches this link and opens it in the system sheet, query and all; the sheet covers this view until it closes.
+        if (bind) location.href = `${google.href}&bind=${encodeURIComponent(bind)}`;
+      } finally {
+        startingGoogle = false;
+        google.removeAttribute('aria-disabled');
+      }
     });
 
     // Sign in with Apple: only inside the iOS app, whose bridge runs Apple's sheet and then opens the page that signs this view in.
     const apple = root.querySelector<HTMLButtonElement>('[data-apple]');
-    if (apple && typeof bridge?.signInWithApple === 'function') {
-      const signInWithApple = bridge.signInWithApple;
+    if (apple && bridge && typeof bridge.signInWithApple === 'function') {
       apple.hidden = false;
       apple.addEventListener('click', async () => {
         trackSignIn('apple');
@@ -159,7 +169,8 @@ Astro.response.headers.set('cache-control', 'private, no-store');
           const bind = await newBind();
           if (!bind) return;
           // On success the app moves this view on to finish signing in; only a failure comes back here.
-          const reply = await signInWithApple(ret, bind);
+          // Called on the bridge, not detached from it, so it keeps its `this`.
+          const reply = await bridge.signInWithApple?.(ret, bind);
           if (reply?.error) showError(reply.error);
         } catch {
           showError('Sign in with Apple failed. Please try again.');
@@ -217,6 +228,7 @@ Astro.response.headers.set('cache-control', 'private, no-store');
   .signin-or { margin-top: 26px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
   .btn-apple { background: #000; color: #fff; border-color: #000; }
   .btn-apple[hidden] { display: none; }
+  [data-google][aria-disabled='true'] { opacity: 0.6; pointer-events: none; }
   .signin-or > span { font-family: var(--font-hand); font-size: 1.4rem; color: var(--ink-soft); }
   .signin-or[hidden], .signin form[hidden], .signin-error[hidden] { display: none; }
   .signin-link {

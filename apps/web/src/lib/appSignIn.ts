@@ -23,6 +23,9 @@ export const REDEEM_PATH = '/auth/app/redeem';
 /** Time for the app to open the redeem page once the sheet closes. */
 export const HANDOFF_MAX_AGE_SEC = 2 * 60;
 
+/** For pages with a bearer credential in the address (a code, a token): keep it out of Referer and caches. */
+export const NO_LEAK = { 'referrer-policy': 'no-referrer', 'cache-control': 'no-store' } as const;
+
 /** The web view's own secret for one sign-in: only the web view that started it can redeem it. */
 export const BIND_COOKIE = 'ink_app_bind';
 export const BIND_PATH = '/auth/app/bind';
@@ -36,6 +39,21 @@ export const isBindHash = (v: unknown): v is string => typeof v === 'string' && 
 export type HandoffIdentity =
   | { readonly kind: 'google'; readonly user: GoogleUser }
   | { readonly kind: 'apple'; readonly user: AppleUser };
+
+/**
+ * Google's `state` for a sign-in started from the app. The callback must go
+ * back to the app whatever happens, even when the flow cookie is gone
+ * (expired, or never set): left on a web page inside the sheet, the player's
+ * "Try again" would sign in the sheet's cookie jar, not the web view's. The
+ * marker only decides where errors go; the state check still needs the cookie.
+ */
+const APP_STATE_PREFIX = 'app.';
+export const appState = (random: string): string => `${APP_STATE_PREFIX}${random}`;
+export const isAppState = (state: string | null): boolean => state?.startsWith(APP_STATE_PREFIX) === true;
+
+/** Where a failed app sign-in goes: back to the app, which shows `error`, with no-store. */
+export const appErrorResponse = (error: string): Response =>
+  new Response(null, { status: 303, headers: { location: appCallbackUrl({ error }), ...NO_LEAK } });
 
 /** Back to the app with a handoff token, or with what went wrong (the app shows it). */
 export function appCallbackUrl(result: { readonly token: string } | { readonly error: string }): string {

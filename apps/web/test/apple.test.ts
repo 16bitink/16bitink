@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { checkAppleClaims, checkAppleNonce, newAppleNonce, verifyAppleSignature, type AppleKey } from '../src/lib/apple';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { appleKeys, checkAppleClaims, checkAppleNonce, KEYS_REFETCH_MIN_MS, newAppleNonce, resetAppleKeys, verifyAppleSignature, type AppleKey } from '../src/lib/apple';
 import { appCallbackUrl, redeemPath } from '../src/lib/appSignIn';
 import { b64url } from '../src/lib/token';
 
@@ -76,5 +76,58 @@ describe('app handoff urls', () => {
     expect(appCallbackUrl({ token: 'abc_-1' })).toBe('inkgames://auth?t=abc_-1');
     expect(appCallbackUrl({ error: 'Sign-in was cancelled. Nothing changed.' })).toBe('inkgames://auth?error=Sign-in+was+cancelled.+Nothing+changed.');
     expect(redeemPath('a/b+c')).toBe('/auth/app/redeem?t=a%2Fb%2Bc');
+  });
+});
+
+describe('Apple keys', () => {
+  const key = { kid: 'k1', kty: 'RSA', n: 'n', e: 'AQAB' };
+  const reply = (keys: unknown[]) => new Response(JSON.stringify({ keys }), { status: 200 });
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    resetAppleKeys();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    fetchMock = vi.fn(async () => reply([key]));
+    vi.stubGlobal('fetch', fetchMock);
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it('asks Apple with a timeout, then serves the cache', async () => {
+    expect(await appleKeys()).toEqual([key]);
+    expect(await appleKeys()).toEqual([key]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect((fetchMock.mock.calls[0]![1] as RequestInit).signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it('refetches for an unknown key at most once a minute', async () => {
+    await appleKeys();
+    await appleKeys(true);
+    await appleKeys(true);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(KEYS_REFETCH_MIN_MS);
+    await appleKeys(true);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not cache an empty list', async () => {
+    fetchMock.mockImplementationOnce(async () => reply([]));
+    expect(await appleKeys()).toEqual([]);
+    expect(await appleKeys()).toEqual([key]);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the keys it has when Apple answers with none', async () => {
+    await appleKeys();
+    vi.advanceTimersByTime(KEYS_REFETCH_MIN_MS);
+    fetchMock.mockImplementationOnce(async () => reply([]));
+    expect(await appleKeys(true)).toEqual([key]);
+  });
+
+  it('shares one request between sign-ins at the same moment', async () => {
+    await Promise.all([appleKeys(), appleKeys(), appleKeys(true)]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
