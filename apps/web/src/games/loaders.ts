@@ -19,4 +19,5 @@ export const GAME_LOADERS: Readonly<Record<string, () => Promise<{ default: Game
   inkheroes: () => import('@16bitink/inkheroes'),
   inktanks: () => import('@16bitink/inktanks'),
   inkbrick: () => import('@16bitink/inkbrick'),
+  inkroad: () => import('@16bitink/inkroad'),
 };

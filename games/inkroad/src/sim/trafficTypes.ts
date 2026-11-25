@@ -1,0 +1,121 @@
+/**
+ * The two contracts inside the simulation:
+ *   Network: the road graph as immutable values (src/sim/network*.ts)
+ *   Traffic: the cars on it (src/sim/traffic*.ts)
+ * src/city decides who drives, where they park and what it costs; Traffic only
+ * moves what it is given and measures it.
+ */
+import type {
+  CarsView, Cell, CellRect, Control, Id, Junction, JunctionStats, Level, Link, Movement, Pt, Road, RoadDef, RoadStats, RoadType, Terrain, VehicleKind,
+} from './types';
+
+// ---------------------------------------------------------------- network
+
+export interface Network {
+  readonly version: number;
+  readonly width: number; // cells
+  readonly height: number;
+  readonly terrain: readonly (readonly Terrain[])[];
+  readonly roads: readonly Road[];
+  readonly links: readonly Link[];
+  readonly junctions: readonly Junction[];
+  readonly gates?: readonly { readonly id: string; readonly cell: readonly [number, number] }[];
+  /** Next free id (nodes and roads share the counter). */
+  readonly nextId?: number;
+}
+
+export interface RoadPlan {
+  readonly ok: boolean;
+  readonly why?: string;
+  readonly cells: readonly Cell[];
+  readonly line: readonly Pt[];
+  readonly type: RoadType;
+  readonly oneWay: boolean;
+  readonly level: Level;
+  readonly cellsOnWater: number;
+  readonly length: number; // cells (diagonal = 1.4)
+  /** Existing roads it will cut into two (a new junction appears). */
+  readonly splits: readonly Id[];
+  /** With a refusal: what is in the way. */
+  readonly at?: CellRect;
+}
+
+/**
+ * network.ts exports (all pure; each change returns a new Network with version + 1; ids of untouched
+ * roads, links and junctions never change):
+ *
+ *   createNetwork(map: readonly string[], roads: readonly RoadDef[], gates): Network
+ *   planRoad(net, cells, type, { oneWay, blocked }): RoadPlan        // blocked(cell): true where lots or car parks stand
+ *   addRoad(net, plan, { fixed? }): Network
+ *   removeRoad(net, id): Network                                      // heals: a two-arm junction without a control becomes a bend
+ *   setRoad(net, id, patch: Partial<Pick<Road, 'type'|'busLane'|'kerb'|'toll'|'truckBan'|'works'|'nightWorks'|'oneWay'>>): Network
+ *   setControl(net, node, control): Network
+ *   setSplit(net, node, split): Network
+ *   planFlyover(net, node, fromRoad, toRoad, level): RoadPlan & { ramps }   // leaves fromRoad ~3 cells before the node, joins toRoad ~3 cells after
+ *   addFlyover(net, plan): Network
+ *   nearestAccess(net, rect): { road, s } | null                      // driveway for a block; never a highway, flyover or bridge
+ *   junctionAt(net, cell), roadAt(net, cell)
+ */
+export interface NetworkApi {
+  createNetwork(map: readonly string[], roads: readonly RoadDef[], gates: readonly { id: string; cell: readonly [number, number] }[]): Network;
+}
+
+// ---------------------------------------------------------------- traffic
+
+/** A place on a road where cars enter and leave: a driveway, a car park, a kerb bay, or a map gate (gate node id). */
+export type Access = { readonly road: Id; readonly s: number } | { readonly gate: Id };
+
+export interface SpawnRequest {
+  readonly from: Access;
+  readonly to: Access;
+  readonly kind: VehicleKind;
+  readonly tint?: number;
+  /** Money the driver would pay to save one second (tolls in routing). */
+  readonly value: number;
+  /** Opaque to Traffic; comes back on the arrival. */
+  readonly tag: number;
+}
+
+export interface Arrival { readonly uid: number; readonly slot: number; readonly tag: number; readonly seconds: number; readonly waited: number; readonly tolls: number; readonly at: Pt }
+
+export interface Trip { readonly seconds: number; readonly toll: number; readonly reachable: boolean; readonly viaRoads?: readonly Id[] }
+
+export interface Traffic {
+  readonly cars: CarsView;
+  readonly active: number;
+  /** Swap the network between or during days. Cars on removed roads are re-routed or sent home; none may end up off the road. */
+  setNetwork(net: Network): void;
+  /** Price now charged at each tolled road, and capacity factors from weather or incidents (1 = normal). */
+  setConditions(c: { readonly tollNow: number; readonly speed: number; readonly trucksAllowed: boolean }): void;
+  /** -1 when the entry is full or the cap is reached (the city retries or counts it as held up at home). */
+  spawn(r: SpawnRequest): number;
+  /** Send a car that has just arrived (and waits at its destination for at most one step) somewhere else: the search for a space. */
+  redirect(uid: number, to: Access): boolean;
+  /** Take an arrived car off the road (it parked, or left by a gate). */
+  remove(uid: number): void;
+  /** Double-parked or broken down: the lane is blocked there for `seconds`. */
+  block(at: Access, seconds: number, state: 2 | 3): number;
+  /** Buses, trams and school buses: drive the stops in a loop, pausing `dwell` at each. Returns a handle. */
+  addService(r: { readonly stops: readonly Access[]; readonly kind: VehicleKind; readonly dwell: number; readonly vehicles: number; readonly tag: number }): number;
+  removeService(id: number): void;
+  /** Mean seconds for one lap over the last day, for waits and crowding. */
+  serviceLap(id: number): number;
+  /** Expected trip by the current travel-time fields (cheap: cached per destination node). */
+  estimate(from: Access, to: Access, value: number): Trip;
+  step(): void; // STEP seconds
+  drainArrivals(): Arrival[];
+  drainGaveUp(): Arrival[];
+  drainHonks(): Pt[];
+  movements(node: Id): readonly Movement[];
+  roadStats(road: Id): RoadStats;
+  junctionStats(node: Id): JunctionStats;
+  /** uids now on the road, for `trace`. */
+  carsOn(road: Id): readonly number[];
+  routeOf(uid: number): { readonly tag: number; readonly seconds: number; readonly waited: number } | null;
+  /** Clear the day's measurements (dawn) or every car (night). */
+  startDay(): void;
+  endDay(): void;
+}
+
+/** traffic.ts exports createTraffic(net: Network, seed: number): Traffic */
+export type { Control };

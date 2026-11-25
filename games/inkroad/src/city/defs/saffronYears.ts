@@ -1,0 +1,142 @@
+import type { YearDef } from '../../sim/types';
+
+/** Saffron Bay, year by year: one new idea each year. */
+export const SAFFRON_YEARS: readonly YearDef[] = [
+  {
+    year: 1, name: 'The Roundabout', cannotLose: true, grant: 45,
+    intro: [
+      { who: 'sulo', text: 'Welcome, Director. I would have come in person, but I am stuck at the crossroads.' },
+      { who: 'zaza', text: 'I can hear it from here. Forty horns and one very angry goose.' },
+      { who: 'zaza', text: 'Tap the red crossroads. The arrows show who is waiting.' },
+    ],
+    tools: ['street', 'remove', 'junction'], controls: ['yield', 'roundabout'], parks: [], policies: [],
+    coach: [
+      { text: 'Watch the crossroads in the middle. Red means jammed. Tap it.', at: 'worstJunction', until: 'selected:junction' },
+      { text: 'Thick arrows are many cars, red arrows are long waits. Build a roundabout.', at: 'worstJunction', until: 'controlChanged' },
+      { text: 'Now let it run. Listen to the horns stop.', until: 'wait' },
+      { text: 'A new street can take cars round the crossroads too. Draw one across the sand.', tool: 'street', until: 'built' },
+    ],
+    goal: { kind: 'wait@22,18', target: 12, text: 'Mean wait at the crossroads under 12 s' },
+    events: [{ season: 2, kind: 'wedding', at: 'Cedar Court' }],
+    plan: ['Year 2: the market doubles', 'Year 3: more villas by the creek'],
+  },
+  {
+    year: 2, name: 'No Space at the Market', cannotLose: true, grant: 45,
+    intro: [
+      { who: 'miko', text: 'Miko, head of parking. Our lookouts count two carpets for every space.' },
+      { who: 'miko', text: 'A price that leaves a few spaces free is a good price. About 85 in 100 full.' },
+    ],
+    tools: ['kerb', 'parking', 'avenue'], parks: ['lot'], policies: ['permits'],
+    coach: [
+      { text: 'Drivers at the market cannot find a space. Add kerb bays or a car park near it.', at: 'market', tool: 'parking', until: 'toolPicked:parking' },
+      { text: 'Open the parking view. You want it nearly full, not full.', until: 'wait' },
+      { text: 'At night you can change the price, one step at a time.', until: 'review' },
+    ],
+    goal: { kind: 'found@market', target: 90, text: '90 of 100 drivers find a space at the market' },
+    events: [{ season: 2, kind: 'festival', at: 'Carpet Market' }],
+    plan: ['Year 3: more villas by the creek', 'Year 4: an office district in the north west'],
+  },
+  {
+    year: 3, name: 'The Fine Print', grant: 50,
+    intro: [
+      { who: 'miko', text: 'People park wherever they like, sometimes on other people.' },
+      { who: 'pim', text: 'Fines! Lovely fines! But not too many, or they will call us a cash machine. They already do.' },
+    ],
+    tools: ['oneway'], policies: ['inspectors'],
+    coach: [{ text: 'Hire an inspector or two at the review. Then look at double parking.', until: 'review' }],
+    goal: { kind: 'double', target: 5, text: 'At most 5 double-parked cars a day' },
+    events: [{ season: 1, kind: 'breakdown' }, { season: 2, kind: 'sandstorm' }],
+    commissions: ['quiet-fines'],
+    plan: ['Year 4: an office district in the north west', 'Year 5: flats and a hospital in the south east'],
+  },
+  {
+    year: 4, name: 'Office Hours', grant: 60,
+    intro: [
+      { who: 'sulo', text: 'Everybody in the new offices starts at nine. Nobody asked the roads.' },
+      { who: 'zaza', text: 'A signal can give the busy road more green. Good when one side is heavier.' },
+      { who: 'pim', text: 'Or the lorries could come at night. They are all bringing paperclips anyway.' },
+    ],
+    tools: [], controls: ['signal'], policies: ['truckHours', 'taxis'],
+    coach: [{ text: 'Tap a junction and choose signals. Slide the green time to the busy road.', at: 'worstJunction', tool: 'junction', until: 'controlChanged' }],
+    goal: { kind: 'bar:trips', target: 56, text: 'Trips at 56 or more' },
+    events: [{ season: 2, kind: 'term' }],
+    commissions: ['office-run'],
+    plan: ['Year 5: flats and a hospital in the south east', 'Year 6: the port and a stadium'],
+  },
+  {
+    year: 5, name: 'The Red Lane', grant: 75,
+    intro: [
+      { who: 'juma', text: 'Juma, buses. I carry everyone and I do not complain. My knees do.' },
+      { who: 'juma', text: 'Tap the stops, choose how many buses. A red lane keeps them out of the jam.' },
+    ],
+    tools: ['bus', 'buslane'],
+    coach: [{ text: 'Draw a bus line from the flats to the offices.', tool: 'bus', until: 'toolPicked:bus' }],
+    goal: { kind: 'riders', target: 400, text: '400 riders in a season' },
+    events: [{ season: 1, kind: 'rain' }],
+    commissions: ['bus-habit'],
+    plan: ['Year 6: the port and a stadium', 'Year 7: the far shore'],
+  },
+  {
+    year: 6, name: 'Over the Top', grant: 90,
+    intro: [
+      { who: 'zaza', text: "Sometimes one left turn ruins everybody's morning. Lift it over the top." },
+      { who: 'pim', text: 'Flyovers cost real money. And two seasons of dust. I have already sneezed.' },
+    ],
+    tools: ['flyover'], policies: ['nightWorks'],
+    coach: [{ text: 'Tap the worst junction, then drag along its reddest arrow to lift that movement.', at: 'worstJunction', tool: 'flyover', until: 'toolPicked:flyover' }],
+    goal: { kind: 'worstWait', target: 14, text: 'No busy junction over 14 s' },
+    events: [{ season: 0, kind: 'football', at: 'Moonball Stadium' }, { season: 2, kind: 'football', at: 'Moonball Stadium' }],
+    commissions: ['port-run'],
+    plan: ['Year 7: the far shore', 'Year 8: the Great Mall'],
+  },
+  {
+    year: 7, name: 'The Second Bridge', grant: 115,
+    intro: [
+      { who: 'sulo', text: 'Half the city now lives across the creek, and the other half is on the bridge.' },
+      { who: 'pim', text: 'The Council pays 60 of every 100 coins of a bridge. A toll on it brings the rest. Leave a free way round.' },
+    ],
+    tools: ['toll', 'boulevard'],
+    coach: [{ text: 'Build a second bridge: drag a road straight over the creek. Then try a toll gate on it.', tool: 'toll', until: 'toolPicked:toll' }],
+    goal: { kind: 'lost', target: 3, text: 'At most 3 of 100 trips lost' },
+    events: [{ season: 1, kind: 'breakdown', at: 'bridge' }, { season: 2, kind: 'festival', at: 'Pepper Market' }],
+    commissions: ['two-bridges'],
+    plan: ['Year 8: the Great Mall', 'Year 9: the metro, and the last towers'],
+  },
+  {
+    year: 8, name: 'Mall Season', grant: 130,
+    intro: [
+      { who: 'miko', text: 'The mall opens. It has a ski slope, a whale, and not enough parking.' },
+      { who: 'zaza', text: 'Remember our first roundabout? It is about to remember us.' },
+    ],
+    tools: ['underpass'], parks: ['multi', 'under'],
+    coach: [{ text: 'Multi-storey car parks hold far more cars on the same sand.', tool: 'parking', until: 'toolPicked:parking' }],
+    goal: { kind: 'bar:parking', target: 66, text: 'Parking at 66 or more' },
+    events: [{ season: 0, kind: 'sale', at: 'The Great Mall' }, { season: 1, kind: 'pipe' }, { season: 2, kind: 'sale', at: 'The Great Mall' }],
+    commissions: ['mall-calm'],
+    plan: ['Year 9: the metro, and the last towers', 'Year 10: the Grand Fair, with twice the visitors'],
+  },
+  {
+    year: 9, name: 'The Green Line', grant: 150,
+    intro: [
+      { who: 'juma', text: 'A train. Under the ground. No knees at all.' },
+      { who: 'sulo', text: 'The Council pays 60 of every 100 coins. Please do not ask which 60.' },
+    ],
+    tools: ['metro'], parks: ['ride'],
+    coach: [{ text: 'Draw the metro where the most people go. It takes three seasons to dig.', tool: 'metro', until: 'toolPicked:metro' }],
+    goal: { kind: 'share', target: 12, text: '12 of 100 trips by bus or metro' },
+    events: [{ season: 1, kind: 'rain' }, { season: 2, kind: 'football', at: 'Moonball Stadium' }],
+    commissions: ['green-share'],
+    plan: ['Year 10: the Grand Fair, with twice the visitors'],
+  },
+  {
+    year: 10, name: 'The Grand Fair', grant: 170,
+    intro: [
+      { who: 'sulo', text: 'The whole world is coming to the Fair. I left home last week to be on time.' },
+      { who: 'zaza', text: 'Everything you built, all at once. My ears are ready.' },
+    ],
+    tools: [],
+    goal: { kind: 'approval', target: 48, text: 'Approval at 48 or more' },
+    events: [{ season: 0, kind: 'fair', at: 'The Grand Fair' }, { season: 1, kind: 'fair', at: 'The Grand Fair' }, { season: 2, kind: 'fair', at: 'The Grand Fair' }, { season: 3, kind: 'fair', at: 'The Grand Fair' }],
+    plan: [],
+  },
+];

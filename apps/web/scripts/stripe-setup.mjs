@@ -73,6 +73,13 @@ const PRODUCTS = [
     unitAmount: 499,
     currency: 'usd',
   },
+  {
+    lookupKey: 'inkroad_full',
+    name: 'InkRoad: Full Game',
+    description: 'The full InkRoad game on 16bit.ink: Old Harbour after the free Saffron Bay, and every new city as a free update for owners. One-time purchase, no subscription.',
+    unitAmount: 499,
+    currency: 'usd',
+  },
 ];
 
 const key = process.env.STRIPE_SECRET_KEY;

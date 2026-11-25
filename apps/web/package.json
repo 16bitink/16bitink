@@ -32,6 +32,7 @@
   "dependencies": {
     "@16bitink/game-sdk": "workspace:*",
     "@16bitink/inkbrick": "workspace:*",
+    "@16bitink/inkroad": "workspace:*",
     "@16bitink/inkcrab": "workspace:*",
     "@16bitink/inkfish": "workspace:*",
     "@16bitink/inkgecko": "workspace:*",

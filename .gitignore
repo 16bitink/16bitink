@@ -12,3 +12,8 @@ coverage
 
 games/inkheroes/dev/pixel/siege3d/out
 .*.tmp.mjs
+
+# InkRoad: raw generated sheets and takes (200 MB); the cut pictures and sounds ship from src
+games/inkroad/dev/art/raw
+games/inkroad/dev/art/ui/raw
+games/inkroad/dev/audio/raw

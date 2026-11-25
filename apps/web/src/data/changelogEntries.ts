@@ -514,4 +514,14 @@ export const GAME_ENTRIES: Readonly<Record<string, readonly ChangelogEntry[]>> =
       ],
     },
   ],
+  inkroad: [
+    {
+      date: "2026-11-29",
+      title: "InkRoad launches",
+      changes: [
+        "Launched InkRoad: run the road authority of a growing city. Build roads, flyovers, car parks, buses, trams and a metro, and keep the traffic moving while the Council watches.",
+        "Two cities are ready: Saffron Bay (years 1 to 10, free) and Old Harbour (years 11 to 20) in the full game. Three more cities follow as free updates for owners.",
+      ],
+    },
+  ],
 };

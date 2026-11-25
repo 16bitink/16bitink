@@ -10,6 +10,7 @@ import { INKFISH_FULL_CHAPTERS } from '@16bitink/inkfish/content';
 import { INKGECKO_PAID_CHAPTERS } from '@16bitink/inkgecko/content';
 import { INKHEROES_PAID_MAPS } from '@16bitink/inkheroes/content';
 import { INKBRICK_PAID_LEVELS } from '@16bitink/inkbrick/content';
+import { PAID_CITIES as INKROAD_PAID_CITIES } from '@16bitink/inkroad/content';
 import { INKTANKS_PAID_LEVELS } from '@16bitink/inktanks/content';
 import { INKPIN_PAID_CHAPTERS } from '@16bitink/inkpin/content';
 import { INKMINE_PAID_PLANETS } from '@16bitink/inkmine/content';
@@ -25,4 +26,5 @@ export const PAID_CONTENT: Readonly<Record<string, unknown>> = {
   inkheroes: INKHEROES_PAID_MAPS,
   inktanks: INKTANKS_PAID_LEVELS,
   inkbrick: INKBRICK_PAID_LEVELS,
+  inkroad: INKROAD_PAID_CITIES,
 };
