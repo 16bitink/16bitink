@@ -1,5 +1,6 @@
 ---
 import Base from '../../../layouts/Base.astro';
+import { BIND_COOKIE, REDEEM_PATH } from '../../../lib/appSignIn';
 import { signInPageUrl } from '../../../lib/buyFlow';
 import { db } from '../../../lib/db';
 import { collectHandoff } from '../../../lib/db/appHandoffRepo';
@@ -10,36 +11,41 @@ import { finishSignIn } from '../../../lib/signIn';
  * The app's web view lands here once Google's or Apple's sheet has proven
  * who the player is (lib/appSignIn.ts): the one-time token in `t` signs this
  * web view in, with its own cookies, so its saves and purchases move into the
- * account as in any browser.
+ * account as in any browser. Only the web view that started the sign-in
+ * can: the handoff names its BIND_COOKIE, so a link sent to anyone else
+ * finds nothing (and stays usable for the real web view).
  */
 export const prerender = false;
 
 // The token in the address bar is a bearer credential: keep it out of Referer and caches.
-Astro.response.headers.set('referrer-policy', 'no-referrer');
-Astro.response.headers.set('cache-control', 'no-store');
+const NO_LEAK = { 'referrer-policy': 'no-referrer', 'cache-control': 'no-store' } as const;
+for (const [k, v] of Object.entries(NO_LEAK)) Astro.response.headers.set(k, v);
 
 const token = Astro.url.searchParams.get('t');
+const bind = Astro.cookies.get(BIND_COOKIE)?.value;
 let error: string | null = null;
 let ret = '/';
-if (!token || token.length > 100) {
+if (!token || token.length > 100 || !bind || bind.length > 100) {
   error = 'That sign-in has expired. Please try again.';
 } else {
   try {
     const now = new Date();
     await db();
-    const got = await collectHandoff(await hashSecret(token), now);
+    const got = await collectHandoff(await hashSecret(token), await hashSecret(bind), now);
     if (!got) {
       error = 'That sign-in has expired. Please try again.';
     } else {
       ret = got.ret;
       await finishSignIn(Astro.cookies, Astro.url, got.who, now);
+      Astro.cookies.delete(BIND_COOKIE, { path: REDEEM_PATH });
     }
   } catch (err) {
     console.error('[auth/app/redeem] sign-in failed', err);
     error = 'Something went wrong signing you in. Please try again.';
   }
 }
-if (!error) return Astro.redirect(ret, 303);
+// Not Astro.redirect, which makes its own response without NO_LEAK (the cookies are still added).
+if (!error) return new Response(null, { status: 303, headers: { location: ret, ...NO_LEAK } });
 ---
 <Base title="Sign in" description="Finish signing in">
   <meta name="referrer" content="no-referrer" slot="head" />

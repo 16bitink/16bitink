@@ -8,6 +8,8 @@ import mongoose, { Schema, type Model, type Types } from 'mongoose';
 export interface AppHandoffDoc {
   readonly _id: Types.ObjectId;
   readonly tokenHash: string;
+  /** SHA-256 of the BIND_COOKIE of the web view that started the sign-in: only it can collect this. */
+  readonly bindHash: string;
   readonly kind: 'google' | 'apple';
   /** The account's id at Google or Apple. */
   readonly providerId: string;
@@ -25,6 +27,7 @@ export interface AppHandoffDoc {
 const appHandoffSchema = new Schema<AppHandoffDoc>(
   {
     tokenHash: { type: String, required: true },
+    bindHash: { type: String, required: true },
     kind: { type: String, enum: ['google', 'apple'], required: true },
     providerId: { type: String, required: true },
     email: { type: String, required: true },

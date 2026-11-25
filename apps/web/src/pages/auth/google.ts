@@ -1,4 +1,5 @@
 import type { APIRoute } from 'astro';
+import { appCallbackUrl, isBindHash } from '../../lib/appSignIn';
 import { requireEnv, requireSecret } from '../../lib/env';
 import { CALLBACK_PATH, googleAuthUrl, pkceChallenge, randomToken, safeReturnPath } from '../../lib/google';
 import { FLOW_COOKIE, FLOW_MAX_AGE, signFlow } from '../../lib/session';
@@ -9,10 +10,19 @@ export const prerender = false;
 export const GET: APIRoute = async ({ url, cookies, redirect }) => {
   try {
     const clientId = requireEnv('GOOGLE_CLIENT_ID');
+    const app = url.searchParams.get('app') === '1';
+    const bind = url.searchParams.get('bind');
+    // From the app, the sign-in must name the web view that will redeem it (lib/appSignIn.ts).
+    if (app && !isBindHash(bind)) {
+      return new Response(null, {
+        status: 303,
+        headers: { location: appCallbackUrl({ error: 'That sign-in has expired. Please try again.' }), 'cache-control': 'no-store' },
+      });
+    }
     const flow = {
       v: 1, state: randomToken(), nonce: randomToken(), verifier: randomToken(),
       ret: safeReturnPath(url.searchParams.get('return')),
-      ...(url.searchParams.get('app') === '1' ? { app: true } : {}),
+      ...(app ? { app: true, bind: bind! } : {}),
       exp: Math.floor(Date.now() / 1000) + FLOW_MAX_AGE,
     } as const;
     cookies.set(FLOW_COOKIE, await signFlow(flow, requireSecret('ENTITLEMENT_SECRET')), {

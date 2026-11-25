@@ -69,11 +69,12 @@ Astro.response.headers.set('cache-control', 'private, no-store');
 </Base>
 
 <script>
+  import { BIND_PATH } from '../lib/appSignIn';
   import { trackSignIn } from '../lib/client/analytics';
 
   interface Reply {
     readonly success?: boolean;
-    readonly data?: { readonly email?: string; readonly ret?: string };
+    readonly data?: { readonly email?: string; readonly ret?: string; readonly bind?: string };
     readonly error?: string;
   }
 
@@ -116,13 +117,36 @@ Astro.response.headers.set('cache-control', 'private, no-store');
       for (const el of form.querySelectorAll<HTMLInputElement | HTMLButtonElement>('input, button')) el.disabled = on;
     };
 
-    root.querySelector('[data-google]')?.addEventListener('click', () => trackSignIn('google'));
-    // Sign in with Apple: only inside the iOS app, whose bridge runs Apple's sheet and then opens the page that signs this view in.
     interface AppleReply {
       readonly error?: string;
       readonly cancelled?: boolean;
     }
-    const bridge = (window as unknown as { InkApp?: { signInWithApple?: (ret: string) => Promise<AppleReply | undefined> } }).InkApp;
+    interface Bridge {
+      readonly isApp?: boolean;
+      readonly signInWithApple?: (ret: string, bind: string) => Promise<AppleReply | undefined>;
+    }
+    const bridge = (window as unknown as { InkApp?: Bridge }).InkApp;
+    // In the app, Google's and Apple's sheets sign in outside this view, and only this view may then redeem
+    // the result: it gets a secret cookie of its own, and the sheet carries its hash (lib/appSignIn.ts).
+    const newBind = async (): Promise<string | null> => {
+      const reply = await post(BIND_PATH, {});
+      if (reply.data?.bind) return reply.data.bind;
+      showError(reply.error ?? 'Something went wrong. Please try again.');
+      return null;
+    };
+
+    const google = root.querySelector<HTMLAnchorElement>('[data-google]');
+    google?.addEventListener('click', async (e) => {
+      trackSignIn('google');
+      if (!bridge?.isApp) return;
+      e.preventDefault();
+      showError(null);
+      const bind = await newBind();
+      // The app catches this link and opens it in the system sheet, query and all.
+      if (bind) location.href = `${google.href}&bind=${encodeURIComponent(bind)}`;
+    });
+
+    // Sign in with Apple: only inside the iOS app, whose bridge runs Apple's sheet and then opens the page that signs this view in.
     const apple = root.querySelector<HTMLButtonElement>('[data-apple]');
     if (apple && typeof bridge?.signInWithApple === 'function') {
       const signInWithApple = bridge.signInWithApple;
@@ -132,8 +156,10 @@ Astro.response.headers.set('cache-control', 'private, no-store');
         showError(null);
         apple.disabled = true;
         try {
+          const bind = await newBind();
+          if (!bind) return;
           // On success the app moves this view on to finish signing in; only a failure comes back here.
-          const reply = await signInWithApple(ret);
+          const reply = await signInWithApple(ret, bind);
           if (reply?.error) showError(reply.error);
         } catch {
           showError('Sign in with Apple failed. Please try again.');

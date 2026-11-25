@@ -4,7 +4,7 @@ import { requireEnv, requireSecret } from '../../../lib/env';
 import { CALLBACK_PATH, GOOGLE_TOKEN_URL, checkIdToken, decodeJwtPayload } from '../../../lib/google';
 import { signInPageUrl } from '../../../lib/buyFlow';
 import { FLOW_COOKIE, verifyFlow } from '../../../lib/session';
-import { appCallbackUrl } from '../../../lib/appSignIn';
+import { appCallbackUrl, isBindHash } from '../../../lib/appSignIn';
 import { finishSignIn, issueHandoff } from '../../../lib/signIn';
 
 export const prerender = false;
@@ -27,8 +27,8 @@ let handoff: string | null = null;
 
 if (params.get('error')) {
   error = 'Sign-in was cancelled. Nothing changed.';
-} else if (!flow || params.get('state') !== flow.state || !params.get('code')) {
-  // A stale tab, a second click, or a forged callback.
+} else if (!flow || params.get('state') !== flow.state || !params.get('code') || (app && !isBindHash(flow.bind))) {
+  // A stale tab, a second click, or a forged callback (or, from the app, one that names no web view).
   error = 'That sign-in link has expired. Please try again.';
 } else {
   ret = flow.ret;
@@ -52,7 +52,7 @@ if (params.get('error')) {
     if (!user) {
       error = 'Google could not confirm a verified email for that account.';
     } else {
-      if (app) handoff = await issueHandoff({ kind: 'google', user }, ret, new Date(nowSec * 1000));
+      if (app) handoff = await issueHandoff({ kind: 'google', user }, flow.bind!, ret, new Date(nowSec * 1000));
       else await finishSignIn(Astro.cookies, Astro.url, { kind: 'google', user }, new Date(nowSec * 1000));
     }
   } catch (err) {

@@ -7,19 +7,23 @@ export interface Collected {
   readonly ret: string;
 }
 
-/** Parks a proven sign-in under `tokenHash` for HANDOFF_MAX_AGE_SEC. */
-export async function createHandoff(tokenHash: string, who: HandoffIdentity, ret: string, now: Date): Promise<void> {
+/** Parks a proven sign-in under `tokenHash` for HANDOFF_MAX_AGE_SEC, for the web view whose BIND_COOKIE hashes to `bindHash`. */
+export async function createHandoff(tokenHash: string, bindHash: string, who: HandoffIdentity, ret: string, now: Date): Promise<void> {
   const providerId = who.kind === 'google' ? who.user.googleId : who.user.appleId;
   await AppHandoff.create({
-    tokenHash, kind: who.kind, providerId, email: who.user.email, name: who.user.name, ret,
+    tokenHash, bindHash, kind: who.kind, providerId, email: who.user.email, name: who.user.name, ret,
     createdAt: now, expiresAt: new Date(now.getTime() + HANDOFF_MAX_AGE_SEC * 1000),
   });
 }
 
-/** Uses up the handoff: who signed in, or null when it is unknown, used or expired. */
-export async function collectHandoff(tokenHash: string, now: Date): Promise<Collected | null> {
+/**
+ * Uses up the handoff: who signed in, or null when it is unknown, used,
+ * expired or not this web view's (`bindHash` differs). A wrong web view
+ * leaves it unused, so a link sent to someone else can't spoil the real one.
+ */
+export async function collectHandoff(tokenHash: string, bindHash: string, now: Date): Promise<Collected | null> {
   const doc = await AppHandoff.findOneAndUpdate(
-    { tokenHash, usedAt: { $exists: false }, expiresAt: { $gt: now } },
+    { tokenHash, bindHash, usedAt: { $exists: false }, expiresAt: { $gt: now } },
     { $set: { usedAt: now } },
     { projection: { kind: 1, providerId: 1, email: 1, name: 1, ret: 1 } },
   ).lean().exec();

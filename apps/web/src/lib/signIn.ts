@@ -49,11 +49,12 @@ export async function finishSignIn(cookies: AstroCookies, url: URL, who: Identit
 /**
  * For the app: parks a sign-in proven outside its web view and returns the
  * one-time token its web view redeems (pages/auth/app/redeem.astro), where
- * finishSignIn then runs with the web view's own cookies.
+ * finishSignIn then runs with the web view's own cookies. `bindHash` ties it
+ * to the web view that started the sign-in (lib/appSignIn.ts).
  */
-export async function issueHandoff(who: HandoffIdentity, ret: string, now: Date): Promise<string> {
+export async function issueHandoff(who: HandoffIdentity, bindHash: string, ret: string, now: Date): Promise<string> {
   await db();
   const token = randomToken();
-  await createHandoff(await hashSecret(token), who, ret, now);
+  await createHandoff(await hashSecret(token), bindHash, who, ret, now);
   return token;
 }
