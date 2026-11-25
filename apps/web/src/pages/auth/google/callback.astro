@@ -1,61 +1,17 @@
 ---
 import Base from '../../../layouts/Base.astro';
-import { requireEnv, requireSecret } from '../../../lib/env';
-import { CALLBACK_PATH, GOOGLE_TOKEN_URL, checkIdToken, decodeJwtPayload } from '../../../lib/google';
 import { signInPageUrl } from '../../../lib/buyFlow';
-import { FLOW_COOKIE, verifyFlow } from '../../../lib/session';
-import { finishSignIn } from '../../../lib/signIn';
+import { NO_LEAK } from '../../../lib/appSignIn';
+import { googleCallback } from '../../../lib/googleCallback';
 
 export const prerender = false;
 
-// The code in the address bar is a bearer credential: keep it out of Referer.
-Astro.response.headers.set('referrer-policy', 'no-referrer');
-Astro.response.headers.set('cache-control', 'no-store');
+for (const [k, v] of Object.entries(NO_LEAK)) Astro.response.headers.set(k, v);
 
-const params = Astro.url.searchParams;
-const secret = requireSecret('ENTITLEMENT_SECRET');
-const nowSec = Math.floor(Date.now() / 1000);
-const flow = await verifyFlow(Astro.cookies.get(FLOW_COOKIE)?.value, secret, nowSec);
-Astro.cookies.delete(FLOW_COOKIE, { path: '/auth/google' });
-
-let error: string | null = null;
-let ret = '/';
-
-if (params.get('error')) {
-  error = 'Sign-in was cancelled. Nothing changed.';
-} else if (!flow || params.get('state') !== flow.state || !params.get('code')) {
-  // A stale tab, a second click, or a forged callback.
-  error = 'That sign-in link has expired. Please try again.';
-} else {
-  ret = flow.ret;
-  try {
-    const clientId = requireEnv('GOOGLE_CLIENT_ID');
-    const res = await fetch(GOOGLE_TOKEN_URL, {
-      method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        code: params.get('code')!,
-        client_id: clientId,
-        client_secret: requireEnv('GOOGLE_CLIENT_SECRET'),
-        redirect_uri: `${Astro.url.origin}${CALLBACK_PATH}`,
-        grant_type: 'authorization_code',
-        code_verifier: flow.verifier,
-      }),
-    });
-    const body = (await res.json().catch(() => null)) as { id_token?: unknown } | null;
-    if (!res.ok || typeof body?.id_token !== 'string') throw new Error(`Google token exchange failed (${res.status})`);
-    const user = checkIdToken(decodeJwtPayload(body.id_token), { clientId, nonce: flow.nonce, nowSec });
-    if (!user) {
-      error = 'Google could not confirm a verified email for that account.';
-    } else {
-      await finishSignIn(Astro.cookies, Astro.url, { kind: 'google', user }, new Date(nowSec * 1000));
-    }
-  } catch (err) {
-    console.error('[auth/google/callback] sign-in failed', err);
-    error = 'Something went wrong signing you in. Please try again.';
-  }
-}
-if (!error) return Astro.redirect(ret, 303);
+// All the work is in lib/googleCallback.ts; this page only shows what went wrong.
+const result = await googleCallback(Astro.cookies, Astro.url, Math.floor(Date.now() / 1000));
+if (result instanceof Response) return result;
+const { error, ret } = result;
 ---
 <Base title="Sign in" description="Sign in with Google">
   <meta name="referrer" content="no-referrer" slot="head" />

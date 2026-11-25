@@ -1,4 +1,6 @@
 import type { Role } from '../admins';
+import type { AppleUser } from '../apple';
+import type { HandoffIdentity } from '../appSignIn';
 import { nameFromEmail } from '../emailSignIn';
 import type { GoogleUser } from '../google';
 import { generatePlayerId, normalizePlayerId } from '../playerId';
@@ -46,6 +48,57 @@ export async function signInGoogleUser(g: GoogleUser, role: Role, now: Date): Pr
   }
 }
 
+/** Who an Apple sign-in turned out to be: the account, and the email it goes by (its own, not Apple's of today). */
+export interface AppleSignIn {
+  readonly userId: UserId;
+  readonly email: string;
+}
+
+/**
+ * Apple can hand back a different email later (say, a private relay address
+ * the player switched to), so an account keeps the email and name it has:
+ * Apple's are used only to create one. Overwriting would cut the account off
+ * from its real address: an email sign-in with it would then make a second,
+ * empty account, and the role (worked out from the email) could change.
+ */
+async function upsertAppleUser(a: AppleUser, roleOf: (email: string) => Role, now: Date): Promise<AppleSignIn> {
+  const own = await User.findOne({ appleId: a.appleId }, { email: 1 }).lean().exec();
+  if (own) {
+    await User.updateOne({ _id: own._id }, { $set: { lastSignInAt: now, role: roleOf(own.email) } });
+    return { userId: own._id.toHexString(), email: own.email };
+  }
+  const set = { lastSignInAt: now, role: roleOf(a.email) };
+  // As with Google: an account with this (Apple-verified) email and no Apple account yet is the same person's.
+  const joined = await User.findOneAndUpdate(
+    { email: a.email, appleId: { $exists: false } },
+    { $set: { ...set, appleId: a.appleId } },
+    { sort: OLDEST_FIRST, projection: ID_ONLY },
+  ).lean().exec();
+  if (joined) return { userId: joined._id.toHexString(), email: a.email };
+  const user = await User.findOneAndUpdate(
+    { appleId: a.appleId },
+    { $set: set, $setOnInsert: { appleId: a.appleId, email: a.email, name: a.name || nameFromEmail(a.email) } },
+    { upsert: true, returnDocument: 'after', projection: { email: 1 } },
+  ).lean().exec();
+  if (!user) throw new Error('User upsert returned nothing');
+  return { userId: user._id.toHexString(), email: user.email };
+}
+
+/**
+ * The user for this Apple account (or the account with its email it joins),
+ * created on first sign-in, with its role as of now: `roleOf` the account's
+ * own email, which may not be the one Apple sent this time.
+ */
+export async function signInAppleUser(a: AppleUser, roleOf: (email: string) => Role, now: Date): Promise<AppleSignIn> {
+  try {
+    return await upsertAppleUser(a, roleOf, now);
+  } catch (err) {
+    // Two first sign-ins at once: one created the user, so the retry finds it.
+    if (!isDuplicateKey(err)) throw err;
+    return upsertAppleUser(a, roleOf, now);
+  }
+}
+
 /**
  * The user with this (proven) email, Google account or not, created on first
  * sign-in, with `role` as of now. Emails aren't unique in the database, so two
@@ -83,6 +136,15 @@ export async function ensurePlayerId(userId: UserId, generate: () => string = ge
 export async function findName(userId: UserId): Promise<string | null> {
   const user = await User.findById(userId, { name: 1 }).lean().exec();
   return user?.name ?? null;
+}
+
+/**
+ * Whether this Google or Apple sign-in would land in an admin account: the
+ * one tied to it already, or one with its email that it would join.
+ */
+export async function isAdminAccount(who: HandoffIdentity): Promise<boolean> {
+  const own = who.kind === 'google' ? { googleId: who.user.googleId } : { appleId: who.user.appleId };
+  return (await User.exists({ $or: [own, { email: who.user.email }], role: 'admin' })) !== null;
 }
 
 /** The user's current role, or null when there is no such user. */

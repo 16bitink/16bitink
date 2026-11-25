@@ -45,6 +45,11 @@ describe('sign-in flow tokens', () => {
     expect(await verifyFlow(await signFlow(flow, SECRET), SECRET, NOW + 601)).toBeNull();
   });
 
+  it('carry, from the app, the web view they are for', async () => {
+    const app = { ...flow, app: true, bind: 'a'.repeat(64) } as const;
+    expect(await verifyFlow(await signFlow(app, SECRET), SECRET, NOW)).toEqual(app);
+  });
+
   it('are not sessions', async () => {
     expect(await verifyFlow(await signSession(session, SECRET), SECRET, NOW)).toBeNull();
   });

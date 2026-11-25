@@ -43,7 +43,7 @@ export const HOME_CLICK_TARGETS = ['cover', 'title', 'play', 'about'] as const;
 /** Where a buy was tapped: one of a game's own offers, the game's page on the site, the home page (the pass), or a game too old to say. */
 export const BUY_PLACES = [...OFFER_PLACES, 'page', 'home', 'unknown'] as const;
 /** Where a sign-in was tapped: a game's "save your progress", the site header, or "Bought it already?" on a game page; then, on the sign-in page, the way chosen. */
-export const SIGN_IN_PLACES = ['save', 'header', 'restore', 'google', 'email'] as const;
+export const SIGN_IN_PLACES = ['save', 'header', 'restore', 'google', 'apple', 'email'] as const;
 /** What the player first pressed in a level run: a finger, a mouse, a pen or a key. */
 export const INPUT_KINDS = ['touch', 'mouse', 'pen', 'key'] as const;
 

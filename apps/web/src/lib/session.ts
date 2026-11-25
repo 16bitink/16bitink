@@ -29,6 +29,10 @@ export interface SignInFlow {
   readonly verifier: string;
   /** Path to return to afterwards */
   readonly ret: string;
+  /** Started from the app: the callback hands back to it (lib/appSignIn.ts) instead of setting a cookie. */
+  readonly app?: boolean;
+  /** With `app`: the hash of the web view's BIND_COOKIE, for the handoff (lib/appSignIn.ts). */
+  readonly bind?: string;
   readonly exp: number;
 }
 
@@ -65,7 +69,8 @@ function isSession(v: unknown): v is UserSession {
 function isFlow(v: unknown): v is SignInFlow {
   if (typeof v !== 'object' || v === null) return false;
   const c = v as Record<string, unknown>;
-  return c.v === 1 && isStr(c.state) && isStr(c.nonce) && isStr(c.verifier) && isStr(c.ret) && typeof c.exp === 'number';
+  return c.v === 1 && isStr(c.state) && isStr(c.nonce) && isStr(c.verifier) && isStr(c.ret) &&
+    (c.bind === undefined || isStr(c.bind)) && typeof c.exp === 'number';
 }
 
 function isEmailFlow(v: unknown): v is EmailFlow {

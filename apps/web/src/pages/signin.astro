@@ -8,7 +8,9 @@ import { EMAIL_FLOW_COOKIE, verifyEmailFlow } from '../lib/session';
 import { parseUserAgent } from '../lib/userAgent';
 
 /**
- * Where every "Sign in" leads: Google, or a code and link by email. In the
+ * Where every "Sign in" leads: Google, or a code and link by email, and in
+ * the iOS app Apple too (the app's bridge offers it; see lib/appSignIn.ts).
+ * The app opens Google's link in the system sign-in sheet itself. In the
  * Facebook, Instagram and TikTok apps Google refuses to sign anyone in, so
  * there the email comes first, and its code is typed back here: the player
  * never leaves the app, and this browser's saves move into the account.
@@ -59,6 +61,7 @@ Astro.response.headers.set('cache-control', 'private, no-store');
       {inApp ? (
         <p class="signin-small">Google sign-in doesn't work inside this app. Use email, or open 16bit.ink in your browser to sign in with Google.</p>
       ) : (
+        <button type="button" class="btn btn-apple" data-apple hidden><span aria-hidden="true">{'\uF8FF'}</span> Sign in with Apple</button>
         <a class="btn" href={googleSignInUrl(ret)} data-google>Sign in with Google</a>
       )}
     </div>
@@ -66,11 +69,12 @@ Astro.response.headers.set('cache-control', 'private, no-store');
 </Base>
 
 <script>
+  import { BIND_PATH } from '../lib/appSignIn';
   import { trackSignIn } from '../lib/client/analytics';
 
   interface Reply {
     readonly success?: boolean;
-    readonly data?: { readonly email?: string; readonly ret?: string };
+    readonly data?: { readonly email?: string; readonly ret?: string; readonly bind?: string };
     readonly error?: string;
   }
 
@@ -113,7 +117,68 @@ Astro.response.headers.set('cache-control', 'private, no-store');
       for (const el of form.querySelectorAll<HTMLInputElement | HTMLButtonElement>('input, button')) el.disabled = on;
     };
 
-    root.querySelector('[data-google]')?.addEventListener('click', () => trackSignIn('google'));
+    interface AppleReply {
+      readonly error?: string;
+      readonly cancelled?: boolean;
+    }
+    interface Bridge {
+      readonly isApp?: boolean;
+      readonly signInWithApple?: (ret: string, bind: string) => Promise<AppleReply | undefined>;
+    }
+    const bridge = (window as unknown as { InkApp?: Bridge }).InkApp;
+    // In the app, Google's and Apple's sheets sign in outside this view, and only this view may then redeem
+    // the result: it gets a secret cookie of its own, and the sheet carries its hash (lib/appSignIn.ts).
+    const newBind = async (): Promise<string | null> => {
+      const reply = await post(BIND_PATH, {});
+      if (reply.data?.bind) return reply.data.bind;
+      showError(reply.error ?? 'Something went wrong. Please try again.');
+      return null;
+    };
+
+    const google = root.querySelector<HTMLAnchorElement>('[data-google]');
+    // As the Apple button: one start at a time. A second tap would replace the bind cookie,
+    // and the sign-in the first tap opened would then come back "expired".
+    let startingGoogle = false;
+    google?.addEventListener('click', async (e) => {
+      if (!bridge?.isApp) return trackSignIn('google');
+      e.preventDefault();
+      if (startingGoogle) return;
+      startingGoogle = true;
+      google.setAttribute('aria-disabled', 'true');
+      trackSignIn('google');
+      showError(null);
+      try {
+        const bind = await newBind();
+        // The app catches this link and opens it in the system sheet, query and all; the sheet covers this view until it closes.
+        if (bind) location.href = `${google.href}&bind=${encodeURIComponent(bind)}`;
+      } finally {
+        startingGoogle = false;
+        google.removeAttribute('aria-disabled');
+      }
+    });
+
+    // Sign in with Apple: only inside the iOS app, whose bridge runs Apple's sheet and then opens the page that signs this view in.
+    const apple = root.querySelector<HTMLButtonElement>('[data-apple]');
+    if (apple && bridge && typeof bridge.signInWithApple === 'function') {
+      apple.hidden = false;
+      apple.addEventListener('click', async () => {
+        trackSignIn('apple');
+        showError(null);
+        apple.disabled = true;
+        try {
+          const bind = await newBind();
+          if (!bind) return;
+          // On success the app moves this view on to finish signing in; only a failure comes back here.
+          // Called on the bridge, not detached from it, so it keeps its `this`.
+          const reply = await bridge.signInWithApple?.(ret, bind);
+          if (reply?.error) showError(reply.error);
+        } catch {
+          showError('Sign in with Apple failed. Please try again.');
+        } finally {
+          apple.disabled = false;
+        }
+      });
+    }
 
     emailForm.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -161,6 +226,9 @@ Astro.response.headers.set('cache-control', 'private, no-store');
   .signin-error { color: var(--red-ink); margin-top: 12px; }
   .signin-small { font-size: 0.92rem; color: var(--ink-soft); }
   .signin-or { margin-top: 26px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .btn-apple { background: #000; color: #fff; border-color: #000; }
+  .btn-apple[hidden] { display: none; }
+  [data-google][aria-disabled='true'] { opacity: 0.6; pointer-events: none; }
   .signin-or > span { font-family: var(--font-hand); font-size: 1.4rem; color: var(--ink-soft); }
   .signin-or[hidden], .signin form[hidden], .signin-error[hidden] { display: none; }
   .signin-link {

@@ -6,6 +6,8 @@ export interface UserDoc {
   readonly _id: Types.ObjectId;
   /** Google's stable account id; never changes, unlike the email. Absent for a user who signs in another way. */
   readonly googleId?: string;
+  /** Apple's stable account id for the app (Sign in with Apple, iOS); absent for a user who signs in another way. */
+  readonly appleId?: string;
   /** Verified, lower-cased; updated on each sign-in. */
   readonly email: string;
   readonly name: string;
@@ -20,6 +22,7 @@ export interface UserDoc {
 const userSchema = new Schema<UserDoc>(
   {
     googleId: { type: String },
+    appleId: { type: String },
     email: { type: String, required: true, index: true },
     name: { type: String, required: true },
     playerId: { type: String },
@@ -30,6 +33,7 @@ const userSchema = new Schema<UserDoc>(
 );
 // Unique among users who have one: users without a Google account don't collide.
 userSchema.index({ googleId: 1 }, { unique: true, partialFilterExpression: { googleId: { $type: 'string' } } });
+userSchema.index({ appleId: 1 }, { unique: true, partialFilterExpression: { appleId: { $type: 'string' } } });
 userSchema.index({ playerId: 1 }, { unique: true, partialFilterExpression: { playerId: { $type: 'string' } } });
 
 // Reused across dev-server reloads instead of redefined (which Mongoose rejects).

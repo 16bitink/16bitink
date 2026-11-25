@@ -1,0 +1,24 @@
+---
+import Base from '../../../layouts/Base.astro';
+import { NO_LEAK } from '../../../lib/appSignIn';
+import { redeemHandoff } from '../../../lib/appRedeem';
+import { signInPageUrl } from '../../../lib/buyFlow';
+
+export const prerender = false;
+
+for (const [k, v] of Object.entries(NO_LEAK)) Astro.response.headers.set(k, v);
+
+// All the work is in lib/appRedeem.ts; this page only shows what went wrong.
+const result = await redeemHandoff(Astro.cookies, Astro.url, new Date());
+if (result instanceof Response) return result;
+const { error, ret } = result;
+---
+<Base title="Sign in" description="Finish signing in">
+  <meta name="referrer" content="no-referrer" slot="head" />
+  <meta name="robots" content="noindex" slot="head" />
+  <section class="paper-card narrow">
+    <h1>Not signed in</h1>
+    <p>{error}</p>
+    <a class="btn" href={signInPageUrl(ret)}>Try again</a>
+  </section>
+</Base>
