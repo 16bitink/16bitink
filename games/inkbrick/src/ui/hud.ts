@@ -5,6 +5,7 @@ import type { HudState } from '../scenes/PlayScene';
 import { CRUMBLE_SHARE } from '../sim/constants';
 import type { LevelDef } from '../sim/types';
 import { clock, esc, heartsHtml, shellIcon } from './dom';
+import { TOUCH_SCREEN } from './touch';
 import { goalIconUrl } from '../render/ink/ruleIcons';
 import { friendShort, GOAL_NAMES, goalIcon, ruleBannerHtml, ruleIcon, RULES, shellLabels } from './rules';
 
@@ -35,8 +36,7 @@ export interface HudActs {
 }
 
 /** Phones and tablets read "Tap"; a mouse reads "Click or press Space". */
-const TOUCH = typeof matchMedia === 'function' && matchMedia('(hover: none) and (pointer: coarse)').matches;
-const LAUNCH_HINT = TOUCH ? 'Tap to skip the stone' : 'Click or press Space to skip the stone';
+const LAUNCH_HINT = TOUCH_SCREEN ? 'Tap to skip the stone' : 'Click or press Space to skip the stone';
 const pctOf = (share: number): number => Math.max(0, Math.min(100, Math.round(share * 100)));
 
 const img = (url: string | null, cls: string): string => (url ? `<img class="${cls}" src="${url}" alt="">` : '');
@@ -86,7 +86,7 @@ export class Hud {
       ? `<div class="side" style="left:0;width:${l.x}px;align-items:flex-end;text-align:right">
           <div class="t44">${esc(this.info.title)}</div><div>${esc(this.info.subtitle)}</div>
           ${timed ? '<div class="t44" data-k="time"></div>' : ''}${beat}${ruleSide}<div class="row" style="justify-content:flex-end">${cheat}${pause}</div></div>
-         <div class="side" style="left:${l.x + l.w}px;width:${Math.min(l.x, 340)}px">${goalHead}<div data-k="hearts"></div><div data-k="boss" class="t18"></div>
+         <div class="side" style="left:${l.x + l.w}px;width:${Math.min(l.x, 340)}px${l.pad ? `;bottom:${l.pad.h}px` : ''}">${goalHead}<div data-k="hearts"></div><div data-k="boss" class="t18"></div>
           <div class="goal-k" data-k="goal"></div>
           <div class="row" style="max-width:260px">${this.bar()}<span data-k="pct"></span></div>
           <div class="panel col" data-k="shells"></div></div><div data-k="hint"></div>`
@@ -156,7 +156,7 @@ export class Hud {
     // On a dark board (a dark level or a Fog day) the words are in lantern light, not ink.
     const night = this.info.level.dark === true || this.info.level.rule === 'fog' ? ' night' : '';
     const tip = this.info.tip ? `<br><span class="t18${banner ? ' tip' : ''}">${esc(this.info.tip)}</span>` : '';
-    if (!banner) return `<div class="hint${night}" style="left:${l.x + l.w / 2}px;top:${l.y + l.h * 0.72}px">${LAUNCH_HINT}${h.fresh ? tip : ''}</div>`;
+    if (!banner) return `<div class="hint${night}" style="left:${l.x + l.w / 2}px;top:${l.y + l.h * 0.72}px;width:max-content;max-width:${Math.min(l.w * 0.94, 460)}px;white-space:normal">${LAUNCH_HINT}${h.fresh ? tip : ''}</div>`;
     // Before the first throw: the goal and the rule of the day, then how to throw. Low on the
     // board, under where the bricks usually are.
     return `<div class="hint fresh${night}" style="left:${l.x + l.w / 2}px;top:${l.y + l.h * 0.7}px;width:${Math.min(l.w * 0.94, 460)}px">${ruleBannerHtml(this.info.level)}<span>${LAUNCH_HINT}</span>${tip.replace('<br>', '')}</div>`;

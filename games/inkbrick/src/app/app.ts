@@ -1,4 +1,5 @@
 import type { GameEvent, GameHost, OfferPlace } from '@16bitink/game-sdk';
+import { TURN_HTML } from '../ui/turnUpright';
 import { SoundBoard } from '../audio/sound';
 import { chapterOf, CHAPTERS, FREE_LEVELS, gate, hasLevel, installPaidLevels, levelFor, TOTAL_LEVELS, type GateContext } from '../level/index';
 import { surroundKey } from '../render/art';
@@ -49,7 +50,7 @@ export class App {
   constructor(parent: HTMLElement, private readonly host: GameHost) {
     this.root = document.createElement('div');
     this.root.className = 'ikb';
-    this.root.innerHTML = '<div class="stage"></div><div class="hud" hidden></div><div class="screen"></div><div class="screen card" hidden></div>';
+    this.root.innerHTML = `<div class="stage"></div><div class="hud" hidden></div><div class="screen"></div><div class="screen card" hidden></div>${TURN_HTML}`;
     parent.appendChild(this.root);
     const [stageEl, hud, screen, card] = Array.from(this.root.children) as HTMLElement[];
     this.hudEl = hud!;

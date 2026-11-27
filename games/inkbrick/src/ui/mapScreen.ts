@@ -1,6 +1,7 @@
 import type { Shells } from '../app/save';
 import { CHAPTERS, type Gate } from '../level/index';
 import { MAP_POINTS } from '../art/manifest';
+import { coastCrop, MAP_H, MAP_W, nextLevel, nodeSpot, trailPath } from './mapGeo';
 import { artUrl } from '../render/art';
 import { esc, render, shellsHtml } from './dom';
 
@@ -27,25 +28,16 @@ export interface MapActs {
   menu(): void;
 }
 
-/** Node centres in % of the screen: across in landscape, upward in portrait. */
-export function nodeSpot(i: number, portrait: boolean): { x: number; y: number } {
-  if (portrait) return { x: 50 + Math.sin(i * 1.15) * 28, y: 88 - i * 6.6 };
-  return { x: 9 + i * 9.2, y: 62 + Math.sin(i * 0.95) * 16 };
-}
-
-function nodeHtml(n: number, d: MapData, pos: string): string {
+function nodeHtml(n: number, d: MapData, pos: string, next: number | null): string {
   const g = d.gate(n);
   const s = d.shells(n);
-  const cls = g === 'paywall' ? 'paid' : g === 'locked' || g === 'coming' ? 'locked' : s?.[0] ? 'done' : 'next';
+  const cls = g === 'paywall' ? 'paid' : g === 'locked' || g === 'coming' ? 'locked' : s?.[0] ? 'done' : n === next ? 'next' : 'open';
   const boss = n % 10 === 0 ? ' boss' : '';
   const title = d.name(n) ?? `Level ${n}`;
   const mark = s?.[0] ? `<span class="m">${shellsHtml(s)}</span>` : '';
   return `<button class="node ${cls}${boss}" style="${pos}" data-act="n${n}" title="${esc(title)}">${n}${mark}</button>`;
 }
 
-/** The coast map image's size (the manifest's MAP_POINTS are in its px). */
-const MAP_W = 1920;
-const MAP_H = 1080;
 /** Room kept under the last node of a trail (map image px): the map is cropped on wide screens. */
 const TRAIL_BOTTOM = 190;
 
@@ -72,12 +64,39 @@ function pinsHtml(d: MapData, w: number, h: number): string {
   }).join('');
 }
 
-/** Portrait: the place's name between arrows to the neighbouring places. */
+/** Portrait: the place's name between arrows to the neighbouring places, a dot for each of the five under it. */
 function switcherHtml(d: MapData): string {
   const ch = CHAPTERS[d.chapter]!;
-  const prev = d.chapter > 0 ? `<button class="btn small sea" data-act="c${d.chapter - 1}">‹</button>` : '<span></span>';
-  const next = d.chapter < CHAPTERS.length - 1 ? `<button class="btn small sea" data-act="c${d.chapter + 1}">›</button>` : '<span></span>';
-  return `<div class="row">${prev}<b class="light t32">${esc(ch.name)}</b>${next}</div>`;
+  const prev = d.chapter > 0 ? `<button class="btn small sea arrow" data-act="c${d.chapter - 1}" aria-label="Previous place">‹</button>` : '<span class="arrow"></span>';
+  const next = d.chapter < CHAPTERS.length - 1 ? `<button class="btn small sea arrow" data-act="c${d.chapter + 1}" aria-label="Next place">›</button>` : '<span class="arrow"></span>';
+  const pips = CHAPTERS.map((c) => `<i class="${c.index === d.chapter ? 'on' : ''}"></i>`).join('');
+  return `<div class="row switcher">${prev}<div class="where"><b class="light t32">${esc(ch.name)}</b><span class="pips">${pips}</span></div>${next}</div>`;
+}
+
+/** Portrait: the dotted trail up the ten levels, inked solid as far as they're cleared. */
+function trailHtml(first: number, d: MapData): string {
+  let cleared = 0;
+  while (cleared < 10 && d.shells(first + cleared)?.[0]) cleared++;
+  const done = cleared > 0 ? `<path class="done" d="${trailPath(0, Math.min(9, cleared))}"/>` : '';
+  const all = trailPath(0, 9);
+  return `<svg class="trail" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><path class="under" d="${all}"/><path class="dots" d="${all}"/>${done}</svg>`;
+}
+
+/** A sideways swipe this long (px), mostly level, moves to the next or previous place. */
+const SWIPE = 60;
+
+/** Portrait: swipe left for the next place, right for the previous one. */
+function onSwipe(el: HTMLElement, go: (dir: 1 | -1) => void): void {
+  let start: { x: number; y: number; id: number } | null = null;
+  el.addEventListener('pointerdown', (e) => (start = { x: e.clientX, y: e.clientY, id: e.pointerId }));
+  el.addEventListener('pointerup', (e) => {
+    if (!start || start.id !== e.pointerId) return;
+    const dx = e.clientX - start.x;
+    const dy = e.clientY - start.y;
+    start = null;
+    if (Math.abs(dx) >= SWIPE && Math.abs(dy) < Math.abs(dx) * 0.6) go(dx < 0 ? 1 : -1);
+  });
+  el.addEventListener('pointercancel', () => (start = null));
 }
 
 /** The screen's size in px; the window's when the screen hasn't been laid out yet. */
@@ -106,20 +125,32 @@ export function showMap(root: HTMLElement, d: MapData, a: MapActs): void {
     return `left:${(w - MAP_W * cover) / 2 + p.x * cover}px;top:${(h - MAP_H * cover) / 2 + p.y * cover}px`;
   };
   const shown = portrait ? Array.from({ length: 10 }, (_, i) => ch.first + i) : Array.from({ length: 50 }, (_, i) => i + 1);
+  const next = nextLevel(shown, d);
   const nodes = shown.map((n) => {
     acts[`n${n}`] = () => a.level(n);
-    return nodeHtml(n, d, at(n, (n - 1) % 10));
+    return nodeHtml(n, d, at(n, (n - 1) % 10), next);
   }).join('');
-  const bg = portrait ? (artUrl(ch.surround) ?? artUrl('map')) : artUrl('map');
+  // Portrait: the painted coast too, slid to this place, under a paper wash so the nodes and words read.
+  const bg = artUrl('map') ?? artUrl(ch.surround);
+  const crop = portrait ? coastCrop(d.chapter, w, h) : null;
+  const bgStyle = bg ? `background-image:url(${bg})${crop ? `;background-size:${crop.size};background-position:${crop.pos}` : ''}` : '';
   const offer = !d.owned && ch.first > 10
     ? `<div class="panel col center" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:2"><h2 class="t32">${esc(ch.name)}</h2><p>Levels 11–50 are the full game.</p><p class="dim">One-time purchase, no ads.</p><button class="btn gold" data-act="buy">Unlock${d.price ? ` · ${esc(d.price)}` : ''}</button></div>`
     : '';
-  render(root, 'mapwrap', `<div class="map">
-    <div class="sea-art"${bg ? ` style="background-image:url(${bg})"` : ''}></div>
+  const screen = render(root, 'mapwrap', `<div class="map${portrait ? ' tall' : ''}">
+    <div class="sea-art"${bgStyle ? ` style="${bgStyle}"` : ''}></div>
+    ${portrait ? `<div class="wash"></div>${trailHtml(ch.first, d)}` : ''}
     <div class="top"><button class="btn small" data-act="menu">Menu</button>${portrait ? switcherHtml(d) : ''}<span></span></div>
     ${portrait ? '' : pinsHtml(d, w, h)}
-    <div class="place" style="left:50%;top:${portrait ? 16 : 5}%"><span class="t18">Levels ${ch.first}–${ch.last} · ${esc(ch.blurb)}</span></div>
+    <div class="place${portrait ? ' narrow' : ''}" style="left:50%;top:${portrait ? 17 : 5}%"><span class="t18">Levels ${ch.first}–${ch.last} · ${esc(ch.blurb)}</span></div>
     ${nodes}${offer}
     ${d.today ? '<button class="btn gold daily-btn" data-act="daily">Daily</button>' : ''}
   </div>`, acts);
+  const map = screen.querySelector<HTMLElement>('.map');
+  if (portrait && map) {
+    onSwipe(map, (dir) => {
+      const to = d.chapter + dir;
+      if (to >= 0 && to < CHAPTERS.length) a.chapter(to);
+    });
+  }
 }

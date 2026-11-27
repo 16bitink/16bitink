@@ -35,7 +35,7 @@ All sizes are in CSS px. On the web a CSS px is Apple's pt and Google's dp, so t
 4. **Keep the HUD in free space.** Put it beside the board or in a strip, never over the play area or under the thumbs.
 5. **Every action is a button.** Firing is a button or a held stick, never "pull and let go". Hide key caps (`kbd`) and "Press Q" hints on touch screens, and say "Tap Repair" instead.
 6. **Sound can always be turned off in two taps, from anywhere.** Put a toggle on the menu, on the map, and on the pause card. On a keyboard, M toggles it. The setting is saved.
-7. **Phones play on their side** when the game is wide. If the phone is held upright, cover the game with "Turn your phone sideways" and pause.
+7. **Phones play on their side** when the game is wide. If the phone is held upright, cover the game with "Turn your phone sideways" and pause. A tall game (InkBrick) is the other way round: locked upright, and "Turn your phone upright" when held on its side. The play page locks to the game's `orientation` in `data/games.ts`.
 8. **Show a border round the playable area.** The scenery carries on past it, never mirrored (see the art notes in each game's doc).
 
 ## Checking a screen

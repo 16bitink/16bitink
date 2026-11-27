@@ -68,7 +68,7 @@ export function showResults(root: HTMLElement, d: ResultsData, a: ResultsActs): 
   const words = resultWords(d);
   const timed = (d.level.goal ?? 'clear') !== 'stones';
   const stats = d.won
-    ? `<p>${esc(words.line)}${timed && d.best !== null ? ` · best ${clock(d.best)}` : ''}</p>${d.breakIn !== null ? `<p class="dim">Broke in at ${clock(d.breakIn)}</p>` : ''}`
+    ? `<p>${esc(timed && d.best !== null ? `${words.line.replace(/\.$/, '')} · best ${clock(d.best)}` : words.line)}</p>${d.breakIn !== null ? `<p class="dim">Broke in at ${clock(d.breakIn)}</p>` : ''}`
     : `<p>${esc(words.line)}</p>`;
   const offer = d.next.kind === 'offer'
     ? '<p>That was the last free level. The rest of the coast is waiting: 40 more levels and four more places.</p><p class="dim">One-time purchase, no ads.</p>'

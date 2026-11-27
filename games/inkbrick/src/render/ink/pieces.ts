@@ -115,12 +115,34 @@ function heartShape(w: number, h: number): Pt[] {
   });
 }
 
+/** The hinge's foot sits this many radii below the fan's centre. */
+const HINGE_DROP = 0.6;
+const HINGE_DROP_PLUS_ONE = 1 + HINGE_DROP;
+
+/**
+ * A scallop in a w x h box: a round fan (one radius both ways, so it never
+ * reads as stretched in a tall box) over a short hinge, centred.
+ */
+interface ShellGeo { readonly cx: number; readonly cy: number; readonly r: number }
+
+function shellGeo(w: number, h: number): ShellGeo {
+  const r = Math.min(w / 2 - 3, (h - 8) / HINGE_DROP_PLUS_ONE);
+  return { cx: w / 2, cy: (h - r * HINGE_DROP_PLUS_ONE) / 2 + r, r };
+}
+
 function shellShape(w: number, h: number): Pt[] {
+  const { cx, cy, r } = shellGeo(w, h);
   const fan = Array.from({ length: 15 }, (_, i) => {
     const a = Math.PI * (1.08 + (i / 14) * 0.84);
-    return { x: w / 2 + Math.cos(a) * (w / 2 - 3), y: h * 0.68 + Math.sin(a) * (h * 0.62) };
+    return { x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r };
   });
-  return [...fan, { x: w * 0.62, y: h * 0.8 }, { x: w * 0.66, y: h - 4 }, { x: w * 0.34, y: h - 4 }, { x: w * 0.38, y: h * 0.8 }];
+  return [
+    ...fan,
+    { x: cx + r * 0.28, y: cy + r * 0.25 },
+    { x: cx + r * 0.4, y: cy + r * HINGE_DROP },
+    { x: cx - r * 0.4, y: cy + r * HINGE_DROP },
+    { x: cx - r * 0.28, y: cy + r * 0.25 },
+  ];
 }
 
 const ui: Record<string, Draw> = {
@@ -134,12 +156,13 @@ const ui: Record<string, Draw> = {
   'shell-icon': (ctx, w, h) => {
     const p = new Pen(ctx, 303, 0.4);
     const s = shellShape(w, h);
+    const { cx, cy, r } = shellGeo(w, h);
     p.fill(s, C.sand);
     for (let i = 1; i < 6; i++) {
       const a = Math.PI * (1.12 + (i / 6) * 0.76);
-      p.hair([{ x: w / 2, y: h * 0.8 }, { x: w / 2 + Math.cos(a) * (w / 2 - 5), y: h * 0.68 + Math.sin(a) * (h * 0.58) }], 1.4);
+      p.hair([{ x: cx, y: cy + r * 0.25 }, { x: cx + Math.cos(a) * (r - 3), y: cy + Math.sin(a) * (r - 3) }], 1.4);
     }
-    p.stipple(s, 300, (_x, y) => (y > h * 0.55 ? 0.6 : 0.08), 0.6);
+    p.stipple(s, 300, (_x, y) => (y > cy - r * 0.15 ? 0.6 : 0.08), 0.6);
     p.closed(s, 2.4);
   },
   'shell-empty': (ctx, w, h) => {

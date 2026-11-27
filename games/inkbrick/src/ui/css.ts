@@ -7,6 +7,8 @@
  */
 import { ART_STYLE } from '../art/style';
 import { CSS_PAINT } from './cssPaint';
+import { CSS_STICK } from './stickCss';
+import { CSS_TURN } from './turnUpright';
 
 const INK = '#1b1a1f';
 
@@ -140,6 +142,25 @@ const CSS_INK = `
 
 /** Goals, rules and daily pearls (2026-11-18): the same in both art sets. */
 const CSS_VARIETY = `
+/* The menu's main action is its biggest button. */
+.ikb .menu-panel .main-act { min-width: min(260px, 70vw); min-height: 64px; font-size: 40px; }
+/* Portrait map: the chapter's line wraps inside the screen, ink on a paper chip so it reads on any backdrop. */
+.ikb .map .place.narrow { white-space: normal; width: min(92vw, 480px); }
+/* Portrait map: the painted coast under a paper wash, a dotted trail up the levels, the place's dots. */
+.ikb .map.tall .wash { position: absolute; inset: 0; background: linear-gradient(rgba(244,237,220,0.92), rgba(244,237,220,0.35) 24%, rgba(244,237,220,0.2) 70%, rgba(244,237,220,0.55)); }
+.ikb .map .trail { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.ikb .map .trail path { fill: none; vector-effect: non-scaling-stroke; stroke-linecap: round; stroke-linejoin: round; }
+.ikb .map .trail .under { stroke: rgba(244,237,220,0.75); stroke-width: 12px; }
+.ikb .map .trail .dots { stroke: var(--ink); stroke-width: 4px; stroke-dasharray: 1 11; opacity: 0.75; }
+.ikb .map .trail .done { stroke: var(--ink); stroke-width: 4px; }
+.ikb .map .node.open { background: var(--paper); }
+.ikb .map .switcher { gap: 8px; }
+.ikb .map .switcher .arrow { width: 48px; min-height: 48px; font-size: 30px; }
+.ikb .map .where { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.ikb .map .pips { display: flex; gap: 6px; }
+.ikb .map .pips i { width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--ink); background: transparent; }
+.ikb .map .pips i.on { background: var(--ink); }
+.ikb .map .place.narrow > span { display: inline-block; padding: 2px 12px; color: var(--ink); text-shadow: none; background: rgba(244, 237, 220, 0.9); border-radius: 10px 7px 12px 6px; line-height: 1.15; }
 .ikb .rule-ic { width: 34px; height: 34px; flex: none; vertical-align: middle; }
 .ikb .rule-ic.big { width: 44px; height: 44px; }
 .ikb .rule-banner { display: flex; flex-direction: column; gap: 6px; text-align: left; padding: 8px 12px; margin-bottom: 8px; background: #f4eddc; border: 2.5px solid #1b1a1f; border-radius: 14px 9px 15px 8px; box-shadow: 0 3px 0 #1b1a1f; }
@@ -181,4 +202,4 @@ const CSS_VARIETY = `
 `;
 
 /** The screens' style sheet for the active art set (src/art/style.ts). */
-export const CSS = (ART_STYLE === 'ink' ? CSS_INK : CSS_PAINT) + CSS_VARIETY;
+export const CSS = (ART_STYLE === 'ink' ? CSS_INK : CSS_PAINT) + CSS_VARIETY + CSS_STICK + CSS_TURN;

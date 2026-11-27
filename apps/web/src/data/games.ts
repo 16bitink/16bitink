@@ -451,7 +451,8 @@ export const GAMES: readonly CatalogGame[] = [
       'One-time purchase: no subscription, no ads',
     ],
     controls: [
-      'Mouse or touch: drag to move the raft · click or tap to launch the ball',
+      'Touch: the stick under the board moves the raft · tap to launch the ball',
+      'Mouse: move to steer the raft · click to launch the ball',
       'Arrow keys / A and D: move the raft · Space: launch',
       'Esc / P / Pause: pause',
     ],

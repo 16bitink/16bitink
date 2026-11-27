@@ -40,7 +40,7 @@ const fontFamilies = ['family=Silkscreen', game.fonts?.googleCss].filter(Boolean
     <link href={`https://fonts.googleapis.com/css2?${fontFamilies}&display=swap`} rel="stylesheet" />
   </head>
   <body style={`--paper:${theme.paper};--ink:${theme.ink};--accent:${theme.accent}`}>
-    <div id="stage" aria-label={`${game.title} game`} data-game={game.slug} data-title={game.title} data-price={game.price ?? ''} data-fonts={JSON.stringify(game.fonts?.await ?? [])}>
+    <div id="stage" aria-label={`${game.title} game`} data-game={game.slug} data-title={game.title} data-price={game.price ?? ''} data-orientation={game.orientation ?? 'any'} data-fonts={JSON.stringify(game.fonts?.await ?? [])}>
       <div id="splash">
         <p class="brand"><span class="bits">16bit</span><span class="ink">.ink</span></p>
         <!-- What you're about to play, while there's room for it (not on a phone held sideways). Usually cached from the home page. -->

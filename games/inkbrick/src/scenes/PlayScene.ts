@@ -1,7 +1,7 @@
 import { safeAreaIn } from '@16bitink/game-sdk';
 import Phaser from 'phaser';
 import type { SoundBoard } from '../audio/sound';
-import { boardLayout, type BoardLayout } from '../render/layout';
+import { boardLayout, STICK_STRIP, type BoardLayout } from '../render/layout';
 import { boardKey, ensureArt, playArtKeys, preloadArt, surroundTexture } from '../render/art';
 import { BricksView } from '../render/bricksView';
 import { Fx, SHOUTS } from '../render/fx';
@@ -14,6 +14,7 @@ import { DevProbe } from './devProbe';
 import type { BoardView, SimPort } from '../render/port';
 import { BOARD_H, BOARD_W, STEP, type GoalKind, type LevelDef, type SimEvent, type SimInput } from '../sim/types';
 import { PlayInput } from './playInput';
+import type { StickSource } from '../ui/stick';
 
 /**
  * A level on the board: steps the sim at its fixed 1/120 s, draws its view,
@@ -80,6 +81,8 @@ export interface PlayOptions {
   readonly hooks: PlayHooks;
   /** Dev only: drives the raft instead of the pointer. */
   readonly autopilot?: (port: SimPort) => SimInput | null;
+  /** Touch screens: the thumbstick; the layout keeps a strip for it (hooks.layout's `pad`). */
+  readonly stick?: StickSource | null;
 }
 
 export class PlayScene extends Phaser.Scene {
@@ -131,7 +134,7 @@ export class PlayScene extends Phaser.Scene {
     const dark = level.dark === true || level.rule === 'fog';
     this.stones = new StonesView(this, this.board, looks.trail, dark ? 'stone-dark' : 'stone');
     this.fx = new Fx(this, this.board, HAND_FONT);
-    this.input2 = new PlayInput(this, (x) => this.toBoardX(x), () => this.opts.hooks.pauseKey());
+    this.input2 = new PlayInput(this, (x) => this.toBoardX(x), () => this.opts.hooks.pauseKey(), this.opts.stick ?? null);
     this.scale.on('resize', this.fit, this);
     this.fit();
     this.events.once('shutdown', () => this.scale.off('resize', this.fit, this));
@@ -159,8 +162,9 @@ export class PlayScene extends Phaser.Scene {
     const h = this.scale.height;
     // The site's play page lets the board's surround fill the screen: the board and its HUD keep clear of a notch and the home bar.
     const safe = safeAreaIn(this.game.canvas);
-    const inSafe = boardLayout(w / dpr - safe.left - safe.right, h / dpr - safe.top - safe.bottom);
-    this.cssLayout = { ...inSafe, x: inSafe.x + safe.left, y: inSafe.y + safe.top };
+    const inSafe = boardLayout(w / dpr - safe.left - safe.right, h / dpr - safe.top - safe.bottom, this.opts.stick ? STICK_STRIP : 0);
+    const pad = inSafe.pad && { ...inSafe.pad, x: inSafe.pad.x + safe.left, y: inSafe.pad.y + safe.top };
+    this.cssLayout = { ...inSafe, x: inSafe.x + safe.left, y: inSafe.y + safe.top, pad };
     const l = this.cssLayout;
     this.board.setPosition(l.x * dpr, l.y * dpr).setScale(l.scale * dpr);
     if (this.backdrop instanceof Phaser.GameObjects.Image) {

@@ -42,7 +42,7 @@ export function showMenu(root: HTMLElement, d: MenuData, a: MenuActs): void {
     <h1 class="t64">InkBrick</h1>
     <p class="dim">Skip the sea otter versus Brumm's walls</p>
     ${d.note ? `<p class="coral">${esc(d.note)}</p>` : ''}
-    <button class="btn go t32" data-act="play">${d.started ? 'Continue' : 'Play'}</button>
+    <button class="btn go t32 main-act" data-act="play">${d.started ? 'Continue' : 'Play'}</button>
     ${daily}
     <div class="row wrap center">
       ${d.today ? '<button class="btn small sea" data-act="calendar">Calendar</button>' : ''}

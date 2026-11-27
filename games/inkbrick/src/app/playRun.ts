@@ -8,6 +8,9 @@ import type { LevelDef, SimInput } from '../sim/types';
 import { clear } from '../ui/dom';
 import { Hud, type HudInfo } from '../ui/hud';
 import { showPause } from '../ui/results';
+import { Stick } from '../ui/stick';
+import { TOUCH_SCREEN } from '../ui/touch';
+import { watchTurned } from '../ui/turnUpright';
 import type { Shells } from './save';
 import type { Stage } from './stage';
 
@@ -65,14 +68,19 @@ export class PlayRun {
   private layout: BoardLayout | null = null;
   private readonly port: SimPort;
   private autopilot: ((port: SimPort) => SimInput) | undefined;
+  /** Stops pausing when a phone is turned on its side. */
+  private readonly unwatchTurn: () => void;
+  /** Touch screens only: the thumbstick under the board. */
+  private readonly stick: Stick | null;
 
   constructor(private readonly parts: RunParts, private readonly spec: RunSpec, private readonly hooks: RunHooks) {
     this.soundOn = spec.soundOn;
     this.port = simPort(spec.level);
     if (import.meta.env.DEV) void this.devBot(spec.level);
+    this.stick = TOUCH_SCREEN && parts.hudRoot.parentElement ? new Stick(parts.hudRoot.parentElement) : null;
     this.hud = new Hud(parts.hudRoot, spec.hud, { pause: () => this.pause(), cheatWin: () => this.finish({ result: 'win', seconds: this.lastT, breakIn: null, heartsLost: 0 }) });
     this.scene = parts.stage.startPlay((key) => new PlayScene(key, {
-      level: spec.level, port: this.port, autopilot: (p) => this.autopilot?.(p) ?? null, looks: spec.looks, sound: parts.sound, surround: spec.surround,
+      level: spec.level, port: this.port, autopilot: (p) => this.autopilot?.(p) ?? null, looks: spec.looks, sound: parts.sound, surround: spec.surround, stick: this.stick,
       hooks: {
         hud: (h) => {
           this.lastT = h.t;
@@ -81,6 +89,7 @@ export class PlayRun {
         layout: (l) => {
           this.layout = l;
           this.hud.setLayout(l);
+          this.stick?.place(l.pad);
         },
         end: (o) => this.finish(o),
         pauseKey: () => (this.paused ? this.resume() : this.pause()),
@@ -89,6 +98,7 @@ export class PlayRun {
     document.documentElement.addEventListener('mouseleave', this.away);
     addEventListener('blur', this.away);
     document.addEventListener('visibilitychange', this.hidden);
+    this.unwatchTurn = watchTurned(() => this.pause());
   }
 
   /** The cursor left the page or the window lost focus: pause, so no heart is lost while the player looks away. */
@@ -114,6 +124,7 @@ export class PlayRun {
     if (this.over || this.paused) return;
     this.paused = true;
     this.scene.setPaused(true);
+    this.stick?.release();
     this.drawPause();
   }
 
@@ -140,6 +151,7 @@ export class PlayRun {
     if (this.over) return;
     this.over = true;
     this.scene.setPaused(true);
+    this.stick?.release();
     this.hooks.end(o);
   }
 
@@ -158,7 +170,9 @@ export class PlayRun {
     document.documentElement.removeEventListener('mouseleave', this.away);
     removeEventListener('blur', this.away);
     document.removeEventListener('visibilitychange', this.hidden);
+    this.unwatchTurn();
     this.hud.destroy();
+    this.stick?.destroy();
     this.parts.stage.endPlay();
   }
 }

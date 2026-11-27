@@ -13,6 +13,7 @@ import { createDailyHost } from './dailyHost';
 import { accountProgress } from './progress';
 import { scopedStorage } from './scopedStorage';
 import { settleWithin } from './settleWithin';
+import { orientationLock } from './orientationLock';
 import { SITE_BUILD } from '../build';
 import { isNewerBuild, reloadForNewBuild, shouldReloadForNewBuild } from './staleBuild';
 
@@ -48,11 +49,12 @@ async function checkAccess(game: string): Promise<Access> {
   }
 }
 
-/** How long the landscape lock waits for fullscreen to open first. */
+/** How long the orientation lock waits for fullscreen to open first. */
 const FULLSCREEN_WAIT_MS = 1_000;
 
 /**
- * Best effort: real fullscreen where supported (desktop, Android, iPad), then landscape.
+ * Best effort: real fullscreen where supported (desktop, Android, iPad), then the game's own
+ * orientation (`data-orientation`: InkBrick upright, the rest on their side).
  * The game start never waits on it: the fullscreen promise and the orientation lock can stay
  * pending for as long as the page is fullscreen (the load sat at 36% until fullscreen was left).
  * The games follow the stage's size, so they fit whenever fullscreen opens.
@@ -62,8 +64,10 @@ async function goFullscreen(el: HTMLElement): Promise<void> {
   if (!document.fullscreenElement && el.requestFullscreen) {
     await settleWithin(() => el.requestFullscreen({ navigationUI: 'hide' }), FULLSCREEN_WAIT_MS);
   }
+  const lock = orientationLock(el.dataset.orientation);
+  if (!lock) return;
   const orientation = screen.orientation as (ScreenOrientation & { lock?: (o: string) => Promise<void> }) | undefined;
-  await settleWithin(() => orientation?.lock?.('landscape'), FULLSCREEN_WAIT_MS);
+  await settleWithin(() => orientation?.lock?.(lock), FULLSCREEN_WAIT_MS);
 }
 
 /** Downloads a game package and checks it implements the SDK contract. */
