@@ -5,14 +5,15 @@
  * content type, or none at all).
  *
  * The exempt endpoints are called by programs from their servers (Claude
- * swapping an OAuth code, registering itself, calling the MCP server), never
+ * swapping an OAuth code, registering itself, calling the MCP server, a
+ * scheduler syncing Google Play refunds), never
  * with cookies: they're authenticated by PKCE or a bearer token, so a
  * cross-site form can't act as anyone there.
  */
 
 const FORM_CONTENT_TYPES = ['application/x-www-form-urlencoded', 'multipart/form-data', 'text/plain'];
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
-const EXEMPT_PATHS: ReadonlySet<string> = new Set(['/oauth/token', '/oauth/register', '/mcp']);
+const EXEMPT_PATHS: ReadonlySet<string> = new Set(['/oauth/token', '/oauth/register', '/mcp', '/api/app/play-refunds']);
 
 export function isForbiddenCrossOrigin(request: Request, url: URL): boolean {
   if (SAFE_METHODS.has(request.method) || EXEMPT_PATHS.has(url.pathname)) return false;

@@ -2,7 +2,9 @@ import { isGameModule, isOfferPlace, type GameModule, type KeyValueStore } from 
 import { GAME_LOADERS } from '../../games/loaders';
 import { BUY_PARAM, isPendingBuy, signInUrl } from '../buyFlow';
 import { flushAnalytics, gameTag, track, trackGameEvent, trackLevelInput, trackPlayTime, trackSignIn, type LoadStage } from './analytics';
+import { canBuyHere, storePrice, syncAppPurchases, watchAppPurchases } from './appBilling';
 import { buyFullGame, fetchMe, startCheckout } from './checkout';
+import { offerText } from './storeOffer';
 import { pointerKind, watchLevelInput } from './levelInput';
 import { createHiddenTime, visibleMs } from './hiddenTime';
 import { createLoadingBar } from './loadingBar';
@@ -128,10 +130,11 @@ export function bootPlayer(game: string, fonts: readonly string[]): void {
 
   // Start the ownership check and engine download while the player reads the splash.
   const accessP = checkAccess(game);
-  void accessP.then(({ unlocked }) => showOwned(unlocked));
+  void accessP.then(({ unlocked }) => showOwned(game, unlocked));
+  // In the app that sells through Google Play, the game's own offers show Play's price (asked now, while the splash shows).
+  const storePriceP = storePrice(game);
   const progressP = accountProgress(game);
   const meP = fetchMe();
-  if (isPendingBuy(window.location.search, game)) void resumeBuy(game, status, accessP);
   // The stats follow each press of play: how long until it showed, or how it failed or was left.
   let tag = gameTag(game, undefined);
   let attempt: Attempt | null = null;
@@ -171,6 +174,18 @@ export function bootPlayer(game: string, fonts: readonly string[]): void {
   // and once the game is mounted nothing here may reload the page out from under the player.
   let tapped = false;
   let playing = false;
+  // In the app: a store purchase saved only now (bought here, paid offline, or a pending payment that went through).
+  // On the splash a reload unlocks it at once; once play was tapped the player chooses when.
+  // Only when the game was locked: a purchase confirmed again (its acknowledge to Google failed, or
+  // Play's cache lags) would otherwise reload the splash on every visit. And once a session, to be sure.
+  const unlockedHere = async (owned: string): Promise<void> => {
+    if (owned !== game || (await accessP).unlocked) return;
+    if (tapped) return offerUnlockedRefresh(stage);
+    if (onceThisSession(`16bitink:unlock-reload:${game}`)) window.location.reload();
+  };
+  if (isPendingBuy(window.location.search, game)) void resumeBuy(game, status, accessP, unlockedHere);
+  void meP.then((me) => (me?.signedIn ? syncAppPurchases((g) => void unlockedHere(g)) : undefined));
+  watchAppPurchases((g) => void unlockedHere(g));
   // Re-created on retry: a failed dynamic import stays rejected forever.
   let engineP = loadGame(game);
   // Failed before the player tapped: a page older than the deploy reloads onto the new one unseen.
@@ -214,7 +229,9 @@ export function bootPlayer(game: string, fonts: readonly string[]): void {
     // The last moment a reload costs the player nothing: once the game mounts, it plays on the files it has.
     const newerP = newerBuildServed();
     try {
-      const [module, { unlocked, allLevelsOpen, cheats }, accountSaves, me, , newer] = await Promise.all([engineP, accessP, progressP, meP, fontP, newerP]);
+      // Play's price, if it answers in time: else the site's (the game only shows it on its offer).
+      const playPrice = settlePrice(storePriceP);
+      const [module, { unlocked, allLevelsOpen, cheats }, accountSaves, me, , newer, storeP] = await Promise.all([engineP, accessP, progressP, meP, fontP, newerP, playPrice]);
       if (newer && reloadOntoNewBuild()) {
         attempt = null;
         status.textContent = 'Updating to the latest version…';
@@ -244,14 +261,17 @@ export function bootPlayer(game: string, fonts: readonly string[]): void {
         storage: safeStorage(userId),
         progress: progress ?? undefined,
         signedIn: me?.signedIn === true,
-        price: stage.dataset.price || undefined,
+        // Inside an app that can't sell (iOS, for now): no offer at all.
+        canBuy: canBuyHere(),
+        price: canBuyHere() ? storeP || stage.dataset.price || undefined : undefined,
         loadContent: () => getJson<unknown>(`/api/content/${encodeURIComponent(game)}`),
         daily: dailyGame(game) ? createDailyHost(game, rawStorage(), window.location) : undefined,
         // Only as a new chapter or level loads (see GameHost): never in the middle of play.
         filesMissing: () => void offerRefresh(stage, false),
         onBuy: (where) => {
+          if (!canBuyHere()) return;
           if (document.fullscreenElement) void document.exitFullscreen();
-          void offerBuy(game, isOfferPlace(where) ? where : 'unknown');
+          void offerBuy(game, isOfferPlace(where) ? where : 'unknown', unlockedHere);
         },
         onSignIn: () => {
           if (document.fullscreenElement) void document.exitFullscreen();
@@ -303,6 +323,8 @@ export function bootPlayer(game: string, fonts: readonly string[]): void {
 }
 
 let refreshOffered = false;
+/** The "unlocked, refresh" card is showing (see offerUnlockedRefresh). */
+let unlockOffered = false;
 
 /**
  * The card over the game with a Refresh button, for a game, chapter or level that can't load
@@ -318,6 +340,8 @@ async function offerRefresh(stage: HTMLElement, onlyIfNewer: boolean): Promise<v
   if (refreshOffered || !card || !text || !go) return;
   refreshOffered = true;
   const newer = await newerBuildServed(10_000);
+  // The unlocked card took the spot while this waited: it says refresh already.
+  if (unlockOffered) return;
   if (!newer && onlyIfNewer) {
     refreshOffered = false;
     return;
@@ -330,25 +354,47 @@ async function offerRefresh(stage: HTMLElement, onlyIfNewer: boolean): Promise<v
   go.focus();
 }
 
-/** The splash's price line, once ownership is known: "unlocked" for an owner, else the price (also when the check failed). */
-function showOwned(unlocked: boolean): void {
+/** A purchase saved while the game runs: the Refresh card, never a reload under the player. */
+function offerUnlockedRefresh(stage: HTMLElement): void {
+  const card = document.getElementById('refresh');
+  const text = document.getElementById('refresh-text');
+  const go = document.getElementById('refresh-go');
+  // Its own guard: offerRefresh holds refreshOffered while it waits to hear of a new build, and this must not be lost then.
+  if (unlockOffered || !card || !text || !go) return;
+  unlockOffered = true;
+  refreshOffered = true;
+  text.textContent = `The full ${stage.dataset.title ?? 'game'} is unlocked. Refresh to play it: your saved progress stays.`;
+  go.addEventListener('click', () => window.location.reload(), { once: true });
+  card.hidden = false;
+  // No go.focus(), unlike offerRefresh: the game is still playing, and Phaser listens for keys on
+  // the whole window, so a Space or Enter meant for the game would press Refresh mid-level.
+}
+
+/**
+ * The splash's price line, once ownership is known: "unlocked" for an owner, else the price (also when
+ * the check failed). Inside the app, the price it can charge, or none where it can't sell (storeOffer.ts).
+ */
+async function showOwned(game: string, unlocked: boolean): Promise<void> {
   const price = document.getElementById('price');
   if (!price) return;
-  price.textContent = unlocked ? 'Full game · unlocked' : (price.dataset.text ?? '');
+  const offer = unlocked ? undefined : await offerText(price, game);
+  price.textContent = unlocked ? 'Full game · unlocked' : offer ?? price.dataset.text ?? '';
   price.removeAttribute('aria-busy');
 }
 
 /** A game's "Unlock" was tapped: sign in, then pay. */
-async function offerBuy(game: string, where: Parameters<typeof buyFullGame>[1]): Promise<void> {
+async function offerBuy(game: string, where: Parameters<typeof buyFullGame>[1], unlocked: (game: string) => Promise<void>): Promise<void> {
   const result = await buyFullGame(game, where);
   if (result.error) alert(result.error);
+  // Bought in the app from the game's own offer: the game is still running, so the Refresh card, never a reload.
+  else if (result.unlocked) await unlocked(game);
 }
 
 /**
  * Back from signing in with a purchase pending: go straight on to checkout.
  * The marker is dropped first so Back or a reload never re-opens checkout.
  */
-async function resumeBuy(game: string, status: HTMLElement, accessP: Promise<Access>): Promise<void> {
+async function resumeBuy(game: string, status: HTMLElement, accessP: Promise<Access>, unlocked: (game: string) => Promise<void>): Promise<void> {
   const url = new URL(window.location.href);
   url.searchParams.delete(BUY_PARAM);
   history.replaceState(null, '', url);
@@ -357,6 +403,23 @@ async function resumeBuy(game: string, status: HTMLElement, accessP: Promise<Acc
   status.textContent = 'Taking you to checkout…';
   const result = await startCheckout(game);
   status.textContent = result.error ?? '';
+  if (result.unlocked) await unlocked(game);
+}
+
+/** The store's price, or null if it isn't known within a moment: the game never waits on it. */
+function settlePrice(p: Promise<string | null>): Promise<string | null> {
+  return Promise.race([p, new Promise<null>((resolve) => setTimeout(() => resolve(null), BUILD_CHECK_TIMEOUT_MS))]);
+}
+
+/** True the first time `key` is asked for in this tab's session (and when session storage can't say). */
+function onceThisSession(key: string): boolean {
+  try {
+    if (window.sessionStorage.getItem(key)) return false;
+    window.sessionStorage.setItem(key, '1');
+  } catch {
+    // No session storage (private mode, blocked): the "only when locked" check still stops a loop.
+  }
+  return true;
 }
 
 /**

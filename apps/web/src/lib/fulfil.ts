@@ -25,6 +25,8 @@ export function isPaidSession(s: SessionLike): boolean {
 export interface FulfilOptions {
   /** Honour Stripe test-mode sessions. Only for local testing, never in production. */
   readonly allowTestMode: boolean;
+  /** Honour Google Play license testers' purchases (PLAY_TEST_PURCHASES=true): for testing the Android app, turn off after. */
+  readonly allowPlayTests?: boolean;
 }
 
 /** Whether the success page may issue an ownership cookie for this session. */

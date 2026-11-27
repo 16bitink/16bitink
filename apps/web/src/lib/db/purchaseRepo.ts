@@ -71,11 +71,15 @@ export interface GameSales {
   readonly amount: number;
 }
 
-/** Live (real-money) sales paid in [from, to), per game and currency, best-selling first. Test-mode payments never count. */
+/**
+ * Live (real-money) sales paid in [from, to), per game and currency, best-selling first. Test-mode
+ * payments and free ones (Play promo codes) never count. A Play sale whose price the app couldn't
+ * report is counted under the currency `xxx` with no amount.
+ */
 export async function salesByGame(range: { readonly from: Date; readonly to: Date }): Promise<GameSales[]> {
   const isPaid = { $eq: ['$status', 'paid'] };
   return Purchase.aggregate<GameSales>([
-    { $match: { livemode: true, paidAt: { $gte: range.from, $lt: range.to } } },
+    { $match: { livemode: true, free: { $ne: true }, paidAt: { $gte: range.from, $lt: range.to } } },
     {
       $group: {
         _id: { game: '$game', currency: '$currency' },

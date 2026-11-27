@@ -1,0 +1,158 @@
+import { generateKeyPairSync, createVerify } from 'node:crypto';
+import { describe, expect, it, vi } from 'vitest';
+import { playClient, tokenAssertion, type PlayProductPurchase } from '../src/lib/googlePlay';
+import { gameForPlayProduct, minorUnits, playProductId, playTokenId, playVerdict, UNKNOWN_CURRENCY, voidedIds } from '../src/lib/playPurchases';
+import { ownedGames, type PurchaseRecord } from '../src/lib/purchases';
+
+const user = { userId: '65f0c0ffee0000000000aa01', email: 'Fish@Example.com' };
+const paid: PlayProductPurchase = {
+  purchaseState: 0, acknowledgementState: 0, orderId: 'GPA.1234-5678-9012-34567', purchaseTimeMillis: '1800000000000',
+  obfuscatedExternalAccountId: user.userId, regionCode: 'US',
+};
+
+describe('Play products', () => {
+  it('maps <slug>_full to a game we sell, and nothing else', () => {
+    expect(gameForPlayProduct('inkfish_full')).toBe('inkfish');
+    expect(gameForPlayProduct('inkfish')).toBeNull();
+    expect(gameForPlayProduct('nope_full')).toBeNull();
+    expect(gameForPlayProduct('all_full')).toBeNull();
+  });
+
+  it('spells a hyphenated slug with underscores, as Play product ids must, and maps it back', () => {
+    expect(playProductId('pixel-quill')).toBe('pixel_quill_full');
+    expect(playProductId('inkfish')).toBe('inkfish_full');
+    expect(gameForPlayProduct('pixel-quill_full')).toBeNull();
+  });
+});
+
+describe('a Play purchase', () => {
+  it('becomes a paid record for the buyer, keyed and refunded by its order', () => {
+    const v = playVerdict(paid, { game: 'inkfish', token: 'tok', user, price: { amount: 4.99, currency: 'USD' } });
+    expect(v).toEqual({
+      ok: true,
+      record: {
+        sessionId: 'play:GPA.1234-5678-9012-34567', paymentIntent: 'play:GPA.1234-5678-9012-34567', game: 'inkfish',
+        email: 'fish@example.com', userId: user.userId, customerId: null, amount: 499, currency: 'usd', livemode: true,
+        status: 'paid', paidAt: new Date(1_800_000_000_000),
+      },
+    });
+  });
+
+  it('never goes to another account than the one the app tagged it with', () => {
+    expect(playVerdict({ ...paid, obfuscatedExternalAccountId: '65f0c0ffee0000000000bb02' }, { game: 'inkfish', token: 'tok', user })).toEqual({ ok: false, status: 'other-account' });
+  });
+
+  it('gives an untagged purchase (a promo code redeemed in the Play Store) to the signed-in player', () => {
+    for (const tag of [undefined, '']) {
+      const v = playVerdict({ ...paid, obfuscatedExternalAccountId: tag, purchaseType: 1 }, { game: 'inkfish', token: 'tok', user });
+      expect(v.ok && v.record).toMatchObject({ userId: user.userId, livemode: true, free: true });
+    }
+  });
+
+  it('saves a paid sale whose price the app could not report with no currency, not as a free dollar sale', () => {
+    const v = playVerdict(paid, { game: 'inkfish', token: 'tok', user });
+    expect(v.ok && v.record).toMatchObject({ amount: 0, currency: UNKNOWN_CURRENCY, livemode: true });
+    expect(v.ok && v.record.free).toBeUndefined();
+  });
+
+  it('waits for a pending payment and refuses a cancelled one', () => {
+    expect(playVerdict({ ...paid, purchaseState: 2 }, { game: 'inkfish', token: 'tok', user })).toEqual({ ok: false, status: 'pending' });
+    expect(playVerdict({ ...paid, purchaseState: 1 }, { game: 'inkfish', token: 'tok', user })).toEqual({ ok: false, status: 'cancelled' });
+  });
+
+  it('marks a license tester purchase as test mode, with no money', () => {
+    const v = playVerdict({ ...paid, purchaseType: 0 }, { game: 'inkfish', token: 'tok', user, price: { amount: 4.99, currency: 'USD' } });
+    expect(v.ok && v.record).toMatchObject({ livemode: false, amount: 0 });
+    // Test mode already keeps it out of the sales: not marked free on top.
+    expect(v.ok && v.record.free).toBeUndefined();
+  });
+
+  it('counts a promo code as owned but free, out of the sales', () => {
+    const v = playVerdict({ ...paid, purchaseType: 1 }, { game: 'inkfish', token: 'tok', user, price: { amount: 4.99, currency: 'USD' } });
+    expect(v.ok && v.record).toMatchObject({ livemode: true, amount: 0, free: true });
+  });
+
+  it('keys a purchase without an order id (a promo code may have none) by its hashed token', () => {
+    const v = playVerdict({ ...paid, orderId: undefined, purchaseType: 1 }, { game: 'inkfish', token: 'tok', user });
+    expect(v.ok && v.record).toMatchObject({ sessionId: playTokenId('tok'), paymentIntent: playTokenId('tok'), livemode: true });
+    // The token itself is never stored: only its hash.
+    expect(playTokenId('tok')).toBe('play:token:1a7674eb4ee78df7e1ac439a93c3fa8e3c945784d4dec9fd8e3011738b2f1d62');
+  });
+
+  it('refuses a purchase without a time', () => {
+    expect(playVerdict({ ...paid, purchaseTimeMillis: undefined }, { game: 'inkfish', token: 'tok', user })).toEqual({ ok: false, status: 'invalid' });
+  });
+
+  it('finds a voided purchase under either id it may have been saved with', () => {
+    expect(voidedIds({ orderId: 'GPA.1', purchaseToken: 'tok' })).toEqual(['play:GPA.1', playTokenId('tok')]);
+    expect(voidedIds({ purchaseToken: 'tok' })).toEqual([playTokenId('tok')]);
+    expect(voidedIds({})).toEqual([]);
+  });
+
+  it('stores prices in the smallest currency unit', () => {
+    expect(minorUnits(4.99, 'USD')).toBe(499);
+    expect(minorUnits(500, 'JPY')).toBe(500);
+    expect(minorUnits(4.99, 'nope')).toBe(0);
+    expect(minorUnits(-1, 'USD')).toBe(0);
+  });
+});
+
+describe('license testers', () => {
+  const test: PurchaseRecord = {
+    sessionId: 'play:GPA.1', paymentIntent: 'play:GPA.1', game: 'inkfish', email: null, userId: user.userId, customerId: null,
+    amount: 0, currency: 'usd', livemode: false, status: 'paid', paidAt: new Date(0),
+  };
+
+  it('unlock only while PLAY_TEST_PURCHASES is on', () => {
+    expect(ownedGames([test], { allowTestMode: false })).toEqual([]);
+    expect(ownedGames([test], { allowTestMode: false, allowPlayTests: true })).toEqual(['inkfish']);
+  });
+
+  it('never turn on Stripe test purchases', () => {
+    expect(ownedGames([{ ...test, sessionId: 'cs_test_1' }], { allowTestMode: false, allowPlayTests: true })).toEqual([]);
+  });
+});
+
+describe('Google Play API client', () => {
+  const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+  const account = { client_email: 'play@ink.iam.gserviceaccount.com', private_key: privateKey.export({ type: 'pkcs8', format: 'pem' }).toString() };
+
+  it('signs the token request as the service account', () => {
+    const jwt = tokenAssertion(account, 1_800_000_000);
+    const [head, body, sig] = jwt.split('.');
+    expect(createVerify('RSA-SHA256').update(`${head}.${body}`).verify(publicKey, Buffer.from(sig, 'base64url'))).toBe(true);
+    expect(JSON.parse(Buffer.from(body, 'base64url').toString())).toEqual({
+      iss: account.client_email, scope: 'https://www.googleapis.com/auth/androidpublisher', aud: 'https://oauth2.googleapis.com/token',
+      iat: 1_800_000_000, exp: 1_800_003_600,
+    });
+  });
+
+  const reply = (body: unknown, status = 200): Response => new Response(JSON.stringify(body), { status });
+
+  it('reuses its access token and follows refund pages', async () => {
+    const fetchFn = vi.fn(async (url: string | URL | Request) => {
+      const u = String(url);
+      if (u.startsWith('https://oauth2.googleapis.com/')) return reply({ access_token: 'at', expires_in: 3600 });
+      if (u.includes('pageSelection.token=p2')) return reply({ voidedPurchases: [{ orderId: 'GPA.2' }] });
+      return reply({ voidedPurchases: [{ orderId: 'GPA.1' }], tokenPagination: { nextPageToken: 'p2' } });
+    });
+    const client = playClient('ink.sixteenbit.games', account, fetchFn as typeof fetch);
+    expect(await client.voidedSince(1)).toEqual([{ orderId: 'GPA.1' }, { orderId: 'GPA.2' }]);
+    const urls = fetchFn.mock.calls.map(([u]) => String(u));
+    expect(urls.filter((u) => u.includes('oauth2'))).toHaveLength(1);
+    expect(urls[1]).toBe('https://androidpublisher.googleapis.com/androidpublisher/v3/applications/ink.sixteenbit.games/purchases/voidedpurchases?type=0&pageSelection.maxResults=1000&startTime=1');
+  });
+
+  it("leaves the refund window to Google unless a start is given", async () => {
+    const fetchFn = vi.fn(async (url: string | URL | Request) => (String(url).includes('oauth2') ? reply({ access_token: 'at' }) : reply({})));
+    expect(await playClient('ink.sixteenbit.games', account, fetchFn as typeof fetch).voidedSince()).toEqual([]);
+    expect(String(fetchFn.mock.calls[1][0])).toBe('https://androidpublisher.googleapis.com/androidpublisher/v3/applications/ink.sixteenbit.games/purchases/voidedpurchases?type=0&pageSelection.maxResults=1000');
+  });
+
+  it('acknowledges at the purchase token', async () => {
+    const fetchFn = vi.fn(async (url: string | URL | Request, _init?: RequestInit) => (String(url).includes('oauth2') ? reply({ access_token: 'at' }) : new Response(null, { status: 204 })));
+    await playClient('ink.sixteenbit.games', account, fetchFn as typeof fetch).acknowledge('inkfish_full', 'tok/1');
+    expect(String(fetchFn.mock.calls[1][0])).toBe('https://androidpublisher.googleapis.com/androidpublisher/v3/applications/ink.sixteenbit.games/purchases/products/inkfish_full/tokens/tok%2F1:acknowledge');
+    expect(fetchFn.mock.calls[1][1]).toMatchObject({ method: 'POST', headers: { authorization: 'Bearer at' } });
+  });
+});

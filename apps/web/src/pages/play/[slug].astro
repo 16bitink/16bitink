@@ -55,7 +55,8 @@ const fontFamilies = ['family=Silkscreen', game.fonts?.googleCss].filter(Boolean
         <!-- The price up front, so the offer later is no surprise; never a button, so Play stays the one tap.
              Dots until the ownership check answers, then the price, or "unlocked" for owners (lib/client/player.ts). -->
         {isPurchasable(game) && game.price && (
-          <p id="price" class="price" aria-busy="true" data-text={`${game.demo ?? 'Start free'} · Full game ${game.price}, one-time`}>
+          <p id="price" class="price" aria-busy="true" data-text={`${game.demo ?? 'Start free'} · Full game ${game.price}, one-time`}
+            data-nosale={game.demo ?? 'Start free'} data-price-tpl={`${game.demo ?? 'Start free'} · Full game {price}, one-time`}>
             <span class="dots" aria-hidden="true"><span></span><span></span><span></span></span>
           </p>
         )}

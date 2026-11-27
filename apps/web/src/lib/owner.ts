@@ -7,6 +7,7 @@ import { optionalEnv, requireSecret } from './env';
 import { db } from './db';
 import { grantedGames } from './db/grantRepo';
 import { claimPurchase, claimPurchasesByEmail, findPurchase, findPurchasesFor } from './db/purchaseRepo';
+import type { FulfilOptions } from './fulfil';
 import { libraryOf, playableFrom } from './library';
 import { isRevoked } from './purchases';
 import type { UserId } from './userId';
@@ -34,6 +35,12 @@ async function refunded(sessionId: string): Promise<boolean> {
   }
 }
 
+/** Which test purchases count here: Stripe test mode on localhost, Play license testers while PLAY_TEST_PURCHASES is on. */
+export const libraryOptions = (url: URL): FulfilOptions => ({
+  allowTestMode: isLocalHost(url.hostname),
+  allowPlayTests: optionalEnv('PLAY_TEST_PURCHASES') === 'true',
+});
+
 /**
  * Every game a user can play, bought or granted by an admin. Purchases made
  * signed out with the user's email are claimed first, so they show up even
@@ -42,7 +49,7 @@ async function refunded(sessionId: string): Promise<boolean> {
 export async function accountGames(email: string, userId: UserId, url: URL): Promise<string[]> {
   await claimPurchasesByEmail(email, userId);
   const [purchases, granted] = await Promise.all([findPurchasesFor(userId), grantedGames(userId)]);
-  return playableFrom(libraryOf(purchases, granted, { allowTestMode: isLocalHost(url.hostname) }));
+  return playableFrom(libraryOf(purchases, granted, libraryOptions(url)));
 }
 
 /**

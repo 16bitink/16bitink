@@ -8,7 +8,7 @@ import { grantedGamesFor } from '../../lib/db/grantRepo';
 import { playerStats } from '../../lib/db/playerStatsRepo';
 import { findPurchasesForUsers } from '../../lib/db/purchaseRepo';
 import { listUsers } from '../../lib/db/userRepo';
-import { isLocalHost } from '../../lib/devUnlock';
+import { libraryOptions } from '../../lib/owner';
 import { libraryOf, purchasesOf } from '../../lib/library';
 import { formatPlayerId } from '../../lib/playerId';
 import type { PlayerStats } from '../../lib/playerStats';
@@ -33,7 +33,7 @@ const stats: ReadonlyMap<string, PlayerStats> = await playerStats(users.map((u) 
   console.error('[admin] could not read player statistics', err);
   return new Map();
 });
-const opts = { allowTestMode: isLocalHost(Astro.url.hostname) };
+const opts = libraryOptions(Astro.url);
 const rows = users.map((u) => ({ ...u, stats: stats.get(u.id), library: libraryOf(purchasesOf(u.id, purchases), grants.get(u.id) ?? [], opts) }));
 // The pass first: it unlocks every game below, and every future one.
 const games = [{ slug: PASS.slug, title: PASS.title }, ...playableGames()];

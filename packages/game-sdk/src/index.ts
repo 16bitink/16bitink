@@ -61,6 +61,13 @@ export interface GameHost {
   onSignIn?(): void;
   /** The full game's one-time price as shown to players, e.g. "$4.99". */
   readonly price?: string;
+  /**
+   * False where the full game can't be bought (inside the iOS app, until it
+   * sells through the App Store): show no unlock offer, price or buy button
+   * at all. Store review rejects a buy button that doesn't work. Undefined
+   * means true. `price` is left out there too.
+   */
+  readonly canBuy?: boolean;
   /** Leaves the game (back to its catalog page). */
   onExit(): void;
   /** Per-browser persistence; undefined when storage is blocked. */
