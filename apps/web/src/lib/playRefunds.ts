@@ -4,17 +4,16 @@ import { optionalEnv } from './env';
 import { play } from './play';
 import { playPurchaseId } from './playPurchases';
 
-/** Google lists voided purchases for the last 30 days. */
-const WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
  * Takes back Google Play purchases that were refunded, charged back or
  * cancelled, as the Stripe webhook does for Stripe ones. Idempotent: each run
- * re-applies the last 30 days.
+ * re-applies Google's default window, the last 30 days (no startTime: Google
+ * refuses one older than 30 days, and now minus 30 days is by the time it checks).
  */
 export async function syncPlayRefunds(): Promise<{ voided: number; revoked: number }> {
-  const voided = await play().voidedSince(Date.now() - WINDOW_MS);
+  const voided = await play().voidedSince();
   await db();
   let revoked = 0;
   for (const v of voided) {

@@ -110,6 +110,12 @@ describe('Google Play API client', () => {
     expect(urls[1]).toBe('https://androidpublisher.googleapis.com/androidpublisher/v3/applications/ink.sixteenbit.games/purchases/voidedpurchases?type=0&pageSelection.maxResults=1000&startTime=1');
   });
 
+  it("leaves the refund window to Google unless a start is given", async () => {
+    const fetchFn = vi.fn(async (url: string | URL | Request) => (String(url).includes('oauth2') ? reply({ access_token: 'at' }) : reply({})));
+    expect(await playClient('ink.sixteenbit.games', account, fetchFn as typeof fetch).voidedSince()).toEqual([]);
+    expect(String(fetchFn.mock.calls[1][0])).toBe('https://androidpublisher.googleapis.com/androidpublisher/v3/applications/ink.sixteenbit.games/purchases/voidedpurchases?type=0&pageSelection.maxResults=1000');
+  });
+
   it('acknowledges at the purchase token', async () => {
     const fetchFn = vi.fn(async (url: string | URL | Request, _init?: RequestInit) => (String(url).includes('oauth2') ? reply({ access_token: 'at' }) : new Response(null, { status: 204 })));
     await playClient('ink.sixteenbit.games', account, fetchFn as typeof fetch).acknowledge('inkfish_full', 'tok/1');

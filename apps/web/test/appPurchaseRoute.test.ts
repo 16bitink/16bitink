@@ -119,5 +119,7 @@ describe('POST /api/app/play-refunds', () => {
     const res = await sync(`Bearer ${'s'.repeat(40)}`);
     expect(await res.json()).toEqual({ success: true, data: { voided: 3, revoked: 2 } });
     expect(setPaymentStatus.mock.calls).toEqual([['play:GPA.1', 'refunded'], ['play:GPA.2', 'refunded']]);
+    // No start time: Google refuses one older than 30 days, and its default is the last 30.
+    expect(voidedSince).toHaveBeenCalledWith();
   });
 });

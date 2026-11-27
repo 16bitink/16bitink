@@ -64,8 +64,12 @@ export class PlayApiError extends Error {
 export interface PlayClient {
   getProductPurchase(productId: string, token: string): Promise<PlayProductPurchase>;
   acknowledge(productId: string, token: string): Promise<void>;
-  /** In-app purchases refunded, charged back or cancelled since `startMs` (Google keeps 30 days). */
-  voidedSince(startMs: number): Promise<VoidedPurchase[]>;
+  /**
+   * In-app purchases refunded, charged back or cancelled since `startMs`, or
+   * in Google's default window, the last 30 days, without it. Google refuses a
+   * start older than 30 days, so never pass exactly now minus 30 days.
+   */
+  voidedSince(startMs?: number): Promise<VoidedPurchase[]>;
 }
 
 export function playClient(packageName: string, account: ServiceAccount, fetchFn: typeof fetch = fetch): PlayClient {
@@ -109,7 +113,7 @@ export function playClient(packageName: string, account: ServiceAccount, fetchFn
       do {
         const q = new URLSearchParams({ type: '0', 'pageSelection.maxResults': '1000' });
         if (page) q.set('pageSelection.token', page);
-        else q.set('startTime', String(startMs));
+        else if (startMs !== undefined) q.set('startTime', String(startMs));
         const body = await call<{ voidedPurchases?: VoidedPurchase[]; tokenPagination?: { nextPageToken?: string } }>(`/purchases/voidedpurchases?${q}`);
         out.push(...(body.voidedPurchases ?? []));
         page = body.tokenPagination?.nextPageToken || undefined;
