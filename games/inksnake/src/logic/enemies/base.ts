@@ -36,9 +36,9 @@ export abstract class EnemyBase<M extends string> implements Enemy {
     return null;
   }
 
-  /** A mark for the moments `struckBy` would count, with the same reach. */
-  protected openWithin(snake: Snake, reach: number, moment = true): StrikeMark {
-    return { x: this.x, y: this.y, r: reach + snake.width / 2, moment };
+  /** A mark for the moments `struckBy` would count, with the same reach; `hurts` false when the strike only sends it off. */
+  protected openWithin(snake: Snake, reach: number, moment = true, hurts = true): StrikeMark {
+    return { x: this.x, y: this.y, r: reach + snake.width / 2, moment, hurts };
   }
 
   protected go(mode: M, seconds = 0): void {

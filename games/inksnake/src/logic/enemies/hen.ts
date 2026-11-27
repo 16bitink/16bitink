@@ -30,7 +30,7 @@ export class Hen extends EnemyBase<HenMode> {
 
   /** A strike sends her off, unless she is already on her way. */
   override strikeMark(snake: Snake): StrikeMark | null {
-    return this.m !== 'scared' && this.m !== 'back' ? this.openWithin(snake, SCARE_REACH, false) : null;
+    return this.m !== 'scared' && this.m !== 'back' ? this.openWithin(snake, SCARE_REACH, false, false) : null;
   }
 
   step(ctx: EnemyCtx, dt: number): void {

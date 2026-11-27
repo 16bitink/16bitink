@@ -5,7 +5,7 @@ import { BOIL } from '../../art/palette';
 import { SHADOW_TEX_R, TEX } from '../../art/textures';
 import type { SpriteArt } from '../../art/types';
 import type { Enemy } from '../../logic/enemyTypes';
-import { preySpec, type Prey } from '../../logic/prey';
+import type { Prey } from '../../logic/prey';
 import type { World } from '../../logic/world';
 
 /** The line boil, frames a second. */
@@ -20,7 +20,6 @@ const GOLD_TINT = 0xffc63a;
 
 /** How big each kind's shadow is, as a share of its frame (fliers cast a soft round one under them). */
 const SHADOW_SIZE: Partial<Record<CritterKind, number>> = { crow: 0.3, hawk: 0.36, hen: 0.36, tomcat: 0.42, rat: 0.32, mouse: 0.3 };
-const RED = 0xb3322b;
 
 interface Shown {
   readonly sprite: Phaser.GameObjects.Image;
@@ -31,21 +30,17 @@ interface Shown {
 /**
  * Everything alive on the board but the snake: prey, enemies and the boss,
  * each a sprite whose pose follows what it's doing, in the line boil.
- * Things in the air are drawn lifted off their shadows. Marked prey (a
- * feast's) wears a red pencil ring.
+ * Things in the air are drawn lifted off their shadows. A feast's prey
+ * wears no ring: red on the board means danger.
  */
 export class CrittersView {
   private readonly shown = new Map<number, Shown>();
-  private readonly rings: Phaser.GameObjects.Graphics;
 
-  constructor(private readonly scene: Phaser.Scene) {
-    this.rings = scene.add.graphics().setDepth(DEPTH.prey - 0.05);
-  }
+  constructor(private readonly scene: Phaser.Scene) {}
 
   update(world: World, time: number): void {
     const f = Math.floor((time / 1000) * BOIL_FPS) % BOIL;
     const seen = new Set<number>();
-    this.rings.clear();
     for (const p of world.prey) {
       seen.add(p.id);
       this.drawPrey(p, f, time);
@@ -94,10 +89,6 @@ export class CrittersView {
     if (p.gold) s.sprite.setTint(GOLD_TINT);
     else s.sprite.clearTint();
     this.shadowUnder(s, p.x, p.y, 0, art.frame, p.mode === 'appear' ? p.shown : 1);
-    if (p.marked) {
-      const r = preySpec(p.kind).size * 0.95 + 6;
-      dottedRing(this.rings, p.x, p.y, r + Math.sin(time / 260) * 1.5, RED, 0.75, 1.6);
-    }
   }
 
   private drawEnemy(e: Enemy, f: number, time: number): void {
@@ -134,7 +125,6 @@ export class CrittersView {
       s.shadow?.destroy();
     }
     this.shown.clear();
-    this.rings.destroy();
   }
 }
 

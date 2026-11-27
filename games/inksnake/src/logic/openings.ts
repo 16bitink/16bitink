@@ -2,7 +2,7 @@ import type { Enemy, StrikeMark } from './enemyTypes';
 import type { Snake } from './snake';
 import { dist } from './vec';
 
-/** An enemy a strike works on right now: the view rings it in green. */
+/** An enemy a strike hurts right now: the view rings it in green. */
 export interface Opening {
   readonly id: number;
   readonly x: number;
@@ -14,14 +14,15 @@ export interface Opening {
 }
 
 /**
- * Every enemy open to a strike, for the view. One that's open only for a
+ * Every enemy a strike would hurt, for the view: one a strike only sends
+ * off (a crow, a hen, a big rival) isn't ringed. One that's open only for a
  * moment (a boss off balance, a hawk on the ground) shows wherever the snake
  * is; one that's always open shows only once a lunge could reach it.
  */
 export function openings(enemies: readonly Enemy[], snake: Snake): Opening[] {
   return enemies.flatMap((e) => {
     const mark = e.away ? null : e.strikeMark?.(snake) ?? null;
-    if (!mark || (!mark.moment && dist(snake.head, mark) > mark.r + snake.lunge)) return [];
+    if (!mark?.hurts || (!mark.moment && dist(snake.head, mark) > mark.r + snake.lunge)) return [];
     return [{ id: e.id, x: mark.x, y: mark.y, r: mark.r, ready: canStrike(snake) && onLine(snake, mark) }];
   });
 }

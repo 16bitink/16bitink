@@ -53,7 +53,7 @@ export class Pecker extends EnemyBase<PeckerMode> {
 
   /** A strike scares it off, once it has landed. */
   override strikeMark(snake: Snake): StrikeMark | null {
-    return this.m === 'hop' || this.m === 'peck' ? this.openWithin(snake, this.spec.scareReach, false) : null;
+    return this.m === 'hop' || this.m === 'peck' ? this.openWithin(snake, this.spec.scareReach, false, false) : null;
   }
 
   step(ctx: EnemyCtx, dt: number): void {

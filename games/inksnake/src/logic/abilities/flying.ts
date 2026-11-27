@@ -40,11 +40,9 @@ const crownsOf = (level: LevelDef): readonly Crown[] =>
 
 /** What to tell the player, up and down. */
 const PROMPTS = {
-  floor: {
-    mouse: 'Down on the forest floor: slow, and hunted. Slither to a tree to climb back up',
-    touch: 'Down on the forest floor: slow, and hunted. Slither to a tree to climb back up',
-  },
-  edge: { mouse: 'The end of the branches: press E to glide to the next tree', touch: 'The end of the branches: tap Glide to sail to the next tree' },
+  // On a phone these stay unsaid: they come back again and again, and the first-time hints taught both.
+  floor: { mouse: 'Down on the forest floor: slow, and hunted. Slither to a tree to climb back up', touch: null },
+  edge: { mouse: 'The end of the branches: press E to glide to the next tree', touch: null },
 } as const satisfies Record<string, Prompt>;
 
 /**

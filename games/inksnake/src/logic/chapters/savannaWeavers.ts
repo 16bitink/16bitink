@@ -71,7 +71,7 @@ export class Weaver extends EnemyBase<WeaverMode> {
 
   /** A strike sends it off while it mobs. */
   override strikeMark(snake: Snake): StrikeMark | null {
-    return this.m === 'mob' || this.m === 'dart' ? this.openWithin(snake, this.spec.scareReach, false) : null;
+    return this.m === 'mob' || this.m === 'dart' ? this.openWithin(snake, this.spec.scareReach, false, false) : null;
   }
 
   step(ctx: EnemyCtx, dt: number): void {

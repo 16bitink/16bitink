@@ -112,7 +112,7 @@ export class Chaser extends EnemyBase<ChaserMode> {
 
   /** A strike sends most off while they hunt; a prickly one is best left alone. */
   override strikeMark(snake: Snake): StrikeMark | null {
-    return this.spec.scared === 'strike' && (this.m === 'prowl' || this.m === 'chase') ? this.openWithin(snake, this.spec.reach + STRIKE_EXTRA, false) : null;
+    return this.spec.scared === 'strike' && (this.m === 'prowl' || this.m === 'chase') ? this.openWithin(snake, this.spec.reach + STRIKE_EXTRA, false, false) : null;
   }
 
   step(ctx: EnemyCtx, dt: number): void {

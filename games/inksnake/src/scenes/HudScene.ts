@@ -183,7 +183,8 @@ export class HudScene extends Phaser.Scene {
     // A boss's word for this moment of the fight, then the ability's (down on the floor…), before any first-time hint.
     const touch = game.input2.touch;
     const now = w.boss?.prompt?.(w.snake) ?? w.ability?.prompt?.(w.snake) ?? null;
-    this.hint.set(now ? (touch ? now.touch : now.mouse) : game.coach.current(touch));
+    const said = now && (touch ? now.touch : now.mouse);
+    this.hint.set(said ?? game.coach.current(touch));
     this.abilityButton?.update(time);
     this.stick.setVisible(!this.pauseCard && (touch || !this.sys.game.device.os.desktop));
     this.stick.update(game.input2.stickHold);

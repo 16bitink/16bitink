@@ -274,7 +274,7 @@ export class GameScene extends Phaser.Scene {
     if (this.follow) this.input2.track();
     this.input2.arrived(w.snake.head);
     const events = w.step(this.input2.read(), dt);
-    this.coach.observe(events, dt);
+    this.coach.observe(events, dt, this.input2.touch);
     for (const e of events) this.react(e);
     this.critters.update(w, time);
     this.snakeView.update(time, dt);

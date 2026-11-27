@@ -15,7 +15,7 @@ Started Oct 24, 2026. Sixth game on 16bit.ink, due Sunday Nov 1.
 1. **Snake, but alive.** The body is a smooth pen-drawn tube that follows the head's exact path, with scales, a flicking tongue and a lump for every meal. Your own body is the main obstacle, as in Snake.
 2. **Eat small, coil big.** Prey narrower than your mouth goes down whole on contact. Bigger prey must be circled: close a loop of your body round it and you squeeze, then swallow. You can't move while you squeeze, so it's always a risk.
 3. **Every snake hunts its own way.** A new species each chapter brings one ability true to life (play dead, bury in sand, glide, hold its breath, lure with its tail…), taught on its own before it's mixed with the rest.
-4. **Readable threat.** Every attack is told before it lands: a shadow circling, a cat's wiggle, a dotted lane, a red ring. A loss is always your fault, never a surprise. The other way round, a green ring round an enemy says a strike works on it now: dotted while it's open, solid once a strike straight ahead would land. Bosses and stunned hunters show it from anywhere; enemies a strike always scares show it only within a lunge. Each enemy says when and where in its `strikeMark`, with the same reach its step checks (`test/openings.test.ts` keeps the two true).
+4. **Readable threat.** Every attack is told before it lands: a shadow circling, a cat's wiggle, a dotted lane, a red ring. A loss is always your fault, never a surprise. The other way round, a green ring round an enemy says a strike hurts it now: dotted while it's open, solid once a strike straight ahead would land. Only a strike that hurts gets a ring (a boss hit, venom on a rival too wide to swallow); one that only scares a crow, a hen or a bigger rival off doesn't. Each enemy says when and where in its `strikeMark` (with `hurts`), with the same reach its step checks (`test/openings.test.ts` keeps the two true).
 5. **No lost progress.** Three lives a level; a failed level is retried on the spot.
 
 ## Rules
@@ -155,6 +155,7 @@ The owner's phone playtest (2026-11-18): "UI elements on the mobile screen shoul
 - **Interface scale:** phones lay the HUD and cards out for a 420-unit short side (0.86 at 360 px, never under 0.8). Before, they drew at the laptop design's 0.55.
 - **Cards** fill the phone's width. Text and buttons are raised to the minimums at the size the card actually draws. A daily card taller than the screen scrolls (drag or wheel) rather than drawing smaller than 0.72 css px per unit.
 - **Phones keep only the essentials:** the album shows 3 snakes a page in one column, the calendar drops the milestone number inside its rosette, and a phone on its side drops the before-hunt card's board picture.
+- **Few words on the board (2026-11-27):** on a touch screen the hint note at the bottom says as little as it can. A level's twist isn't repeated there (its card said it). A prompt or first-time hint with `touch: null` is skipped, as are the glide's "end of the branches" and "forest floor" prompts, which come back again and again. The touch wording is short ("Hold Glide to sail to the next tree").
 - **Map:** zoom 0.8 or more on phones. Nests are then 48 css px and names 18 px. The map pans sideways too, centred on the current level and clamped to the plan's 760-px width. A tap on a nest still opens its card.
 
 ## The map

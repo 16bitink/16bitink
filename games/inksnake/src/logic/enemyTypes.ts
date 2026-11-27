@@ -53,6 +53,8 @@ export interface StrikeMark extends Pt {
   readonly r: number;
   /** It's open only for a moment (off balance after an attack): worth showing from anywhere on the board. */
   readonly moment: boolean;
+  /** A strike hurts it (a boss hit, venom that puts it to sleep); false when it only sends it off. Only these get the green ring. */
+  readonly hurts: boolean;
 }
 
 /** Every enemy, whatever kind: it lives on the board and steps itself. */
@@ -84,7 +86,7 @@ export interface Enemy {
   frighten?(ctx: EnemyCtx, from: Pt): boolean;
   /** Frozen still for `seconds` (a king cobra's hood). Optional. */
   freeze?(seconds: number): void;
-  /** Where a strike would work on it now (hurt it, or send it off), or null: the view rings it in green. Optional: without it, a strike never works. */
+  /** Where a strike would work on it now (hurt it, or send it off), or null; the view rings it in green when the strike hurts. Optional: without it, a strike never works. */
   strikeMark?(snake: Snake): StrikeMark | null;
 }
 
@@ -114,10 +116,10 @@ export function isRinged(e: object): e is Ringed {
 }
 
 /** A boss: an enemy with hit points, driven off when they run out. */
-/** What to do right now, worded for mouse and keys, and for touch. */
+/** What to do right now, worded for mouse and keys, and for touch (null: unsaid on a touch screen, where the note would cover the board). */
 export interface Prompt {
   readonly mouse: string;
-  readonly touch: string;
+  readonly touch: string | null;
 }
 
 export interface Boss extends Enemy {
@@ -154,10 +156,10 @@ export interface BossEntry {
   readonly text: EnemyText;
 }
 
-/** A chapter's first-time hint. */
+/** A chapter's first-time hint (touch null: skipped on a touch screen). */
 export interface ChapterHint {
   readonly mouse: string;
-  readonly touch: string;
+  readonly touch: string | null;
   readonly after?: string;
   readonly until?: string;
   readonly max?: number;

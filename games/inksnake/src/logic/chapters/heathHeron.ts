@@ -83,7 +83,7 @@ export class Heron extends EnemyBase<HeronMode> {
 
   /** Open to a strike: bill down after a stab. */
   override strikeMark(snake: Snake): StrikeMark | null {
-    return this.m === 'rest' ? this.openWithin(snake, STRIKE_REACH) : null;
+    return this.m === 'rest' ? this.openWithin(snake, STRIKE_REACH, true, false) : null;
   }
 
   step(ctx: EnemyCtx, dt: number): void {

@@ -147,7 +147,7 @@ export class JungleRival extends RivalSnake {
     const pts = s.trail.pts;
     let at = pts[0]!;
     for (let i = 2; i < s.trail.count; i += 2) if (dist(pts[i]!, me.head) < dist(at, me.head)) at = pts[i]!;
-    return { x: at.x, y: at.y, r: (me.width + TOUCH_EXTRA + s.width) / 2, moment: false };
+    return { x: at.x, y: at.y, r: (me.width + TOUCH_EXTRA + s.width) / 2, moment: false, hurts: this.venomWorks(me) };
   }
 
   /** Whether a strike would do anything to it: put it to sleep, or send it off. */

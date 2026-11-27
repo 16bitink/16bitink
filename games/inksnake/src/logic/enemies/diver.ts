@@ -96,7 +96,7 @@ export class Diver extends EnemyBase<DiverMode> {
 
   /** Open to a strike: on the ground after a miss. */
   override strikeMark(snake: Snake): StrikeMark | null {
-    return this.m === 'ground' ? this.openWithin(snake, GROUND_REACH) : null;
+    return this.m === 'ground' ? this.openWithin(snake, GROUND_REACH, true, false) : null;
   }
 
   step(ctx: EnemyCtx, dt: number): void {

@@ -33,7 +33,7 @@ const GULP_MS = 160;
  * popping up (points, "Squeeze!", "Shoo!"), and the warnings that make
  * every attack readable: the hawk's red ring tightening, the cat's dotted
  * pounce lane, and a blue dotted ring when a coil is about to close. A green
- * ring round an enemy says a strike works on it now.
+ * ring round an enemy says a strike hurts it now.
  */
 export class FxView {
   /** The camera's turn (upright phones), so words stay upright. */
@@ -140,7 +140,7 @@ export class FxView {
     }
   }
 
-  /** An enemy open to a strike: a green dotted ring, solid once a strike straight ahead would land. */
+  /** An enemy a strike hurts: a green dotted ring, solid once a strike straight ahead would land. */
   private openRing(o: Opening, time: number): void {
     const g = this.warn;
     const r = o.r + Math.sin(time / 110) * 1.5;

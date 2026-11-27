@@ -30,7 +30,7 @@ export function twistTexts(level: LevelDef): TwistText[] {
   if (g?.kind === 'rush') out.push({ card: `Grow within ${g.seconds} seconds`, hint: `${g.seconds} seconds to grow!`, tip: 'On the clock, don\'t chase one meal round the board: turn to the nearest one.' });
   if (g?.kind === 'feast') {
     const name = foodName(g.food, g.count !== 1);
-    const tip = isTreatKind(g.food) ? `Every ${foodName(g.food, false)} counts: sweep the board for them between meals.` : `Only the ringed ${foodName(g.food, true)} count: go for those first.`;
+    const tip = isTreatKind(g.food) ? `Every ${foodName(g.food, false)} counts: sweep the board for them between meals.` : `Go for the ${foodName(g.food, true)} first, and grow on whatever is nearest between them.`;
     out.push({ card: `Also eat ${g.count} ${name}`, hint: `Eat ${g.count} ${name}, and grow`, tip });
   }
   if (g?.kind === 'golden') {

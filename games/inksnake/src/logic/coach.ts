@@ -2,11 +2,11 @@ import type { Teach } from '../level/types';
 import { CHAPTER_HINTS } from './chapters/index';
 import type { WorldEvent } from './world';
 
-/** A hint, worded for a mouse or for a touch screen. */
+/** A hint, worded for a mouse or for a touch screen (null: skipped there, to keep a phone's board clear). */
 interface Hint {
   readonly id: string;
   readonly mouse: string;
-  readonly touch: string;
+  readonly touch: string | null;
   /** Shown once an event like this happens (immediately when absent). */
   readonly after?: (e: WorldEvent) => boolean;
   /** Done once an event like this happens. */
@@ -23,7 +23,7 @@ const HINTS: Readonly<Record<string, Hint>> = {
   steer: { id: 'steer', mouse: 'Move the mouse: the snake\'s head follows it', touch: 'Steer with the stick bottom left, or hold a finger where to go', until: never, max: 5 },
   eat: { id: 'eat', mouse: 'Eat the hen\'s eggs and catch mice to grow longer', touch: 'Eat the hen\'s eggs and catch mice to grow longer', until: is('eat'), max: 14 },
   strike: { id: 'strike', mouse: 'Click or Space to strike: a quick lunge', touch: 'Tap to strike: a quick lunge', after: is('eat'), until: is('strike'), max: 10 },
-  knot: { id: 'knot', mouse: 'One life: don\'t bite your own body!', touch: 'One life: don\'t bite your own body!', until: never, max: 6 },
+  knot: { id: 'knot', mouse: 'One life: don\'t bite your own body!', touch: 'Don\'t bite your own body!', until: never, max: 6 },
   coil: {
     id: 'coil', mouse: 'Rats are too big to swallow: circle round one to coil it', touch: 'Rats are too big to swallow: circle round one to coil it',
     until: is('squeeze'), max: 25,
@@ -34,7 +34,7 @@ const HINTS: Readonly<Record<string, Hint>> = {
   feast: { id: 'feast', mouse: 'Eat the hen\'s eggs! A strike sends her flapping', touch: 'Eat the hen\'s eggs! A strike sends her flapping', until: (e) => e.type === 'eat' && e.kind === 'egg', max: 14 },
   rush: { id: 'rush', mouse: 'Grow before the clock runs out!', touch: 'Grow before the clock runs out!', until: never, max: 5 },
   dark: { id: 'dark', mouse: 'Night: you only see what\'s near you', touch: 'Night: you only see what\'s near you', until: never, max: 6 },
-  venom: { id: 'venom', mouse: 'Too big to swallow? Strike it: it runs off, falls asleep, then swallow it', touch: 'Too big to swallow? Tap to strike it: it runs off, falls asleep, then swallow it', until: is('bite'), max: 18 },
+  venom: { id: 'venom', mouse: 'Too big to swallow? Strike it: it runs off, falls asleep, then swallow it', touch: 'Too big? Tap to strike, then swallow it asleep', until: is('bite'), max: 18 },
   boss: { id: 'boss', mouse: 'Dodge the pounce, then strike the cat while it\'s off balance', touch: 'Dodge the pounce, then tap to strike the cat while it\'s off balance', after: is('crouch'), until: is('bossHit'), max: 16 },
 };
 
@@ -57,7 +57,9 @@ const TWIST_FOR = 6;
 /**
  * First-time hints for a level's `teach` list, one at a time: each shows
  * once its moment comes and goes when the player has done the thing (or
- * after a while). A level's twist (already worded) is told first.
+ * after a while). A level's twist (already worded) is told first, but not
+ * on a touch screen: the level's card said it, and a phone's board needs
+ * the room.
  */
 export class Coach {
   private queue: Hint[];
@@ -65,7 +67,7 @@ export class Coach {
   private started = false;
 
   constructor(teach: readonly Teach[], twists: readonly string[] = []) {
-    const told = twists.map((text): Hint => ({ id: 'twist', mouse: text, touch: text, until: never, max: TWIST_FOR }));
+    const told = twists.map((text): Hint => ({ id: 'twist', mouse: text, touch: null, until: never, max: TWIST_FOR }));
     this.queue = [...told, ...teach.map(hintFor).filter((h): h is Hint => h !== null)];
   }
 
@@ -75,7 +77,9 @@ export class Coach {
     return h && this.started ? (touch ? h.touch : h.mouse) : null;
   }
 
-  observe(events: readonly WorldEvent[], dt: number): void {
+  observe(events: readonly WorldEvent[], dt: number, touch: boolean): void {
+    // A hint with nothing to say on a touch screen goes at once, so the next one doesn't wait behind it.
+    if (touch) this.queue = this.queue.filter((q) => q.touch !== null);
     const h = this.queue[0];
     if (!h) return;
     if (!this.started && (!h.after || events.some(h.after))) this.started = true;

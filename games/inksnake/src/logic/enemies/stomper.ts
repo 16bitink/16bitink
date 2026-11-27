@@ -65,7 +65,7 @@ export class Stomper extends EnemyBase<StomperMode> {
 
   /** Open to a strike: foot down after a stomp. */
   override strikeMark(snake: Snake): StrikeMark | null {
-    return this.m === 'rest' ? this.openWithin(snake, STRIKE_REACH) : null;
+    return this.m === 'rest' ? this.openWithin(snake, STRIKE_REACH, true, false) : null;
   }
 
   step(ctx: EnemyCtx, dt: number): void {

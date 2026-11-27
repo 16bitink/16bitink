@@ -23,9 +23,9 @@ const SLACK = 14;
 /** The shark's mark is its snout, but a strike on its side, this much further off, lands too. */
 const SIDE_HIT: Readonly<Record<string, number>> = { shark: SNOUT + 6 };
 
-/** A stand-in enemy at `at`, open to a strike within `r`. */
-function dummy(at: { x: number; y: number }, r: number, moment: boolean): Enemy {
-  const mark: StrikeMark = { x: at.x, y: at.y, r, moment };
+/** A stand-in enemy at `at`, open to a strike within `r` (one that hurts it, unless `hurts` is false). */
+function dummy(at: { x: number; y: number }, r: number, moment: boolean, hurts = true): Enemy {
+  const mark: StrikeMark = { x: at.x, y: at.y, r, moment, hurts };
   return { id: 7, kind: 'hawk', x: at.x, y: at.y, heading: 0, alt: 0, mode: 'x', modeAge: 0, away: false, step: () => undefined, strikeMark: () => mark };
 }
 
@@ -60,6 +60,10 @@ describe('openings', () => {
   it('leaves out enemies that are off the board, or that a strike does nothing to', () => {
     const { strikeMark: _, ...plain } = dummy(pt(240, 200), 40, true);
     expect(openings([{ ...dummy(pt(240, 200), 40, true), away: true }, plain], snake())).toHaveLength(0);
+  });
+
+  it('rings only what a strike hurts, not what it just scares off', () => {
+    expect(openings([dummy(pt(260, 200), 50, true, false), dummy(pt(240, 200), 40, false, false)], snake())).toHaveLength(0);
   });
 
   it('never invites a strike at something prickly', () => {

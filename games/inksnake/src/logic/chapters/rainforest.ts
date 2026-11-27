@@ -47,19 +47,19 @@ export const RAINFOREST_RULES: ChapterRules = {
     },
   },
   hints: {
-    canopy: { mouse: 'Catch the geckos in the tree crowns to grow longer', touch: 'Catch the geckos in the tree crowns to grow longer', until: 'eat', max: 14 },
+    canopy: { mouse: 'Catch the geckos in the tree crowns to grow longer', touch: 'Catch geckos to grow', until: 'eat', max: 14 },
     glide: {
-      mouse: 'On a tree crown, press E (or Shift) to glide: hold it to sail further', touch: 'On a tree crown, press Glide: hold it to sail further',
+      mouse: 'On a tree crown, press E (or Shift) to glide: hold it to sail further', touch: 'Hold Glide to sail to the next tree',
       until: 'land', max: 20,
     },
     floor: {
-      mouse: 'On the forest floor you\'re slow: slither back to a tree to glide again', touch: 'On the forest floor you\'re slow: slither back to a tree to glide again',
+      mouse: 'On the forest floor you\'re slow: slither back to a tree to glide again', touch: 'Slither back to a tree',
       max: 8,
     },
-    nightcanopy: { mouse: 'Night in the canopy: you only see what\'s near you', touch: 'Night in the canopy: you only see what\'s near you', max: 6 },
-    bats: { mouse: 'Bats flit between the trees: glide into one to catch it', touch: 'Bats flit between the trees: glide into one to catch it', max: 10 },
+    nightcanopy: { mouse: 'Night in the canopy: you only see what\'s near you', touch: null, max: 6 },
+    bats: { mouse: 'Bats flit between the trees: glide into one to catch it', touch: 'Glide into bats to catch them', max: 10 },
     eagleplan: {
-      mouse: 'Missed! The eagle has landed: glide over and strike it', touch: 'Missed! The eagle has landed: glide over and tap to strike it',
+      mouse: 'Missed! The eagle has landed: glide over and strike it', touch: 'It landed: glide over and tap',
       after: 'miss', until: 'bossHit', max: 12,
     },
   },
