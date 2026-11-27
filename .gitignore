@@ -17,3 +17,13 @@ games/inkheroes/dev/pixel/siege3d/out
 games/inkroad/dev/art/raw
 games/inkroad/dev/art/ui/raw
 games/inkroad/dev/audio/raw
+
+# InkFish promo: review snapshots (regenerable with snap.mjs)
+games/inkfish/dev/promo/*/snap/
+games/inkfish/dev/promo/*/snaps/
+# Dewy dev-story kit: raw generations, mouth-chart sources and review sheets; the cut art ships
+games/inkfish/dev/promo/devstory/art/raw/
+games/inkfish/dev/promo/devstory/art/screen/raw/
+games/inkfish/dev/promo/devstory/art/dewy/mouth/src/
+games/inkfish/dev/promo/devstory/art/*.png
+games/inkfish/dev/promo/devstory/art/screen/demo-*.png
