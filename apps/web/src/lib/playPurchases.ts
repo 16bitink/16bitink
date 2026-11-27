@@ -50,7 +50,10 @@ export interface PlayContext {
   /** The purchase token Google was asked about. */
   readonly token: string;
   readonly user: { readonly userId: UserId; readonly email: string };
-  /** The price the store showed the buyer, as the app reported it (stats only: never trusted for access). */
+  /**
+   * The price the store showed the buyer, as the app reported it (stats only: never trusted for access).
+   * What the buyer paid, before Google's fee: the same basis as a Stripe purchase's amount_total.
+   */
   readonly price?: { readonly amount: number; readonly currency: string };
 }
 

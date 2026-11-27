@@ -94,6 +94,13 @@ export async function buyInApp(billing: Billing, game: string, userId: string): 
   return {};
 }
 
+/** The store's product for each game, so a confirm can carry its price (for the sales stats). Empty when the store can't say. */
+async function productsFor(billing: Billing, games: readonly string[]): Promise<Map<string, AppProduct>> {
+  if (games.length === 0) return new Map();
+  const products = await billing.getProducts([...new Set(games)]).catch(() => [] as AppProduct[]);
+  return new Map(products.map((p) => [p.game, p]));
+}
+
 /**
  * Saves store purchases the server hasn't confirmed yet: one paid while the
  * app was closed, a payment that was pending, or a confirm that failed
@@ -102,10 +109,11 @@ export async function buyInApp(billing: Billing, game: string, userId: string): 
 export async function syncAppPurchases(onOwned: (game: string) => void): Promise<void> {
   const billing = appBilling();
   if (!billing) return;
-  const purchases = await billing.getPurchases().catch(() => [] as AppPurchase[]);
+  const purchases = (await billing.getPurchases().catch(() => [] as AppPurchase[])).filter((p) => p.state === 'purchased' && !p.acknowledged);
+  // The first save of a purchase is the one that counts, price included.
+  const products = await productsFor(billing, purchases.map((p) => p.game));
   for (const p of purchases) {
-    if (p.state !== 'purchased' || p.acknowledged) continue;
-    const confirmed = await confirmPurchase(p);
+    const confirmed = await confirmPurchase(p, products.get(p.game));
     if ('status' in confirmed && confirmed.status === 'owned') onOwned(p.game);
   }
 }
@@ -114,9 +122,12 @@ export async function syncAppPurchases(onOwned: (game: string) => void): Promise
 export function watchAppPurchases(onOwned: (game: string) => void): void {
   window.addEventListener('inkapp:purchase', (e) => {
     const p = (e as CustomEvent<AppPurchase>).detail;
-    if (!p || p.state !== 'purchased' || p.acknowledged) return;
-    void confirmPurchase(p).then((c) => {
-      if ('status' in c && c.status === 'owned') onOwned(p.game);
-    });
+    const billing = appBilling();
+    if (!billing || !p || p.state !== 'purchased' || p.acknowledged) return;
+    void productsFor(billing, [p.game])
+      .then((products) => confirmPurchase(p, products.get(p.game)))
+      .then((c) => {
+        if ('status' in c && c.status === 'owned') onOwned(p.game);
+      });
   });
 }
