@@ -1,10 +1,11 @@
 import type { Policies, Prices } from '../../sim/types';
 import { answerCommission } from '../commissions';
-import { earn } from '../money';
 import type { City } from '../state';
 import { openPolicies, openTools } from '../state';
 import { applyConditions } from '../run';
-import { FLOAT_SEASONS, PRICE_RANGE } from '../tune';
+import { MONTHS_PER_SEASON } from '../../sim/constants';
+import { earn, lastMonths } from '../money';
+import { FLOAT_MONTHS, PRICE_RANGE } from '../tune';
 import { dropZone, syncZone } from '../zone';
 import { next as closeCard } from '../years';
 import { no, priced, type Handler } from './shared';
@@ -85,7 +86,8 @@ export const commission: Handler<'commission'> = {
   run(c, cmd) { answerCommission(c, cmd.id, cmd.take); return HERE; },
 };
 
-export const floatPrice = (c: City, stream: 'parking' | 'tolls'): number => Math.round(c.lastLedger.income[stream] * FLOAT_SEASONS);
+/** A month of the stream, by the last three months' mean, times the months the float buys. */
+export const floatPrice = (c: City, stream: 'parking' | 'tolls'): number => Math.round((lastMonths(c).income[stream] / MONTHS_PER_SEASON) * FLOAT_MONTHS);
 
 export const floatCo: Handler<'float'> = {
   quote(c, cmd) {

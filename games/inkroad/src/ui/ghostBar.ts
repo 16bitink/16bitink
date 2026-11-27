@@ -1,6 +1,6 @@
 import type { Ghost, WorldPort } from '../app/worldPort';
 import { Dirty, esc, Router } from './dom';
-import { num } from './format';
+import { num, worksText } from './format';
 
 /** The bar under a drawn, unbuilt change: price, works, warning, Build and Cancel. */
 export class GhostBar {
@@ -22,14 +22,14 @@ export class GhostBar {
 
   update(g: Ghost | null, money: number): void {
     this.el.hidden = !g;
-    const key = g ? `${g.label}|${g.quote.ok}|${g.quote.cost}|${g.quote.land}|${g.quote.works}|${g.quote.warn ?? ''}|${g.quote.note ?? ''}|${g.quote.why ?? ''}|${g.dragging}|${g.undoable ?? false}|${money >= g.quote.cost}` : '';
+    const key = g ? `${g.label}|${g.quote.ok}|${g.quote.cost}|${g.quote.land}|${g.quote.works}|${g.quote.closes ?? ''}|${g.quote.warn ?? ''}|${g.quote.note ?? ''}|${g.quote.why ?? ''}|${g.dragging}|${g.undoable ?? false}|${money >= g.quote.cost}` : '';
     if (!g || !this.dirty.changed('g', key)) return;
     const q = g.quote;
     const total = q.cost;
     const poor = total > money;
     const lines = [
       q.land > 0 ? `<span class="small dim">Includes <span class="coin">${num(q.land)}</span> for land</span>` : '',
-      q.works > 0 ? `<span class="small dim">${q.works} ${q.works === 1 ? 'season' : 'seasons'} of road works</span>` : '',
+      q.works > 0 ? `<span class="small dim">${worksText(q)}</span>` : '',
       q.note ? `<span class="small note">${esc(q.note)}</span>` : '',
       q.warn ? `<span class="warn small">${esc(q.warn)}</span>` : '',
       !q.ok && q.why ? `<span class="why">${esc(q.why)}</span>` : '',
@@ -91,3 +91,4 @@ export class KindBar {
     this.el.innerHTML = kinds.map((k) => `<button class="btn sm" data-act="park" data-v="${k}">${PARK_NAMES[k] ?? k}</button>`).join('');
   }
 }
+

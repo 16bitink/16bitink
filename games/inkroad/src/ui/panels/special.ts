@@ -27,10 +27,10 @@ export function ageingBlock(c: PanelCtx, r: Road): string {
   const why = [rep, rpl].find((q) => !q.ok && q.why && r.works === 0)?.why;
   const match = r.bridge && rpl.ok && rpl.warn ? `<p class="small dim">${esc(rpl.warn)}</p>` : '';
   return `<h3>Condition</h3>${kv('Surface', `${words(r.condition)}, ${pct(r.condition)}`)}${meter(r.condition, r.condition < POOR)}
-    <div class="choices"><button class="btn" data-act="mend" data-v="repair" ${rep.ok ? '' : 'disabled'} title="${esc(rep.why ?? 'One season of works')}">Repair ${rep.ok ? priceTag(rep) : ''}</button>
-    <button class="btn" data-act="mend" data-v="replace" ${rpl.ok ? '' : 'disabled'} title="${esc(rpl.why ?? 'Two seasons, as new')}">Replace ${rpl.ok ? priceTag(rpl) : ''}</button></div>
+    <div class="choices"><button class="btn" data-act="mend" data-v="repair" ${rep.ok ? '' : 'disabled'} title="${esc(rep.why ?? 'Three months of works')}">Repair ${rep.ok ? priceTag(rep) : ''}</button>
+    <button class="btn" data-act="mend" data-v="replace" ${rpl.ok ? '' : 'disabled'} title="${esc(rpl.why ?? 'Six months, as new')}">Replace ${rpl.ok ? priceTag(rpl) : ''}</button></div>
     ${match}${why ? `<p class="small dim">${esc(why)}</p>` : ''}
-    <p class="small dim">Repair: one season, a bit better. Replace: two seasons, as new.</p>`;
+    <p class="small dim">Repair: three months, a bit better. Replace: six months, as new.</p>`;
 }
 
 /** A piece of the old freeway may become a boulevard. */

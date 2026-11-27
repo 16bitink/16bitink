@@ -32,7 +32,7 @@ const YEAR_6: readonly Step[] = [
   ...toolLesson({
     id: 'fly', stage: 0, tool: 'flyover', why: (v, m) => { const j = junctionOf(v.city, node(m)); const x = move(v, m); return j && x ? `Cars ${turnWords(v.city, j, x)}: lift them over.` : 'Lift that turn over the rest.'; }, pick: 'Tap Flyover.', placeWhy: 'The game lays the ramps and the pillars.',
     place: 'Drag along the arrow, tail to head.', target: (v, m): Target | null => { const x = move(v, m); return x ? { t: 'drag', line: x.arrow } : null; }, ready: (v) => v.ghost?.cmd.t === 'flyover' && v.ghost.quote.ok && !v.ghost.dragging,
-    done: (v, m) => flights(v) > (m.fly ?? Infinity), skip: (_v, m) => m.node === undefined, buildWhy: (v) => `${coins(v.ghost?.quote.cost ?? 0)}, and ${v.ghost?.quote.works ?? 2} seasons of dust.`,
+    done: (v, m) => flights(v) > (m.fly ?? Infinity), skip: (_v, m) => m.node === undefined, buildWhy: (v) => `${coins(v.ghost?.quote.cost ?? 0)}, and ${v.ghost?.quote.works ?? 6} months of dust.`,
   }),
   { id: 'fly-run', stage: 0, pause: true, ok: 'Next', who: 'pim', why: 'Works first: a lane is closed, people grumble.', say: 'When it opens, that arrow turns green.', skipIf: (v, m) => flights(v) <= (m.fly ?? Infinity), target: () => look('.projects') },
 ];
@@ -75,7 +75,7 @@ const YEAR_9: readonly Step[] = [
     target: (v) => { const i = metroIdea(v.city); const s = i?.stops[Math.min(v.stops, i.stops.length - 1)]; return s ? { t: 'spot', at: ptOf(s), r: 28, tap: true } : null; },
     marks: (v) => { const i = metroIdea(v.city); return i ? [{ line: i.stops.map(ptOf) }, ...i.stops.map((s) => ({ ring: ptOf(s), r: 24 }))] : []; }, look: (v) => metroIdea(v.city)?.stops.map(ptOf) ?? null,
     ready: (v) => stopsDone(v, metroIdea(v.city)?.stops.length ?? 2), done: (v, m) => trains(v) > (m.trains ?? Infinity), skip: (v, m) => m.trains === undefined || (!metroIdea(v.city) && !v.ghost && trains(v) <= m.trains),
-    buildWhy: (v) => `Your share is ${coins(v.ghost?.quote.cost ?? 0)}. Digging takes ${v.ghost?.quote.works ?? 3} seasons.`,
+    buildWhy: (v) => `Your share is ${coins(v.ghost?.quote.cost ?? 0)}. Digging takes ${v.ghost?.quote.works ?? 9} months.`,
   }),
   { id: 'ride', stage: 2, who: 'miko', ok: 'Next', pause: true, why: 'Park and ride: leave the car outside, take the train.', say: 'It is a kind of car park. Put it by a station.', target: () => ({ t: 'tool', tool: 'parking' }), skipIf: (v) => trains(v) === 0 || !v.city.parkKinds.includes('ride') },
 ];

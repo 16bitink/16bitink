@@ -151,7 +151,7 @@ export class GhostLayer {
 
   private say(q: Quote | null, at: Pt): void {
     if (!q) return;
-    const text = q.ok ? `${Math.round(q.cost)} coins${q.works > 0 ? `\n${q.works} ${q.works === 1 ? 'season' : 'seasons'} of works` : ''}` : wrap(q.why ?? 'Not here', 26);
+    const text = q.ok ? `${Math.round(q.cost)} coins${q.works > 0 ? `\n${q.works} ${q.works === 1 ? 'month' : 'months'} of works${q.closes ? ', road closed' : ''}` : ''}` : wrap(q.why ?? 'Not here', 26);
     this.tag.setText(text).setColor(q.ok ? '#1f5a5c' : '#5b4a3a').setVisible(true);
     this.tagAt = !q.ok && q.at ? this.flash(q.at) : at;
   }

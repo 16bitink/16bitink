@@ -7,6 +7,7 @@ import { SAFFRON } from '../src/city/defs/saffron';
 import { cellsToBlock } from '../src/city/geometry';
 import { BEACH, leanOf, recordOf } from '../src/city/rules/beach';
 import { readRules } from '../src/city/rules/state';
+import { emptyLedger } from '../src/city/state';
 import { cityProblems } from '../src/city/validate';
 import { createNetwork, planRoad } from '../src/sim/network';
 import type { Cell, CityView } from '../src/sim/types';
@@ -101,7 +102,7 @@ describe('the Council decides', () => {
 
   it('leans to sell with thin books or too few homes, to public when trips and streets are good', () => {
     const c = inner(january(DECIDES));
-    c.lastLedger = { ...c.lastLedger, income: { ...c.lastLedger.income, budget: 100 } };
+    c.books = [{ ...emptyLedger(), income: { ...emptyLedger().income, budget: 100 } }];
     c.bars = { trips: 70, parking: 70, cost: 70, streets: 80 };
     expect(leanOf(c).lean).toBe('public');
     c.bars = { trips: 50, parking: 70, cost: 70, streets: 60 };

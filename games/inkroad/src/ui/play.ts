@@ -2,7 +2,7 @@ import type { Selection } from '../app/worldPort';
 import { Cards } from './cards';
 import { CarBubble } from './carBubble';
 import { div, Dirty, esc, Router } from './dom';
-import { pct, signed } from './format';
+import { opensMonth, pct, signed } from './format';
 import { GhostBar, HintBar, KindBar } from './ghostBar';
 import { goalInfo } from '../guide/goalInfo';
 import type { Store } from '../guide/progress';
@@ -158,7 +158,7 @@ export class Play {
     this.guide.update(nowMs);
     this.advisor.update(nowMs, this.guide.busy);
     this.root.classList.toggle('advising', this.advisor.showing);
-    this.projectChips(city.projects);
+    this.projectChips(city);
     this.popover(env);
     this.insets(nowMs, sel !== this.lastSel);
     if (sel !== this.lastSel) this.uncover(sel);
@@ -183,10 +183,11 @@ export class Play {
     this.guide.pinned();
   }
 
-  private projectChips(list: UiEnv['city']['projects']): void {
+  private projectChips(city: UiEnv['city']): void {
+    const list = city.projects;
     this.projects.hidden = list.length === 0;
-    if (!this.dirty.changed('projects', list)) return;
-    this.projects.innerHTML = list.map((p) => `<button class="chip" data-act="project" data-v="${p.id}">${p.level > 0 ? 'Flyover' : 'Underpass'}: <b>${p.left}</b> ${p.left === 1 ? 'season' : 'seasons'} left</button>`).join('');
+    if (!this.dirty.changed('projects', `${list.map((p) => `${p.id}:${p.left}`).join(',')}|${city.phase}:${city.month}`)) return;
+    this.projects.innerHTML = list.map((p) => `<button class="chip" data-act="project" data-v="${p.id}">${p.level > 0 ? 'Flyover' : 'Underpass'}: opens in <b>${opensMonth(city, p.left)}</b></button>`).join('');
   }
 
   private popover(env: UiEnv): void {
@@ -196,7 +197,7 @@ export class Play {
     if (this.popOpen === 'goal') return this.goalPop(city);
     const key = `${city.bars.trips}|${city.bars.parking}|${city.bars.cost}|${city.bars.streets}|${city.goal.text}`;
     if (!this.dirty.changed('pop', key)) return;
-    this.pop.innerHTML = `<div class="col">${BAR_NAMES.map(([k, n]) => `<div class="kv"><span>${n}</span><b>${pct(city.bars[k] / 100)}</b></div>`).join('')}<div class="kv"><span>Next season</span><b>${signed(city.forecast.nextSeason)}</b></div><hr><p class="small">${esc(city.goal.text)}</p></div>`;
+    this.pop.innerHTML = `<div class="col">${BAR_NAMES.map(([k, n]) => `<div class="kv"><span>${n}</span><b>${pct(city.bars[k] / 100)}</b></div>`).join('')}<div class="kv"><span>Next month</span><b>${signed(city.forecast.nextMonth)}</b></div><hr><p class="small">${esc(city.goal.text)}</p></div>`;
   }
 
   private goalPop(city: UiEnv['city']): void {

@@ -1,5 +1,6 @@
 import type { TextureName } from '../../art/manifest';
 import { LANE } from '../../sim/constants';
+import { closedForWorks } from '../../sim/roadGeom';
 import { boxesMeet, offsetLine, type Box } from '../geom';
 import { linePath, wobble } from '../pen';
 import { INK, SHADOW, WATER_DEEP } from '../style';
@@ -63,7 +64,8 @@ export function paintRoads(b: Brush, scene: RoadScene, box: Box): void {
   for (const j of joins) markJoin(b, j);
   for (const j of joins) if (j.kind === 'ring') paintIsland(b, j);
   for (const r of roads) if (r.road.toll) paintToll(g, r);
-  for (const r of roads) if (r.road.works > 0) paintWorks(b, r);
+  // Night works leave the road open by day, so no diggings are drawn under its cars.
+  for (const r of roads) if (closedForWorks(r.road)) paintWorks(b, r);
   sketch(g, roads);
   for (const r of roads) paintMouth(b, r);
   for (const r of all) {

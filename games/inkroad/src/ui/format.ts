@@ -1,4 +1,6 @@
-import { SEASONS, YEARS_PER_CITY } from '../sim/constants';
+import { paydaysDone } from '../city/clock';
+import { MONTHS, MONTHS_PER_SEASON, SEASONS, YEARS_PER_CITY } from '../sim/constants';
+import type { Phase } from '../sim/types';
 
 /** Number and text formatting for the screens. Pure, so it is tested. */
 
@@ -29,8 +31,19 @@ export function clockText(hour: number): string {
 
 export const seasonName = (s: number): string => SEASONS[Math.min(3, Math.max(0, Math.floor(s)))] ?? SEASONS[0]!;
 
-/** "Year 3, Winter". */
-export const dateLine = (year: number, season: number): string => `Year ${year}, ${seasonName(season)}`;
+/** "Year 3, Winter": the season a review closes. */
+export const seasonLine = (year: number, season: number): string => `Year ${year}, ${seasonName(season)}`;
+
+/** A month of the Council's year, 0 = March; it wraps. */
+export const monthName = (m: number): string => MONTHS[((Math.floor(m) % MONTHS.length) + MONTHS.length) % MONTHS.length]!;
+
+/** "Year 3, May": the month that is on (at a review, the one just paid). */
+export const dateLine = (year: number, month: number): string => `Year ${year}, ${monthName(month)}`;
+
+/** The month works with `left` paydays to go are over in: they end at the payday before it. */
+export function opensMonth(city: { readonly phase: Phase; readonly season: number; readonly month: number }, left: number): string {
+  return monthName(paydaysDone(city.phase, city.season, city.month - city.season * MONTHS_PER_SEASON) + left);
+}
 
 /** The year as it is shown: a city's years run on from the one before (Old Harbour starts in year 11). */
 export const shownYear = (city: { readonly def: { readonly number: number }; readonly year: number }, year = city.year): number => (city.def.number - 1) * YEARS_PER_CITY + year;
@@ -63,3 +76,13 @@ export function minutes(sec: number): string {
 
 /** Player text never holds em or en dashes: swaps them for a plain hyphen. */
 export const plain = (s: string): string => s.replace(/[–—]/g, '-');
+
+/** "3 months" */
+export const monthsText = (n: number): string => `${n} ${n === 1 ? 'month' : 'months'}`;
+
+/** '3 months of road works, road closed, open in September': works on a road close it, unless they are done by night. */
+export function worksText(q: { readonly works: number; readonly closes?: boolean; readonly opens?: number }): string {
+  const n = `${monthsText(q.works)} of road works`;
+  const opens = q.opens !== undefined ? `, ${q.closes === true ? 'open' : 'done'} in ${monthName(q.opens)}` : '';
+  return q.closes === true ? `${n}, road closed${opens}` : q.closes === false ? `${n} by night, road open${opens}` : `${n}${opens}`;
+}

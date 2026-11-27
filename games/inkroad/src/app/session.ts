@@ -1,7 +1,7 @@
 import type { GameHost } from '@16bitink/game-sdk';
 import type { SoundBoard } from '../audio/sound';
 import type { CityDef, CityView, Command, Letter, Phase, Quote } from '../sim/types';
-import { dateLine, shownYear } from '../ui/format';
+import { seasonLine, shownYear } from '../ui/format';
 import type { Play } from '../ui/play';
 import { LoadingSheet } from '../ui/veils';
 import type { Speed } from '../ui/types';
@@ -202,7 +202,7 @@ export class Session {
   private review(): void {
     const { city } = this;
     this.persist((s) => recordAuto(s, this.cityNo, city.year, city.season, safeSave(city)));
-    this.tracker.progress(`${dateLine(city.year, city.season)}, approval ${Math.round(city.approval)}`);
+    this.tracker.progress(`${seasonLine(city.year, city.season)}, approval ${Math.round(city.approval)}`);
     this.showLetters();
   }
 
@@ -223,7 +223,7 @@ export class Session {
 
   private replaced(): void {
     const { city } = this;
-    this.tracker.end('lose', undefined, city.replacedWhy?.text.slice(0, 80), dateLine(city.year, city.season));
+    this.tracker.end('lose', undefined, city.replacedWhy?.text.slice(0, 80), seasonLine(city.year, city.season));
     this.io.play.cards.show('replaced');
   }
 

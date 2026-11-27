@@ -39,11 +39,11 @@ describe('roads', () => {
     expect(why(v, { t: 'kerb', road: roadThrough(v, 22, 12).id, on: true })).toMatch(/toolbox/);
   });
 
-  it('widens with a season of works, and the works end', () => {
+  it('widens with three months of works, and the works end with the season', () => {
     const v = cityAtYear(3);
     const r = roadThrough(v, 12, 18);
     ok(v, { t: 'upgrade', road: r.id, type: 'avenue' });
-    expect(v.roads.find((x) => x.id === r.id)!.works).toBe(1);
+    expect(v.roads.find((x) => x.id === r.id)!.works).toBe(3);
     expect(why(v, { t: 'upgrade', road: r.id, type: 'avenue' })).toMatch(/already/);
     runDay(v);
     expect(v.roads.find((x) => x.id === r.id)!.works).toBe(0);
@@ -82,7 +82,7 @@ describe('junctions', () => {
     expect(why(newCity(), { t: 'control', node: at(newCity(), 22, 18), control: 'signal' })).toMatch(/toolbox/);
   });
 
-  it('a flyover takes two seasons, then opens', () => {
+  it('a flyover takes six months, then opens', () => {
     const v = cityAtYear(6);
     const node = at(v, 22, 18);
     const arms = v.junctions.find((j) => j.id === node)!.arms;
@@ -139,7 +139,7 @@ describe('the desk', () => {
     expect(v.money).toBe(money + job.upfront);
     runDay(v);
     expect(v.commissions[0]!.state).not.toBe('offered');
-    inner(v).lastLedger = { ...v.lastLedger, income: { ...v.lastLedger.income, parking: 20 } };
+    inner(v).books = [{ ...v.lastLedger, income: { ...v.lastLedger.income, parking: 20 } }];
     const before = v.money;
     ok(v, { t: 'float', stream: 'parking' });
     expect(v.money).toBe(before + 100);
@@ -151,7 +151,7 @@ describe('the desk', () => {
     const c = inner(v);
     const job = v.commissions[0]!;
     ok(v, { t: 'commission', id: job.id, take: true });
-    c.commissions = c.commissions.map((x) => ({ ...x, seasonsLeft: 1, kind: 'riders', target: 1e6 }));
+    c.commissions = c.commissions.map((x) => ({ ...x, monthsLeft: 3, kind: 'riders', target: 1e6 }));
     const money = v.money;
     settleSeason(c);
     expect(v.commissions[0]!.state).toBe('failed');
@@ -183,20 +183,21 @@ describe('lines', () => {
     expect(v.lines).toHaveLength(0);
   });
 
-  it('a metro is matched by the Council and takes three seasons', () => {
+  it('a metro is matched by the Council and takes nine months', () => {
     const v = cityAtYear(9);
     const cmd = draw(v, 'metro', [cell(11, 14), cell(22, 14), cell(30, 18), cell(44, 18)]);
     const q = v.quote(cmd);
-    expect(q.works).toBe(3);
+    expect(q.works).toBe(9);
     expect(q.warn).toMatch(/Council pays/);
     ok(v, cmd);
     expect(bestRide(inner(v), { x: 11 * 40, y: 14 * 40 }, { x: 44 * 40, y: 18 * 40 }, 'am')).toBeNull();
-    for (let i = 0; i < 3; i++) settleSeason(inner(v));
+    // Nine paydays.
+    for (let i = 0; i < 9; i++) settleSeason(inner(v));
     expect(v.lines[0]!.works).toBe(0);
     const a = { x: 11 * 40, y: 14 * 40 };
     expect(bestRide(inner(v), a, { x: 44 * 40, y: 18 * 40 }, 'am')!.lines).toHaveLength(1);
     ok(v, draw(v, 'metro', [cell(22, 13), cell(22, 24)]));
-    for (let i = 0; i < 3; i++) settleSeason(inner(v));
+    for (let i = 0; i < 9; i++) settleSeason(inner(v));
     expect(bestRide(inner(v), a, { x: 22 * 40, y: 25 * 40 }, 'am')!.changes).toBe(1);
   });
 

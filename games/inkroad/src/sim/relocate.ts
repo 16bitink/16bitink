@@ -3,8 +3,10 @@ import { angleDiff, pointAt, project } from './geom';
 import { giveUp, plan, pose } from './motion';
 import { ENTRY_T, LANE_T, TURN_T, nearest, type Track } from './track';
 import type { Sim } from './sim';
+import { closedForWorks } from './roadGeom';
 import type { World } from './world';
 import type { Access, Network } from './trafficTypes';
+import type { Road } from './types';
 
 const SAME = 1.5; // px
 const FAR = 70;
@@ -22,14 +24,26 @@ export function remapAccess(old: Network, w: World, a: Access): Access | null {
   const now = w.roadById.get(a.road);
   if (before && now && before.line === now.line) return a;
   if (!before) return now ? a : null;
-  const p = pointAt(before.line, a.s);
+  return nearestRoadPoint(w, pointAt(before.line, a.s), () => true);
+}
+
+/** The nearest place on a ground road that `ok` allows, within DEST_FAR. */
+function nearestRoadPoint(w: World, p: { x: number; y: number }, ok: (r: Road) => boolean): Access | null {
   let best: Access | null = null, bestD = DEST_FAR;
   for (const r of w.net.roads) {
-    if (r.flyover) continue;
+    if (r.flyover || !ok(r)) continue;
     const at = project(r.line, p);
     if (at.d < bestD) { best = { road: r.id, s: at.s }; bestD = at.d; }
   }
   return best;
+}
+
+/** A trip's end on a road under works moves to the nearest open road, as if the road were gone. */
+function openEnd(w: World, a: Access): Access | null {
+  if ('gate' in a) return a;
+  const r = w.roadById.get(a.road);
+  if (!r || !closedForWorks(r)) return a;
+  return nearestRoadPoint(w, pointAt(r.line, a.s), (q) => !closedForWorks(q));
 }
 
 const sameTrack = (p: Track, q: Track): boolean =>
@@ -42,6 +56,7 @@ const END = 0.5;
 
 function nearestLane(w: World, x: number, y: number, h: number, z: number, taken: (t: Track, s: number) => boolean): { t: Track; s: number } | null {
   let best: { t: Track; s: number } | null = null, bestD = FAR;
+  // Closed lanes count too: a car on a road that has just closed stays on it, and drives off it.
   for (const l of w.links) {
     for (const t of l.lanes) {
       const n = nearest(t, x, y);
@@ -73,6 +88,8 @@ function keep(sim: Sim, was: Was): boolean {
   if (t.kind === LANE_T && !was.granted) { c.insert(was.i, t, was.s); return true; }
   const opt = was.optKey ? w.optByKey.get(was.optKey) : undefined;
   if (!opt) return false;
+  // Its way on runs into a road that has just closed: at the line it asks again (inside the junction it goes on, then off).
+  if (t.kind === LANE_T && opt.to.closed && !opt.from.closed) { c.insert(was.i, t, was.s); return true; }
   const exit = was.exitKey ? w.byKey.get(was.exitKey) : null, out = was.outKey ? w.byKey.get(was.outKey) : null;
   const ring = t.kind !== LANE_T && t.kind !== TURN_T;
   if ((ring && !exit) || (was.outKey && !out)) return false;
@@ -134,7 +151,8 @@ function replan(sim: Sim, i: number, old: Network): void {
   const { cars: c, world: w } = sim;
   if (c.state[i]! >= 2) { c.link[i] = c.track[i]!.link; return; }
   const to: Access = c.destNode[i]! >= 0 ? { gate: c.destNode[i]! } : { road: c.destRoad[i]!, s: c.destS[i]! };
-  const now = remapAccess(old, w, to);
+  const moved = remapAccess(old, w, to);
+  const now = moved && openEnd(w, moved);
   if (!now) { giveUp(sim, i); return; }
   if ('road' in now) { c.destRoad[i] = now.road; c.destS[i] = now.s; }
   const t = c.track[i]!;

@@ -92,7 +92,7 @@ function cutOff(city: CityView): Problem[] {
   }));
 }
 
-/** The biggest thing people paid last season. */
+/** The biggest thing people paid last month. */
 function whyDear(city: CityView): string {
   const i = city.lastLedger.income;
   const paid = ([['fines', 'fines'], ['tolls', 'tolls'], ['parking', 'parking'], ['fares', 'fares'], ['zone', 'the zone charge']] as const).map(([k, name]) => ({ name, n: i[k] })).sort((a, b) => b.n - a.n)[0];
@@ -115,9 +115,10 @@ function bars(city: CityView): Problem[] {
 }
 
 function purse(city: CityView): Problem[] {
-  const f = city.forecast.nextSeason;
-  if (f >= 0 || city.money + f * 2 > 0) return [];
-  return [{ id: 'money', kind: 'money', bar: 'money', score: 60, place: 'The purse is running out', cause: `We lose ${Math.round(-f)} coins a season, and hold ${Math.round(city.money)}.`, at: null, r: 0, ref: -1 }];
+  const f = city.forecast.nextMonth;
+  // Half a year of it would empty the purse.
+  if (f >= 0 || city.money + f * 6 > 0) return [];
+  return [{ id: 'money', kind: 'money', bar: 'money', score: 60, place: 'The purse is running out', cause: `We lose ${Math.round(-f)} coins a month, and hold ${Math.round(city.money)}.`, at: null, r: 0, ref: -1 }];
 }
 
 function old(city: CityView): Problem[] {

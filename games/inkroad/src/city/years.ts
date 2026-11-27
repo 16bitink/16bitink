@@ -65,9 +65,10 @@ function councilRoads(c: City, net: Network): Network {
   return out;
 }
 
-/** January: roads and districts open, the year card goes up. A fresh traffic run keeps saves exact. */
+/** March, the Council's new year: roads and districts open, the year card goes up. A fresh traffic run keeps saves exact. */
 export function beginYear(c: City): void {
   c.season = 0;
+  c.month = 0;
   c.phase = 'yearStart';
   c.clock = 0;
   clearForRoads(c);
@@ -103,6 +104,7 @@ export function freshTraffic(c: City): void {
 }
 
 function beginDay(c: City): void {
+  c.month = 0;
   c.ledger = emptyLedger();
   c.phase = 'day';
   emit(c, { t: 'phase', phase: 'day' });

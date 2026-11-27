@@ -1,4 +1,4 @@
-import { DAY, STEP } from '../sim/constants';
+import { DAY, MONTHS_PER_SEASON, STEP } from '../sim/constants';
 import { createNetwork } from '../sim/network';
 import { createTraffic } from '../sim/traffic';
 import type {
@@ -13,12 +13,14 @@ import { priceLimits } from './commands/desk';
 import { emptyDay } from './day';
 import { yearGoal } from './goals';
 import { moodOf, population } from './growth';
+import { lastMonth } from './money';
 import { lotFullness } from './parking';
 import { createDice, mixSeed } from './rng';
 import { specialView } from './rules';
 import { beachCase, beachPlan, beachViews } from './rules/beach';
 import { endDay, startDay, stepDay } from './run';
 import { restoreFields, saveCity, saveProblem, type CitySave } from './save';
+import { upgradeSave } from './saveUpgrade';
 import { NO_VOTE } from './zone';
 import { forecast, settleSeason } from './settle';
 import { plannedRoads } from './standing';
@@ -45,11 +47,11 @@ const baseLots = (def: CityDef, seed: number): readonly Lot[] => def.lots.map((l
 function newCity(def: CityDef, seed: number): City {
   const net0 = createNetwork(def.map, def.roads.filter((r) => (r.opensYear ?? 1) === 1), def.gates);
   const c: City = {
-    def, seed, dice: createDice(mixSeed(seed, 1)), net: net0, traffic: createTraffic(net0, seed), year: 1, season: 0, phase: 'yearStart', clock: 0, carry: 0,
+    def, seed, dice: createDice(mixSeed(seed, 1)), net: net0, traffic: createTraffic(net0, seed), year: 1, season: 0, month: 0, phase: 'yearStart', clock: 0, carry: 0,
     nextId: 1, lots: baseLots(def, seed), parks: [], lines: [], projects: [], money: def.startMoney, approval: START_APPROVAL,
-    bars: START_BARS, lastBars: { ...START_BARS, approval: START_APPROVAL }, yearApprovals: [], yearHabits: [], letters: [], plates: [],
+    bars: START_BARS, opening: { bars: START_BARS, approval: START_APPROVAL }, lastBars: { ...START_BARS, approval: START_APPROVAL }, yearApprovals: [], yearHabits: [], letters: [], plates: [],
     prices: START_PRICES, priceBase: START_PRICES, policies: { inspectors: 0, permits: false, truckHours: false, nightWorks: false, taxis: 0 },
-    ledger: emptyLedger(), lastLedger: emptyLedger(), purse: { parking: 0, fines: 0, tolls: 0, fares: 0, zone: 0 },
+    ledger: emptyLedger(), books: [], purse: { parking: 0, fines: 0, tolls: 0, fares: 0, zone: 0 },
     techs: [], techChoices: [], commissions: [], floated: [], bailouts: 0, expect: { trip: START_EXPECT, pay: START_PAY }, ownership: def.rules.carOwnership,
     moods: new Map(), memory: new Map(), vote: NO_VOTE, weather: { speed: 1, crashes: 0 }, day: emptyDay(), services: new Map(),
     measures: emptyMeasures(), report: null, complaints: [], events: [], replacedWhy: undefined,
@@ -58,7 +60,8 @@ function newCity(def: CityDef, seed: number): City {
   return c;
 }
 
-function loadCity(def: CityDef, save: unknown): City | null {
+function loadCity(def: CityDef, saved: unknown): City | null {
+  const save = upgradeSave(saved);
   const problem = saveProblem(def, save);
   if (problem) { console.warn(`InkRoad: save not used (${problem})`); return null; }
   const s = save as CitySave;
@@ -94,6 +97,7 @@ class CityGame implements CityView {
   get def() { return this.c.def; }
   get year() { return this.c.year; }
   get season() { return this.c.season; }
+  get month() { return this.c.season * MONTHS_PER_SEASON + this.c.month; }
   get phase() { return this.c.phase; }
   get clock() { return localClock(this.c.clock); }
   get hour() { return hourAt(this.c.clock, this.c.phase); }
@@ -122,7 +126,8 @@ class CityGame implements CityView {
   get priceLimits() { return priceLimits(this.c); }
   get policies() { return this.c.policies; }
   get ledger() { return this.c.ledger; }
-  get lastLedger() { return this.c.lastLedger; }
+  get lastLedger() { return lastMonth(this.c); }
+  get books() { return this.c.books; }
   get complaints() { return this.c.complaints; }
   get tools() { return openTools(this.c); }
   get newTools() { return yearDef(this.c).tools; }
@@ -138,7 +143,7 @@ class CityGame implements CityView {
   get commissions() { return this.c.commissions; }
   get goal(): YearGoal { return yearGoal(this.c); }
   get population() { return population(this.c); }
-  get forecast() { return { nextSeason: forecast(this.c) }; }
+  get forecast() { return { nextMonth: forecast(this.c) }; }
   get vote() { const v = this.c.vote; return openTools(this.c).includes('zone') ? { support: Math.round(v.support), seasons: v.seasons, running: v.running, kept: v.kept } : undefined; }
   get special() { return specialView(this.c); }
   get replacedWhy() { return this.c.replacedWhy; }

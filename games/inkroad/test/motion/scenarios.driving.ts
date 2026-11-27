@@ -7,6 +7,9 @@ import type { KnownSets } from './known';
 import { brakesUnder, clean, closest, expect, passesBy, samplesOf } from './checks';
 import { CROSS_GAP } from '../../src/city/manoeuvre';
 import type { City } from '../../src/city/state';
+import { commitNetwork } from '../../src/city/network';
+import { setRoad } from '../../src/sim/network';
+import { halfWidth } from '../../src/sim/roadGeom';
 
 const cityOf = (r: Parameters<typeof clean>[0]): City => (r.city as unknown as { c: City }).c;
 
@@ -537,7 +540,46 @@ export const JAM_GIVEUP: Scenario = {
   },
 };
 
-export const DRIVING: readonly Scenario[] = [CROSS_LEFT, CROSS_STRAIGHT, FOLLOW_QUEUE, YIELD_GO, SIGNAL_CYCLE, LANES_CHANGE, T_ALL, GATE_INOUT, DIAGONAL, ONE_WAY, FLYOVER_RAMPS, BRIDGE, BUS_STOP, DEAD_END, JAM_GIVEUP];
+/** Two streets along rows 3 and 7, joined at columns 3 and 10; the row-3 piece between them is dug up for works. */
+const WORKS_LOOP = {
+  size: [14, 11] as const,
+  roads: [{ cells: [[0, 3], [13, 3]] as const }, { cells: [[3, 3], [3, 7]] as const }, { cells: [[10, 3], [10, 7]] as const }, { cells: [[3, 7], [10, 7]] as const }],
+  gates: [{ id: 'W', cell: [0, 3] as const }, { id: 'E', cell: [13, 3] as const }],
+};
+
+export const WORKS_CLOSED: Scenario = {
+  id: 'drive.works.closed',
+  title: 'Road works close a road: through cars go round',
+  expect: 'A road under works between two junctions takes no cars; through cars go round by the side streets and still arrive',
+  ...WORKS_LOOP,
+  // The lab's roads are the Council's own (fixed), so the works are put on directly, as a burst pipe would.
+  setup: (v) => {
+    const c = (v as unknown as { c: City }).c;
+    const dug = c.net.roads.find((q) => q.cells.some((x) => x.gx === 6 && x.gy === 3))!;
+    commitNetwork(c, setRoad(c.net, dug.id, { works: 1 }));
+  },
+  actors: [{ kind: 'through', id: 'A', at: 1, from: 'W', to: 'E' }, { kind: 'through', id: 'B', at: 2, from: 'E', to: 'W' }],
+  flows: [{ from: 'W', to: 'E', every: 5, start: 4, until: 30 }],
+  seconds: 45,
+  expectations: (r) => {
+    const dug = cityOf(r).net.roads.find((q) => q.works > 0 && q.cells.some((x) => x.gx === 6 && x.gy === 3));
+    const ends = cityOf(r).net.junctions.filter((j) => dug && (j.id === dug.a || j.id === dug.b));
+    // A car on the dug road: within its paved width, between the two junction boxes at its ends (it runs along row 3).
+    const [lo, hi] = [Math.min(...ends.map((j) => j.x + j.radius)), Math.max(...ends.map((j) => j.x - j.radius))];
+    const onDug = (s: { x: number; y: number }) => !!dug && Math.abs(s.y - dug.line[0]!.y) < halfWidth(dug) && s.x > lo && s.x < hi;
+    const on = r.trace.flatMap((row) => (row ?? []).filter((s) => s.state !== 'parked' && onDug(s)));
+    // Going round means driving the row-7 street (y about 300 px).
+    const round = (who: string) => samplesOf(r, who).some((s) => s.y > 6.5 * 40);
+    return [
+      expect('the road is under works', !!dug && ends.length === 2, dug ? `road ${dug.id}, ${dug.works} season` : 'no works'),
+      expect('no car on the closed road', on.length === 0, on.length ? `${on[0]!.who} at ${on[0]!.t.toFixed(1)} s (${on.length} frames)` : 'none'),
+      expect('A and B went round by the row-7 street', round('A') && round('B'), `A ${round('A')}, B ${round('B')}`),
+      passesBy(r, 'A', 45), passesBy(r, 'B', 45), brakesUnder(r, 'A', 400), clean(r, 'A'), clean(r, 'B'),
+    ];
+  },
+};
+
+export const DRIVING: readonly Scenario[] = [CROSS_LEFT, CROSS_STRAIGHT, FOLLOW_QUEUE, YIELD_GO, SIGNAL_CYCLE, LANES_CHANGE, T_ALL, GATE_INOUT, DIAGONAL, ONE_WAY, FLYOVER_RAMPS, BRIDGE, BUS_STOP, DEAD_END, JAM_GIVEUP, WORKS_CLOSED];
 
 export const KNOWN_DRIVING: KnownSets = {
   defaults: {
@@ -556,6 +598,7 @@ export const KNOWN_DRIVING: KnownSets = {
     'drive.bus.stop': { counts: {}, failing: [] },
     'drive.deadend.turn': { counts: {'too fast on a curve (moving)': 124, 'too tight (moving)': 56, 'reverse too fast (manoeuvre)': 106, 'jumps (manoeuvre)': 82, 'too tight (manoeuvre)': 2, 'too fast on a curve (manoeuvre)': 30, 'crosses a kerb (manoeuvre)': 4}, failing: ['A never turns on the spot (no heading change while standing)', 'A breaks no motion rule', 'B breaks no motion rule'] },
     'drive.jam.giveup': { counts: {'cuts across without a gap (manoeuvre)': 3, 'bodies overlap (manoeuvre)': 12, 'bodies overlap (moving)': 2, 'jumps (manoeuvre)': 68, 'too fast on a curve (manoeuvre)': 44, 'reverse too fast (manoeuvre)': 26, 'turns in place (manoeuvre)': 2, 'crosses a kerb (manoeuvre)': 4, 'too fast on a curve (moving)': 134, 'too tight (moving)': 14}, failing: ['A pulled over to the shoulder (stood off its lane)', 'A breaks no motion rule'] },
+    'drive.works.closed': { counts: {'too fast on a curve (moving)': 935, 'too tight (moving)': 414}, failing: ['A breaks no motion rule', 'B breaks no motion rule'] },
   },
   on: {
     'drive.cross.left': { counts: {'too tight (moving)': 10, 'too fast on a curve (moving)': 43}, failing: ['A breaks no motion rule'] },
@@ -573,5 +616,6 @@ export const KNOWN_DRIVING: KnownSets = {
     'drive.bus.stop': { counts: {}, failing: [] },
     'drive.deadend.turn': { counts: {'too fast on a curve (moving)': 144, 'too tight (moving)': 16, 'cuts across without a gap (manoeuvre)': 1, 'bodies overlap (manoeuvre)': 2, 'crosses a kerb (manoeuvre)': 2}, failing: ['B (a van) turned round too', 'A is through by 40 s', 'A breaks no motion rule', 'B breaks no motion rule'] }, // fix round 1b follow-up: ROAD_STOPS joined the 'on' set
     'drive.jam.giveup': { counts: {'cuts across without a gap (manoeuvre)': 4, 'bodies overlap (manoeuvre)': 7, 'too fast on a curve (moving)': 73, 'crosses a kerb (manoeuvre)': 1}, failing: ['A breaks no motion rule'] },
+    'drive.works.closed': { counts: {'too fast on a curve (moving)': 1529, 'too tight (moving)': 14}, failing: ['A breaks no motion rule', 'B breaks no motion rule'] },
   },
 };

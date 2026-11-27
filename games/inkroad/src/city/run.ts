@@ -1,6 +1,6 @@
-import { STEP } from '../sim/constants';
+import { MONTHS_PER_SEASON, STEP } from '../sim/constants';
 import { setRoad } from '../sim/network';
-import { isPeak, NIGHT_END, periodAt, SEASON_END, WEEKEND_AT } from './clock';
+import { isPeak, NIGHT_END, PAYDAYS, periodAt, SEASON_END, WEEKEND_AT } from './clock';
 import type { Leg, Tour } from './day';
 import { emptyDay } from './day';
 import { planDay, planWeekend } from './demand';
@@ -16,6 +16,7 @@ import { commitNetwork } from './network';
 import { buildSpots, publishParks, sampleSpots } from './parking';
 import { accessOf } from './places';
 import { scoreLost, scorePricedOut, scoreTrip } from './score';
+import { settleMonth } from './settle';
 import type { City } from './state';
 import { emit, has } from './state';
 import { pointOf } from './places';
@@ -28,7 +29,6 @@ const WATCH_EVERY = 1;
 const HONKS_PER_STEP = 2;
 const RED = new Set(['D', 'E', 'F']);
 const CALM = new Set(['A', 'B']);
-const PIPE_WORKS = 1;
 /** Seconds a household waits for its car before trying to set off again. */
 const BUSY_WAIT = 2;
 /** The parking view is rebuilt at most this often (seconds). */
@@ -49,13 +49,15 @@ function firstMorning<T>(c: City, plan: () => T): T {
 export function startDay(c: City): void {
   c.clock = -PREWARM;
   c.carry = 0;
+  c.opening = { bars: c.bars, approval: c.approval };
   c.day = emptyDay();
   buildSpots(c);
   c.fleet = buildFleet(c);
   parkAllAtHome(c);
   c.traffic.startDay();
   const pipe = pipeRoad(c);
-  if (pipe !== null) commitNetwork(c, setRoad(c.net, pipe, { works: PIPE_WORKS }));
+  // A burst pipe digs for the rest of the season: it is done at the season's last payday.
+  if (pipe !== null) commitNetwork(c, setRoad(c.net, pipe, { works: MONTHS_PER_SEASON - c.month }));
   syncServices(c);
   const today = todayPlan(c);
   c.weather = { speed: today.speed, crashes: 0 };
@@ -148,7 +150,7 @@ function nightAndWeekend(c: City): void {
   c.day.plan = [...c.day.plan.slice(0, c.day.next), ...[...c.day.plan.slice(c.day.next), ...weekend].sort((a, b) => a.leave - b.leave || a.id - b.id)];
 }
 
-/** One fixed step of the season. Returns true when the weekend's night falls. */
+/** One fixed step of the season, with its mid-day paydays. Returns true when the weekend's night falls. */
 export function stepDay(c: City): boolean {
   c.clock += STEP;
   nightAndWeekend(c);
@@ -167,6 +169,8 @@ export function stepDay(c: City): boolean {
   for (const at of c.traffic.drainHonks().slice(0, HONKS_PER_STEP)) emit(c, { t: 'honk', at });
   if (every(c, WATCH_EVERY)) { sendStrandedHome(c); sampleSpots(c); publishParks(c); watch(c); if (tickRules(c)) applyConditions(c); }
   if (c.day.parkingDirty && (c.day.parkingNow || every(c, PARKING_EVERY))) { c.day.parkingDirty = false; c.day.parkingNow = false; c.parking = parkingView(c); }
+  // The months that end inside the day; the last one ends with it.
+  for (let m = 0; m < MONTHS_PER_SEASON - 1; m++) if (crossed(c, PAYDAYS[m]!)) settleMonth(c, m);
   return c.clock >= SEASON_END - STEP / 2;
 }
 

@@ -51,7 +51,7 @@ export interface Road {
   readonly kerb: boolean; // paid kerb bays
   readonly toll: boolean;
   readonly truckBan: boolean;
-  /** 0 = open. Seasons of road works left; capacity is halved while > 0. */
+  /** 0 = open. Paydays of road works left (months; the month under way counts once started); the road is closed to cars while > 0 (open by day with nightWorks). */
   readonly works: number;
   readonly nightWorks: boolean;
   /** Roads that exist at the start and can't be removed (map entries). */
@@ -194,7 +194,7 @@ export interface TransitLine {
   readonly vehicles: number;
   readonly riders: number; // last season
   readonly crowding: number; // 0..1+
-  readonly works: number;
+  readonly works: number; // paydays of works left
   /** Seven Hills: a minibus nobody asked for. Private ones stop anywhere; licensed ones pay and behave. Not ours to change or remove (see the 'minibus' command). */
   readonly mini?: 'private' | 'licensed';
 }
@@ -254,7 +254,8 @@ export interface Commission {
   readonly upfront: number; readonly reward: number;
   readonly goal: string; // shown: 'Mean wait at Pearl Roundabout under 20 s'
   readonly progress: number; // 0..1 at the last review
-  readonly endsYear: number; readonly endsSeason: number;
+  /** Checked at the review that closes this month (0 = March) of this year. */
+  readonly endsYear: number; readonly endsMonth: number;
   readonly state: 'offered' | 'taken' | 'done' | 'failed';
 }
 
@@ -301,13 +302,13 @@ export type Command =
   | { readonly t: 'speedToll'; readonly road: Id; readonly on: boolean } // Twin Isles: a gate that keeps its road at a speed
   | { readonly t: 'tollLimit'; readonly max: number } // Twin Isles, review: the dearest a speed toll may get
   | { readonly t: 'minibus'; readonly line: Id; readonly deal: 'license' | 'buyOut' } // Seven Hills
-  | { readonly t: 'repair'; readonly road: Id } // Cross Rivers: one season of works
-  | { readonly t: 'replace'; readonly road: Id } // Cross Rivers: two seasons, as new; bridges are matched
+  | { readonly t: 'repair'; readonly road: Id } // Cross Rivers: three months of works
+  | { readonly t: 'replace'; readonly road: Id } // Cross Rivers: six months, as new; bridges are matched
   | { readonly t: 'boulevard'; readonly road: Id } // Cross Rivers: this piece of freeway becomes a boulevard with a park
   | { readonly t: 'beach'; readonly id: string; readonly advice: 'sell' | 'public' | 'out' } // yearStart: the Director's word on a beach
   | { readonly t: 'next' }; // close the current card: start the year / next season / next year
 
-/** A flyover being built: seasons left. `line` is where it will run. */
+/** A flyover being built: paydays left. `line` is where it will run. */
 export interface Project {
   readonly id: Id;
   readonly node: Id; readonly fromRoad: Id; readonly toRoad: Id; readonly level: 1 | -1;
@@ -323,8 +324,12 @@ export interface Quote {
   readonly cost: number;
   /** The part of `cost` that buys land. */
   readonly land: number;
-  /** Seasons of works. */
+  /** Months of works, whole ones: the rest of a month under way comes on top. */
   readonly works: number;
+  /** With works: the month (0 = March) it is open again, at the payday before it. */
+  readonly opens?: number;
+  /** The works dig up a road: true closes it to cars, false works by night and leaves it open. Unset: no road dug. */
+  readonly closes?: boolean;
   /** For the ghost drawing. */
   readonly line?: readonly Pt[];
   readonly level?: Level;
@@ -383,6 +388,8 @@ export interface CityView {
   readonly def: CityDef;
   readonly year: number; // 1..10
   readonly season: 0 | 1 | 2 | 3;
+  /** The month of the year, 0 = March: the season's first at its year start, its last at a review. */
+  readonly month: number;
   readonly phase: Phase;
   readonly clock: number; // seconds into the drawn day, 0..dayLength
   /** A season is a workday and then a weekend, both in phase 'day'. The review comes after the weekend. */
@@ -410,8 +417,10 @@ export interface CityView {
   /** Allowed steps at this review. */
   readonly priceLimits: Readonly<Record<keyof Prices, { readonly min: number; readonly max: number; readonly step: number; readonly open: boolean }>>;
   readonly policies: Policies;
-  readonly ledger: Ledger; // this season
-  readonly lastLedger: Ledger; // last season
+  readonly ledger: Ledger; // this month
+  readonly lastLedger: Ledger; // last month
+  /** The last three months' books, oldest first: at a review, the season's. */
+  readonly books: readonly Ledger[];
   readonly complaints: readonly Complaint[];
   readonly tools: readonly ToolId[]; // unlocked
   readonly newTools: readonly ToolId[]; // this year's
@@ -420,7 +429,7 @@ export interface CityView {
   readonly commissions: readonly Commission[];
   readonly goal: YearGoal;
   readonly population: number;
-  readonly forecast: { readonly nextSeason: number }; // expected balance
+  readonly forecast: { readonly nextMonth: number }; // expected balance
   /** What is open besides `tools`: junction controls, car park kinds, policies. */
   readonly controls: readonly Control[];
   readonly parkKinds: readonly CarParkKind[];

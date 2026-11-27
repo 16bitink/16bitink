@@ -2,7 +2,7 @@ import { signalPhases } from '../../sim/network';
 import type { Network } from '../../sim/trafficTypes';
 import type { Control, Junction, Movement } from '../../sim/types';
 import { esc } from '../dom';
-import { num, pct } from '../format';
+import { monthsText, num, pct } from '../format';
 import { advised, CONTROL_ICONS, CONTROL_NAMES, CONTROL_ORDER, CONTROL_WORDS, EFFECT_WORDS, effectOf, inflow, type Inflow } from './controls';
 import { kv, quoted, rebalance, type PanelCtx } from './shared';
 
@@ -23,7 +23,7 @@ function choice(c: PanelCtx, j: Junction, id: Control, f: Inflow, pick: boolean)
   const q = quoted(c.city, { t: 'control', node: j.id, control: id });
   const cur = j.control === id;
   const eff = effectOf(j.control, id, f);
-  const works = q.works > 0 ? `<em class="works">${q.works} ${q.works === 1 ? 'season' : 'seasons'} of works</em>` : '';
+  const works = q.works > 0 ? `<em class="works">${monthsText(q.works)} of works</em>` : '';
   const right = cur ? '<em class="now">Here now</em>' : q.cost > 0 ? `<span class="coin">${num(q.cost)}</span>` : '<em>free</em>';
   const told = cur || f.cars < FEW ? '' : `<span class="eff ${eff}">${q.ok ? EFFECT_WORDS[eff] : esc(q.why ?? 'Not yet')}</span>`;
   return `<button class="btn choice${cur ? ' on' : ''}${pick ? ' pick' : ''}" data-act="control" data-v="${id}" ${cur || !q.ok ? 'disabled' : ''}>

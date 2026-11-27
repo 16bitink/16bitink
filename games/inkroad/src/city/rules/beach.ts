@@ -1,8 +1,9 @@
 import { APPROVAL_GOOD } from '../../sim/constants';
 import type { BeachCase, BeachDef, BeachView, CityView, Lot } from '../../sim/types';
 import { no, priced, type Handler } from '../commands/shared';
-import { builtArea, cellsToBlock, centreOf, clamp, type Block } from '../geometry';
-import { earn, total } from '../money';
+import { builtArea, cellsToBlock, centreOf, type Block } from '../geometry';
+import { bump } from '../approval';
+import { earn, lastMonths, total } from '../money';
 import { blockAccess } from '../net';
 import { refreshAccess } from '../places';
 import { shownYear } from '../standing';
@@ -53,7 +54,7 @@ export const reachOf = (l: Pick<Lot, 'kind' | 'district'>): number | undefined =
 interface Lean { readonly lean: 'sell' | 'public'; readonly why: string }
 
 function seasonIncome(c: City): number {
-  const { parking, fines, tolls, fares, zone, budget } = c.lastLedger.income;
+  const { parking, fines, tolls, fares, zone, budget } = lastMonths(c).income;
   return total({ parking, fines, tolls, fares, zone, budget });
 }
 
@@ -138,7 +139,7 @@ function open(c: City, b: BeachDef): void {
   c.lots = [...c.lots, { ...made, access: blockAccess(c.net, made, BEACH.reach) }];
   // A surface car park that was here already is beach parking now.
   c.parks = c.parks.map((p) => (!p.beach && beachServed(c, p.kind, p) ? { ...p, beach: true } : p));
-  c.approval = clamp(c.approval + BEACH.ribbon, 0, 100);
+  bump(c, BEACH.ribbon);
   emit(c, { t: 'toast', who: 'dewy', text: `${b.name} is everyone's. Everyone will come by car, I can already hear them.` });
 }
 

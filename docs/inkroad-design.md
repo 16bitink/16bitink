@@ -76,18 +76,20 @@ Three research agents, plus spot checks. Agents read news and search summaries m
 3. Choose: signals (cheap, fair), a price on the car park drawing them in, a bus route, or a **flyover for that one turn**.
 4. Drag from the arrow's tail to its head. The game lays the ramps and pillars and shows the price and the months of works.
 5. Works close a lane and anger rises. The flyover opens and the arrow goes green.
-6. Two years later that district has apartments instead of villas, and the next junction down is red.
+6. Every month ends on a payday (about once a minute): the bills, the Council's budget and what drivers paid land in the books, approval moves, and works count down.
+7. Two years later that district has apartments instead of villas, and the next junction down is red.
 
 **Building for one movement is the signature mechanic.** It is how real projects are described ("a bridge for the left turn from A to B"), it makes the player read traffic instead of adding lanes, and it's one drag on a phone. No freehand ramp drawing, no lane editor.
 
 ## Time
 
-- **A season is one drawn day of 90 seconds:** dawn, morning peak, midday, evening peak, night. Four seasons make a year of 6 minutes at 1×. Speeds: pause, 1×, 2×, 4×. You can build while paused.
+- **A season is one drawn day of about 3 minutes:** a workday of 120 s (dawn, morning peak, midday, evening peak, night) and a weekend day of 62 s. Four seasons make a year of about 12 minutes at 1×. Speeds: pause, 1×, 2×, 4×. You can build while paused.
+- **A year has 12 months, three a season, each ending on a payday** (the owner, November 27: four a year was too few). The Council's year starts in spring: March to May, June to August, September to November, December to February. Paydays come at quiet moments of the drawn day: after the morning peak (about 2 pm, 60 s), at the workday's midnight (120 s) and at the weekend's night (182 s, the review). About every 60 s at 1×, 15 s at 4×. Each pays a month's bills and a third of the budget, books what drivers paid since the last one, moves approval a third of the day's step, and counts works down a month. Works are quoted in whole months; the month under way when they start does not count. The HUD shows "Year 2, May" and "+7 next month". Weather, routines, the year's events, the art and the review stay seasonal.
 - **Night is the review.** Money, approval, the top three complaints. Prices can change only here, in fixed steps.
 - **Year end:** the Council's review, next year's Master Plan, the plate auction, and **a choice of 1 of 3 technologies**. It is also the save point.
 - **Ten years make a city.** Five cities × ten years = **50 years, the 50 levels**. City 1 (years 1–10) is free.
 
-The 90-second day is the first thing the prototype must prove: a jam has to form, be read and clear within it.
+The drawn day is the first thing the prototype must prove: a jam has to form, be read and clear within it.
 
 ## The city grows
 

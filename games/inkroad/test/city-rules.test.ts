@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { approvalOf, settleApproval, streetsScore } from '../src/city/approval';
 import { emptyDay, emptyStats, lotTally, add, type Leg, type Tour } from '../src/city/day';
 import { growLots, moodOf, updateMoods, driftOwnership } from '../src/city/growth';
-import { bank, operating } from '../src/city/money';
+import { bank, operating, sumLedgers } from '../src/city/money';
 import { buildSpots, chooseSpot, priceAt, searchMinutes } from '../src/city/parking';
 import { measure, progressOf } from '../src/city/goals';
 import { pickMode, type Choice } from '../src/city/modes';
@@ -41,14 +41,17 @@ describe('money', () => {
     expect(v.ledger.costs.building + v.ledger.costs.land).toBe(q.cost);
   });
 
-  it('pays the season bills and the Council budget at night', () => {
+  it('pays the bills and the Council budget month by month, a season of them in a day', () => {
     const v = newCity();
     ok(v, { t: 'next' });
     const before = v.money;
     runDay(v);
     const grant = v.def.years[0]!.grant;
-    expect(v.lastLedger.income.budget).toBe(grant);
-    expect(v.money).toBe(before + grant + operating(v.lastLedger));
+    const season = sumLedgers(v.books);
+    expect(v.books).toHaveLength(3);
+    expect(season.income.budget).toBe(grant);
+    expect(v.books.every((l) => Math.abs(l.income.budget - grant / 3) <= 0.5)).toBe(true);
+    expect(v.money).toBe(before + grant + operating(season));
   });
 
   it('debt: the Council lends once, with a letter; the second time is the end', () => {
@@ -76,6 +79,7 @@ describe('approval', () => {
   it('moves towards the day, not all at once', () => {
     const c = inner(newCity());
     c.approval = 50;
+    c.opening = { bars: c.bars, approval: 50 };
     settleApproval(c, { ...EMPTY_REPORT, trips: 100, parking: 100, cost: 100, streets: 100 });
     expect(c.approval).toBeGreaterThan(50);
     expect(c.approval).toBeLessThan(90);
@@ -89,6 +93,7 @@ describe('approval', () => {
       for (let i = 0; i < 4 && c.phase === 'day'; i++) {
         c.bars = { trips: 0, parking: 0, cost: 0, streets: 0 };
         c.approval = 5;
+        c.opening = { bars: c.bars, approval: c.approval };
         c.day.stats = emptyStats();
         settleSeason(c);
         if (v.phase === 'review') v.apply({ t: 'next' });

@@ -2,7 +2,7 @@
 import { CELL } from './constants';
 import { dist, lineLength, project, resample, sameCell } from './geom';
 import { armHeading, groundArms, ringOuter } from './netCore';
-import { halfWidth } from './roadGeom';
+import { closedForWorks, halfWidth } from './roadGeom';
 import type { Cell, CellRect, Id, Junction, Pt, Road, RoadType } from './types';
 import type { Network } from './trafficTypes';
 
@@ -26,13 +26,13 @@ function rectDistance(r: CellRect, p: Pt): number {
 /** In front of a block: south of its south edge, within its frontage (every gate is in the south wall). */
 const inFront = (r: CellRect, p: Pt): boolean => p.y > (r.gy + r.h) * CELL && p.x >= r.gx * CELL && p.x <= (r.gx + r.w) * CELL;
 
-/** A block's driveway: the best road point within `reach`; with `front`, only on the road along its south edge. */
-export function nearestAccess(net: Network, rect: CellRect, reach = REACH, front = false): { road: Id; s: number } | null {
+/** A block's driveway: the best road point within `reach`; with `front`, only on the road along its south edge; with `open`, not on a road under works. */
+export function nearestAccess(net: Network, rect: CellRect, reach = REACH, front = false, open = false): { road: Id; s: number } | null {
   const centre = { x: (rect.gx + rect.w / 2) * CELL, y: (rect.gy + rect.h / 2) * CELL };
   let best: { road: Id; s: number } | null = null;
   let bestScore = Infinity;
   for (const r of net.roads) {
-    if (r.flyover || r.bridge || r.type === 'highway' || r.level !== 0) continue;
+    if (r.flyover || r.bridge || r.type === 'highway' || r.level !== 0 || (open && closedForWorks(r))) continue;
     const len = lineLength(r.line);
     const clear = Math.min(len * 0.45, JUNCTION_CLEAR);
     const pts = resample(r.line, SAMPLE);

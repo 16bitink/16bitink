@@ -74,12 +74,12 @@ export const CATCH_RATE = 0.4; // per inspector
 // ---------------------------------------------------------------- transit
 /** How much of a lap's delay riders feel: the turning round at the ends is not theirs. */
 export const LAP_FELT = 0.55;
-export const TRANSIT: Readonly<Record<TransitMode, { cap: number; speed: number; dwell: number; /** Buses each drawn one stands for. */ stands: number; perStop: number; perCell: number; vehicle: number; run: number; works: number; match: number; minStops: number }>> = {
+export const TRANSIT: Readonly<Record<TransitMode, { cap: number; speed: number; dwell: number; /** Buses each drawn one stands for. */ stands: number; perStop: number; perCell: number; vehicle: number; run: number; /** Months to build. */ works: number; match: number; minStops: number }>> = {
   bus: { cap: 4.5, speed: 50, dwell: 0.8, stands: 3, perStop: 4, perCell: 0, vehicle: 14, run: 4, works: 0, match: 0, minStops: 2 },
   express: { cap: 4.8, speed: 58, dwell: 0.8, stands: 3, perStop: 8, perCell: 0, vehicle: 18, run: 5, works: 0, match: 0, minStops: 2 },
-  tram: { cap: 6, speed: 56, dwell: 1, stands: 3, perStop: 20, perCell: 11, vehicle: 30, run: 8, works: 2, match: 0.6, minStops: 2 },
-  metro: { cap: 15, speed: 105, dwell: 2, stands: 1, perStop: 45, perCell: 9, vehicle: 30, run: 12, works: 3, match: 0.6, minStops: 2 },
-  boat: { cap: 5, speed: 60, dwell: 2, stands: 2, perStop: 18, perCell: 2, vehicle: 30, run: 7, works: 1, match: 0, minStops: 2 },
+  tram: { cap: 6, speed: 56, dwell: 1, stands: 3, perStop: 20, perCell: 11, vehicle: 30, run: 8, works: 6, match: 0.6, minStops: 2 },
+  metro: { cap: 15, speed: 105, dwell: 2, stands: 1, perStop: 45, perCell: 9, vehicle: 30, run: 12, works: 9, match: 0.6, minStops: 2 },
+  boat: { cap: 5, speed: 60, dwell: 2, stands: 2, perStop: 18, perCell: 2, vehicle: 30, run: 7, works: 3, match: 0, minStops: 2 },
 };
 export const MAX_VEHICLES = 6;
 export const MAX_STOPS = 12;
@@ -90,15 +90,18 @@ export const BANKED = { parking: 0.32, fines: 0.5, tolls: 0.3, fares: 0.35, zone
 export const STAFF_PER_INSPECTOR = 7;
 export const STAFF_PER_RANK = 4;
 export const INTEREST = 0.05;
-/** Unspent money over some seasons' income goes back to the Council, most of it. */
-export const PURSE = { seasons: 3, least: 160, takes: 0.6, worth: 10, warnSeason: 1 } as const;
+/** Unspent money over some months' income goes back to the Council, most of it. Pim warns once half the year's paydays are behind. */
+export const PURSE = { months: 9, least: 160, takes: 0.6, worth: 10, warnAfter: 6 } as const;
 export const DEBT_LIMIT = -150;
 export const BAILOUT_TO = 60;
 export const FLOAT_KEEP = 0.25;
-export const FLOAT_SEASONS = 5;
+/** A float buys this many months of the stream's takings. */
+export const FLOAT_MONTHS = 15;
 export const AUCTION = { base: 25, perYear: 12, perApproval: 0.5 } as const;
 export const CONTROL_LAND = 0;
-export const FLYOVER = { base: 80, perCell: 9, under: 1.45, works: 2 } as const;
+export const FLYOVER = { base: 80, perCell: 9, under: 1.45, works: 6 } as const;
+/** Months of works: widening a road or mending it takes a season, replacing it two. */
+export const WORKS = { upgrade: 3, repair: 3, replace: 6 } as const;
 export const BRIDGE_PER_CELL = 22;
 /** The share of a new bridge the Council pays, where it does (matching grants). */
 export const BRIDGE_MATCH: Readonly<Record<string, number>> = { saffron: 0.6 };

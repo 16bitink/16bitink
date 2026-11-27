@@ -1,3 +1,4 @@
+import { closedForWorks } from '../../sim/roadGeom';
 import { lineLength, offsetLine, pointAt, subLine } from '../geom';
 import { linePath } from '../pen';
 import { INK, KERB_BLUE, PAINT } from '../style';
@@ -76,7 +77,7 @@ function tape(g: CanvasRenderingContext2D, line: readonly { readonly x: number; 
 
 /** Where a road's cones stand: along both edges of the dug half. */
 export function coneSpots(r: RoadShape): { readonly x: number; readonly y: number }[] {
-  if (r.road.works <= 0) return [];
+  if (!closedForWorks(r.road)) return [];
   const len = lineLength(r.inner);
   if (len < 20) return [];
   const dug = subLine(r.inner, len * 0.14, len * 0.86);

@@ -48,15 +48,15 @@ export class TopBar {
   update(city: CityView, speed: Speed): void {
     const b = this.bind;
     b.text('money', num(city.money));
-    const f = city.forecast.nextSeason;
-    b.text('forecast', `${signed(f)} next season`);
+    const f = city.forecast.nextMonth;
+    b.text('forecast', `${signed(f)} next month`);
     b.cls('forecast', 'up', f >= 0);
     b.cls('forecast', 'down', f < 0);
     b.text('appr', String(Math.round(city.approval)));
     b.attr('arc', 'stroke-dasharray', `${Math.round((Math.min(100, Math.max(0, city.approval)) / 100) * ARC_LEN)} ${ARC_LEN}`);
     b.attr('arc', 'stroke', city.approval < LOW_APPROVAL ? '#a8691f' : '#2c7a80');
     this.bars(city);
-    b.text('date', dateLine(shownYear(city), city.season));
+    b.text('date', dateLine(shownYear(city), city.month));
     b.text('period', `${PERIOD_NAMES[city.period]} ${clockText(city.hour)}`);
     b.attr('hand', 'transform', `rotate(${Math.round((city.hour / 24) * 360)} 22 22)`);
     b.attr('face', 'fill', PERIOD_FILL[city.period]);

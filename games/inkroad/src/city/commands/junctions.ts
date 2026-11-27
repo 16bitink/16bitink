@@ -6,7 +6,7 @@ import { commitNetwork } from '../network';
 import type { City } from '../state';
 import { has, junctionById, openControls, openTools } from '../state';
 import { FLYOVER, SMART_SHARE } from '../tune';
-import { homesBeside, landFor, middle, needTool, nightRate, no, noAt, priced, type Handler } from './shared';
+import { homesBeside, landFor, middle, needTool, nightRate, no, noAt, precast, priced, worksLeft, type Handler } from './shared';
 
 const MIN_GREEN = 0.1;
 const names: Readonly<Record<Control, string>> = { yield: 'a plain crossing', roundabout: 'a roundabout', signal: 'signals', smart: 'smart signals' };
@@ -65,12 +65,12 @@ export const flyover: Handler<'flyover'> = {
     const building = (FLYOVER.base + plan.length * FLYOVER.perCell) * (cmd.level === -1 ? FLYOVER.under : 1) * (has(c, 'precast') ? 0.85 : 1) * nightRate(c);
     const noisy = cmd.level === 1 ? homesBeside(c, plan.line, 2) : 0;
     const warn = noisy > 0 ? `A deck beside ${noisy} block${noisy > 1 ? 's' : ''} of homes: noise` : undefined;
-    const works = has(c, 'precast') ? 1 : FLYOVER.works;
+    const works = has(c, 'precast') ? precast(FLYOVER.works) : FLYOVER.works;
     return priced(c, building, { land: landFor(c, plan.cells) * 0.5, works, line: plan.line, level: cmd.level, ...(warn ? { warn } : {}) });
   },
   run(c, cmd, q) {
     const line = q.line ?? [];
-    c.projects = [...c.projects, { id: c.nextId, node: cmd.node, fromRoad: cmd.fromRoad, toRoad: cmd.toRoad, level: cmd.level, line, left: q.works }];
+    c.projects = [...c.projects, { id: c.nextId, node: cmd.node, fromRoad: cmd.fromRoad, toRoad: cmd.toRoad, level: cmd.level, line, left: worksLeft(c, q.works) }];
     c.nextId += 1;
     return middle(line);
   },

@@ -1,7 +1,8 @@
 import { CELL } from '../sim/constants';
 import type { Access } from '../sim/trafficTypes';
-import type { Id, Lot, Pt } from '../sim/types';
-import { blockAccess } from './net';
+import type { Network } from '../sim/trafficTypes';
+import type { CarPark, Id, Lot, Pt } from '../sim/types';
+import { accessOpen, blockAccess } from './net';
 import { areaOf, centreOf, lotRect, pointAlong } from './geometry';
 import type { Place } from './day';
 import { reachOf } from './rules/beach';
@@ -11,7 +12,23 @@ import { junctionById, lotById, roadById } from './state';
 /** Where a place's cars enter and leave the road, or null when it is cut off. */
 export function accessOf(c: City, p: Place): Access | null {
   if ('gate' in p) return { gate: p.gate };
-  return lotById(c, p.lot)?.access ?? null;
+  const l = lotById(c, p.lot);
+  return l ? tripAccess(c, l) : null;
+}
+
+const tripCache = new WeakMap<Network, Map<string, Access | null>>();
+/**
+ * Where a block's cars come and go now: its driveway, or while that road is dug up, an open road in reach on any
+ * side (the builders' way round). With none it keeps its driveway and is cut off by car. Its gate and spaces don't move.
+ */
+export function tripAccess(c: City, b: Lot | CarPark): Access | null {
+  const door = b.access;
+  if (!door || accessOpen(c.net, door)) return door;
+  const cache = tripCache.get(c.net) ?? new Map<string, Access | null>();
+  tripCache.set(c.net, cache);
+  const key = `${'spaces' in b ? 'p' : 'l'}${b.id}`;
+  if (!cache.has(key)) cache.set(key, blockAccess(c.net, b, 'spaces' in b ? undefined : reachOf(b), false, true) ?? door);
+  return cache.get(key)!;
 }
 
 export function pointOf(c: City, p: Place): Pt {

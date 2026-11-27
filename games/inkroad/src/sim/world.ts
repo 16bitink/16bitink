@@ -1,6 +1,6 @@
 /** The network as tracks: what the cars actually drive on. Rebuilt on every network change. */
 import { angleDiff, lineLength, offsetLine, resample, reverseLine, sliceLine } from './geom';
-import { deckZ, isForward, laneOffset } from './roadGeom';
+import { closedForWorks, deckZ, isForward, laneOffset } from './roadGeom';
 import { LANE_T, Track } from './track';
 import { MIN_LANE, SAMPLE } from './tune';
 import { buildNode } from './nodeBuild';
@@ -46,6 +46,8 @@ export interface LinkRt {
   /** Smoothed seconds to drive it. */
   time: number;
   readonly headway: number;
+  /** Under works by day: routing never sends a car onto it. */
+  readonly closed: boolean;
   /** The real junction this link queues for (through ramp nodes). */
   statNode: Id;
 }
@@ -139,10 +141,9 @@ function buildLinks(net: Network, w: World): void {
     const i = w.links.length;
     for (const t of lanes) { t.link = i; addTrack(w, t); }
     const carLanes = road.busLane && link.lanes > 1 ? link.lanes - 1 : link.lanes;
-    const works = road.works > 0 && !road.nightWorks;
     const rt: LinkRt = {
       i, link, road, lanes, carLanes, node, fromNode, opts: [], preds: [], trim0: t0, trim1: t1, freeTime: 0, time: 0,
-      headway: works ? 1.9 : road.kerb ? 1.12 : 1, statNode: link.to,
+      headway: road.kerb ? 1.12 : 1, closed: closedForWorks(road), statNode: link.to,
     };
     w.links.push(rt);
     w.linkById.set(link.id, rt);
@@ -192,7 +193,10 @@ export function buildWorld(net: Network): World {
     l.statNode = findStatNode(l);
     l.freeTime = l.lanes[0]!.len / l.link.freeSpeed + CONTROL_DELAY[l.node.kind];
     l.time = l.freeTime;
-    for (const o of l.opts) { o.to.preds.push(o); w.optByKey.set(o.key, o); }
+    for (const o of l.opts) w.optByKey.set(o.key, o);
+    // No turn into a road under works: only cars already on it drive on, and off it.
+    if (!l.closed) l.opts = l.opts.filter((o) => !o.to.closed);
+    for (const o of l.opts) o.to.preds.push(o);
   }
   return w;
 }

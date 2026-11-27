@@ -1,6 +1,7 @@
 import { greensOf, spriteKeys, type Greens, type SpriteName } from '../../art/manifest';
 import { lotRect } from '../../city/geometry';
 import { CELL } from '../../sim/constants';
+import { closedForWorks } from '../../sim/roadGeom';
 import type { CityView, Lot, Pt } from '../../sim/types';
 import { boxesMeet, boxOf, dist, lineLength, nearestOnLine, pointAt, type Box } from '../geom';
 import { coneSpots } from '../ground/roadExtras';
@@ -116,7 +117,7 @@ export class Scenery {
   private alongRoad(r: RoadShape, greens: Greens): void {
     if (r.road.flyover || r.waits) return;
     for (const c of coneSpots(r)) this.prop('prop/cone', c, 1.1);
-    if (r.road.works > 0) this.worksKit(r);
+    if (closedForWorks(r.road)) this.worksKit(r);
     if (r.road.toll) this.gantry(r);
     if (r.median >= 5 && !r.road.bridge) this.row(r, MEDIAN_STEP, 0, greens.tall[0]!, 0.55);
     if (r.road.type !== 'street' && !r.road.bridge) this.lamps(r);

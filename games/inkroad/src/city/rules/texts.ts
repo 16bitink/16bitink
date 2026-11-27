@@ -68,12 +68,12 @@ export const RULE_EVENTS: Readonly<Record<string, RuleEvent>> = {
   parade: { text: 'Harvest parade. The largest pumpkin takes both lanes.', crowd: { tours: 16, perYear: 2, from: 40, to: 80 } },
 };
 
-interface RuleCommission { readonly id: string; readonly title: string; readonly text: string; readonly goal: string; readonly kind: string; readonly target: number; readonly reward: number; readonly seasons: number }
+interface RuleCommission { readonly id: string; readonly title: string; readonly text: string; readonly goal: string; readonly kind: string; readonly target: number; readonly reward: number; readonly months: number }
 export const RULE_COMMISSIONS: readonly RuleCommission[] = [
-  { id: 'isles-doors', title: 'A Space for Every Umbrella', text: 'The market has a queue of cars with nobody in them. They are looking for space too.', goal: '75 of 100 find a space at the market', kind: 'found@market', target: 75, reward: 160, seasons: 5 },
-  { id: 'isles-ride', title: 'Wet Feet Club', text: 'A councillor sold her car by mistake and needs a bus by Thursday.', goal: '12 of 100 trips by bus or boat', kind: 'share', target: 12, reward: 260, seasons: 6 },
-  { id: 'isles-flow', title: 'Keep It Moving', text: 'The bridge has a nice view. Drivers have seen enough of it.', goal: 'Watched roads keep their speed 80 of 100 rush minutes', kind: 'speedKept', target: 80, reward: 320, seasons: 5 },
-  { id: 'isles-fewer', title: 'Fewer Wheels', text: 'The Council counted the cars, then counted the land, then sat down.', goal: 'At most 52 of 100 homes\' trips own a car', kind: 'cars', target: 52, reward: 380, seasons: 6 },
-  { id: 'hills-peace', title: 'A Quiet Corridor', text: 'Please turn the minibuses into something with a timetable.', goal: 'At most 1 private minibus', kind: 'minis', target: 1, reward: 260, seasons: 6 },
-  { id: 'rivers-mend', title: 'Mend It First', text: 'The mayor\'s hat fell into a hole. The hole is winning.', goal: 'Roads at 65 of 100 on average', kind: 'condition', target: 65, reward: 280, seasons: 6 },
+  { id: 'isles-doors', title: 'A Space for Every Umbrella', text: 'The market has a queue of cars with nobody in them. They are looking for space too.', goal: '75 of 100 find a space at the market', kind: 'found@market', target: 75, reward: 160, months: 15 },
+  { id: 'isles-ride', title: 'Wet Feet Club', text: 'A councillor sold her car by mistake and needs a bus by Thursday.', goal: '12 of 100 trips by bus or boat', kind: 'share', target: 12, reward: 260, months: 18 },
+  { id: 'isles-flow', title: 'Keep It Moving', text: 'The bridge has a nice view. Drivers have seen enough of it.', goal: 'Watched roads keep their speed 80 of 100 rush minutes', kind: 'speedKept', target: 80, reward: 320, months: 15 },
+  { id: 'isles-fewer', title: 'Fewer Wheels', text: 'The Council counted the cars, then counted the land, then sat down.', goal: 'At most 52 of 100 homes\' trips own a car', kind: 'cars', target: 52, reward: 380, months: 18 },
+  { id: 'hills-peace', title: 'A Quiet Corridor', text: 'Please turn the minibuses into something with a timetable.', goal: 'At most 1 private minibus', kind: 'minis', target: 1, reward: 260, months: 18 },
+  { id: 'rivers-mend', title: 'Mend It First', text: 'The mayor\'s hat fell into a hole. The hole is winning.', goal: 'Roads at 65 of 100 on average', kind: 'condition', target: 65, reward: 280, months: 18 },
 ];

@@ -1,7 +1,7 @@
 /** Buses, trams and school buses: vehicles that loop through stops, pausing at each. */
 import { MINIBUS_TINT } from './constants';
 import { plan } from './motion';
-import { exists, firstLink, place, setDest, spaceAt } from './place';
+import { firstLink, openAt, place, setDest, spaceAt } from './place';
 import { LANE_T } from './track';
 import { kindIndex } from './tune';
 import type { Sim } from './sim';
@@ -80,7 +80,8 @@ export class Services {
     const sim = this.sim(), c = sim.cars;
     v.readyAt = sim.time + RETRY;
     const from = s.stops[v.stop]!, to = s.stops[(v.stop + 1) % s.stops.length]!;
-    if (!exists(sim, from) || !exists(sim, to)) { v.stop = (v.stop + 1) % s.stops.length; return; }
+    // A stop on a road under works is skipped until the road opens again.
+    if (!openAt(sim, from) || !openAt(sim, to)) { v.stop = (v.stop + 1) % s.stops.length; return; }
     const kind = kindIndex(s.kind);
     const l = firstLink(sim, from, to, BUS_VALUE, kind);
     const i = l ? c.take(kind) : -1;
@@ -124,7 +125,7 @@ export class Services {
     }
     for (let hop = 0; hop < s.stops.length; hop++) {
       v.stop = (v.stop + 1) % s.stops.length;
-      if (exists(sim, s.stops[v.stop]!)) break;
+      if (openAt(sim, s.stops[v.stop]!)) break;
     }
     setDest(sim, i, s.stops[v.stop]!);
     const l = sim.world.links[c.link[i]!]!;

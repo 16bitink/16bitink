@@ -1,6 +1,6 @@
 import type { Commission, Ledger, Prices } from '../../sim/types';
 import { esc } from '../dom';
-import { num, pct, signed } from '../format';
+import { monthName, num, pct, shownYear, signed } from '../format';
 import { pic } from '../pics';
 import type { UiEnv } from '../types';
 import { section } from './shell';
@@ -19,11 +19,18 @@ const lines = (rec: Readonly<Record<string, number>>, names: Readonly<Record<str
   Object.entries(names).filter(([k]) => Math.round(rec[k] ?? 0) !== 0)
     .map(([k, n]) => `<span>${n}</span><span class="r coin">${num(sign * (rec[k] ?? 0))}</span>`).join('');
 
-export function ledgerHtml(l: Ledger): string {
+const add = <T extends Readonly<Record<string, number>>>(a: T, b: T): T => Object.fromEntries(Object.entries(a).map(([k, v]) => [k, v + (b[k] ?? 0)])) as T;
+
+/** The season's three months, and what was spent tonight on top. */
+export function seasonBooks(city: { readonly books: readonly Ledger[]; readonly ledger: Ledger }): Ledger {
+  return city.books.reduce((s, l) => ({ income: add(s.income, l.income), costs: add(s.costs, l.costs) }), city.ledger);
+}
+
+export function ledgerHtml(l: Ledger, title = 'The books'): string {
   const inc = Object.values(l.income).reduce((a, b) => a + b, 0);
   const out = Object.values(l.costs).reduce((a, b) => a + b, 0);
   const net = inc - out;
-  return section('The books', `<div class="ledger">${lines(l.income, INCOME, 1)}<span class="t">Coming in</span><span class="t r coin">${num(inc)}</span>
+  return section(title, `<div class="ledger">${lines(l.income, INCOME, 1)}<span class="t">Coming in</span><span class="t r coin">${num(inc)}</span>
     ${lines(l.costs, COSTS, -1)}<span class="t">Going out</span><span class="t r coin">${num(-out)}</span>
     <span class="t">This season</span><span class="t r ${net >= 0 ? 'up' : 'down'}">${signed(net)}</span></div>`);
 }
@@ -82,18 +89,18 @@ export function policiesHtml(env: UiEnv): string {
   return rows ? section('Policies', rows) : '';
 }
 
-function commissionHtml(c: Commission): string {
+function commissionHtml(c: Commission, year: number): string {
   const taken = c.state === 'taken';
   const buttons = c.state === 'offered'
     ? `<div class="row"><button class="btn go sm" data-act="commission" data-v="${esc(c.id)}:1">Take it</button><button class="btn sm" data-act="commission" data-v="${esc(c.id)}:0">Not now</button></div>`
     : `<div class="meter" style="--w:${pct(c.progress)}"><i></i></div>`;
   return `<div class="commission${taken ? ' taken' : ''}"><b>${esc(c.title)}</b><span class="small">${esc(c.text)}</span><span class="small dim">${esc(c.goal)}</span>
-    <span class="small">Upfront <span class="coin">${num(c.upfront)}</span>, reward <span class="coin">${num(c.reward)}</span></span>${buttons}</div>`;
+    <span class="small">Upfront <span class="coin">${num(c.upfront)}</span>, reward <span class="coin">${num(c.reward)}</span>, by the end of ${monthName(c.endsMonth)}, year ${year}</span>${buttons}</div>`;
 }
 
 export function commissionsHtml(env: UiEnv): string {
   const open = env.city.commissions.filter((c) => c.state === 'offered' || c.state === 'taken');
-  return open.length ? section('Council commissions', open.map(commissionHtml).join('')) : '';
+  return open.length ? section('Council commissions', open.map((c) => commissionHtml(c, shownYear(env.city, c.endsYear))).join('')) : '';
 }
 
 export const VOTE_WIN = 50;

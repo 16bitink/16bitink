@@ -1,6 +1,6 @@
 import type { Command, Road, RoadType } from '../../sim/types';
 import { esc } from '../dom';
-import { num, pct } from '../format';
+import { num, opensMonth, pct } from '../format';
 import { kv, meter, priceTag, quoted, toggleRow, type PanelCtx } from './shared';
 import { ageingBlock, freewayBlock, speedTollRow } from './special';
 
@@ -39,7 +39,7 @@ export function roadPanel(c: PanelCtx, id: number): string {
   const st = c.city.roadStats(id);
   const tr = c.city.trace(id);
   const title = r.flyover ? (r.level < 0 ? 'Underpass' : 'Flyover') : `${NAMES[r.type]}${r.bridge ? ' bridge' : ''}`;
-  return `<h2>${title}</h2>${r.works > 0 ? `<p class="warn small">Road works: ${r.works} more ${r.works === 1 ? 'season' : 'seasons'}</p>` : ''}
+  return `<h2>${title}</h2>${r.works > 0 ? `<p class="warn small">${worksLine(r, opensMonth(c.city, r.works))}</p>` : ''}
     ${kv('Cars a minute', num(st.flow))}${kv('Speed', pct(st.speedRatio))}${meter(st.speedRatio, st.speedRatio < BUSY_RATIO)}
     ${ageingBlock(c, r)}${freewayBlock(c, r)}
     ${st.queue > 0 ? kv('Queue', `${num(st.queue)} cars`) : ''}
@@ -61,3 +61,7 @@ export function roadSwitch(r: Road, which: string): Command | null {
     default: return null;
   }
 }
+
+/** Dug by day, the road is closed to cars; by night it stays open. */
+const worksLine = (r: { readonly nightWorks: boolean }, opens: string): string =>
+  `Road works${r.nightWorks ? ' by night' : ''}, done in ${opens}. ${r.nightWorks ? 'Open by day.' : 'Closed to cars.'}`;

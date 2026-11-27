@@ -51,7 +51,8 @@ export function playYear(city: CityView, bot: Bot, attempt: number): YearRow {
   for (;;) {
     playDay(city, bot, attempt, (n) => { peak = Math.max(peak, n); });
     worst = worstJunctions(city);
-    income += Object.values(city.lastLedger.income).reduce((n, v) => n + v, 0);
+    // The review's three months are the season's books.
+    income += city.books.reduce((s, l) => s + Object.values(l.income).reduce((n, v) => n + v, 0), 0);
     approvals.push(city.approval);
     seasons.push(`${city.approval.toFixed(0)}(${Object.values(city.bars).map((b) => b.toFixed(0)).join('/')}) $${city.money}`);
     if (city.phase === 'replaced') break;

@@ -8,8 +8,8 @@ import { blockedBy } from '../net';
 import { commitNetwork } from '../network';
 import type { City } from '../state';
 import { has, roadById } from '../state';
-import { BRIDGE_MATCH, BRIDGE_PER_CELL, BUS_LANE_PER_CELL, KERB_COST, ONE_WAY_COST, REFUND, REMOVE_COST, SQUARE_PER_CELL, TOLL_GATE, TRUCK_BAN_COST, WIDEN } from '../tune';
-import { middle, homesBeside, isGround, landFor, needTool, nightRate, no, noAt, priced, type Handler } from './shared';
+import { BRIDGE_MATCH, BRIDGE_PER_CELL, BUS_LANE_PER_CELL, KERB_COST, ONE_WAY_COST, REFUND, REMOVE_COST, SQUARE_PER_CELL, TOLL_GATE, TRUCK_BAN_COST, WIDEN, WORKS } from '../tune';
+import { middle, homesBeside, isGround, landFor, needTool, nightRate, no, noAt, priced, roadWorks, worksLeft, type Handler } from './shared';
 
 const NOISY_CELLS = 1.6;
 export const cellsOf = (r: Road): number => polyLength(r.line) / CELL;
@@ -64,11 +64,11 @@ export const upgrade: Handler<'upgrade'> = {
     const per = Math.max(2, ROADS[cmd.type].cost - ROADS[r.type].cost * WIDEN.keep);
     const land = widening ? landFor(c, r.cells) * WIDEN.land * (RANK[cmd.type] - RANK[r.type]) : 0;
     const water = r.bridge ? wetCells(c, r) * BRIDGE_PER_CELL * 0.5 * (RANK[cmd.type] - RANK[r.type]) : 0;
-    return priced(c, (cellsOf(r) * per + Math.max(0, water)) * nightRate(c), { land, works: 1, line: r.line, ...optional(noiseWarn(c, cmd.type, r.line)) });
+    return priced(c, (cellsOf(r) * per + Math.max(0, water)) * nightRate(c), { land, ...roadWorks(c, has(c, 'precast') ? 0 : WORKS.upgrade), line: r.line, ...optional(noiseWarn(c, cmd.type, r.line)) });
   },
   run(c, cmd) {
     const r = roadById(c, cmd.road)!;
-    commitNetwork(c, setRoad(c.net, r.id, { type: cmd.type, works: has(c, 'precast') ? 0 : 1, nightWorks: c.policies.nightWorks }));
+    commitNetwork(c, setRoad(c.net, r.id, { type: cmd.type, works: worksLeft(c, has(c, 'precast') ? 0 : WORKS.upgrade), nightWorks: c.policies.nightWorks }));
     return midOf(r);
   },
 };

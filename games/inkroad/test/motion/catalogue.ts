@@ -42,6 +42,7 @@ export const CATALOGUE: readonly Situation[] = [
   { id: 'drive.bus.stop', built: true, expect: 'A bus pulls into its stop and out again with forward S moves; cars behind wait or pass, no overlap' },
   { id: 'drive.gate.inout', built: true, expect: 'Cars enter at a map gate and leave at another without appearing or vanishing away from the gate' },
   { id: 'drive.jam.giveup', built: true, expect: 'A car stuck in a jam gives up and pulls over to the shoulder with a forward S, then drives off when it can' },
+  { id: 'drive.works.closed', built: true, expect: 'A road under works between two junctions takes no cars; through cars go round by the side streets and still arrive' },
   // ---- the city changing under the cars
   { id: 'city.road-removed', built: true, expect: 'A road with parked cars is removed: the cars drive away or are moved with a drawn move, never teleport' },
   { id: 'city.year-start', built: true, expect: 'A new year starts (or a save is loaded): no car jumps, appears or vanishes away from a gate or a drawn move' },

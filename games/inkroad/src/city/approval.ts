@@ -65,9 +65,9 @@ function outrage(c: City): number {
 }
 
 /** The day's parking: everybody's mean, and the talk of the town. */
-function parkingBar(c: City): number {
+function parkingBar(c: City, base: Readonly<Record<Bar, number>>): number {
   const s = c.day.stats;
-  if (s.parking.w <= 0) return c.bars.parking;
+  if (s.parking.w <= 0) return base.parking;
   const all = mean(s.parking, 0);
   const worst = c.lots.filter((l) => l.level > 0 && l.kind !== 'home').flatMap((l) => {
     const t = s.lots.get(l.id)?.parking;
@@ -78,13 +78,17 @@ function parkingBar(c: City): number {
   return stretch(all + (talk - all) * PARKING_TALK.share, PARKING_STRETCH);
 }
 
+/** The bars a day falls back on where it has no numbers yet: the dawn's, while it runs. */
+const baseBars = (c: City): Readonly<Record<Bar, number>> => (c.phase === 'day' ? c.opening.bars : c.bars);
+
 /** The day in numbers. */
 export function reportDay(c: City): DayReport {
   const s = c.day.stats;
+  const base = baseBars(c);
   const found: Record<string, number> = {};
   for (const [k, t] of s.found) found[k] = mean(t, 1);
   return {
-    trips: stretch(mean(s.trips, TRIPS_NONE), TRIPS_STRETCH), parking: parkingBar(c), cost: clamp(mean(s.cost, c.bars.cost) - outrage(c), 0, 100), streets: streetsScore(c),
+    trips: stretch(mean(s.trips, TRIPS_NONE), TRIPS_STRETCH), parking: parkingBar(c, base), cost: clamp(mean(s.cost, base.cost) - outrage(c), 0, 100), streets: streetsScore(c),
     count: s.count, gaveUp: s.gaveUp, stayed: s.stayed, onTime: s.count > 0 ? s.onTime / s.count : 1,
     transit: s.count > 0 ? s.transit / s.count : 0, doubled: s.doubled, fines: s.fines, fined: s.fined,
     meanRatio: mean(s.ratio, 1), meanPay: mean(s.pay, 0), meanSeconds: mean(s.seconds, 0), found, riders: s.riders,
@@ -93,12 +97,28 @@ export function reportDay(c: City): DayReport {
 
 export const BAR_EASE = 0.75;
 
-/** Move the bars to what the day was like, then approval to the bars. */
+/**
+ * A payday: the bars move `share` of the way the whole day would move them from dawn, toward what the day has been
+ * like so far, then approval with them. The season's last payday (share 1) is the old once-a-season step.
+ */
+export function moveApproval(c: City, r: DayReport, share: number): void {
+  const o = c.opening;
+  const ease = (was: number, now: number): number => was + (now - was) * BAR_EASE * share;
+  c.bars = { trips: ease(o.bars.trips, r.trips), parking: ease(o.bars.parking, r.parking), cost: ease(o.bars.cost, r.cost), streets: ease(o.bars.streets, r.streets) };
+  c.approval = o.approval + (approvalOf(c.bars) - o.approval) * APPROVAL_EASE * share;
+}
+
+/** A one-off jump (a ribbon, a dip): it stays through the season's paydays, as it always stayed till the review. */
+export function bump(c: City, points: number): void {
+  const was = c.approval;
+  c.approval = clamp(c.approval + points, 0, 100);
+  c.opening = { ...c.opening, approval: c.opening.approval + c.approval - was };
+}
+
+/** The season's end: the bars and approval take the whole day's step. */
 export function settleApproval(c: City, r: DayReport): void {
-  const ease = (was: number, now: number): number => was + (now - was) * BAR_EASE;
-  c.lastBars = { ...c.bars, approval: c.approval };
-  c.bars = { trips: ease(c.bars.trips, r.trips), parking: ease(c.bars.parking, r.parking), cost: ease(c.bars.cost, r.cost), streets: ease(c.bars.streets, r.streets) };
-  c.approval = c.approval + (approvalOf(c.bars) - c.approval) * APPROVAL_EASE;
+  c.lastBars = { ...c.opening.bars, approval: c.opening.approval };
+  moveApproval(c, r, 1);
   c.yearApprovals = [...c.yearApprovals, c.approval];
   c.yearHabits = [...c.yearHabits, { ratio: r.meanRatio, pay: r.meanPay, transit: r.transit }];
 }

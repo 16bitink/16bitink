@@ -5,7 +5,7 @@ import type { City, DayReport } from '../state';
 import { ageView, repair, replaceRoad, tickHoles, wear, wornStreets } from './ageing';
 import { beach, dawnBeaches, yearBeaches } from './beach';
 import { dawnSea, nightSea } from './beachDay';
-import { boulevard, freewayStreets, freewayVeto, freewayView, nightFreeway } from './freeway';
+import { boulevard, freewayStreets, freewayVeto, freewayView, monthFreeway } from './freeway';
 import { holdAuction, licencePain, licences, licenceView, nightLicences } from './licences';
 import { dawnMinis, minibus, miniStreets, miniView, nightMinis, tickMinis } from './minibus';
 import { dawnTolls, nightTolls, speedToll, tickTolls, tollLimit, tollView } from './speedTolls';
@@ -48,11 +48,16 @@ export function reportRules(c: City, r: DayReport): DayReport {
   return { ...r, streets: clamp(r.streets + streets, 0, 100), cost: clamp(r.cost - pain, 0, 100) };
 }
 
-/** Night, when the roads are empty again. */
+/** Night, when the roads are empty again: the season's last payday. */
 export function nightRules(c: City): void {
   nightMinis(c);
   wear(c);
-  nightFreeway(c);
+  monthFreeway(c, true);
+}
+
+/** A payday inside the day, after the works. */
+export function monthRules(c: City): void {
+  monthFreeway(c, false);
 }
 
 const HILL_WORDS: Readonly<Record<string, string>> = {

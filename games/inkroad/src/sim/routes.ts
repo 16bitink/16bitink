@@ -71,6 +71,8 @@ export class Routes {
     const heap = this.heap;
     heap.clear();
     for (const l of links) {
+      // A trip never ends on a road under works; cars still on one are costed by their way off it.
+      if (l.closed) continue;
       const here = f.gate ? l.link.to === f.dest : l.road.id === f.dest && runsWith(l, f.dir);
       if (!here) continue;
       cost[l.i] = this.linkCost(l, f) * (f.gate ? 1 : 0.5);
@@ -167,10 +169,11 @@ export class Routes {
 
 /** Links a trip may begin on, and how far along (0..1). */
 export function startLinks(w: World, a: Access): { l: LinkRt; part: number }[] {
-  if ('gate' in a) return (w.nodeById.get(a.gate)?.outs ?? []).map((l) => ({ l, part: 0 }));
+  if ('gate' in a) return (w.nodeById.get(a.gate)?.outs ?? []).filter((l) => !l.closed).map((l) => ({ l, part: 0 }));
   const r = w.roadById.get(a.road);
   if (!r) return [];
-  const all = r.links.map((id) => w.linkById.get(id)!);
+  // Nobody sets off on a road under works: a block whose only driveway is there is cut off by car.
+  const all = r.links.map((id) => w.linkById.get(id)!).filter((l) => !l.closed);
   // A car standing on one kerb sets off the way it faces (when told), never across the road.
   const own = a.dir ? all.filter((l) => runsWith(l, a.dir)) : all;
   return (own.length > 0 ? own : all).map((l) => ({ l, part: laneS(l, a.s) / l.lanes[0]!.len }));

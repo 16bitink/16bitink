@@ -3,7 +3,8 @@ import type { Id, Lot, Pt } from '../sim/types';
 import { isPeak } from './clock';
 import type { Place, Spot } from './day';
 import { builtArea, centreOf, cellsToBlock, clamp, midOf, polyLength } from './geometry';
-import { accessPoint } from './places';
+import { accessPoint, tripAccess } from './places';
+import { accessOpen } from './net';
 import type { City } from './state';
 import { has, lotById } from './state';
 import { beachLot, publicBeaches } from './rules/beach';
@@ -50,7 +51,7 @@ function legalSpots(c: City, put: Put): void {
   for (const l of c.lots) {
     if (l.level === 0 || !l.access) continue;
     const layout = lotLayout(c.net.roads, l);
-    put({ key: `lot:${l.id}`, kind: l.kind === 'home' ? 'home' : 'private', id: l.id, spaces: Math.min(lotSpaces(c, l), layout.poses.length), access: l.access, at: centreOf(l), layout });
+    put({ key: `lot:${l.id}`, kind: l.kind === 'home' ? 'home' : 'private', id: l.id, spaces: Math.min(lotSpaces(c, l), layout.poses.length), access: tripAccess(c, l) ?? l.access, at: centreOf(l), layout });
   }
   for (const r of c.net.roads) {
     if (!r.kerb || r.level !== 0) continue;
@@ -61,7 +62,7 @@ function legalSpots(c: City, put: Put): void {
     // Multi-storey and underground car parks take their cars inside: no slots drawn, every space counts.
     const layout = parkLayout(c.net.roads, p);
     const drawn = layout.poses.length > 0;
-    put({ key: `park:${p.id}`, kind: 'park', id: p.id, spaces: drawn ? Math.min(p.spaces, layout.poses.length) : p.spaces, access: p.access, at: centreOf(p), ...(drawn ? { layout } : {}) });
+    put({ key: `park:${p.id}`, kind: 'park', id: p.id, spaces: drawn ? Math.min(p.spaces, layout.poses.length) : p.spaces, access: tripAccess(c, p) ?? p.access, at: centreOf(p), ...(drawn ? { layout } : {}) });
   }
 }
 
@@ -75,7 +76,7 @@ function roughSpots(c: City, put: Put): void {
     const lot = beachLot(c, b);
     if (!lot?.access) continue;
     const layout = sandLayout(c.net.roads, b);
-    put({ key: `sand:${b.id}`, kind: 'sand', id: lot.id, spaces: Math.min(Math.max(1, Math.round(b.w * b.h * SAND_PER_CELL)), layout.poses.length), access: lot.access, at: centreOf(lot), layout });
+    put({ key: `sand:${b.id}`, kind: 'sand', id: lot.id, spaces: Math.min(Math.max(1, Math.round(b.w * b.h * SAND_PER_CELL)), layout.poses.length), access: tripAccess(c, lot) ?? lot.access, at: centreOf(lot), layout });
   }
 }
 
@@ -86,7 +87,7 @@ export function roughSpot(c: City, place: Place, tried: readonly string[]): Spot
   let best: Spot | null = null;
   let bestCells = Infinity;
   for (const s of c.day.spots.values()) {
-    if ((s.kind !== 'street' && s.kind !== 'sand') || s.used >= s.spaces || tried.includes(s.key)) continue;
+    if ((s.kind !== 'street' && s.kind !== 'sand') || s.used >= s.spaces || tried.includes(s.key) || !accessOpen(c.net, s.access)) continue;
     if (s.kind === 'sand' && s.id !== l.id && cellsToBlock(l, s.at) > PARK_RADIUS) continue;
     const cells = cellsToBlock(l, s.at);
     if (cells <= PARK_RADIUS && cells < bestCells) { bestCells = cells; best = s; }
@@ -117,7 +118,8 @@ export function spotCost(c: City, l: Lot, s: Spot, clock: number, home: boolean)
 export function spotsNear(c: City, l: Lot): readonly Spot[] {
   const out: Spot[] = [];
   for (const s of c.day.spots.values()) {
-    if (!isLegal(s)) continue;
+    // Nobody heads for a place on a road under works: its cars stay, new ones go elsewhere.
+    if (!isLegal(s) || !accessOpen(c.net, s.access)) continue;
     if (s.kind === 'private' || s.kind === 'home') { if (s.id === l.id) out.push(s); continue; }
     if (cellsToBlock(l, s.at) <= PARK_RADIUS) out.push(s);
   }

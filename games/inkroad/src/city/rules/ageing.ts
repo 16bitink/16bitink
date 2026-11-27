@@ -2,14 +2,14 @@ import { CELL, ROADS } from '../../sim/constants';
 import { setRoad } from '../../sim/network';
 import type { Network } from '../../sim/trafficTypes';
 import type { Road, SpecialView } from '../../sim/types';
-import { no, nightRate, priced, type Handler } from '../commands/shared';
+import { no, nightRate, priced, roadWorks, worksLeft, type Handler } from '../commands/shared';
 import { midOf, polyLength } from '../geometry';
 import { commitNetwork } from '../network';
 import { mixSeed } from '../rng';
 import { sore } from '../score';
 import type { City } from '../state';
 import { emit, has, roadById } from '../state';
-import { BRIDGE_PER_CELL, MATCH } from '../tune';
+import { BRIDGE_PER_CELL, MATCH, WORKS } from '../tune';
 import { patchRoad } from './ground';
 import { ruleDay, setRuleDay } from './state';
 
@@ -91,11 +91,11 @@ export const repair: Handler<'repair'> = {
     if (typeof r === 'string') return no(r);
     if (condition(r) >= AGE.repairFrom) return no('It is still good. The seagulls checked');
     const cost = newPrice(c, r) * AGE.repairShare * (0.6 + (1 - condition(r))) * nightRate(c);
-    return priced(c, Math.max(4, cost), { works: 1, line: r.line });
+    return priced(c, Math.max(4, cost), { ...roadWorks(c, WORKS.repair), line: r.line });
   },
   run(c, cmd) {
     const r = roadById(c, cmd.road)!;
-    const net = setRoad(c.net, r.id, { works: 1, nightWorks: c.policies.nightWorks });
+    const net = setRoad(c.net, r.id, { works: worksLeft(c, WORKS.repair), nightWorks: c.policies.nightWorks });
     commitNetwork(c, patchRoad(net, r.id, { condition: Math.min(AGE.repairTop, condition(r) + AGE.repairGain) }));
     return midOf(r);
   },
@@ -109,11 +109,11 @@ export const replaceRoad: Handler<'replace'> = {
     const full = newPrice(c, r) * AGE.replaceShare * nightRate(c);
     const match = r.bridge ? bridgeMatch(c) : 0;
     const warn = match > 0 ? { warn: `The Council pays ${Math.round(full * match)} of ${Math.round(full)}` } : {};
-    return priced(c, full * (1 - match), { works: 2, line: r.line, ...warn });
+    return priced(c, full * (1 - match), { ...roadWorks(c, WORKS.replace), line: r.line, ...warn });
   },
   run(c, cmd) {
     const r = roadById(c, cmd.road)!;
-    const net = setRoad(c.net, r.id, { works: 2, nightWorks: c.policies.nightWorks, truckBan: false });
+    const net = setRoad(c.net, r.id, { works: worksLeft(c, WORKS.replace), nightWorks: c.policies.nightWorks, truckBan: false });
     commitNetwork(c, patchRoad(net, r.id, { condition: 1 }));
     return midOf(r);
   },

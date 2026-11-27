@@ -1,21 +1,21 @@
-import { APPROVAL_GOOD, CELL, LETTERS_TO_LOSE, ROADS } from '../sim/constants';
+import { APPROVAL_GOOD, CELL, LETTERS_TO_LOSE, MONTHS_PER_SEASON, ROADS } from '../sim/constants';
 import { addFlyover, planFlyover, setRoad } from '../sim/network';
 import type { CarPark, Project } from '../sim/types';
-import { reportDay, settleApproval, worstBar, writeLetter } from './approval';
+import { bump, moveApproval, reportDay, settleApproval, worstBar, writeLetter } from './approval';
 import { reviewCommissions } from './commissions';
 import { growLots, updateMoods } from './growth';
-import { earn, operating, spend } from './money';
+import { closeBooks, earn, lastMonths, spend, unearned } from './money';
 import { commitNetwork } from './network';
 import { meanOccupancy } from './parking';
 import { warnPurse } from './purse';
-import { nightRules, reportRules } from './rules';
+import { monthRules, nightRules, reportRules } from './rules';
 import { polyLength } from './geometry';
 
-import type { City, Measures } from './state';
+import type { City, DayReport, Measures } from './state';
 import { emit, has, yearDef } from './state';
 import { BAILOUT_TO, DEBT_LIMIT, FLYOVER, INTEREST, PARKS, RIBBON, STAFF_PER_INSPECTOR, STAFF_PER_RANK, TRANSIT } from './tune';
 import { feelZone } from './zone';
-import { capacity, isRunning, runsOnRoad } from './transit';
+import { capacity, isRunning, runsOnRoad, syncServices } from './transit';
 import { worstSpots, writeComplaints } from './voices';
 
 /** Keep the day's measurements: the traffic clears its own at dawn. */
@@ -37,24 +37,29 @@ export const transitCost = (c: City): number => Math.round(c.lines.reduce((n, l)
 export const staffCost = (c: City): number => c.policies.inspectors * STAFF_PER_INSPECTOR + c.policies.taxis * STAFF_PER_RANK;
 export const interestCost = (c: City): number => (c.money < 0 ? Math.ceil(-c.money * INTEREST) : 0);
 
+/** This month's part of a season's sum in whole coins: the three parts always add up to the whole. */
+const monthPart = (whole: number, month: number): number =>
+  Math.round((whole * (month + 1)) / MONTHS_PER_SEASON) - Math.round((whole * month) / MONTHS_PER_SEASON);
+
+/** A month's bills and grant: a third of a season's. */
 function payBills(c: City): void {
-  spend(c, 'upkeep', upkeepCost(c));
-  spend(c, 'transit', transitCost(c));
-  spend(c, 'staff', staffCost(c));
-  spend(c, 'interest', interestCost(c));
-  earn(c, 'budget', yearDef(c).grant);
+  const m = c.month;
+  spend(c, 'upkeep', monthPart(upkeepCost(c), m));
+  spend(c, 'transit', monthPart(transitCost(c), m));
+  spend(c, 'staff', monthPart(staffCost(c), m));
+  spend(c, 'interest', monthPart(interestCost(c), m));
+  earn(c, 'budget', monthPart(yearDef(c).grant, m));
 }
 
-const ribbon = (c: City, points: number): void => { c.approval = Math.min(100, c.approval + points); };
-
-/** Works move on a season: roads reopen, flyovers and lines open. */
-function advanceWorks(c: City): void {
+/** Works move on a month: roads reopen, flyovers and lines open. Inside the day only what opens touches the traffic. */
+function advanceWorks(c: City, night: boolean): void {
   let net = c.net;
+  let opened = false;
   for (const r of c.net.roads) {
     if (r.works === 0) continue;
     const works = Math.max(0, r.works - 1);
     net = setRoad(net, r.id, { works });
-    if (works === 0) emit(c, { t: 'opened', road: r.id, at: r.line[Math.floor(r.line.length / 2)]! });
+    if (works === 0) { opened = true; emit(c, { t: 'opened', road: r.id, at: r.line[Math.floor(r.line.length / 2)]! }); }
   }
   const due: Project[] = [];
   c.projects = c.projects.flatMap((p) => {
@@ -66,13 +71,18 @@ function advanceWorks(c: City): void {
     const plan = planFlyover(net, p.node, p.fromRoad, p.toRoad, p.level);
     if (!plan.ok) { earn(c, 'grant', FLYOVER.base); emit(c, { t: 'toast', who: 'dewy', text: 'The flyover lost its road. The Council gave part of the money back.' }); continue; }
     net = addFlyover(net, plan);
+    opened = true;
     const road = net.roads[net.roads.length - 1]!;
     emit(c, { t: 'opened', road: road.id, at: plan.line[Math.floor(plan.line.length / 2)] ?? { x: 0, y: 0 } });
-    ribbon(c, RIBBON.flyover);
+    bump(c, RIBBON.flyover);
   }
-  for (const l of c.lines) if (l.works === 1) ribbon(c, RIBBON.line);
+  const lineOpens = c.lines.some((l) => l.works === 1);
+  for (const l of c.lines) if (l.works === 1) bump(c, RIBBON.line);
   c.lines = c.lines.map((l) => (l.works > 0 ? { ...l, works: l.works - 1 } : l));
-  commitNetwork(c, net);
+  // Only the counts changed: the cars drive on the same roads, so the traffic keeps its own.
+  if (night || opened) commitNetwork(c, net); else c.net = net;
+  if (lineOpens && !night) syncServices(c);
+  if (!night) monthRules(c);
 }
 
 function settleParks(c: City): void {
@@ -124,7 +134,30 @@ function checkLetters(c: City): void {
   if (c.phase !== 'replaced' && c.letters.length >= LETTERS_TO_LOSE) replace(c, REPLACED_TEXT[worstBar(c.bars)]);
 }
 
-/** Night of a drawn day: everything that happens between the last car and the review card. */
+/** The day so far as its night would judge it, the special rules' bends in, leaving no trace: their night is still to come. */
+function reportSoFar(c: City): DayReport {
+  const keep = { rule: c.rule, ownership: c.ownership, sores: c.day.stats.sores.length };
+  const r = reportRules(c, reportDay(c));
+  if (keep.rule) c.rule = keep.rule; else delete c.rule;
+  c.ownership = keep.ownership;
+  c.day.stats.sores.length = keep.sores;
+  return r;
+}
+
+/**
+ * A month's end inside the day: approval so far, bills and grant, works. The day runs on.
+ * A day restarted from its save passes paydays it had already: what drivers paid then is not this month's.
+ */
+export function settleMonth(c: City, month: number): void {
+  if (month < c.month) { c.ledger = unearned(c.ledger); return; }
+  moveApproval(c, reportSoFar(c), (month + 1) / MONTHS_PER_SEASON);
+  payBills(c);
+  advanceWorks(c, false);
+  closeBooks(c);
+  c.month = (month + 1) as City['month'];
+}
+
+/** Night of a drawn day, the season's last payday: everything that happens between the last car and the review card. */
 export function settleSeason(c: City): void {
   c.measures = takeMeasures(c);
   const report = reportRules(c, reportDay(c));
@@ -139,10 +172,10 @@ export function settleSeason(c: City): void {
   updateMoods(c);
   growLots(c);
   c.traffic.endDay();
-  advanceWorks(c);
+  advanceWorks(c, true);
   nightRules(c);
   c.priceBase = c.prices;
-  c.lastLedger = c.ledger;
+  closeBooks(c);
   c.phase = 'review';
   warnPurse(c);
   checkLetters(c);
@@ -156,9 +189,10 @@ export function yearPlates(c: City, goalMet: boolean): number {
 export const yearMeanApproval = (c: City): number =>
   (c.yearApprovals.length === 0 ? c.approval : c.yearApprovals.reduce((n, v) => n + v, 0) / c.yearApprovals.length);
 
-/** What the books should say next season if nothing changes. */
+/** What the books should say next month if nothing changes: a month of the last three's takings, a third of a season's bills. */
 export function forecast(c: City): number {
-  const inNow = operating(c.lastLedger) + c.lastLedger.costs.upkeep + c.lastLedger.costs.transit + c.lastLedger.costs.staff + c.lastLedger.costs.interest;
-  return Math.round(inNow + yearDef(c).grant - upkeepCost(c) - transitCost(c) - staffCost(c) - interestCost(c));
+  const i = lastMonths(c).income;
+  const takings = i.parking + i.fines + i.tolls + i.fares + i.zone;
+  return Math.round((takings + yearDef(c).grant - upkeepCost(c) - transitCost(c) - staffCost(c) - interestCost(c)) / MONTHS_PER_SEASON);
 }
 

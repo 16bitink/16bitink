@@ -80,16 +80,18 @@ describe('saves', () => {
     expect(JSON.stringify(b.save())).toBe(JSON.stringify(a.save()));
   });
 
-  it('a save in a day starts the day again with what was built, and gives back what the day earned', () => {
+  it('a save in a day starts the day again with what was built, and gives back what drivers paid (its paydays stay paid)', () => {
     const v = cityAtYear(2);
     const node = v.junctions.find((j) => j.cell.gx === 22 && j.cell.gy === 18)!.id;
     ok(v, { t: 'control', node, control: 'roundabout' });
     const before = v.money;
     v.advance(90);
+    const march = v.lastLedger;
+    const bills = march.costs.upkeep + march.costs.transit + march.costs.staff + march.costs.interest;
     const back = createCity(SAFFRON, SEED, JSON.parse(JSON.stringify(v.save())));
     expect(back.phase).toBe('day');
     expect(back.clock).toBe(0);
-    expect(back.money).toBe(before);
+    expect(back.money).toBe(before + march.income.budget - bills);
     expect(back.junctions.find((j) => j.id === node)!.control).toBe('roundabout');
   });
 

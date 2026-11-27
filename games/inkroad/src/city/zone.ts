@@ -1,5 +1,6 @@
 import { setRoad } from '../sim/network';
 import type { Cell, Road } from '../sim/types';
+import { bump } from './approval';
 import { clamp } from './geometry';
 import { commitNetwork } from './network';
 import type { City, DayReport, Vote } from './state';
@@ -48,7 +49,7 @@ export function feelZone(c: City, r: DayReport): void {
 
 function count(c: City): void {
   const kept = c.vote.support >= 50;
-  if (kept) c.approval = Math.min(100, c.approval + JOY); else dropZone(c);
+  if (kept) bump(c, JOY); else dropZone(c);
   c.vote = { ...c.vote, running: false, kept };
   emit(c, { t: 'toast', who: 'sulo', text: kept ? 'The people voted to keep the charge. I am as surprised as you.' : 'The people voted the charge away. Back to the drawing desk.' });
 }

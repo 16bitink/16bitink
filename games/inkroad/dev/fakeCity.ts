@@ -38,7 +38,7 @@ const COMPLAINTS: Complaint[] = [
 ];
 const COMMISSION: Commission = {
   id: 'c1', title: 'Calm the market', text: 'The Council wants the market road quiet.', upfront: 40, reward: 120, goal: 'Mean wait at the market under 20 s', progress: 0.4,
-  endsYear: 1, endsSeason: 3, state: 'offered',
+  endsYear: 1, endsMonth: 11, state: 'offered',
 };
 
 /** A tiny state machine that walks the phases like the real city does. */
@@ -76,6 +76,8 @@ export class FakeCity {
   get newTools(): ToolId[] { return TOOLS_BY_YEAR[this.year - 1] ?? []; }
   get ledger(): Ledger { return { income: { ...ZERO_L.income, parking: 84, fines: 31, budget: 60 }, costs: { ...ZERO_L.costs, building: 40, upkeep: 12, staff: 20 } }; }
   get lastLedger(): Ledger { return ZERO_L; }
+  get books(): Ledger[] { return [ZERO_L, ZERO_L, this.ledger]; }
+  get month(): number { return this.season * 3; }
   get goal(): CityView['goal'] { return { text: this.def.years[this.year - 1]!.goal.text, value: 24, target: 20, met: this.year % 2 === 0, unit: 's' }; }
   get techChoices(): TechDef[] { return this.phase === 'yearEnd' ? TECHS : []; }
   get complaints(): Complaint[] { return COMPLAINTS; }
@@ -86,12 +88,12 @@ export class FakeCity {
   get projects(): CityView['projects'] { return this.year > 0 ? [{ id: 1, node: 1, fromRoad: 1, toRoad: 2, level: 1, line: [{ x: 200, y: 200 }], left: 2 }] : []; }
   get vote(): CityView['vote'] { return { support: 46, seasons: 2, running: false, kept: null }; }
   get masterPlan(): string[] { return ['Year 3: the office district opens', 'Year 4: the first buses']; }
-  get forecast(): { nextSeason: number } { return { nextSeason: 36 }; }
+  get forecast(): { nextMonth: number } { return { nextMonth: 12 }; }
   readonly priceLimits = Object.fromEntries((['park', 'parkPeak', 'fine', 'toll', 'tollPeak', 'fare', 'zone'] as const).map((k) => [k, { min: 0, max: 30, step: k === 'fine' ? 5 : 1, open: !['toll', 'tollPeak', 'zone'].includes(k) }])) as CityView['priceLimits'];
 
   quote(cmd: Command): Quote {
     if (cmd.t === 'control') return { ok: cmd.control !== 'smart', why: 'Needs the smart signals technology', cost: cmd.control === 'signal' ? 60 : cmd.control === 'roundabout' ? 30 : 0, land: 0, works: 0 };
-    if (cmd.t === 'upgrade') return { ok: this.money > 9, cost: 9, land: 0, works: 1 };
+    if (cmd.t === 'upgrade') return { ok: this.money > 9, cost: 9, land: 0, works: 3, closes: true, opens: this.month + 3 };
     if (cmd.t === 'float') return { ok: cmd.stream === 'parking' && this.year > 1, cost: 400, land: 0, works: 0 };
     return { ok: true, cost: 0, land: 0, works: 0 };
   }

@@ -25,6 +25,9 @@ export function laneOffset(road: Pick<Road, 'type' | 'oneWay' | 'flyover'>, i: n
   return MEDIAN[road.type] / 2 + (i + 0.5) * LANE;
 }
 
+/** Dug up by day: no car may drive on it. Night works leave the road open (the crews come after dark). */
+export const closedForWorks = (road: Pick<Road, 'works' | 'nightWorks'>): boolean => road.works > 0 && !road.nightWorks;
+
 /** Link ids come from the road's id, so they never change. */
 export const forwardLink = (roadId: number): number => roadId * 2;
 export const backwardLink = (roadId: number): number => roadId * 2 + 1;

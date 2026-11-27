@@ -1,8 +1,9 @@
 import { CELL, ROADS } from '../../sim/constants';
 import { planRoad, setRoad } from '../../sim/network';
 import type { Cell, Command, Lot, Quote, Road, SpecialView } from '../../sim/types';
-import { no, nightRate, priced, type Handler } from '../commands/shared';
-import { builtArea, blocksMeet, centreOf, clamp, distToLine, midOf, polyLength, vertexInBlock, type Block } from '../geometry';
+import { bump } from '../approval';
+import { no, nightRate, priced, roadWorks, worksLeft, type Handler } from '../commands/shared';
+import { builtArea, blocksMeet, centreOf, distToLine, midOf, polyLength, vertexInBlock, type Block } from '../geometry';
 import { blockAccess, blockedBy } from '../net';
 import { commitNetwork } from '../network';
 import { sore } from '../score';
@@ -18,7 +19,7 @@ import { ruleState, setRule } from './state';
  * while it is dug and rises after.
  */
 export const FREEWAY = {
-  works: 2, share: 0.5, dip: 2.5, digging: 4, joy: 2.2, joyMax: 14, noise: 12, near: 4.5, through: 0.05, throughMin: 0.65, cars: 0.006, carsMin: 0.5, parkGap: 2, parkDeep: 2,
+  works: 6, share: 0.5, dip: 2.5, digging: 4, joy: 2.2, joyMax: 14, noise: 12, near: 4.5, through: 0.05, throughMin: 0.65, cars: 0.006, carsMin: 0.5, parkGap: 2, parkDeep: 2,
 } as const;
 const PARKS = ['Old Lane Park', 'Quiet Park', 'Seven Ducks Park', 'Asphalt Garden', 'Exit Nine Park', 'Bench Park', 'Puddle Park', 'Off Ramp Garden'];
 
@@ -43,27 +44,29 @@ export const boulevard: Handler<'boulevard'> = {
     if (!r?.freeway) return no('Pick a piece of the freeway');
     if (r.works > 0) return no('Men with shovels are here already');
     const cost = (polyLength(r.line) / CELL) * ROADS.boulevard.cost * FREEWAY.share * nightRate(c);
-    return priced(c, cost, { works: FREEWAY.works, line: r.line, warn: 'People will grumble first and stroll later' });
+    return priced(c, cost, { ...roadWorks(c, FREEWAY.works), line: r.line, warn: 'People will grumble first and stroll later' });
   },
   run(c, cmd) {
     const r = roadById(c, cmd.road)!;
-    const net = setRoad(c.net, r.id, { type: 'boulevard', works: FREEWAY.works, nightWorks: c.policies.nightWorks });
+    const left = worksLeft(c, FREEWAY.works);
+    const net = setRoad(c.net, r.id, { type: 'boulevard', works: left, nightWorks: c.policies.nightWorks });
     commitNetwork(c, patchRoad(net, r.id, { condition: 1 }));
     const s = ruleState(c).freeway;
-    setRule(c, { freeway: { ...s, digs: [...s.digs, { road: r.id, left: FREEWAY.works }] } });
-    c.approval = clamp(c.approval - FREEWAY.dip, 0, 100);
+    setRule(c, { freeway: { ...s, digs: [...s.digs, { road: r.id, left }] } });
+    bump(c, -FREEWAY.dip);
     return midOf(r);
   },
 };
 
-// ---------------------------------------------------------------- the night
+// ---------------------------------------------------------------- paydays
 
-export function nightFreeway(c: City): void {
+/** A month of digging done. A piece whose works are over becomes a boulevard with its park that night, when the streets are empty. */
+export function monthFreeway(c: City, night: boolean): void {
   const s = ruleState(c).freeway;
   if (!c.def.rules.freeway || s.digs.length === 0) return;
-  const digs = s.digs.map((d) => ({ ...d, left: d.left - 1 }));
-  const ready = digs.filter((d) => d.left <= 0);
-  setRule(c, { freeway: { digs: digs.filter((d) => d.left > 0), done: s.done + ready.length } });
+  const digs = s.digs.map((d) => ({ ...d, left: Math.max(0, d.left - 1) }));
+  const ready = night ? digs.filter((d) => d.left === 0) : [];
+  setRule(c, { freeway: { digs: digs.filter((d) => !ready.includes(d)), done: s.done + ready.length } });
   for (const d of ready) {
     const r = roadById(c, d.road);
     c.ownership = Math.max(FREEWAY.carsMin, c.ownership - FREEWAY.cars);

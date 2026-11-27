@@ -15,6 +15,9 @@ export const PERIODS = { dawn: 0, am: 10, mid: 42, pm: 70, night: 108 } as const
 export const WEEKEND = 62;
 export const WEEKEND_PERIODS = { dawn: 0, am: 16, mid: 16, pm: 40, night: 53 } as const;
 export const SEASONS = ['Spring', 'Summer', 'Autumn', 'Winter'] as const;
+/** The Council's year starts in spring: three months a season, each ending on a payday. */
+export const MONTHS = ['March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February'] as const;
+export const MONTHS_PER_SEASON = 3;
 export const YEARS_PER_CITY = 10;
 
 export const MAX_CARS = 700;

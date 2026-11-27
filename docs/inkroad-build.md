@@ -6,7 +6,7 @@ Package `games/inkroad`, branch `feat/inkroad`, port 5181, Phaser 4 + TypeScript
 
 ## The launch cut
 
-A year has four seasons; a season is one drawn day of 120 s (`DAY`). Speeds 0, 1, 2, 4. Build while paused.
+A year has four seasons; a season is one drawn day: a workday of 120 s (`DAY`) and a weekend of 62 s (`WEEKEND`). A year has 12 months, three a season, each ending on a payday (`PAYDAYS` in `src/city/clock.ts`; see "Months and paydays" below). Speeds 0, 1, 2, 4. Build while paused.
 
 | In for Sunday | After |
 |---|---|
@@ -41,7 +41,7 @@ A year has four seasons; a season is one drawn day of 120 s (`DAY`). Speeds 0, 1
 
 ## Money and balance
 
-Money is whole coins. Start 300–600. A season's Council budget is small (40–80); a street costs 4 a cell, a roundabout 30, signals 60, a flyover 180–300, a metro line 1,200+ (60% matched). Prices move one step a season.
+Money is whole coins. Start 300–600. A season's Council budget is small (40–80), paid a third each month; a street costs 4 a cell, a roundabout 30, signals 60, a flyover 180–300, a metro line 1,200+ (60% matched). Prices move one step a season.
 
 ## The projection (the angle)
 
@@ -244,3 +244,27 @@ Lab after (seeds 1 / 2 / 3; end = reached year 10's end; targets in brackets): S
 
 Tried and dropped (seed 1 to 3, nobody and beginner): Saffron school runs by car 0.7 to 0.6 (its own note says 60 percent), dinners out 0.45 to 0.3, both: within noise. A lane at column 33 from row 24 to row 30: nobody Y6/Y5/Y3 (too easy for the year 4 or 5 test), beginner no better, and the layout check calls the gap behind Mint Row a sliver. Column 36 north of row 18 opening in year 4 instead of 6: beginner no better. Still short: the Saffron beginner falls in year 6 (approval 48 to 50 in year 5, 35 to 41 in year 6) on every map tried; year 6 adds the port's lorries, two football days, the flyover works and a jump in trips (workday trips 304 to 393).
 
+
+## Road works close the road (the owner, November 27)
+
+The owner: "we got roadworks stuck there after upgrading to avenue and the cars moving through it. if there are roadworks cars should not be able to pass."
+
+- **Closed.** A road with `works > 0` and no `nightWorks` is closed to cars (`closedForWorks`, `src/sim/roadGeom.ts`). Its links are marked `closed` (`src/sim/world.ts`) and no turn into one is built into a junction's options, so routing goes round it; no trip starts or ends on it (`startLinks` and the fields' seeds skip it, `src/sim/routes.ts`). Junction works stay as they were: slowed, not closed.
+- **Cars already on it** drive on and off it (its own lanes keep their way out, `src/sim/relocate.ts`); a car at the line about to turn in asks again; a trip that ended on it ends on the nearest open road. Nobody new enters. In a jam the last can take a while to leave.
+- **Driveways.** A block keeps its drawn driveway, gate and spaces (`Lot.access`). While that road is dug, its cars come and go by an open road within reach on any side (`tripAccess`, `src/city/places.ts`, cached per network); with none it is cut off by car: no car trips, its parked cars stay. Places on a closed road are not chosen for parking (`spotsNear`, `roughSpot`). Everything reopens when the works end.
+- **Buses** drive round and skip stops on a closed road (`openAt`, `src/sim/services.ts`); the drawn line is unchanged.
+- **Night works** keep the road open by day, so it is drawn without diggings or cones. The quote says which (`Quote.closes`): "3 months of road works, road closed, open in September" or "by night, road open" (months since the change below).
+- Bots (Saffron seed 1): planner years 4 to 10 at 59.0 (58.4 before), beginner still lost in year 7. A front-street block cut off for a whole season cost the planner a point (57.5) until the any-side fallback came in.
+
+## Months and paydays (the owner, November 27)
+
+The owner: "change the reward cycles to months, it will be much more manageable, 4 reward cycles per year is too low." One drawn day a season and the game's length stay; the day settles three times.
+
+- **Calendar.** `City.month` is 0..2 within the season (`CityView.month` is 0..11 in the year, 0 = March). The season is still the day: weather, routines, happenings, art, the review card, letters and the year review.
+- **Paydays** at season clock 60 (after the morning peak), 120 (the workday's midnight) and 182 (the season's end, `settleSeason`). The first two run `settleMonth` from `stepDay`; the day goes on.
+- **Money.** Each payday pays `monthPart` of the season's upkeep, transit, staff and interest and of the grant (three parts that add up to the season's sum). `City.ledger` is this month's books, `City.books` the last three months (at a review, the season's; the review card shows them with tonight's spending). Purse limit, float price, the beach's thin books and the bots read the three months together, so a season's totals are what they were. `forecast` is a month: "+7 next month".
+- **Approval.** `City.opening` holds the dawn's bars and approval. Payday k moves them k/3 of the old day's step from there, toward the day so far (`reportDay`, the special rules' bends in, their side effects undone). The last payday is the old step exactly. One-off jumps (ribbons, the freeway dip, the zone vote, the beach) go through `bump`, which moves the opening too.
+- **Works** count paydays (`Road.works`, `TransitLine.works`, `Project.left`, freeway digs): a season is 3. Begun in a month under way (`worksLeft`), they get the rest of it on top; `Quote.works` is the whole months and `Quote.opens` the month they are over in. Inside the day only what opens is committed to the traffic. A burst pipe digs to the season's end. Freeway pieces still become parks at night.
+- **Commissions** count months (`monthsLeft`, `endsMonth`) but are judged at the review, where their day's numbers are. The zone vote and the minibus protest stay in seasons: both are decided at the review.
+- **Saves** are version 2 (`month`, `books`). A save in a day keeps its paydays: it restarts at dawn with the dawn's approval, gives back what drivers paid, and skips the paydays already had. A version 1 save loads at the start of its season (a review's at its end), works and deadlines ×3, its last season's books spread over three months (`src/city/saveUpgrade.ts`).
+- Test: `test/months.test.ts` (12 paydays a year at the three points; Saffron years 1 to 4 and Harbour and Rivers year 2 end each season exactly where they did with one payday; saves).

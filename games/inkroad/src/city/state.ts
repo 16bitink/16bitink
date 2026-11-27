@@ -28,10 +28,12 @@ export interface DayReport {
   readonly riders: number;
 }
 
-export interface ActiveCommission extends Commission { readonly kind: string; readonly target: number; readonly seasonsLeft: number }
+export interface ActiveCommission extends Commission { readonly kind: string; readonly target: number; readonly monthsLeft: number }
 
 /** The zone charge: tried for a season or more, then voted on. Support is lowest the day before it starts. */
 export interface Vote { readonly running: boolean; readonly kept: boolean | null; readonly support: number; readonly seasons: number; readonly base: { readonly trips: number; readonly streets: number } | null }
+
+export interface Opening { readonly bars: Readonly<Record<Bar, number>>; readonly approval: number }
 
 /** The whole city while it runs. Collections are immutable values that get replaced; the object itself is owned by city.ts. */
 export interface City {
@@ -42,6 +44,8 @@ export interface City {
   traffic: Traffic;
   year: number;
   season: 0 | 1 | 2 | 3;
+  /** The month within the season, 0..2: the paydays behind today. At a review, the season's last. */
+  month: 0 | 1 | 2;
   phase: Phase;
   clock: number;
   carry: number; // unspent seconds
@@ -53,6 +57,8 @@ export interface City {
   money: number;
   approval: number;
   bars: Readonly<Record<Bar, number>>;
+  /** Bars and approval at dawn, moved by the day's one-off jumps: each payday eases from them, so a season ends where it always did. */
+  opening: Opening;
   lastBars: Readonly<Record<Bar, number>> & { readonly approval: number };
   yearApprovals: readonly number[];
   /** Each season's mean trip ratio and pay this year: what people got used to. */
@@ -62,8 +68,10 @@ export interface City {
   prices: Prices;
   priceBase: Prices;
   policies: Policies;
+  /** This month's books. */
   ledger: Ledger;
-  lastLedger: Ledger;
+  /** The last three months' books, oldest first: at a review, the season's. */
+  books: readonly Ledger[];
   purse: Record<'parking' | 'fines' | 'tolls' | 'fares' | 'zone', number>; // fractions not yet a whole coin
   techs: readonly string[];
   techChoices: readonly string[];

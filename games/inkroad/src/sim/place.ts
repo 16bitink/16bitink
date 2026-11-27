@@ -8,6 +8,7 @@ const PULL_OUT_STRETCH = 2;
 import { pose } from './motion';
 import { LANE_T, POSE_ZERO, poseAt, type Track } from './track';
 import { laneS, type LinkRt } from './world';
+import { closedForWorks } from './roadGeom';
 import { runsWith, startLinks } from './routes';
 import type { Sim } from './sim';
 import type { Access } from './trafficTypes';
@@ -37,6 +38,13 @@ export function setDest(sim: Sim, i: number, to: Access): void {
 /** Does the destination still exist? */
 export function exists(sim: Sim, a: Access): boolean {
   return 'gate' in a ? sim.world.nodeById.has(a.gate) : sim.world.roadById.has(a.road);
+}
+
+/** Does it exist, and is it not on a road under works? */
+export function openAt(sim: Sim, a: Access): boolean {
+  if ('gate' in a) return sim.world.nodeById.has(a.gate);
+  const r = sim.world.roadById.get(a.road);
+  return r !== undefined && !closedForWorks(r);
 }
 
 /** Best link to set off on, or null when there is no way there. */

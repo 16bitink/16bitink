@@ -1,4 +1,4 @@
-import { DAY, PERIODS, WEEKEND, WEEKEND_PERIODS } from '../sim/constants';
+import { DAY, MONTHS_PER_SEASON, PERIODS, WEEKEND, WEEKEND_PERIODS } from '../sim/constants';
 import type { DayKind, Period, Phase } from '../sim/types';
 
 /**
@@ -9,6 +9,11 @@ export const WEEKEND_AT = DAY;
 export const SEASON_END = DAY + WEEKEND;
 /** The small hours are over: whoever is still out is home, and the weekend's plan begins. */
 export const NIGHT_END = WEEKEND_AT + WEEKEND_PERIODS.am;
+/**
+ * Month ends on the season clock, at quiet moments: the lull after the morning peak (about 2 pm), the workday's
+ * midnight, and the weekend's night (the season's end, where the review comes). About 60 s each.
+ */
+export const PAYDAYS = [60, WEEKEND_AT, SEASON_END] as const;
 
 const ORDER: readonly Period[] = ['dawn', 'am', 'mid', 'pm', 'night'];
 /** The hour shown at each period's start, then at the day's end. Hours run past 24 and wrap. */
@@ -85,4 +90,10 @@ export function clockAt(hour: number, kind: DayKind): number {
     if (h <= h1 && h1 > h0) return dayStart(kind) + starts[i]! + ((starts[i + 1]! - starts[i]!) * (h - h0)) / (h1 - h0);
   }
   return dayStart(kind) + LENGTH[kind];
+}
+
+/** Paydays already behind this year: at a review all three of its season's are. */
+export function paydaysDone(phase: Phase, season: number, month: number): number {
+  if (phase === 'yearStart') return 0;
+  return season * MONTHS_PER_SEASON + (phase === 'day' ? month : MONTHS_PER_SEASON);
 }
