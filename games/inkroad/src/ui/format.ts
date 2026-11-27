@@ -1,4 +1,4 @@
-import { paydaysDone } from '../city/clock';
+import { monthAt, paydaysDone } from '../city/clock';
 import { MONTHS, MONTHS_PER_SEASON, SEASONS, YEARS_PER_CITY } from '../sim/constants';
 import type { Phase } from '../sim/types';
 
@@ -40,8 +40,9 @@ export const monthName = (m: number): string => MONTHS[((Math.floor(m) % MONTHS.
 /** "Year 3, May": the month that is on (at a review, the one just paid). */
 export const dateLine = (year: number, month: number): string => `Year ${year}, ${monthName(month)}`;
 
-/** The month works with `left` paydays to go are over in: they end at the payday before it. */
-export function opensMonth(city: { readonly phase: Phase; readonly season: number; readonly month: number }, left: number): string {
+/** The month works are over in: from their end on the city's clock, or (counted in paydays) `left` paydays on. */
+export function opensMonth(city: { readonly phase: Phase; readonly season: number; readonly month: number }, left: number, end?: number): string {
+  if (end !== undefined) return monthName(monthAt(end));
   return monthName(paydaysDone(city.phase, city.season, city.month - city.season * MONTHS_PER_SEASON) + left);
 }
 

@@ -173,7 +173,7 @@ describe('what the player reads', () => {
     expect(night.cars).toBe(live.cars);
     expect(night.wait).toBeGreaterThan(0.5);
     expect(t.roadStats(armTo(net, 'W')).flow).toBeGreaterThan(1);
-    expect(t.roadStats(-5)).toEqual({ flow: 0, speedRatio: 1, queue: 0 });
+    expect(t.roadStats(-5)).toEqual({ flow: 0, speedRatio: 1, queue: 0, cars: 0 });
   });
 
   it('a hopeless jam is graded F and drivers honk, then give up', () => {

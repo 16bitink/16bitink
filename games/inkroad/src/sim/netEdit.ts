@@ -104,7 +104,7 @@ function joinRoads(d: Draft, node: Id, r1: Road, r2: Road): void {
   const turn = turnsBack(cells, node, d);
   if (turn) return;
   const base = makeRoad(p.id, pIn ? p.a : far, pIn ? far : p.b, { cells, type: p.type, oneWay: p.oneWay, fixed: p.fixed, bridge: p.bridge || q.bridge });
-  d.roads.set(p.id, { ...p, ...base, busLane: p.busLane, kerb: p.kerb, toll: p.toll, truckBan: p.truckBan, works: Math.max(p.works, q.works), nightWorks: p.nightWorks });
+  d.roads.set(p.id, { ...p, ...base, busLane: p.busLane, kerb: p.kerb, toll: p.toll, truckBan: p.truckBan, works: Math.max(p.works, q.works), ...joinedEnd(p, q), nightWorks: p.nightWorks });
   d.roads.delete(q.id);
   d.nodes.delete(node);
   for (const f of [...d.roads.values()]) {
@@ -122,4 +122,10 @@ function turnsBack(cells: readonly Cell[], node: Id, d: Draft): boolean {
   const a = cells[i - 1], b = cells[i], c = cells[i + 1];
   if (!a || !b || !c) return true;
   return (b.gx - a.gx) * (c.gx - b.gx) + (b.gy - a.gy) * (c.gy - b.gy) < 0;
+}
+
+/** Two roads joined into one keep the later end of their works. */
+function joinedEnd(p: Road, q: Road): Pick<Road, 'worksEnd'> {
+  const ends = [p, q].flatMap((r) => (r.works > 0 && r.worksEnd !== undefined ? [r.worksEnd] : []));
+  return ends.length > 0 ? { worksEnd: Math.max(...ends) } : {};
 }

@@ -5,6 +5,9 @@ import { ROADS } from './constants';
 import { TURN_T, Track, limitSpin, type Conflict } from './track';
 import { CONFLICT_DIST, TURN } from './tune';
 import { buildRing } from './ringBuild';
+import { pathOf, poseAlong } from './drivePath';
+import { A_LAT_PLAYED, R_MIN, REVERSE_PLAYED } from './kinematics';
+import { turnRound } from './parkPaths';
 import { addTrack, type LinkRt, type NodeRt, type OutOpt, type World } from './world';
 
 const SHARP = 2.1;
@@ -69,13 +72,60 @@ function turnSpeed(o: OutOpt, len: number, works: boolean): number {
   return works ? v * WORKS_SLOW : v;
 }
 
+/** Px between a turn-round track's points: far under a sim step's walk at walking pace, so the drawn glide (heading vs chord) follows the arcs. */
+const ROUND_STEP = 0.05;
+
+/**
+ * Turning round at a dead end as a real car does (docs/inkroad-build.md "Car motion rules"): a forward U on R_MIN
+ * arcs where the lanes lie far enough apart, else a three-point turn at walking pace. The track's heading is the
+ * body's, so its reverse leg is drawn backing up.
+ */
+function roundTrack(o: OutOpt, a: Track, b: Track, lane: number): Track {
+  const p0 = a.end(), p1 = b.start();
+  const { segs, three } = turnRound({ x: p0.x, y: p0.y, a: a.h1 }, { x: p1.x, y: p1.y, a: b.h0 });
+  const path = pathOf(segs);
+  const at = { x: 0, y: 0, a: 0, dir: 1 as 1 | -1 };
+  const n = Math.max(2, Math.ceil(path.len / ROUND_STEP));
+  const pts = Array.from({ length: n + 1 }, (_, i) => { poseAlong(path, (path.len * i) / n, at); return { x: at.x, y: at.y }; });
+  const t = new Track(`C${o.key}:${lane}`, TURN_T, pts, three ? REVERSE_PLAYED * TURN_PACE_SHARE : MANOEUVRE_PACE, { z: (u) => a.zs[a.n]! * (1 - u) + b.zs[0]! * u, step: ROUND_STEP });
+  for (let i = 0; i <= t.n; i++) {
+    // Point i of the resampled track lies i/n of the way along the path (its chords cut the cusps: never t.len).
+    poseAlong(path, (path.len * i) / t.n, at);
+    t.hs[i] = i === 0 ? at.a : t.hs[i - 1]! + angleDiff(t.hs[i - 1]!, at.a);
+  }
+  t.turnRound = three ? 'three' : 'u';
+  t.cusps = cuspsOf(segs, t.len / Math.max(path.len, 1e-6));
+  return t;
+}
+
+/** Px along a path where its gear changes, scaled to the track's length. */
+function cuspsOf(segs: readonly { readonly len: number; readonly dir: number }[], scale: number): number[] {
+  const out: number[] = [];
+  let at = 0;
+  segs.forEach((g, k) => { at += g.len; if (k + 1 < segs.length && segs[k + 1]!.dir !== g.dir) out.push(at * scale); });
+  return out;
+}
+
+/** Under walking pace, so a brisk driver (vf up to 1.08) still backs up at walking pace. */
+const TURN_PACE_SHARE = 0.9;
+
+/** Forward pace on a manoeuvre: the most a car may take a R_MIN bend at (src/sim/parkMove.ts MANOEUVRE_SPEED). */
+const MANOEUVRE_PACE = Math.sqrt(A_LAT_PLAYED * R_MIN);
+
 function connect(w: World, n: NodeRt, o: OutOpt, lane: number): Track {
   const a = o.from.lanes[lane]!, b = o.to.lanes[outLane(o, lane)]!;
+  if (o.uTurn) {
+    const t = roundTrack(o, a, b, lane);
+    t.node = n.i; t.from = a; t.to = b; t.left = true;
+    o.conn[lane] = t;
+    n.turns.push(t);
+    return addTrack(w, t);
+  }
   const p0 = a.end(), p1 = b.start();
-  const pull = o.uTurn ? Math.max(6, dist(p0, p1) * 0.66) : o.turn < -SIDE && n.kind !== 'free' ? dist(p0, p1) * LEFT_PULL : 0;
+  const pull = o.turn < -SIDE && n.kind !== 'free' ? dist(p0, p1) * LEFT_PULL : 0;
   const pts = curve(p0, a.h1, p1, b.h0, Math.max(4, Math.ceil(dist(p0, p1) / 3)), pull);
   const t = new Track(`C${o.key}:${lane}`, TURN_T, pts, 0, { h0: a.h1, h1: b.h0, z: (u) => a.zs[a.n]! * (1 - u) + b.zs[0]! * u });
-  t.vmax = o.uTurn ? TURN.min : n.kind === 'free' && Math.abs(o.turn) < SHARP
+  t.vmax = n.kind === 'free' && Math.abs(o.turn) < SHARP
     ? Math.min(o.from.link.freeSpeed, o.to.link.freeSpeed) : turnSpeed(o, t.len, n.j.works > 0);
   limitSpin(t);
   t.node = n.i;

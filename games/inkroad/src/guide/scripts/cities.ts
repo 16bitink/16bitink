@@ -25,7 +25,7 @@ export const CITY_STEPS: Readonly<Record<string, readonly Step[]>> = {
   '4:1': [talk('hills', 0, 'dewy', 'Seven hills: steep old streets are slow.', 'Keep the heavy traffic on the flat.'), redOne],
   '4:3': [talk('mini', 0, 'juma', 'Private minibuses: quick, cheap, and they stop anywhere.', 'Tap one line to license it, or buy it out.')],
   '4:4': [talk('ferry', 0, 'juma', 'The bridges are full. The water is empty.', 'Ferries here carry nearly twice as many.', { target: () => ({ t: 'tool', tool: 'boat' }) })],
-  '5:1': [talk('worn', 0, 'dewy', 'Every road here is old and wearing out.', 'Open the Condition map: the worst need mending.', { target: () => look('[data-act=ov][data-v=condition]') }), redOne],
+  '5:1': [talk('worn', 0, 'dewy', 'Every road here is old and wearing out.', 'Open the Repairs map: the busy red ones need mending first.', { target: () => look('[data-act=ov][data-v=condition]') }), redOne],
   '5:3': [talk('match', 0, 'sulo', 'Bridges wear out too.', 'The Council pays 60 of every 100 coins of a new one.')],
   '5:6': [talk('freeway', 0, 'sulo', 'The old freeway cuts the city in two.', 'Tap a piece of it: it may become a boulevard.')],
 };

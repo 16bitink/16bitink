@@ -190,7 +190,8 @@ export class CarLayer {
   /** The picture of a vehicle at a heading (parked cars borrow it). */
   frame(kind: number, tint: number, heading: number): AtlasFrame {
     const byTint = this.frames[kind] ?? this.frames[0]!;
-    return byTint[tint % byTint.length]!.frames[heading]!;
+    // The same paint rule as moving cars, so a vehicle never changes look as it parks.
+    return byTint[paintOf((VEHICLES[kind] ?? 'car') as VehicleKind, tint, byTint.length)]!.frames[heading]!;
   }
 
   get size(): number { return this.slots.length; }

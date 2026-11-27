@@ -3,7 +3,7 @@ import type { LanePose, SpawnRequest } from '../sim/trafficTypes';
 import type { VehicleKind } from '../sim/types';
 import type { Leg, Place } from './day';
 import { lotRect } from './geometry';
-import { doorTimes } from './moveTimes';
+import { doorTimes, swingsRound } from './moveTimes';
 import { plannedTimes } from './manoeuvre';
 import { viewKind } from './stand';
 import { emit, type City } from './state';
@@ -40,7 +40,9 @@ export function doorIn(c: City, uid: number, leg: Leg, look: Look, at: string | 
   const lane = key ? pose ?? c.traffic.poseOf(uid) : null;
   if (!key || !lane) return false;
   // It holds its lane while its body is in it (the planned path's lane part), then the view plays the rest.
-  const timed = plannedTimes() ? doorTimes(c, key, lane, 'in', look.kind) : null;
+  // A mouth behind the car (a swing round) always takes its drawn path's own time.
+  const plan = doorTimes(c, key, lane, 'in', look.kind);
+  const timed = plan && (plannedTimes() || swingsRound(plan)) ? plan : null;
   if (!timed || !c.traffic.park(uid, timed.lane)) c.traffic.remove(uid);
   tell(c, 'in', uid, key, lane, timed?.lane ?? 0, timed?.move ?? TURN_IN_MOVE, look, timed?.split);
   return true;
@@ -77,7 +79,8 @@ export function doorReady(c: City, leg: Leg, req: SpawnRequest, look: Look): boo
   if (!key || !lane) return true;
   // It joins the lane moving, as such cars always did: the move ends where the car's kerb slide begins.
   const edge = kerbStart(lane);
-  const move = (plannedTimes() ? doorTimes(c, key, edge, 'out', look.kind)?.move : undefined) ?? TURN_OUT_MOVE - TURN_OUT;
+  const plan = doorTimes(c, key, edge, 'out', look.kind);
+  const move = (plan && (plannedTimes() || swingsRound(plan)) ? plan.move : undefined) ?? TURN_OUT_MOVE - TURN_OUT;
   leg.door = { uid: DOOR_UID + leg.tag, goAt: c.clock + move, lane: edge, key };
   tell(c, 'out', leg.door.uid, key, leg.door.lane, 0, move, look);
   return move <= STEP / 2;

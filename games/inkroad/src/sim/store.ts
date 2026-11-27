@@ -1,6 +1,7 @@
 /** Every car, as struct of arrays, and the queue operations that keep lanes ordered. */
 import { MAX_CARS } from './constants';
 import { angleDiff } from './geom';
+import { slideLength } from './kinematics';
 import { LANE_T, poseAt, type Pose, type Track } from './track';
 import { LENGTH_OF, SPEED_OF, isBus } from './tune';
 import type { CarsView } from './types';
@@ -175,8 +176,10 @@ export class CarStore implements CarsView {
     this.offX[i] = x - POSE.x;
     this.offY[i] = y - POSE.y;
     this.offH[i] = angleDiff(POSE.h, h);
-    this.offLeft[i] = over;
-    this.offLen[i] = over;
+    // Never a sideways move tighter than a car turns (a lane change, a redirect, a kerb swing).
+    const len = Math.max(over, slideLength(Math.hypot(this.offX[i]!, this.offY[i]!)));
+    this.offLeft[i] = len;
+    this.offLen[i] = len;
   }
 }
 

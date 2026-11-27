@@ -60,6 +60,8 @@ export function askWay(sim: Sim, i: number): boolean {
   if (c.ticket[i] === 0) c.ticket[i] = sim.time;
   const { lane, exit } = exitOf(sim, i, conn, o);
   if (!hasRoom(sim, i, lane)) return false;
+  // A turn-round folds back on itself: one car in it at a time.
+  if (conn.turnRound && conn.occ.length > 0) return false;
   const n = sim.world.nodes[conn.node]!;
   const ok = conn.free || (n.kind === 'ring' ? ringClear(sim, i, conn, n, d) : turnClear(sim, i, conn, n, d));
   if (ok) {

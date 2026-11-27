@@ -9,7 +9,7 @@ const INCOME: Readonly<Record<keyof Ledger['income'], string>> = {
   parking: 'Parking fees', fines: 'Fines', tolls: 'Tolls', fares: 'Fares', zone: 'Zone charge', grant: 'Matching grant', auction: 'Plate auction', float: 'Company float', budget: 'Council budget',
 };
 const COSTS: Readonly<Record<keyof Ledger['costs'], string>> = {
-  building: 'Building', land: 'Land', upkeep: 'Upkeep', transit: 'Buses and trains', staff: 'Inspectors', interest: 'Interest',
+  building: 'Building', land: 'Land', repairs: 'Repairs', parks: 'Car parks', transit: 'Buses and trains', staff: 'Inspectors', interest: 'Interest',
 };
 export const PRICE_NAMES: Readonly<Record<keyof Prices, string>> = {
   park: 'Parking, off-peak', parkPeak: 'Parking, peak', fine: 'Parking fine', toll: 'Toll, off-peak', tollPeak: 'Toll, peak', fare: 'Fare', zone: 'Zone charge',

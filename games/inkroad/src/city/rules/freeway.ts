@@ -44,10 +44,11 @@ export const boulevard: Handler<'boulevard'> = {
     if (!r?.freeway) return no('Pick a piece of the freeway');
     if (r.works > 0) return no('Men with shovels are here already');
     const cost = (polyLength(r.line) / CELL) * ROADS.boulevard.cost * FREEWAY.share * nightRate(c);
-    return priced(c, cost, { ...roadWorks(c, FREEWAY.works), line: r.line, warn: 'People will grumble first and stroll later' });
+    return priced(c, cost, { ...roadWorks(c, FREEWAY.works), paydays: true, line: r.line, warn: 'People will grumble first and stroll later' });
   },
   run(c, cmd) {
     const r = roadById(c, cmd.road)!;
+    // Counted in paydays: the piece becomes its park on the night its digs are done.
     const left = worksLeft(c, FREEWAY.works);
     const net = setRoad(c.net, r.id, { type: 'boulevard', works: left, nightWorks: c.policies.nightWorks });
     commitNetwork(c, patchRoad(net, r.id, { condition: 1 }));

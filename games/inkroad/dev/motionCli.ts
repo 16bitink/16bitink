@@ -11,7 +11,7 @@ import { CATALOGUE } from '../test/motion/catalogue';
 import type { MotionSwitches } from '../src/sim/switches';
 
 type Env = Readonly<Record<string, string | undefined>>;
-const NAMES: readonly (keyof MotionSwitches)[] = ['PLANNED_TIMES', 'ROOMY_CORNERS', 'GAP_ACCEPT', 'ROAD_STOPS'];
+const NAMES: readonly (keyof MotionSwitches)[] = ['PLANNED_TIMES', 'ROOMY_CORNERS', 'GAP_ACCEPT', 'ROAD_STOPS', 'HONEST_SWINGS'];
 const TIMELINE = 40;
 
 export function parseSwitches(args: readonly string[], env: Env): Partial<MotionSwitches> {
@@ -67,8 +67,8 @@ function detail(r: RunResult, args: readonly string[]): string {
   return out.join('\n');
 }
 
-const OFF: MotionSwitches = { PLANNED_TIMES: false, ROOMY_CORNERS: false, GAP_ACCEPT: false, ROAD_STOPS: false };
-const ON: MotionSwitches = { PLANNED_TIMES: true, ROOMY_CORNERS: true, GAP_ACCEPT: true, ROAD_STOPS: true };
+const OFF: MotionSwitches = { PLANNED_TIMES: false, ROOMY_CORNERS: false, GAP_ACCEPT: false, ROAD_STOPS: false, HONEST_SWINGS: false };
+const ON: MotionSwitches = { PLANNED_TIMES: true, ROOMY_CORNERS: true, GAP_ACCEPT: true, ROAD_STOPS: true, HONEST_SWINGS: true };
 /** Rules shown in the main-failure column when no other expectation fails. */
 const TOP_RULES = 2;
 
@@ -101,7 +101,7 @@ export function table(): string {
 export function main(args: readonly string[], env: Env): string {
   const name = args.find((a) => !a.startsWith('--') && !a.includes('=')) ?? 'all';
   const switches = parseSwitches(args, env);
-  const runs: Partial<MotionSwitches>[] = args.includes('--both') ? [{ PLANNED_TIMES: false, ROOMY_CORNERS: false, GAP_ACCEPT: false, ROAD_STOPS: false }, { PLANNED_TIMES: true, ROOMY_CORNERS: true, GAP_ACCEPT: true, ROAD_STOPS: true }] : [switches];
+  const runs: Partial<MotionSwitches>[] = args.includes('--both') ? [{ PLANNED_TIMES: false, ROOMY_CORNERS: false, GAP_ACCEPT: false, ROAD_STOPS: false, HONEST_SWINGS: false }, { PLANNED_TIMES: true, ROOMY_CORNERS: true, GAP_ACCEPT: true, ROAD_STOPS: true, HONEST_SWINGS: true }] : [switches];
   if (name === 'table') return table();
   if (name === 'list') return CATALOGUE.map((k) => `${k.id.padEnd(34)} ${k.built ? 'built' : 'todo '} ${k.expect}`).join('\n');
   const picked = name === 'all' ? SCENARIOS : SCENARIOS.filter((s) => s.id === name || s.id.startsWith(name));

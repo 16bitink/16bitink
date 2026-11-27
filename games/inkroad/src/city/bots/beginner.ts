@@ -1,6 +1,6 @@
 import type { CityView, Command } from '../../sim/types';
 import { METROS, ROADS } from './atlas';
-import { kerbNear, liftWorst, parkNear, sickest, tryIt, lineThrough, worstMovement, type Bot } from './tools';
+import { kerbNear, liftWorst, mendBusy, parkNear, sickest, tryIt, lineThrough, worstMovement, type Bot } from './tools';
 
 /** Does nothing but close cards. */
 export const nobody: Bot = { name: 'nobody', act: () => undefined };
@@ -8,6 +8,11 @@ export const nobody: Bot = { name: 'nobody', act: () => undefined };
 const RED_WAIT = 9;
 const CRAMMED = 0.9;
 const FIRST_BRIDGE = 7;
+/** A beginner mends what Dewy names (the worst busy worn road), one a night, keeping a little back. */
+const BEGINNER_RESERVE = 30;
+const BEGINNER_MENDS = 1;
+/** Streets points a worn road costs when Dewy names it (src/guide/advisor/problems.ts). */
+const DEWY_NAMES = 0.3;
 
 /** The cheapest thing that might help the reddest junction. */
 function fixJunction(city: CityView, node: number): boolean {
@@ -53,6 +58,8 @@ export const beginner: Bot = {
     if (moment === 'yearStart' || moment === 'dawn') return;
     followCoach(city, attempt);
     for (const s of sickest(city, RED_WAIT).slice(0, 1 + attempt)) fixJunction(city, s.node.id);
+    // Dewy names the worst busy worn road: a beginner mends it when the purse allows.
+    if (moment === 'review') mendBusy(city, BEGINNER_MENDS, BEGINNER_RESERVE, DEWY_NAMES);
     const moan = moment === 'review' ? city.complaints.find((x) => x.bar === 'parking') : undefined;
     if (moan && !kerbNear(city, moan.at)) parkNear(city, moan.at, ['lot', 'multi'], city.money);
   },

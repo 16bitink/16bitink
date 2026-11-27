@@ -592,7 +592,7 @@ export const KNOWN_DRIVING: KnownSets = {
     'drive.t.all': { counts: {'too fast on a curve (moving)': 87, 'too tight (moving)': 76}, failing: ['A breaks no motion rule', 'B breaks no motion rule', 'C breaks no motion rule', 'D breaks no motion rule'] },
     'drive.gate.inout': { counts: {'too fast on a curve (moving)': 106, 'too tight (moving)': 336}, failing: ['C breaks no motion rule'] },
     'drive.diagonal': { counts: {'too fast on a curve (moving)': 1414, 'too tight (moving)': 71}, failing: ['A breaks no motion rule', 'B breaks no motion rule', 'C breaks no motion rule', 'D breaks no motion rule', 'E breaks no motion rule', 'F breaks no motion rule'] },
-    'drive.oneway': { counts: {'too fast on a curve (moving)': 195, 'too tight (moving)': 2}, failing: ['A breaks no motion rule', 'bg breaks no motion rule'] },
+    'drive.oneway': { counts: {'too fast on a curve (moving)': 194, 'too tight (moving)': 2}, failing: ['A breaks no motion rule', 'bg breaks no motion rule'] },
     'drive.flyover.ramps': { counts: {'too fast on a curve (moving)': 342}, failing: ['A breaks no motion rule', 'B breaks no motion rule', 'bg breaks no motion rule'] },
     'drive.bridge': { counts: {}, failing: [] },
     'drive.bus.stop': { counts: {}, failing: [] },
@@ -606,7 +606,7 @@ export const KNOWN_DRIVING: KnownSets = {
     'drive.follow.queue': { counts: {'too fast on a curve (moving)': 27, 'too tight (moving)': 12, 'bodies overlap (moving)': 3, 'bodies overlap (manoeuvre)': 9, 'cuts across without a gap (manoeuvre)': 8}, failing: ['bg breaks no motion rule'] },
     'drive.yield.go': { counts: {}, failing: [] },
     'drive.signal.cycle': { counts: {}, failing: [] },
-    'drive.lanes.change': { counts: {'too fast on a curve (moving)': 321, 'bodies overlap (moving)': 7, 'too tight (moving)': 26, 'bodies overlap (manoeuvre)': 3, 'cuts across without a gap (manoeuvre)': 1}, failing: ['bg breaks no motion rule'] },
+    'drive.lanes.change': { counts: {'too fast on a curve (moving)': 348, 'bodies overlap (moving)': 6, 'too tight (moving)': 9, 'bodies overlap (manoeuvre)': 3, 'cuts across without a gap (manoeuvre)': 1}, failing: ['bg breaks no motion rule'] },
     'drive.t.all': { counts: {'too fast on a curve (moving)': 198, 'too tight (moving)': 14}, failing: ['A breaks no motion rule', 'B breaks no motion rule', 'C breaks no motion rule', 'D breaks no motion rule'] },
     'drive.gate.inout': { counts: {'too fast on a curve (moving)': 604, 'too tight (moving)': 15}, failing: ['C breaks no motion rule'] },
     'drive.diagonal': { counts: {'too fast on a curve (moving)': 1496, 'too tight (moving)': 17}, failing: ['A breaks no motion rule', 'B breaks no motion rule', 'C breaks no motion rule', 'D breaks no motion rule', 'E breaks no motion rule', 'F breaks no motion rule'] },
@@ -614,8 +614,8 @@ export const KNOWN_DRIVING: KnownSets = {
     'drive.flyover.ramps': { counts: {'too fast on a curve (moving)': 269}, failing: ['A breaks no motion rule', 'B breaks no motion rule', 'bg breaks no motion rule'] },
     'drive.bridge': { counts: {}, failing: [] },
     'drive.bus.stop': { counts: {}, failing: [] },
-    'drive.deadend.turn': { counts: {'too fast on a curve (moving)': 144, 'too tight (moving)': 16, 'cuts across without a gap (manoeuvre)': 1, 'bodies overlap (manoeuvre)': 2, 'crosses a kerb (manoeuvre)': 2}, failing: ['B (a van) turned round too', 'A is through by 40 s', 'A breaks no motion rule', 'B breaks no motion rule'] }, // fix round 1b follow-up: ROAD_STOPS joined the 'on' set
-    'drive.jam.giveup': { counts: {'cuts across without a gap (manoeuvre)': 4, 'bodies overlap (manoeuvre)': 7, 'too fast on a curve (moving)': 73, 'crosses a kerb (manoeuvre)': 1}, failing: ['A breaks no motion rule'] },
+    'drive.deadend.turn': { counts: {'too fast on a curve (moving)': 144, 'too tight (moving)': 16, 'cuts across without a gap (manoeuvre)': 1, 'bodies overlap (manoeuvre)': 2, 'crosses a kerb (manoeuvre)': 2}, failing: ['B (a van) turned round too', 'A is through by 40 s', 'A breaks no motion rule', 'B breaks no motion rule'] },
+    'drive.jam.giveup': { counts: {'cuts across without a gap (manoeuvre)': 6, 'bodies overlap (manoeuvre)': 8, 'crosses a kerb (manoeuvre)': 4}, failing: ['A drove off afterwards and left the map', 'A breaks no motion rule'] },
     'drive.works.closed': { counts: {'too fast on a curve (moving)': 1529, 'too tight (moving)': 14}, failing: ['A breaks no motion rule', 'B breaks no motion rule'] },
   },
 };

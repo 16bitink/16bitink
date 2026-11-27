@@ -9,7 +9,7 @@ import type { Id, JunctionStats, Movement, Pt, RoadStats } from './types';
 
 interface Window { readonly cars: Float64Array; readonly wait: Float64Array; at: number }
 interface Count { cars: number; wait: number; held: number; lastCars: number; lastWait: number; lastHeld: number }
-interface RoadCount { flow: number; ratio: number; queue: number; lastFlow: number; lastRatio: number; lastQueue: number; sumRatio: number; sumQueue: number; n: number; entered: number }
+interface RoadCount { flow: number; ratio: number; queue: number; lastFlow: number; lastRatio: number; lastQueue: number; sumRatio: number; sumQueue: number; n: number; entered: number; cars: number; lastCars: number }
 
 const RECENT = 30; // seconds, for road flow
 const EVERY = 5; // steps
@@ -23,7 +23,7 @@ const DAWN = 8; // seconds
 const PAUSE_WAIT = 1.5;
 
 const newCount = (): Count => ({ cars: 0, wait: 0, held: 0, lastCars: 0, lastWait: 0, lastHeld: 0 });
-const newRoad = (): RoadCount => ({ flow: 0, ratio: 1, queue: 0, lastFlow: 0, lastRatio: 1, lastQueue: 0, sumRatio: 0, sumQueue: 0, n: 0, entered: 0 });
+const newRoad = (): RoadCount => ({ flow: 0, ratio: 1, queue: 0, lastFlow: 0, lastRatio: 1, lastQueue: 0, sumRatio: 0, sumQueue: 0, n: 0, entered: 0, cars: 0, lastCars: 0 });
 
 export class Measure {
   private readonly moves = new Map<string, Count>();
@@ -58,7 +58,9 @@ export class Measure {
   /** Car i has come through `o` onto link l. Ramps pass its waiting on to the junction they serve. */
   entered(i: number, l: LinkRt, o: OutOpt | null): void {
     const c = this.sim().cars;
-    this.road(l.road.id).entered++;
+    const m = this.road(l.road.id);
+    m.entered++;
+    m.cars++;
     if (!o) { c.linkWait[i] = 0; return; }
     const fly = o.from.road.flyover;
     if (fly) this.add(fly.node, fly.fromRoad, fly.toRoad, c.linkWait[i]!);
@@ -196,7 +198,7 @@ export class Measure {
     this.elapsed = 0;
     for (const k of this.moves.values()) k.cars = k.wait = k.held = 0;
     this.windows.clear();
-    for (const r of this.roads.values()) Object.assign(r, { flow: 0, ratio: 1, queue: 0, sumRatio: 0, sumQueue: 0, n: 0, entered: 0 });
+    for (const r of this.roads.values()) Object.assign(r, { flow: 0, ratio: 1, queue: 0, sumRatio: 0, sumQueue: 0, n: 0, entered: 0, cars: 0 });
     for (const l of this.sim().world.links) l.time = l.freeTime;
     this.waiting = new Map();
   }
@@ -207,6 +209,7 @@ export class Measure {
     this.live = false;
     for (const k of this.moves.values()) { k.lastCars = k.cars; k.lastWait = k.wait; k.lastHeld = k.held; }
     for (const r of this.roads.values()) {
+      r.lastCars = r.cars;
       if (r.n === 0) continue;
       r.lastRatio = r.sumRatio / r.n;
       r.lastQueue = r.sumQueue / r.n;
@@ -273,8 +276,8 @@ export class Measure {
 
   roadStats(id: Id): RoadStats {
     const r = this.roads.get(id);
-    if (!r) return { flow: 0, speedRatio: 1, queue: 0 };
-    return this.live ? { flow: r.flow, speedRatio: r.ratio, queue: r.queue } : { flow: r.lastFlow, speedRatio: r.lastRatio, queue: r.lastQueue };
+    if (!r) return { flow: 0, speedRatio: 1, queue: 0, cars: 0 };
+    return this.live ? { flow: r.flow, speedRatio: r.ratio, queue: r.queue, cars: r.cars } : { flow: r.lastFlow, speedRatio: r.lastRatio, queue: r.lastQueue, cars: r.lastCars };
   }
 }
 

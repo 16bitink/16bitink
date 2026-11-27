@@ -1,7 +1,7 @@
 import { moveSeconds, planMove, roadSplit, type Mode } from '../sim/parkMove';
 import { sizeOf } from '../sim/vehicleSize';
 import { MOTION_SWITCHES } from '../sim/switches';
-import type { Pose } from '../sim/drivePath';
+import { turning, type Pose } from '../sim/drivePath';
 import { pointAt } from '../sim/geom';
 import { halfWidth, laneOffset, lanesPerLink } from '../sim/roadGeom';
 import { streetLoose } from '../sim/roadSlots';
@@ -26,7 +26,12 @@ export interface MoveTimes {
   /** The slot is across the road: the far lanes are crossed, at `at`. */
   readonly cross: boolean;
   readonly at: Access | null;
+  /** The path's whole heading change (rad): over SWING it swings the car round, so it always takes its own time. */
+  readonly turn: number;
 }
+
+/** A move that turns the car more than this (rad) swings it round (a U, a three-point turn): never squeezed into a fixed second. */
+export const SWING = 2;
 
 /** Kerb and street cars stand this far outside the paved width (the renderer's kerb stripe and half a car). */
 export const KERB_OUT = 1.1 + 3.6;
@@ -94,6 +99,15 @@ function roadAt(c: City, e: Standing, lane: LanePose): { road: Road; s: number }
   return road ? { road, s: sAlong(road, lane) } : null;
 }
 
+/** The move swings the car round and the HONEST_SWINGS switch asks for its own time. */
+export const swingsRound = (t: MoveTimes): boolean => MOTION_SWITCHES.HONEST_SWINGS && t.turn > SWING;
+
+/** The planned times when the switch asks for them, or when the move swings the car round (SWING): null keeps the fixed seconds. */
+export function honestTimes(c: City, e: Standing, lane: LanePose | null, dir: 'in' | 'out', planned: boolean): MoveTimes | null {
+  const t = lane ? moveTimes(c, e, lane, dir) : null;
+  return t && (planned || swingsRound(t)) ? t : null;
+}
+
 export function moveTimes(c: City, e: Standing, lane: LanePose, dir: 'in' | 'out'): MoveTimes | null {
   const slot = slotOfStanding(c, e, lane);
   const on = e.spot.kind === 'double' ? null : roadAt(c, e, lane);
@@ -108,7 +122,7 @@ export function moveTimes(c: City, e: Standing, lane: LanePose, dir: 'in' | 'out
   const split = on ? roadSplit(plan, dir, band.centre, band.half, sizeOf(e.kind)) : plan.split;
   const t = moveSeconds(plan, dir, split);
   const laneS = t.lane * SLACK;
-  return { lane: laneS, move: laneS + t.off * SLACK, split, cross, at: on ? { road: on.road.id, s: on.s } : null };
+  return { lane: laneS, move: laneS + t.off * SLACK, split, cross, at: on ? { road: on.road.id, s: on.s } : null, turn: turning(plan.path.segs) };
 }
 
 
@@ -123,5 +137,5 @@ export function doorTimes(c: City, key: string, lane: LanePose, dir: 'in' | 'out
   const plan = planMove('enter', lane, { x: ex + Math.cos(a) * MOUTH_IN, y: ey + Math.sin(a) * MOUTH_IN, a }, dir);
   const split = roadSplit(plan, dir, lane, LANE_HALF, sizeOf(kind));
   const t = moveSeconds(plan, dir, split);
-  return { lane: t.lane * SLACK, move: (t.lane + t.off) * SLACK, split, cross: false, at: null };
+  return { lane: t.lane * SLACK, move: (t.lane + t.off) * SLACK, split, cross: false, at: null, turn: turning(plan.path.segs) };
 }

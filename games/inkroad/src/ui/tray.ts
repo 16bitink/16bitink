@@ -4,7 +4,7 @@ import type { Complaint, Letter } from '../sim/types';
 import { Dirty, esc, Router } from './dom';
 import { pic } from './pics';
 
-const OVERLAY_NAMES: Readonly<Record<Exclude<Overlay, 'none'>, string>> = { flow: 'Flow', parking: 'Parking', anger: 'Anger', money: 'Money', condition: 'Condition' };
+const OVERLAY_NAMES: Readonly<Record<Exclude<Overlay, 'none'>, string>> = { flow: 'Flow', parking: 'Parking', anger: 'Anger', money: 'Money', condition: 'Repairs' };
 /** Until the painter makes one: a cracked road in ink. */
 const CONDITION_ICON = '<svg class="pic" viewBox="0 0 40 40"><rect x="4" y="9" width="32" height="22" rx="3" fill="#8b898f" stroke="#2a2832" stroke-width="2.5"/><path d="M12 9l5 8-4 5 6 9M27 9l-3 7 5 5" fill="none" stroke="#2a2832" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="31" cy="27" r="4" fill="#c8962a" stroke="#2a2832" stroke-width="2"/></svg>';
 const overlayIcon = (o: Exclude<Overlay, 'none'>): string => (o === 'condition' ? CONDITION_ICON : pic(`ov-${o}`));

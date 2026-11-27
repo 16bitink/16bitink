@@ -9,7 +9,7 @@ import { commitNetwork } from '../network';
 import type { City } from '../state';
 import { has, roadById } from '../state';
 import { BRIDGE_MATCH, BRIDGE_PER_CELL, BUS_LANE_PER_CELL, KERB_COST, ONE_WAY_COST, REFUND, REMOVE_COST, SQUARE_PER_CELL, TOLL_GATE, TRUCK_BAN_COST, WIDEN, WORKS } from '../tune';
-import { middle, homesBeside, isGround, landFor, needTool, nightRate, no, noAt, priced, roadWorks, worksLeft, type Handler } from './shared';
+import { middle, homesBeside, isGround, landFor, needTool, nightRate, no, noAt, priced, roadDig, roadWorks, type Handler } from './shared';
 
 const NOISY_CELLS = 1.6;
 export const cellsOf = (r: Road): number => polyLength(r.line) / CELL;
@@ -68,7 +68,8 @@ export const upgrade: Handler<'upgrade'> = {
   },
   run(c, cmd) {
     const r = roadById(c, cmd.road)!;
-    commitNetwork(c, setRoad(c.net, r.id, { type: cmd.type, works: worksLeft(c, has(c, 'precast') ? 0 : WORKS.upgrade), nightWorks: c.policies.nightWorks }));
+    // A wider road is a new road: its surface is new too.
+    commitNetwork(c, setRoad(c.net, r.id, { type: cmd.type, ...roadDig(c, has(c, 'precast') ? 0 : WORKS.upgrade), condition: 1 }));
     return midOf(r);
   },
 };

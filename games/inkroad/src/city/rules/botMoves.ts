@@ -29,9 +29,10 @@ const miniMoves = (city: CityView): readonly Move[] =>
 
 const MENDS = 3;
 function roadMoves(city: CityView): readonly Move[] {
-  const worst = (city.special?.ageing?.worst ?? []).slice(0, MENDS).flatMap((w) => [
+  // Only roads worn enough to mend (every city's roads wear; a new one is not worth a thought).
+  const worst = (city.special?.ageing?.worst ?? []).filter((w) => city.quote({ t: 'repair', road: w.road }).ok).slice(0, MENDS).flatMap((w) => [
     one(`repair ${w.road}`, 'repair', 'build', { t: 'repair', road: w.road }, 1),
-    one(`replace ${w.road}`, 'replace', 'build', { t: 'replace', road: w.road }, 2),
+    ...(city.def.rules.ageing ? [one(`replace ${w.road}`, 'replace', 'build', { t: 'replace', road: w.road }, 2)] : []),
   ]);
   const cut = city.special?.freeway?.open
     ? city.roads.filter((r) => r.freeway).slice(0, 2).map((r) => one(`boulevard ${r.id}`, 'boulevard', 'build', { t: 'boulevard', road: r.id }, 2)) : [];

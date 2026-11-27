@@ -4,5 +4,6 @@ import { SCENARIOS as CORE } from './scenarios';
 import { CITY } from './scenarios.city';
 import { DRIVING } from './scenarios.driving';
 import { PARKING } from './scenarios.parking';
+import { TURNS } from './scenarios.turns';
 
-export const ALL_SCENARIOS: readonly Scenario[] = [...CORE, ...PARKING, ...DRIVING, ...CITY];
+export const ALL_SCENARIOS: readonly Scenario[] = [...CORE, ...PARKING, ...DRIVING, ...CITY, ...TURNS];

@@ -2,6 +2,7 @@
 import { gapAcross, holdAcross } from './crossing';
 import { STEP } from './constants';
 import { angleDiff } from './geom';
+import { slideLength } from './kinematics';
 import { considerLane, think } from './drive';
 import { feel, move, plan, pose } from './motion';
 import { Measure } from './measure';
@@ -148,7 +149,8 @@ function slideFromDrawn(sim: Sim, i: number, x: number, y: number, h: number): v
   c.offY[i] = y - c.y[i]!;
   c.offH[i] = angleDiff(c.heading[i]!, h);
   // A long way to undo is undone over a longer stretch: the drawn car never runs backward or jumps (slope under 1).
-  const over = Math.max(CHANGE.length, Math.hypot(c.offX[i]!, c.offY[i]!) * SLIDE_PER_PX);
+  const off = Math.hypot(c.offX[i]!, c.offY[i]!);
+  const over = Math.max(CHANGE.length, off * SLIDE_PER_PX, slideLength(off));
   c.offLeft[i] = over;
   c.offLen[i] = over;
   c.x[i] = x; c.y[i] = y; c.heading[i] = h;

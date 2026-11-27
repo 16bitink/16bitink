@@ -39,7 +39,7 @@ export function roadPanel(c: PanelCtx, id: number): string {
   const st = c.city.roadStats(id);
   const tr = c.city.trace(id);
   const title = r.flyover ? (r.level < 0 ? 'Underpass' : 'Flyover') : `${NAMES[r.type]}${r.bridge ? ' bridge' : ''}`;
-  return `<h2>${title}</h2>${r.works > 0 ? `<p class="warn small">${worksLine(r, opensMonth(c.city, r.works))}</p>` : ''}
+  return `<h2>${title}</h2>${r.works > 0 ? `<p class="warn small">${worksLine(r, opensMonth(c.city, r.works, r.worksEnd))}</p>` : ''}
     ${kv('Cars a minute', num(st.flow))}${kv('Speed', pct(st.speedRatio))}${meter(st.speedRatio, st.speedRatio < BUSY_RATIO)}
     ${ageingBlock(c, r)}${freewayBlock(c, r)}
     ${st.queue > 0 ? kv('Queue', `${num(st.queue)} cars`) : ''}

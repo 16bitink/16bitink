@@ -105,6 +105,17 @@ export function saveProblem(def: CityDef, x: unknown): string | null {
   return ['junctions', 'roads', 'movements'].every((k) => Array.isArray(m[k])) ? null : 'bad measures';
 }
 
+/**
+ * A page of the books with every line: saves from before roads stopped costing a month have 'upkeep' (roads and
+ * car parks together) and no 'repairs'; it is shown as car parks, the only running cost of the kind left.
+ */
+function booksOf(l: Ledger | undefined): Ledger {
+  const empty = emptyLedger();
+  if (!l) return empty;
+  const { upkeep, ...costs } = l.costs as Ledger['costs'] & { readonly upkeep?: number };
+  return { income: { ...empty.income, ...l.income }, costs: { ...empty.costs, ...costs, parks: (costs.parks ?? 0) + (upkeep ?? 0) } };
+}
+
 /** The network as saved, on the city's own ground. */
 export function restoreNetwork(def: CityDef, s: CitySave): Network {
   const fresh = createNetwork(def.map, [], def.gates);
@@ -118,7 +129,7 @@ export function restoreFields(def: CityDef, s: CitySave, baseLots: readonly Lot[
     def, seed: s.seed, dice: createDice(s.dice), net: restoreNetwork(def, s), year: s.year, season: s.season, month: s.month, phase: s.phase, clock: 0, carry: 0, nextId: s.nextId,
     lots: [...baseLots.map((l, i) => restoreLot(def, l, s.lots[i])), ...s.extraLots], parks: s.parks, lines: s.lines, projects: s.projects,
     money: s.money, approval: s.approval, bars: s.bars, opening: { bars: s.bars, approval: s.approval }, lastBars: s.lastBars, yearApprovals: s.yearApprovals, yearHabits: s.yearHabits, letters: s.letters, plates: s.plates,
-    prices: s.prices, priceBase: s.priceBase, policies: s.policies, ledger: s.ledger ?? emptyLedger(), books: s.books, purse: s.purse,
+    prices: s.prices, priceBase: s.priceBase, policies: s.policies, ledger: booksOf(s.ledger), books: s.books.map(booksOf), purse: s.purse,
     techs: s.techs, techChoices: s.techChoices, commissions: s.commissions, floated: s.floated, bailouts: s.bailouts, expect: s.expect, ownership: s.ownership,
     moods: new Map(s.moods), memory: new Map(s.memory), vote: s.vote, weather: { speed: 1, crashes: 0 }, day: emptyDay(), services: new Map(),
     measures, report: s.report, complaints: s.complaints, events: [], replacedWhy: s.replacedWhy,

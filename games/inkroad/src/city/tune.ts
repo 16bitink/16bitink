@@ -100,8 +100,11 @@ export const FLOAT_MONTHS = 15;
 export const AUCTION = { base: 25, perYear: 12, perApproval: 0.5 } as const;
 export const CONTROL_LAND = 0;
 export const FLYOVER = { base: 80, perCell: 9, under: 1.45, works: 6 } as const;
-/** Months of works: widening a road or mending it takes a season, replacing it two. */
-export const WORKS = { upgrade: 3, repair: 3, replace: 6 } as const;
+/**
+ * Months of works, each a fixed stretch of the clock from the start (MONTH_SECONDS): widening or mending a road
+ * closes it for one month (the owner, November 27), replacing it (Cross Rivers) for six.
+ */
+export const WORKS = { upgrade: 1, repair: 1, replace: 6 } as const;
 export const BRIDGE_PER_CELL = 22;
 /** The share of a new bridge the Council pays, where it does (matching grants). */
 export const BRIDGE_MATCH: Readonly<Record<string, number>> = { saffron: 0.6 };
@@ -137,7 +140,11 @@ export const WEATHER_PATIENCE = 0.8;
  * (waiting for a gap, the manoeuvre): measured at 0.07 of the free-flow drive on a workday (Saffron Bay, years 1 to 6), on top of the old 1.35.
  */
 export const START_EXPECT = 1.42;
-export const EXPECT_RANGE = { min: 1.19, max: 1.47 } as const;
+/**
+ * How slow a normal trip may come to seem, as people get used to their city: `max`, and from the end of year `from` a
+ * little more each year (the owner, November 27: make it easier; a beginner's city of years 6 to 10 is slow).
+ */
+export const EXPECT_RANGE = { min: 1.19, max: 1.55, from: 5, perYear: 0.1 } as const;
 export const HABIT = 1 / 3;
 /** Points of trip score by how far past the expected ratio a trip went. */
 export const TRIP_CURVE: readonly (readonly [number, number])[] = [[0.75, 100], [0.9, 93], [1, 85], [1.12, 68], [1.25, 40], [1.4, 16], [1.6, 4], [1.8, 0]];
@@ -152,7 +159,7 @@ export const OUTRAGE = { park: [3, 3], parkPeak: [4, 3], fine: [8, 0.8], toll: [
 /** Everybody likes a ribbon: approval on the day something big opens. */
 export const RIBBON = { flyover: 3, line: 3 } as const;
 /** Homes beside a jam breathe it; lorries in the day are heard by everyone. */
-export const FUMES = { from: 7, per: 0.012, max: 8, cells: 4, lorriesFrom: 6, perLorry: 0.35, lorriesMax: 8 } as const;
+export const FUMES = { from: 7, per: 0.012, max: 8, cells: 4, lorriesFrom: 6, perLorry: 0.35, lorriesMax: 5 } as const;
 /**
  * How much a trip of each purpose weighs in the Trips bar ("a late school run hurts Trips most, a missed dinner least", the design).
  * Shopping, visits, dinners and days out weigh about half a commute: people value time on them at under half of commuting time (UK WebTAG values of time).
@@ -172,7 +179,7 @@ export const PARK_SCORE = { first: 95, perCell: 6, freeCells: 1.5, perTry: 24, i
 /** Coming home to one's own space is no news. */
 export const OWN_SPACE_WEIGHT = 0.25;
 export const PAY_SCORE = { free: 76, perCoin: 13, fineHit: 45, homeCharge: 20, normal: 0.7 } as const;
-export const STREETS = { base: 82, works: 1.6, nightWorks: 0.6, project: 2.5, crash: 4, double: 1, cut: 0.35, cutFrom: 10, landscape: 2, busy: 0.12 } as const;
+export const STREETS = { base: 82, works: 1.6, nightWorks: 0.6, project: 1.5, crash: 4, double: 1, cut: 0.35, cutFrom: 10, landscape: 2, busy: 0.12 } as const;
 export const NOISE_PER_HOME = 0.16;
 
 // ---------------------------------------------------------------- growth

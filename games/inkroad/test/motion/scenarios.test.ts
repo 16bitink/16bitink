@@ -11,6 +11,7 @@ import { ALL_SCENARIOS as SCENARIOS } from './all';
 import { KNOWN_CITY } from './scenarios.city';
 import { KNOWN_DRIVING } from './scenarios.driving';
 import { KNOWN_PARKING } from './scenarios.parking';
+import { KNOWN_TURNS } from './scenarios.turns';
 import type { KnownSets } from './known';
 import { CATALOGUE } from './catalogue';
 import type { MotionSwitches } from '../../src/sim/switches';
@@ -32,19 +33,19 @@ const KNOWN_CORE: KnownSets = {
     'park.carpark.gate-aisle': { counts: {'too tight (moving)': 15, 'too fast on a curve (moving)': 21, 'crosses a kerb (manoeuvre)': 1, 'jumps (manoeuvre)': 1}, failing: ['A leaves and is gone by 36 s', 'A breaks no motion rule'] },
     'drive.cross.right': { counts: {'too fast on a curve (moving)': 48}, failing: ['A breaks no motion rule'] },
     'drive.roundabout.exits': { counts: {'too fast on a curve (moving)': 494, 'too tight (moving)': 170, 'bodies overlap (moving)': 1}, failing: ['A breaks no motion rule', 'B breaks no motion rule', 'C breaks no motion rule'] },
-    'park.double.park-leave': { counts: {'too fast on a curve (moving)': 27, 'too tight (moving)': 12, 'bodies overlap (moving)': 1, 'bodies overlap (manoeuvre)': 6, 'cuts across without a gap (manoeuvre)': 1, 'crosses a kerb (manoeuvre)': 3}, failing: ['A leaves and is gone by 40 s', 'A breaks no motion rule'] },
+    'park.double.park-leave': { counts: {'too fast on a curve (moving)': 27, 'too tight (moving)': 12, 'bodies overlap (moving)': 1, 'bodies overlap (manoeuvre)': 2}, failing: ['A breaks no motion rule'] },
   },
 };
 
-const GROUP_KNOWN: readonly KnownSets[] = [KNOWN_CORE, KNOWN_PARKING, KNOWN_DRIVING, KNOWN_CITY];
+const GROUP_KNOWN: readonly KnownSets[] = [KNOWN_CORE, KNOWN_PARKING, KNOWN_DRIVING, KNOWN_CITY, KNOWN_TURNS];
 const KNOWN: KnownSets = {
   defaults: Object.assign({}, ...GROUP_KNOWN.map((k) => k.defaults)),
   on: Object.assign({}, ...GROUP_KNOWN.map((k) => k.on)),
 };
 
 const SETS: readonly { readonly name: 'defaults' | 'on'; readonly switches: MotionSwitches }[] = [
-  { name: 'defaults', switches: { PLANNED_TIMES: false, ROOMY_CORNERS: false, GAP_ACCEPT: false, ROAD_STOPS: false } },
-  { name: 'on', switches: { PLANNED_TIMES: true, ROOMY_CORNERS: true, GAP_ACCEPT: true, ROAD_STOPS: true } },
+  { name: 'defaults', switches: { PLANNED_TIMES: false, ROOMY_CORNERS: false, GAP_ACCEPT: false, ROAD_STOPS: false, HONEST_SWINGS: false } },
+  { name: 'on', switches: { PLANNED_TIMES: true, ROOMY_CORNERS: true, GAP_ACCEPT: true, ROAD_STOPS: true, HONEST_SWINGS: true } },
 ];
 
 const strict = (globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env.MOTION_STRICT;

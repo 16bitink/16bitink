@@ -89,7 +89,7 @@ function advance(sim: Sim, i: number): void {
     const t = c.track[i]!;
     if (c.s[i]! < t.len) return;
     const next = nextTrack(sim, i, t);
-    const barred = t.kind === LANE_T && !c.granted[i] && next !== null && sim.world.nodes[next.node]!.kind !== 'free';
+    const barred = t.kind === LANE_T && !c.granted[i] && next !== null && (sim.world.nodes[next.node]!.kind !== 'free' || next.turnRound !== null);
     if (!next || barred) { c.s[i] = t.len - TINY; c.v[i] = 0; return; }
     if (!cross(sim, i, t, next)) return;
   }
@@ -110,6 +110,9 @@ export function move(sim: Sim, i: number): void {
   if (nv === 0 && v > 0) ds = Math.min(ds, (v * STEP) / 2);
   let after = nv;
   if (ds > c.room[i]!) { ds = c.room[i]!; after = Math.min(nv, ds / STEP); }
+  // A three-point turn stops at each change of gear (the drawn car never glides through one in a step).
+  const cusp = c.track[i]!.cusps.find((k) => c.s[i]! < k - TINY && c.s[i]! + ds > k);
+  if (cusp !== undefined) { ds = cusp - c.s[i]!; after = 0; }
   c.s[i]! += ds;
   c.v[i] = after;
   if (c.offLeft[i]! > 0) c.offLeft[i] = Math.max(0, c.offLeft[i]! - ds);

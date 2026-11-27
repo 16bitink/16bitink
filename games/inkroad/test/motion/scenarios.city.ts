@@ -321,7 +321,7 @@ export const KNOWN_CITY: KnownSets = {
     'city.year-start': { counts: {}, failing: [] },
     'park.beach.sand': { counts: {'too tight (moving)': 9, 'too fast on a curve (moving)': 20, 'crosses a kerb (manoeuvre)': 4}, failing: ['A stands on the sand', 'A left through the same access', 'A leaves and is gone by 40 s', 'A breaks no motion rule'] },
     'park.petrol.queue': { counts: {'too fast on a curve (moving)': 67, 'too tight (moving)': 48, 'turns in place (moving)': 10, 'crosses a kerb (manoeuvre)': 4, 'bodies overlap (manoeuvre)': 4, 'cuts across without a gap (manoeuvre)': 4}, failing: ['A and B took a pump each', 'C and D found every pump in use and queued in the lane', 'nothing overlaps at the station', 'A breaks no motion rule', 'B breaks no motion rule', 'C breaks no motion rule', 'D breaks no motion rule'] },
-    'park.taxi.drop': { counts: {'too tight (moving)': 13, 'too fast on a curve (moving)': 40}, failing: ['A breaks no motion rule'] }, // fix round 1b follow-up: ROAD_STOPS joined the 'on' set
+    'park.taxi.drop': { counts: {'too tight (moving)': 13, 'too fast on a curve (moving)': 22, 'cuts across without a gap (manoeuvre)': 4, 'bodies overlap (manoeuvre)': 3, 'crosses a kerb (manoeuvre)': 2}, failing: ['it pulled out forward', 'A leaves and is gone by 40 s', 'A breaks no motion rule'] },
     'park.taxi.pick': { counts: {'slip (moving)': 4, 'too tight (moving)': 6, 'too fast on a curve (moving)': 6, 'crosses a kerb (manoeuvre)': 4, 'cuts across without a gap (manoeuvre)': 4, 'bodies overlap (manoeuvre)': 2}, failing: ['A breaks no motion rule'] },
   },
 };

@@ -6,7 +6,7 @@ import type { City } from '../state';
 import { has } from '../state';
 import { MAX_STOPS, MAX_VEHICLES, TRANSIT } from '../tune';
 import { linePath, runsOnRoad, syncServices } from '../transit';
-import { middle, needTool, no, noAt, precast, priced, worksLeft, type Handler } from './shared';
+import { middle, needTool, no, noAt, precast, priced, worksEnd, type Handler } from './shared';
 
 const TOOL: Readonly<Record<TransitMode, ToolId>> = { bus: 'bus', express: 'bus', tram: 'tram', metro: 'metro', boat: 'boat' };
 const NAMES: Readonly<Record<TransitMode, readonly string[]>> = {
@@ -60,7 +60,7 @@ export const line: Handler<'line'> = {
     const names = NAMES[cmd.mode];
     const made: TransitLine = {
       id: c.nextId, mode: cmd.mode, name: names[same % names.length]!, colour: c.lines.length % COLOURS, stops: cmd.stops, path,
-      vehicles: START_VEHICLES[cmd.mode], riders: 0, crowding: 0, works: worksLeft(c, q.works),
+      vehicles: START_VEHICLES[cmd.mode], riders: 0, crowding: 0, works: q.works, ...(q.works > 0 ? { ends: worksEnd(c, q.works) } : {}),
     };
     c.nextId += 1;
     c.lines = [...c.lines, made];

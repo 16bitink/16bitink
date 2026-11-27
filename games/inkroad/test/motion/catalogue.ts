@@ -43,6 +43,15 @@ export const CATALOGUE: readonly Situation[] = [
   { id: 'drive.gate.inout', built: true, expect: 'Cars enter at a map gate and leave at another without appearing or vanishing away from the gate' },
   { id: 'drive.jam.giveup', built: true, expect: 'A car stuck in a jam gives up and pulls over to the shoulder with a forward S, then drives off when it can' },
   { id: 'drive.works.closed', built: true, expect: 'A road under works between two junctions takes no cars; through cars go round by the side streets and still arrive' },
+  // ---- driveways and turning round (the owner, November 27: no fast rounds, U-turns only where they fit)
+  { id: 'park.driveway.near-lane', built: true, expect: "From the near lane A turns into its driveway at a manoeuvre's pace (no swing faster than an R_MIN arc), stands off the road, later leaves forward the way it came" },
+  { id: 'park.driveway.far-lane', built: true, expect: "From the far lane A waits for oncoming B, crosses with a 3 s gap into its driveway at a manoeuvre's pace; nothing overlaps, no fast swing" },
+  { id: 'park.driveway.leave-far', built: true, expect: "A in a driveway south of the street leaves for the west: waits for a gap in the eastbound lane, pulls out across it into the westbound lane at a manoeuvre's pace, never a fast swing" },
+  { id: 'park.kerb.way-behind', built: true, expect: 'A in a kerb bay facing east leaves for the west gate on a one-lane-each-way street: turns round only as a real car can (a three-point turn at walking pace, or round by the side streets), never a fast swing or a U in the box' },
+  { id: 'drive.uturn.crossroads', built: true, expect: 'A in a kerb bay facing east leaves for the west gate: no U-turn in the crossroads (a street U does not fit at R_MIN), it drives round the block or turns round where it fits, at a real pace' },
+  { id: 'drive.uturn.deadend', built: true, expect: 'A in a bare-kerb space on a dead-end street, facing the end, leaves for the west gate: at the end it makes a three-point turn at walking pace (a street U does not fit at R_MIN), never a tight U' },
+  { id: 'drive.uturn.avenue', built: true, expect: 'At a dead-end avenue (outer lanes 27 px apart, under 2 R_MIN) A makes a three-point turn; nothing turns tighter than R_MIN or faster than a real car' },
+  { id: 'drive.uturn.roundabout', built: true, expect: 'A enters a roundabout from the south and leaves by the south arm again: anticlockwise, at the speed its radius allows (√(a·R)), no swing faster than a real car' },
   // ---- the city changing under the cars
   { id: 'city.road-removed', built: true, expect: 'A road with parked cars is removed: the cars drive away or are moved with a drawn move, never teleport' },
   { id: 'city.year-start', built: true, expect: 'A new year starts (or a save is loaded): no car jumps, appears or vanishes away from a gate or a drawn move' },

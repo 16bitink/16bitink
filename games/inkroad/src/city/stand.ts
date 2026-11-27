@@ -97,8 +97,8 @@ export function clearStanding(c: City, keep: (e: Standing) => boolean = () => fa
 // ---------------------------------------------------------------- the view
 
 const shown = new WeakMap<Spot, { readonly ver: number; readonly view: ParkingView }>();
-const VIEW_KINDS: ReadonlySet<string> = new Set(['car', 'van', 'taxi', 'truck']);
-export const viewKind = (k: VehicleKind): ParkedCar['kind'] => (VIEW_KINDS.has(k) ? k : 'car') as ParkedCar['kind'];
+/** A vehicle keeps its own kind when it stands, so it never changes look. */
+export const viewKind = (k: VehicleKind): ParkedCar['kind'] => k;
 
 function parkedOf(e: Standing): ParkedCar {
   const span = spanOf(e.spot, e.slot, e.kind);

@@ -11,7 +11,9 @@ import type { Overlay } from '../../scenes/port';
 /** Coloured washes on the ground: flow along the roads, parking, anger and money on lots. */
 const EVERY_S = 0.5;
 const FAR_ALPHA = 0.95;
-const WEAR_ALPHA = 0.8;
+const WEAR_ALPHA = 0.85;
+/** How faint an unused road is on the repairs map. */
+const WEAR_QUIET = 0.25;
 const BLOCK = { parking: 0x3f9fb0, money: 0xc99a2e } as const;
 
 export class FlowLayer {
@@ -40,7 +42,7 @@ export class FlowLayer {
 
   private drawRoads(city: CityView, scene: RoadScene, far: number, view: Box, worn: boolean): void {
     const g = this.roads.clear();
-    if (worn) { this.drawWear(g, scene, view); return; }
+    if (worn) { this.drawWear(g, city, scene, view); return; }
     const alpha = far > 0.3 ? FAR_ALPHA : 0.62;
     for (const r of scene.roads) {
       if (r.waits || !boxesMeet(r.box, view)) continue;
@@ -50,13 +52,19 @@ export class FlowLayer {
     }
   }
 
-  /** Condition: each road in one colour, green when new, red when falling apart. */
-  private drawWear(g: Phaser.GameObjects.Graphics, scene: RoadScene, view: Box): void {
+  /**
+   * Repairs: each road in one colour, green when new, red when falling apart, and strong where many drive it,
+   * faint where nobody does: the worn roads that hurt stand out.
+   */
+  private drawWear(g: Phaser.GameObjects.Graphics, city: CityView, scene: RoadScene, view: Box): void {
+    const cars = (id: number): number => city.roadStats(id).cars ?? 0;
+    const busiest = Math.max(1, ...scene.roads.map((r) => cars(r.road.id)));
     for (const r of scene.roads) {
-      if (r.waits || r.road.condition === undefined || !boxesMeet(r.box, view)) continue;
+      if (r.waits || !boxesMeet(r.box, view)) continue;
       const line = subLine(r.road.line, r.cut[0] - r.lead, r.cut[1] - r.lead);
       if (line.length < 2) continue;
-      g.fillStyle(heat(clamp(1 - r.road.condition, 0, 1) * 1.1), WEAR_ALPHA).fillPoints(ribbon(line, r.half * 0.7) as Phaser.Math.Vector2[], true, true);
+      const used = WEAR_QUIET + (1 - WEAR_QUIET) * Math.min(1, cars(r.road.id) / busiest);
+      g.fillStyle(heat(clamp(1 - (r.road.condition ?? 1), 0, 1) * 1.1), WEAR_ALPHA * used).fillPoints(ribbon(line, r.half * 0.7) as Phaser.Math.Vector2[], true, true);
     }
   }
 

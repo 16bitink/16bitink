@@ -36,7 +36,8 @@ export function quote(c: City, cmd: Command): Quote {
 export function apply(c: City, cmd: Command): Quote {
   const q = quote(c, cmd);
   if (!q.ok) return q;
-  spend(c, 'building', q.cost - q.land);
+  // Mending is its own line on the books: what the roads cost now that they cost nothing a month.
+  spend(c, cmd.t === 'repair' || cmd.t === 'replace' ? 'repairs' : 'building', q.cost - q.land);
   spend(c, 'land', q.land);
   const at = handlerOf(cmd)!.run(c, cmd, q);
   if (!QUIET.has(cmd.t)) emit(c, { t: 'built', what: cmd.t, at });

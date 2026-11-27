@@ -89,6 +89,15 @@ export const COMPLAINTS: Readonly<Record<string, readonly string[]>> = {
     'They are digging near {place}. They found a pipe and a sandal.',
     'There is {dust} in {place}, {dust} in the bed, {dust} in the {snack}.',
   ],
+  worn: [
+    'The road by {place} is all holes. I drive it every day, slowly, like a waiter with soup.',
+    'The road by {place} is crumbling. I can feel every crack in my teeth.',
+    'My car rattles all the way down the road by {place}. So do I.',
+  ],
+  pothole: [
+    'A hole on the road by {place} ate my wheel. It is still hungry.',
+    'There is a hole by {place} so deep the ducks swim in it.',
+  ],
   crash: ['Bent bumper near {place}. Everyone got out to look at it. Everyone.'],
   happy: [
     'I got from {place} to work without humming. I missed the humming.',

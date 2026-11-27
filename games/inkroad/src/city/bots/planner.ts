@@ -3,7 +3,7 @@ import { worstBar } from '../approval';
 import { specialYearEnd } from '../rules/botMoves';
 import type { Family, Move } from './moves';
 import { costOf, follow, stepsOf } from './playbook';
-import { tryIt, type Bot } from './tools';
+import { mendBusy, tryIt, type Bot } from './tools';
 
 /**
  * A good player by rule: it looks at the bar that hurts, takes the answers that help that bar in the
@@ -14,6 +14,10 @@ const TECH_ORDER = ['smart', 'bigbus', 'stagger', 'schoolbus', 'precast', 'app',
 const CHANGES = 3;
 const CALM = 74;
 const RESERVE = 25;
+/** Worn busy roads mended a night, worst first. */
+const MENDS = 3;
+/** A planner mends a busy road before it costs half a Streets point. */
+const MEND_FROM = 0.2;
 /** A family bot has the whole night for its one sort of answer. */
 const PER_NIGHT = 4;
 
@@ -23,6 +27,7 @@ function desk(city: CityView): void {
   if (city.openPolicies.includes('inspectors') && city.policies.inspectors < 2) set({ inspectors: 2 });
   if (city.openPolicies.includes('nightWorks') && !city.policies.nightWorks) set({ nightWorks: true });
   for (const x of city.commissions) if (x.state === 'offered') city.apply({ t: 'commission', id: x.id, take: true });
+  mendBusy(city, MENDS, RESERVE, MEND_FROM);
   if (city.vote && city.vote.kept === null && !city.vote.running && city.vote.seasons >= 2 && city.vote.support >= 50) tryIt(city, { t: 'vote', keep: true });
 }
 

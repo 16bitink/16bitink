@@ -225,3 +225,33 @@ export function closest(r: RunResult, who: string, p: Pt): { t: number; d: numbe
 }
 
 export { lotRect };
+
+/** A turn of this much (rad) is a swing round, and takes a real car at least ROUND_S (an R_MIN arc at manoeuvre pace, played). */
+const ROUND = (2 * Math.PI) / 3;
+const ROUND_S = (ROUND * 18.5) / (17.5 * 1.25);
+
+/** The quickest the car swung round (ROUND rad of heading, moving or manoeuvring) in seconds, and where; Infinity if it never did. */
+export function quickestRound(r: RunResult, who: string): { s: number; t: number; x: number; y: number } {
+  const list = samplesOf(r, who).filter((s) => s.state !== 'parked');
+  let best = { s: Infinity, t: 0, x: 0, y: 0 };
+  const cum: number[] = [0];
+  for (let i = 1; i < list.length; i++) {
+    const join = list[i]!.frame - list[i - 1]!.frame <= 2;
+    cum.push(cum[i - 1]! + (join ? Math.atan2(Math.sin(list[i]!.a - list[i - 1]!.a), Math.cos(list[i]!.a - list[i - 1]!.a)) : 0));
+  }
+  for (let i = 0, j = 0; i < list.length; i++) {
+    while (j < i && Math.abs(cum[i]! - cum[j]!) >= ROUND) {
+      const s = list[i]!.t - list[j]!.t;
+      if (s < best.s) best = { s, t: list[j]!.t, x: list[j]!.x, y: list[j]!.y };
+      j++;
+    }
+  }
+  return best;
+}
+
+/** No swing round faster than a real car can drive it (120 degrees on an R_MIN arc at the manoeuvre pace). */
+export function roundsAtPace(r: RunResult, who: string): Expectation {
+  const q = quickestRound(r, who);
+  return expect(`${who} swings round no faster than a real car (120 deg in ${ROUND_S.toFixed(1)} s or more)`, q.s >= ROUND_S * 0.9,
+    q.s === Infinity ? 'never swung round' : `quickest ${q.s.toFixed(2)} s at ${q.t.toFixed(1)} s (${q.x.toFixed(0)},${q.y.toFixed(0)})`);
+}

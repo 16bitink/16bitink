@@ -12,7 +12,7 @@ import { emit, lotById, type City } from './state';
 import { AISLE_SPEED, BAY_PX, PARK_IN, PARK_IN_MOVE, PARK_OUT, PARK_OUT_MOVE, TURN_IN, TURN_IN_MOVE, TURN_OUT, TURN_OUT_MOVE } from './tune';
 import { STEP } from '../sim/constants';
 import { kerbStart } from './door';
-import { KERB_OUT, moveTimes, slotOfStanding } from './moveTimes';
+import { honestTimes, KERB_OUT, moveTimes, slotOfStanding } from './moveTimes';
 import { halfWidth, laneOffset, lanesPerLink } from '../sim/roadGeom';
 import { GAME_PACE, GAP_S, R_MIN } from '../sim/kinematics';
 import { polyLength } from './geometry';
@@ -238,7 +238,8 @@ export function turnIn(c: City, uid: number, e: Standing | null, hold?: number, 
   if (!e) { c.traffic.remove(uid); return; }
   const lane = c.traffic.poseOf(uid);
   // A car stopped on the road (src/city/kerbside.ts stopOnRoad) eases onto its line by its drawn path's own time.
-  const timed = (plannedTimes() || (e.spot.kind === 'double' && e.lat !== undefined)) && lane ? moveTimes(c, e, lane, 'in') : null;
+  // A move that swings the car round always takes its drawn path's own time (never a U in a fixed second).
+  const timed = honestTimes(c, e, lane, 'in', plannedTimes() || (e.spot.kind === 'double' && e.lat !== undefined));
   // Across the road: wait for a gap in the far lanes, then hold them while the body is in them.
   const at = lane && e.spot.kind !== 'double' ? across(c, e, lane, 'in', timed) : null;
   const wait = at && lane ? c.traffic.gapAcross(at, lane.a, CROSS_GAP) : 0;
@@ -259,7 +260,7 @@ function blockedAt(e: Standing, at: Access): Access {
 
 /** A car already off the road (the traffic let it go) is shown stopping at `lane`, then onto the shoulder. */
 export function shoulderFrom(c: City, e: Standing, lane: LanePose, hold: number): void {
-  const timed = plannedTimes() ? moveTimes(c, e, lane, 'in') : null;
+  const timed = honestTimes(c, e, lane, 'in', plannedTimes());
   const move = hold + (timed ? timed.move : SHOULDER_MOVE);
   e.readyAt = c.clock + move;
   tell(c, 'in', e, lane, hold, move);
@@ -289,7 +290,7 @@ export function readyAtEdge(c: City, e: Standing, req: SpawnRequest): boolean {
   // timed by its drawn path at the manoeuvre paces, never squeezed into the fixed second (the whole path is the
   // move's own part: shoulderOut's split is its length).
   const turns = onRoadStop && turnsRound(c, e, pose);
-  const timed = (plannedTimes() && !onRoadStop) || turns ? moveTimes(c, e, pose, 'out') : null;
+  const timed = honestTimes(c, e, pose, 'out', (plannedTimes() && !onRoadStop) || turns);
   // Planned: always a held moment in the lane, so the moving car starts where the drawn one ends (no kerb slide).
   const seconds = turns ? STEP : timed ? Math.max(STEP, timed.lane) : onRoadStop && !e.shoulder ? STEP : holdOut(e.spot);
   // With no lane hold it joins the lane moving: the move ends where its kerb slide begins.

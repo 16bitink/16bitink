@@ -51,8 +51,10 @@ export interface Road {
   readonly kerb: boolean; // paid kerb bays
   readonly toll: boolean;
   readonly truckBan: boolean;
-  /** 0 = open. Paydays of road works left (months; the month under way counts once started); the road is closed to cars while > 0 (open by day with nightWorks). */
+  /** 0 = open. Months of road works (as quoted); the road is closed to cars while > 0 (open by day with nightWorks). */
   readonly works: number;
+  /** The city's clock (`cityTime`) when the works end: a fixed stretch from their start. Absent: they end at paydays (`works` left). */
+  readonly worksEnd?: number;
   readonly nightWorks: boolean;
   /** Roads that exist at the start and can't be removed (map entries). */
   readonly fixed: boolean;
@@ -60,7 +62,7 @@ export interface Road {
   readonly tunnel?: boolean;
   /** Twin Isles: the toll gate here follows the speed (see SpecialView.speedTolls). */
   readonly speedToll?: boolean;
-  /** Cross Rivers: 1 = new, 0 = falling apart. Absent = this city's roads don't age. */
+  /** 1 = new, 0 = falling apart: roads wear by age and use in every city. Absent = new. */
   readonly condition?: number;
   /** Cross Rivers: a piece of the old freeway that may become a boulevard. */
   readonly freeway?: boolean;
@@ -194,7 +196,9 @@ export interface TransitLine {
   readonly vehicles: number;
   readonly riders: number; // last season
   readonly crowding: number; // 0..1+
-  readonly works: number; // paydays of works left
+  readonly works: number; // months of works (paydays left when `ends` is absent)
+  /** The city's clock when the works end (see Road.worksEnd). */
+  readonly ends?: number;
   /** Seven Hills: a minibus nobody asked for. Private ones stop anywhere; licensed ones pay and behave. Not ours to change or remove (see the 'minibus' command). */
   readonly mini?: 'private' | 'licensed';
 }
@@ -228,7 +232,8 @@ export interface Policies {
 
 export interface Ledger {
   readonly income: Readonly<Record<'parking' | 'fines' | 'tolls' | 'fares' | 'zone' | 'grant' | 'auction' | 'float' | 'budget', number>>;
-  readonly costs: Readonly<Record<'building' | 'land' | 'upkeep' | 'transit' | 'staff' | 'interest', number>>;
+  /** `parks`: car parks' running costs; `repairs`: mending roads (roads themselves cost nothing a month). */
+  readonly costs: Readonly<Record<'building' | 'land' | 'repairs' | 'parks' | 'transit' | 'staff' | 'interest', number>>;
 }
 
 export interface Complaint {
@@ -302,18 +307,20 @@ export type Command =
   | { readonly t: 'speedToll'; readonly road: Id; readonly on: boolean } // Twin Isles: a gate that keeps its road at a speed
   | { readonly t: 'tollLimit'; readonly max: number } // Twin Isles, review: the dearest a speed toll may get
   | { readonly t: 'minibus'; readonly line: Id; readonly deal: 'license' | 'buyOut' } // Seven Hills
-  | { readonly t: 'repair'; readonly road: Id } // Cross Rivers: three months of works
+  | { readonly t: 'repair'; readonly road: Id } // a month of works, the surface as new (Cross Rivers: a bit better)
   | { readonly t: 'replace'; readonly road: Id } // Cross Rivers: six months, as new; bridges are matched
   | { readonly t: 'boulevard'; readonly road: Id } // Cross Rivers: this piece of freeway becomes a boulevard with a park
   | { readonly t: 'beach'; readonly id: string; readonly advice: 'sell' | 'public' | 'out' } // yearStart: the Director's word on a beach
   | { readonly t: 'next' }; // close the current card: start the year / next season / next year
 
-/** A flyover being built: paydays left. `line` is where it will run. */
+/** A flyover being built: months of works. `line` is where it will run. */
 export interface Project {
   readonly id: Id;
   readonly node: Id; readonly fromRoad: Id; readonly toRoad: Id; readonly level: 1 | -1;
   readonly line: readonly Pt[];
   readonly left: number;
+  /** The city's clock when it opens (see Road.worksEnd); absent: when `left` paydays have passed. */
+  readonly ends?: number;
 }
 
 export interface Quote {
@@ -324,9 +331,9 @@ export interface Quote {
   readonly cost: number;
   /** The part of `cost` that buys land. */
   readonly land: number;
-  /** Months of works, whole ones: the rest of a month under way comes on top. */
+  /** Months of works: each a fixed stretch of the clock (about 60 s) from the moment they start. */
   readonly works: number;
-  /** With works: the month (0 = March) it is open again, at the payday before it. */
+  /** With works: the month (0 = March) it is open again in. */
   readonly opens?: number;
   /** The works dig up a road: true closes it to cars, false works by night and leaves it open. Unset: no road dug. */
   readonly closes?: boolean;
@@ -375,7 +382,8 @@ export type CityEvent =
   | { readonly t: 'toast'; readonly who: string; readonly text: string };
 
 /** Per-road and per-junction numbers the map views colour by. Over the last ~30 s (live) or the last day. */
-export interface RoadStats { readonly flow: number; readonly speedRatio: number; readonly queue: number }
+/** `cars`: cars that drove onto the road this season so far (at night, the whole last season): how much it is used. */
+export interface RoadStats { readonly flow: number; readonly speedRatio: number; readonly queue: number; readonly cars?: number }
 export interface JunctionStats { readonly wait: number; readonly cars: number; readonly grade: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' }
 
 /**
@@ -529,7 +537,7 @@ export interface ParkedCar {
   /** Stable while the car stands here; a household's car keeps its uid all season. */
   readonly uid: number;
   readonly tint: number;
-  readonly kind: 'car' | 'van' | 'taxi' | 'truck';
+  readonly kind: VehicleKind;
   readonly household?: Id;
   /** Road kinds (kerb, street, double): px along road.line where it stands, and the side (1 = right of the line's direction). */
   readonly s?: number;
@@ -623,8 +631,12 @@ export interface SpecialView {
     /** Seasons of protest left, and why. */
     readonly protest: number;
   };
+  /**
+   * Road wear, in every city. `worst`: the roads that hurt most, by how worn and how used (`cars` last season,
+   * `hurt` the Streets points they cost); the worn but unused come last.
+   */
   readonly ageing?: {
-    readonly mean: number; readonly worst: readonly { readonly road: Id; readonly condition: number }[];
+    readonly mean: number; readonly worst: readonly { readonly road: Id; readonly condition: number; readonly cars: number; readonly hurt: number }[];
     /** Share of a bridge's bill the Council pays now, 0..1. */
     readonly match: number;
   };

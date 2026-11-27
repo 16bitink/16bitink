@@ -2,6 +2,8 @@ import type { CityView, Command } from '../src/sim/types';
 import { createCity } from '../src/city/city';
 import { SAFFRON } from '../src/city/defs/saffron';
 import type { City } from '../src/city/state';
+import { SEASON_END } from '../src/city/clock';
+import { settleSeason } from '../src/city/settle';
 
 export const SEED = 7;
 export const newCity = (): CityView => createCity(SAFFRON, SEED);
@@ -10,6 +12,16 @@ export const inner = (v: CityView): City => (v as unknown as { c: City }).c;
 
 export function runDay(v: CityView): void {
   while (v.phase === 'day') v.advance(10);
+}
+
+/** A season of the city's clock passes without drawing it: its night is settled and the next dawn comes (works on the clock move on). */
+export function passSeason(c: City): void {
+  c.phase = 'day';
+  c.clock = SEASON_END;
+  settleSeason(c);
+  if (c.season === 3) { c.year += 1; c.season = 0; } else c.season = (c.season + 1) as City['season'];
+  c.phase = 'day';
+  c.clock = 0;
 }
 
 /** Close cards and run days until the next year's card (or the end). */

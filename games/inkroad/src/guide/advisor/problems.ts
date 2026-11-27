@@ -17,6 +17,8 @@ const EMPTY = 0.3;
 const CROWDED = 0.9;
 const LOW_BAR = 45;
 const WORN = 0.35;
+/** Streets points a worn road must cost before Dewy names it. */
+const HURTS = 0.3;
 const FOUND = 0.6;
 const DAWN = 34; // before this nothing has been measured
 const pc = (n: number): string => `${Math.round(n * 100)}%`;
@@ -121,10 +123,19 @@ function purse(city: CityView): Problem[] {
   return [{ id: 'money', kind: 'money', bar: 'money', score: 60, place: 'The purse is running out', cause: `We lose ${Math.round(-f)} coins a month, and hold ${Math.round(city.money)}.`, at: null, r: 0, ref: -1 }];
 }
 
+/** The worn road that hurts most: busy first (a worn road nobody drives can wait), then, in Cross Rivers, a ruin. */
 function old(city: CityView): Problem[] {
-  return (city.special?.ageing?.worst ?? []).filter((w) => w.condition < WORN).slice(0, 1).flatMap((w) => {
+  const ruins = city.def.rules.ageing !== undefined;
+  return (city.special?.ageing?.worst ?? []).filter((w) => w.hurt >= HURTS || (ruins && w.condition < WORN)).slice(0, 1).flatMap((w) => {
     const r = roadOf(city, w.road);
-    return r ? [{ id: `w${r.id}`, kind: 'worn' as const, bar: 'trips' as const, score: 34 + (WORN - w.condition) * 60, place: `Road by ${nearestLot(city, roadMid(r))?.name ?? 'the edge'}: falling apart`, cause: 'Cars crawl round the holes.', at: roadMid(r), r: 50, ref: r.id }] : [];
+    if (!r) return [];
+    const name = `Road by ${nearestLot(city, roadMid(r))?.name ?? 'the edge'}`;
+    const busy = w.hurt >= HURTS;
+    return [{
+      id: `w${r.id}`, kind: 'worn' as const, bar: 'streets' as const, score: 30 + w.hurt * 8 + Math.max(0, WORN - w.condition) * 60,
+      place: busy ? `${name} is crumbling and busy: repair it` : `${name}: falling apart`,
+      cause: busy ? `${Math.round(w.cars)} cars a season shake down it, and say so.` : 'Cars crawl round the holes.', at: roadMid(r), r: 50, ref: r.id,
+    }];
   });
 }
 

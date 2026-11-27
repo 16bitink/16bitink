@@ -118,6 +118,49 @@ export function kTurn(at: Pose): Seg[] {
   return out;
 }
 
+/** Bisection steps for the three-point turn's first leg. */
+const K_STEPS = 40;
+
+/**
+ * A three-point turn from `from` that ends facing the other way `d` px to its side (sideOf's sign): forward, back and
+ * forward again on R_MIN arcs, the first and last legs alike, so it ends level with where it began.
+ */
+function kTurnTo(from: Pose, d: number): Seg[] {
+  const way = d < 0 ? -1 : 1;
+  const legs = (t: number): Seg[] => {
+    const out: Seg[] = [];
+    let p: Pose = from;
+    for (const [turn, dir] of [[t, 1], [Math.PI - 2 * t, -1], [t, 1]] as const) {
+      const s = arc(p.x, p.y, dir > 0 ? p.a : p.a + Math.PI, way * turn, R_MIN, dir);
+      out.push(s);
+      p = endOf([s], p);
+    }
+    return out;
+  };
+  // The end's sideways offset falls steadily as the first leg grows (a long middle leg carries the car back across).
+  let lo = 0.05, hi = Math.PI / 2 - 0.01;
+  for (let i = 0; i < K_STEPS; i++) {
+    const mid = (lo + hi) / 2;
+    if (way * sideOf(from, from.a, endOf(legs(mid), from)) < Math.abs(d)) lo = mid; else hi = mid;
+  }
+  return legs((lo + hi) / 2);
+}
+
+/**
+ * Turning round where a road ends (a dead end), from the end of one lane to the start of the lane back: a forward U
+ * where the two lie at least 2 R_MIN apart, else a three-point turn. `three` says which.
+ */
+export function turnRound(from: Pose, to: Pose): { segs: Seg[]; three: boolean } {
+  const d = sideOf(from, from.a, to);
+  if (Math.abs(d) >= 2 * R_MIN) {
+    const u = csc(from, to, R_MIN, 1);
+    if (turning(u) <= Math.PI + SKEW_SLACK) return { segs: u, three: false };
+  }
+  const k = kTurnTo(from, d);
+  const end = endOf(k, from);
+  return { segs: [...k, ...onto(end, to)], three: true };
+}
+
 /** A U fits when the swing round turns little more than half a circle. */
 const U_MOST = Math.PI + 0.4;
 

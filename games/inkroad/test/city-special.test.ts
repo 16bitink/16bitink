@@ -40,9 +40,9 @@ const again = (v: CityView, def: CityDef): CityView => createCity(def, 5, JSON.p
 const DASH = /[–—]/;
 
 describe('special rules elsewhere', () => {
-  it('cost nothing in the first cities', () => {
+  it('cost nothing in the first cities (only road wear is everywhere)', () => {
     const v = start(SAFFRON, 2);
-    expect(v.special).toBeUndefined();
+    expect(Object.keys(v.special ?? {})).toEqual(['ageing']);
     expect(inner(v).rule).toBeUndefined();
     expect(throughShare(inner(v))).toBe(1);
     for (const cmd of [{ t: 'licences', quota: 100 }, { t: 'repair', road: 1 }, { t: 'boulevard', road: 1 }, { t: 'minibus', line: 1, deal: 'license' }, { t: 'speedToll', road: 1, on: true }, { t: 'tollLimit', max: 4 }] as const) expect(v.quote(cmd).ok).toBe(false);

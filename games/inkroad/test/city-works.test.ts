@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { PAYDAYS, WEEKEND_AT } from '../src/city/clock';
+import { cityTime, MONTH_SECONDS, PAYDAYS } from '../src/city/clock';
+import { createCity } from '../src/city/city';
+import { SAFFRON } from '../src/city/defs/saffron';
 import { tripAccess } from '../src/city/places';
 import { setRoad } from '../src/sim/network';
 import { closedForWorks } from '../src/sim/roadGeom';
 import type { Access } from '../src/sim/trafficTypes';
 import type { CityView, Lot, Road } from '../src/sim/types';
-import { cityAtYear, inner, ok, runDay } from './city-helpers';
+import { cityAtYear, inner, ok, runDay, SEED } from './city-helpers';
 import { TeleportWatch } from './teleport-helpers';
 
 /** Road works close a road to cars, in a whole city (docs/inkroad-build.md "Road works close the road"). */
@@ -34,13 +36,13 @@ function scene(): { v: CityView; road: Road; cut: Lot; other: Lot } {
 }
 
 describe('road works close the road, in a city', () => {
-  it('upgrading a street closes it: no car drives it, cut-off blocks keep their cars, nothing teleports, it reopens', () => {
+  it('upgrading a street closes it for one month of clock: no car drives it, cut-off blocks keep their cars, nothing teleports, it reopens', () => {
     const { v, road, cut, other } = scene();
     const c = inner(v);
     const watch = new TeleportWatch(v);
     const kept = parkedIn(v, cut);
-    // Begun 20 s into March: the rest of March, then three whole months; open again in July.
-    expect(v.quote({ t: 'upgrade', road: road.id, type: 'avenue' })).toMatchObject({ works: 3, closes: true, opens: 4 });
+    // Begun 20 s into March: one month from now, open again in April (not at a payday).
+    expect(v.quote({ t: 'upgrade', road: road.id, type: 'avenue' })).toMatchObject({ works: 1, closes: true, opens: 1 });
     ok(v, { t: 'upgrade', road: road.id, type: 'avenue' });
     const at = c.clock;
     expect(closedForWorks(c.net.roads.find((r) => r.id === road.id)!)).toBe(true);
@@ -51,29 +53,45 @@ describe('road works close the road, in a city', () => {
     // Cars on it, or already turning into it, when the works began may drive on and off it; nobody else ever enters.
     const allowed = new Set(c.traffic.carsOn(road.id));
     const entered = new Set<number>();
-    let lastOn = at, lost = 0;
-    while (v.phase === 'day') {
+    let lost = 0;
+    const dug = (): boolean => c.net.roads.find((r) => r.id === road.id)!.works > 0;
+    // The first payday (at 60 s) passes and the road stays closed: the works are a month long whatever the date.
+    while (dug() && v.phase === 'day') {
       watch.step();
       const t = c.traffic.cars;
       const moving = c.traffic.carsOn(road.id).filter((uid) => { const i = t.slotOf.get(uid); return i !== undefined && t.state[i]! < 2; });
       if (c.clock - at < 3) for (const uid of moving) allowed.add(uid);
       for (const uid of moving) if (!allowed.has(uid)) entered.add(uid);
-      if (moving.length > 0) lastOn = c.clock;
-      if (c.clock < WEEKEND_AT && kept.some((uid) => !parkedIn(v, cut).includes(uid))) lost++;
+      if (kept.some((uid) => !parkedIn(v, cut).includes(uid))) lost++;
     }
+    expect(c.clock - at).toBeGreaterThan(MONTH_SECONDS - 1.5);
+    expect(c.clock - at).toBeLessThan(MONTH_SECONDS + 1.5);
     expect([...entered]).toEqual([]);
-    expect(lastOn).toBeLessThan(WEEKEND_AT);
     expect(lost).toBe(0);
     expect(watch.counts()).toEqual({});
-    // The month it began in does not count: after the season one month of works is still to go.
-    expect(c.net.roads.find((r) => r.id === road.id)!).toMatchObject({ works: 1, type: 'avenue' });
-    v.apply({ t: 'next' });
-    while (c.clock < PAYDAYS[0] + 1) v.advance(1);
-    // June's payday: the works are done, the road is open, the cones are gone.
     const after = c.net.roads.find((r) => r.id === road.id)!;
     expect(after).toMatchObject({ works: 0, type: 'avenue' });
     expect(closedForWorks(after)).toBe(false);
     expect(tripAccess(c, other)).toEqual(c.lots.find((l) => l.id === other.id)!.access);
+  }, 120_000);
+
+  it('works begun just before a payday or late in a month still last a whole month', () => {
+    const v = cityAtYear(3);
+    const c = inner(v);
+    const street = (): Road => c.net.roads.find((r) => r.type === 'street' && r.works === 0 && v.quote({ t: 'upgrade', road: r.id, type: 'avenue' }).ok)!;
+    while (c.clock < PAYDAYS[0] - 2) v.advance(1);
+    const late = street();
+    ok(v, { t: 'upgrade', road: late.id, type: 'avenue' });
+    const begun = c.clock;
+    while (c.clock < PAYDAYS[0] + 5) v.advance(1);
+    expect(c.net.roads.find((r) => r.id === late.id)!.works).toBe(1);
+    const left = c.net.roads.find((r) => r.id === late.id)!.worksEnd! - cityTime(c);
+    expect(left + (c.clock - begun)).toBeCloseTo(MONTH_SECONDS, 5);
+    // Saved now, the time left goes with it; the day restarts at dawn and the works end as long after as they had left.
+    const back = createCity(SAFFRON, SEED, JSON.parse(JSON.stringify(v.save())));
+    const r = back.roads.find((x) => x.id === late.id)!;
+    expect(r.works).toBe(1);
+    expect(r.worksEnd! - cityTime(inner(back))).toBeCloseTo(left + c.clock, 5);
   }, 120_000);
 
   it('works always end: night works (open by day) and precast (no works at all)', () => {
@@ -82,7 +100,7 @@ describe('road works close the road, in a city', () => {
     const street = (): Road => c.net.roads.find((r) => r.type === 'street' && v.quote({ t: 'upgrade', road: r.id, type: 'avenue' }).ok)!;
     c.policies = { ...c.policies, nightWorks: true };
     const night = street();
-    expect(v.quote({ t: 'upgrade', road: night.id, type: 'avenue' })).toMatchObject({ works: 3, closes: false });
+    expect(v.quote({ t: 'upgrade', road: night.id, type: 'avenue' })).toMatchObject({ works: 1, closes: false });
     ok(v, { t: 'upgrade', road: night.id, type: 'avenue' });
     expect(closedForWorks(c.net.roads.find((r) => r.id === night.id)!)).toBe(false);
     runDay(v);

@@ -13,6 +13,17 @@ export interface Bot {
 
 export const tryIt = (city: CityView, cmd: Command): boolean => city.quote(cmd).ok && city.apply(cmd).ok;
 
+/** Mend the worn roads that hurt most (Streets points they cost), keeping `reserve` coins: at most `n` a night. */
+export function mendBusy(city: CityView, n: number, reserve: number, from = 0.5): number {
+  let done = 0;
+  for (const w of city.special?.ageing?.worst ?? []) {
+    if (done >= n || w.hurt < from) break;
+    const q = city.quote({ t: 'repair', road: w.road });
+    if (q.ok && q.cost <= city.money - reserve && city.apply({ t: 'repair', road: w.road }).ok) done += 1;
+  }
+  return done;
+}
+
 export interface Sick { readonly node: Junction; readonly wait: number; readonly pain: number }
 
 /** Junctions by how much waiting they cause, worst first. */

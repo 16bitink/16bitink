@@ -1,7 +1,7 @@
 import { CELL, MONTHS, MONTHS_PER_SEASON, STEP } from '../../sim/constants';
 import type { Refusal } from '../../sim/netGround';
 import type { Cell, Command, Pt, Quote, Road, ToolId } from '../../sim/types';
-import { PAYDAYS, paydaysDone } from '../clock';
+import { cityTime, MONTH_SECONDS, monthAt, PAYDAYS, paydaysDone } from '../clock';
 import { cellsToBlock } from '../geometry';
 import type { City } from '../state';
 import { openTools } from '../state';
@@ -17,14 +17,15 @@ export const no = (why: string): Quote => ({ ok: false, why, cost: 0, land: 0, w
 /** A refusal that shows what is in the way. */
 export const noAt = (r: Refusal): Quote => ({ ...no(r.why), at: r.at });
 
-export interface Extra { readonly land?: number; readonly works?: number; readonly closes?: boolean; readonly line?: readonly Pt[]; readonly level?: -1 | 0 | 1; readonly warn?: string; readonly note?: string }
+/** `paydays`: works that end at paydays (the old freeway's), not after a fixed stretch of the clock. */
+export interface Extra { readonly land?: number; readonly works?: number; readonly paydays?: boolean; readonly closes?: boolean; readonly line?: readonly Pt[]; readonly level?: -1 | 0 | 1; readonly warn?: string; readonly note?: string }
 
 /** A price the authority can or can't pay. */
 export function priced(c: City, building: number, x: Extra = {}): Quote {
   const land = Math.round((x.land ?? 0) * (1 + INFLATION.land * (c.year - 1)));
   const cost = Math.round(building * (1 + INFLATION.building * (c.year - 1))) + land;
   const rest = {
-    cost, land, works: x.works ?? 0, ...(x.closes !== undefined && (x.works ?? 0) > 0 ? { closes: x.closes } : {}), ...((x.works ?? 0) > 0 ? { opens: opensIn(c, x.works ?? 0) } : {}),
+    cost, land, works: x.works ?? 0, ...(x.closes !== undefined && (x.works ?? 0) > 0 ? { closes: x.closes } : {}), ...((x.works ?? 0) > 0 ? { opens: x.paydays ? opensIn(c, x.works ?? 0) : monthAt(worksEnd(c, x.works ?? 0)) } : {}),
     ...(x.line ? { line: x.line } : {}), ...(x.level !== undefined ? { level: x.level } : {}), ...(x.warn ? { warn: x.warn } : {}), ...(x.note ? { note: x.note } : {}),
   };
   return cost > c.money && cost > 0 ? { ok: false, why: `Too dear: ${cost} of ${Math.max(0, c.money)}`, ...rest } : { ok: true, ...rest };
@@ -63,6 +64,11 @@ const midMonth = (c: City): boolean => c.phase === 'day' && c.clock > (c.month =
 export const worksLeft = (c: City, months: number): number => (months > 0 && midMonth(c) ? months + 1 : months);
 /** The month (0 = March) works begun now are over in: they end at the payday before it. */
 export const opensIn = (c: City, months: number): number => (paydaysDone(c.phase, c.season, c.month) + worksLeft(c, months)) % MONTHS.length;
+/** When works of `months` begun now are over, on the city's clock: a fixed stretch, whenever in a month they start. */
+export const worksEnd = (c: City, months: number): number => cityTime(c) + months * MONTH_SECONDS;
+/** A road's works fields for `months` begun now: closed (unless by night) until the clock gets there. */
+export const roadDig = (c: City, months: number): Pick<Road, 'works' | 'worksEnd' | 'nightWorks'> =>
+  (months > 0 ? { works: months, worksEnd: worksEnd(c, months), nightWorks: c.policies.nightWorks } : { works: 0, nightWorks: c.policies.nightWorks });
 /** The night crews' tech: half as long, in whole seasons as it always was. */
 export const precast = (months: number): number => MONTHS_PER_SEASON * Math.ceil(months / (2 * MONTHS_PER_SEASON));
 /** Months of works on a road, and whether they close it (night works leave it open by day). */

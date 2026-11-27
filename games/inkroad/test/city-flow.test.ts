@@ -87,7 +87,7 @@ describe('saves', () => {
     const before = v.money;
     v.advance(90);
     const march = v.lastLedger;
-    const bills = march.costs.upkeep + march.costs.transit + march.costs.staff + march.costs.interest;
+    const bills = march.costs.parks + march.costs.transit + march.costs.staff + march.costs.interest;
     const back = createCity(SAFFRON, SEED, JSON.parse(JSON.stringify(v.save())));
     expect(back.phase).toBe('day');
     expect(back.clock).toBe(0);

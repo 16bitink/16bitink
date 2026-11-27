@@ -54,12 +54,17 @@ export class Track {
   merge: Track[] = [];
   /** Right of way can be taken without asking (bends, ramps, slips). */
   free = false;
+  /** Turning round at a dead end (src/sim/parkPaths.ts turnRound): one car at a time; a three-point turn reverses on it (`hs` is the body's heading). */
+  turnRound: 'u' | 'three' | null = null;
+  /** Px along a three-point turn where its gear changes: a car stops there before it backs up or sets off again. */
+  cusps: readonly number[] = [];
 
-  constructor(key: string, kind: TrackKind, line: readonly Pt[], vmax: number, ends: { h0?: number; h1?: number; z?: (t: number) => number } = {}) {
+  /** `ends.step`: px between the track's points (SAMPLE by default; finer for a walking-pace turn-round). */
+  constructor(key: string, kind: TrackKind, line: readonly Pt[], vmax: number, ends: { h0?: number; h1?: number; z?: (t: number) => number; step?: number } = {}) {
     this.key = key;
     this.kind = kind;
     this.vmax = vmax;
-    const pts = resample(line, SAMPLE);
+    const pts = resample(line, ends.step ?? SAMPLE);
     let len = 0;
     for (let i = 1; i < pts.length; i++) len += Math.hypot(pts[i]!.x - pts[i - 1]!.x, pts[i]!.y - pts[i - 1]!.y);
     this.len = Math.max(len, 0.5);

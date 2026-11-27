@@ -12,7 +12,7 @@ import { dawnTolls, nightTolls, speedToll, tickTolls, tollLimit, tollView } from
 
 /**
  * The special rules of cities 3 to 5, called from one place each in src/city.
- * Everything here does nothing in a city whose def.rules don't ask for it.
+ * Everything here does nothing in a city whose def.rules don't ask for it, except road wear (ageing.ts): every city's roads wear.
  */
 export const RULE_HANDLERS = { licences, speedToll, tollLimit, minibus, repair, replace: replaceRoad, boulevard, beach } as const;
 export const QUIET_RULES: readonly Command['t'][] = ['licences', 'tollLimit', 'beach'];
@@ -74,9 +74,8 @@ export function quoteRules(c: City, cmd: Command, q: Quote): Quote {
   return why ? { ...q, why } : q;
 }
 
-export function specialView(c: City): SpecialView | undefined {
-  const r = c.def.rules;
-  if (!r.licences && !r.speedTolls && !r.minibuses && !r.ageing && !r.freeway) return undefined;
+/** Every city has its road wear; the other parts only where their rule is on. */
+export function specialView(c: City): SpecialView {
   const parts = { licences: licenceView(c), speedTolls: tollView(c), minibuses: miniView(c), ageing: ageView(c), freeway: freewayView(c) };
   return Object.fromEntries(Object.entries(parts).filter(([, v]) => v !== undefined)) as SpecialView;
 }

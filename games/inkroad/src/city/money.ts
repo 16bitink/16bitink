@@ -37,7 +37,7 @@ export const total = (o: Readonly<Record<string, number>>): number => Object.val
 
 /** Income less running costs, building left out: what the desk calls the balance. */
 export const operating = (l: Ledger): number =>
-  l.income.parking + l.income.fines + l.income.tolls + l.income.fares + l.income.zone - l.costs.upkeep - l.costs.transit - l.costs.staff - l.costs.interest;
+  l.income.parking + l.income.fines + l.income.tolls + l.income.fares + l.income.zone - l.costs.parks - l.costs.transit - l.costs.staff - l.costs.interest;
 
 /** Books added line by line. */
 export function sumLedgers(list: readonly Ledger[]): Ledger {
@@ -51,7 +51,8 @@ export const lastMonth = (c: City): Ledger => c.books[c.books.length - 1] ?? emp
 
 /** A payday: this month's books go on the shelf, a new page begins. */
 export function closeBooks(c: City): void {
-  c.books = [...c.books, c.ledger].slice(-MONTHS_PER_SEASON);
+  // A season's books are its three months; paid once a season (tests), its one page.
+  c.books = [...c.books, c.ledger].slice(c.oncePaid ? -1 : -MONTHS_PER_SEASON);
   c.ledger = emptyLedger();
 }
 

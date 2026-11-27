@@ -97,3 +97,25 @@ export function paydaysDone(phase: Phase, season: number, month: number): number
   if (phase === 'yearStart') return 0;
   return season * MONTHS_PER_SEASON + (phase === 'day' ? month : MONTHS_PER_SEASON);
 }
+
+/** A month of works on the season clock: three make a season, whenever in a month they start. */
+export const MONTH_SECONDS = SEASON_END / MONTHS_PER_SEASON;
+const SEASONS_PER_YEAR = 4;
+
+/**
+ * The city's own clock, in season seconds since its first dawn. Between days it stands at the next dawn,
+ * and before the curtain rises at this one: works never run while nobody watches.
+ */
+export function cityTime(c: { readonly year: number; readonly season: number; readonly phase: Phase; readonly clock: number }): number {
+  const start = ((c.year - 1) * SEASONS_PER_YEAR + c.season) * SEASON_END;
+  if (c.phase === 'yearStart') return start;
+  return start + (c.phase === 'day' ? Math.min(SEASON_END, Math.max(0, c.clock)) : SEASON_END);
+}
+
+/** The month of the year (0 = March) a moment of the city's clock falls in. */
+export function monthAt(time: number): number {
+  const season = Math.floor(time / SEASON_END);
+  const t = time - season * SEASON_END;
+  const inSeason = PAYDAYS.findIndex((p) => t < p);
+  return ((season % SEASONS_PER_YEAR) * MONTHS_PER_SEASON + (inSeason < 0 ? MONTHS_PER_SEASON - 1 : inSeason));
+}

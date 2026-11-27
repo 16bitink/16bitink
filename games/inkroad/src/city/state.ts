@@ -46,6 +46,8 @@ export interface City {
   season: 0 | 1 | 2 | 3;
   /** The month within the season, 0..2: the paydays behind today. At a review, the season's last. */
   month: 0 | 1 | 2;
+  /** Tests only: pay a season's bills and move approval once, at its night, as before months (to check months change nothing). */
+  oncePaid?: boolean;
   phase: Phase;
   clock: number;
   carry: number; // unspent seconds
@@ -102,7 +104,7 @@ export interface City {
 
 export const emptyLedger = (): Ledger => ({
   income: { parking: 0, fines: 0, tolls: 0, fares: 0, zone: 0, grant: 0, auction: 0, float: 0, budget: 0 },
-  costs: { building: 0, land: 0, upkeep: 0, transit: 0, staff: 0, interest: 0 },
+  costs: { building: 0, land: 0, repairs: 0, parks: 0, transit: 0, staff: 0, interest: 0 },
 });
 
 export const emptyMeasures = (): Measures => ({ junctions: new Map(), roads: new Map(), movements: new Map() });

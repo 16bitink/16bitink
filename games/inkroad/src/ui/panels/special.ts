@@ -1,12 +1,14 @@
 import type { Road, TransitLine } from '../../sim/types';
 import { esc } from '../dom';
-import { num, pct } from '../format';
+import { num, pct, worksText } from '../format';
 import { kv, meter, priceTag, quoted, toggleRow, type PanelCtx } from './shared';
 
-/** The panels of cities 3 to 5: speed tolls, ageing, the freeway and minibuses, in plain words. */
-export const POOR = 0.45;
+/** The panels of cities 3 to 5 (speed tolls, the freeway and minibuses) and every city's road condition, in plain words. */
+/** Under this a road is slower and its drivers grumble (rules/ageing.ts AGE.worn, ground.ts WORN.from). */
+export const POOR = 0.7;
 
-const words = (c: number): string => (c >= 0.75 ? 'Good' : c >= 0.55 ? 'Fair' : c >= POOR ? 'Tired' : c >= 0.22 ? 'Poor' : 'Falling apart');
+/** Good, Worn, Poor, Broken: people start to grumble under 70, holes come under 45. */
+export const conditionWord = (c: number): string => (c >= 0.8 ? 'Good' : c >= 0.6 ? 'Worn' : c >= 0.4 ? 'Poor' : 'Broken');
 
 /** The speed-toll switch for a road, and what the gates are doing. */
 export function speedTollRow(c: PanelCtx, r: Road): string {
@@ -19,19 +21,27 @@ export function speedTollRow(c: PanelCtx, r: Road): string {
   return `${toggleRow('Speed toll', !!r.speedToll, 'road', 'speedToll')}${note}`;
 }
 
-/** Condition bar with Repair and Replace and their prices. */
+/** Condition bar, how much the road is driven, and Repair (Replace in Cross Rivers) with its price and works. */
 export function ageingBlock(c: PanelCtx, r: Road): string {
-  if (!c.city.special?.ageing || r.condition === undefined || r.flyover) return '';
+  if (r.flyover) return '';
+  const cond = r.condition ?? 1;
   const rep = quoted(c.city, { t: 'repair', road: r.id });
-  const rpl = quoted(c.city, { t: 'replace', road: r.id });
-  const why = [rep, rpl].find((q) => !q.ok && q.why && r.works === 0)?.why;
-  const match = r.bridge && rpl.ok && rpl.warn ? `<p class="small dim">${esc(rpl.warn)}</p>` : '';
-  return `<h3>Condition</h3>${kv('Surface', `${words(r.condition)}, ${pct(r.condition)}`)}${meter(r.condition, r.condition < POOR)}
-    <div class="choices"><button class="btn" data-act="mend" data-v="repair" ${rep.ok ? '' : 'disabled'} title="${esc(rep.why ?? 'Three months of works')}">Repair ${rep.ok ? priceTag(rep) : ''}</button>
-    <button class="btn" data-act="mend" data-v="replace" ${rpl.ok ? '' : 'disabled'} title="${esc(rpl.why ?? 'Six months, as new')}">Replace ${rpl.ok ? priceTag(rpl) : ''}</button></div>
-    ${match}${why ? `<p class="small dim">${esc(why)}</p>` : ''}
-    <p class="small dim">Repair: three months, a bit better. Replace: six months, as new.</p>`;
+  const old = c.city.def.rules.ageing !== undefined;
+  const rpl = old ? quoted(c.city, { t: 'replace', road: r.id }) : null;
+  // A sound road needs no excuse for its grey button: the reason shows once it is worn enough to mend.
+  const why = cond < MENDABLE ? [rep, rpl].find((q) => q && !q.ok && q.why && r.works === 0)?.why : undefined;
+  const hurt = c.city.special?.ageing?.worst.find((w) => w.road === r.id)?.hurt ?? 0;
+  const match = r.bridge && rpl?.ok && rpl.warn ? `<p class="small dim">${esc(rpl.warn)}</p>` : '';
+  const replace = rpl ? `<button class="btn" data-act="mend" data-v="replace" ${rpl.ok ? '' : 'disabled'} title="${esc(rpl.why ?? 'Six months, as new')}">Replace ${rpl.ok ? priceTag(rpl) : ''}</button>` : '';
+  return `<h3>Condition</h3>${kv('Surface', `${conditionWord(cond)}, ${pct(cond)}`)}${meter(cond, cond < POOR)}
+    ${hurt >= HURT_SHOWN ? `<p class="warn small">Busy and worn: people are complaining. It costs about ${num(hurt)} of Streets.</p>` : ''}
+    <div class="choices"><button class="btn" data-act="mend" data-v="repair" ${rep.ok ? '' : 'disabled'} title="${esc(rep.why ?? '')}">Repair ${rep.ok ? priceTag(rep) : ''}</button>${replace}</div>
+    ${rep.ok ? `<p class="small dim">${esc(worksText(rep))}. ${old ? 'A bit better after.' : 'As good as new after.'}</p>` : ''}
+    ${match}${why ? `<p class="small dim">${esc(why)}</p>` : ''}`;
 }
+
+const HURT_SHOWN = 0.3;
+const MENDABLE = 0.85;
 
 /** A piece of the old freeway may become a boulevard. */
 export function freewayBlock(c: PanelCtx, r: Road): string {

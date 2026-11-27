@@ -65,7 +65,7 @@ export function removeRoad(net: Network, id: Id): Network {
   return finish(net, d);
 }
 
-type RoadPatch = Partial<Pick<Road, 'type' | 'busLane' | 'kerb' | 'toll' | 'truckBan' | 'works' | 'nightWorks' | 'oneWay' | 'dir'>>;
+type RoadPatch = Partial<Pick<Road, 'type' | 'busLane' | 'kerb' | 'toll' | 'truckBan' | 'works' | 'worksEnd' | 'nightWorks' | 'oneWay' | 'dir' | 'condition'>>;
 
 export function setRoad(net: Network, id: Id, patch: RoadPatch): Network {
   const d = draftOf(net);

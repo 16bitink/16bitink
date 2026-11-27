@@ -16,7 +16,7 @@ import { commitNetwork } from './network';
 import { buildSpots, publishParks, sampleSpots } from './parking';
 import { accessOf } from './places';
 import { scoreLost, scorePricedOut, scoreTrip } from './score';
-import { settleMonth } from './settle';
+import { settleMonth, tickWorks } from './settle';
 import type { City } from './state';
 import { emit, has } from './state';
 import { pointOf } from './places';
@@ -167,7 +167,7 @@ export function stepDay(c: City): boolean {
   for (const a of c.traffic.drainArrivals()) arrive(c, a);
   for (const a of c.traffic.drainGaveUp()) gaveUp(c, a);
   for (const at of c.traffic.drainHonks().slice(0, HONKS_PER_STEP)) emit(c, { t: 'honk', at });
-  if (every(c, WATCH_EVERY)) { sendStrandedHome(c); sampleSpots(c); publishParks(c); watch(c); if (tickRules(c)) applyConditions(c); }
+  if (every(c, WATCH_EVERY)) { tickWorks(c); sendStrandedHome(c); sampleSpots(c); publishParks(c); watch(c); if (tickRules(c)) applyConditions(c); }
   if (c.day.parkingDirty && (c.day.parkingNow || every(c, PARKING_EVERY))) { c.day.parkingDirty = false; c.day.parkingNow = false; c.parking = parkingView(c); }
   // The months that end inside the day; the last one ends with it.
   for (let m = 0; m < MONTHS_PER_SEASON - 1; m++) if (crossed(c, PAYDAYS[m]!)) settleMonth(c, m);

@@ -51,7 +51,9 @@ export interface Finding {
 }
 
 /** A drawn car as the watch saw it this frame: moving (`m`), turning in or out (`c`) or parked (`p`). */
-export interface DrawnCar extends Body { readonly uid: number; readonly z: number; readonly v: number; readonly man: boolean; readonly id: string; readonly info?: string }
+export interface DrawnCar extends Body { readonly uid: number; readonly z: number; readonly v: number; readonly man: boolean; readonly id: string; readonly info?: string;
+  /** A moving car in a three-point turn at a dead end (src/sim/parkPaths.ts turnRound): it may reverse, at walking pace. */
+  readonly rev?: boolean }
 /** Hooks for the motion lab (test/motion/): run something before each sim step, see every drawn frame. */
 export interface WatchHooks {
   readonly before?: () => void;
@@ -204,7 +206,8 @@ export class MotionWatch {
       if (p.z <= UNDER) continue;
       const kind = VEHICLES[c.kind[i]!] as VehicleKind;
       this.note = this.why(i);
-      drawn.push(this.motion({ x: p.x, y: p.y, a: p.a, ...sizeOf(kind), uid: g.uid, z: p.z, v: 0, man: false, id: `m${g.uid}`, info: this.note }));
+      const rev = (c as unknown as { track: ({ turnRound: string | null } | null)[] }).track[i]?.turnRound === 'three';
+      drawn.push(this.motion({ x: p.x, y: p.y, a: p.a, ...sizeOf(kind), uid: g.uid, z: p.z, v: 0, man: false, id: `m${g.uid}`, info: this.note, ...(rev ? { rev } : {}) }));
     }
     for (let i = 0; i < this.core.active; i++) {
       const m = this.core.at(i);
@@ -253,7 +256,7 @@ export class MotionWatch {
     if (da > ds / R_TEST + TURN_EPS) this.flag('too tight', who, b.uid, `r ${(ds / da).toFixed(1)} px ${m ? `${m.mode}/${m.dir}/${m.phase}` : this.note}`, b, ds / da, R_TEST);
     else if (da > TURN_EPS && v > Math.sqrt(A_LAT * (ds / da)) * CURVE_SLACK + SPEED_EPS) this.flag('too fast on a curve', who, b.uid, `${v.toFixed(0)} px/s on r ${(ds / da).toFixed(0)}`, b, v, Math.sqrt(A_LAT * (ds / da)) * CURVE_SLACK + SPEED_EPS);
     if (along < -0.5) {
-      if (!b.man) this.flag('reverse on the road', who, b.uid, `${v.toFixed(1)} px/s ${this.note}`, b, v, 0);
+      if (!b.man && !b.rev) this.flag('reverse on the road', who, b.uid, `${v.toFixed(1)} px/s ${this.note}`, b, v, 0);
       else if (v > REVERSE_MAX + SPEED_EPS) this.flag('reverse too fast', who, b.uid, `${v.toFixed(1)} px/s ${m ? `${m.mode}/${m.dir}/${m.phase}` : this.note}`, b, v, REVERSE_MAX + SPEED_EPS);
     }
     return { ...b, v: along < 0 ? -v : v };

@@ -148,12 +148,15 @@ export function writeLetter(c: City): Letter | null {
 
 const avg = (list: readonly number[], none: number): number => (list.length === 0 ? none : list.reduce((n, v) => n + v, 0) / list.length);
 
+/** A big city gets used to its traffic: from year EXPECT_RANGE.from on, people put up with a little more each year. */
+export const expectMax = (year: number): number => EXPECT_RANGE.max + EXPECT_RANGE.perYear * Math.max(0, year - EXPECT_RANGE.from);
+
 /** Last year's miracle becomes this year's normal. */
 export function adaptExpectations(c: City): void {
   const ratio = avg(c.yearHabits.map((h) => h.ratio), c.expect.trip);
   const pay = avg(c.yearHabits.map((h) => h.pay), c.expect.pay);
   c.expect = {
-    trip: clamp(c.expect.trip + (ratio - c.expect.trip) * HABIT, EXPECT_RANGE.min, EXPECT_RANGE.max),
+    trip: clamp(c.expect.trip + (ratio - c.expect.trip) * HABIT, EXPECT_RANGE.min, expectMax(c.year)),
     pay: Math.max(0, c.expect.pay + (pay - c.expect.pay) * HABIT),
   };
 }

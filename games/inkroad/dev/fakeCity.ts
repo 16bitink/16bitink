@@ -7,7 +7,7 @@ import type {
 const TOOLS_BY_YEAR: ToolId[][] = [['street', 'junction', 'remove'], ['kerb', 'parking'], [], ['avenue']];
 const ZERO_L: Ledger = {
   income: { parking: 0, fines: 0, tolls: 0, fares: 0, zone: 0, grant: 0, auction: 0, float: 0, budget: 0 },
-  costs: { building: 0, land: 0, upkeep: 0, transit: 0, staff: 0, interest: 0 },
+  costs: { building: 0, land: 0, repairs: 0, parks: 0, transit: 0, staff: 0, interest: 0 },
 };
 const TECHS: TechDef[] = [
   { id: 'smart_signals', name: 'Smart signals', text: 'Signals adjust themselves. 10 to 20 percent less waiting.', icon: 'smart_signals' },
@@ -74,7 +74,7 @@ export class FakeCity {
   get period(): Period { const h = this.hour; return h < 8 ? 'dawn' : h < 11 ? 'am' : h < 16 ? 'mid' : h < 20 ? 'pm' : 'night'; }
   get tools(): ToolId[] { return TOOLS_BY_YEAR.slice(0, this.year).flat(); }
   get newTools(): ToolId[] { return TOOLS_BY_YEAR[this.year - 1] ?? []; }
-  get ledger(): Ledger { return { income: { ...ZERO_L.income, parking: 84, fines: 31, budget: 60 }, costs: { ...ZERO_L.costs, building: 40, upkeep: 12, staff: 20 } }; }
+  get ledger(): Ledger { return { income: { ...ZERO_L.income, parking: 84, fines: 31, budget: 60 }, costs: { ...ZERO_L.costs, building: 40, repairs: 12, parks: 4, staff: 20 } }; }
   get lastLedger(): Ledger { return ZERO_L; }
   get books(): Ledger[] { return [ZERO_L, ZERO_L, this.ledger]; }
   get month(): number { return this.season * 3; }

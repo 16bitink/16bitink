@@ -187,7 +187,7 @@ export class Play {
     const list = city.projects;
     this.projects.hidden = list.length === 0;
     if (!this.dirty.changed('projects', `${list.map((p) => `${p.id}:${p.left}`).join(',')}|${city.phase}:${city.month}`)) return;
-    this.projects.innerHTML = list.map((p) => `<button class="chip" data-act="project" data-v="${p.id}">${p.level > 0 ? 'Flyover' : 'Underpass'}: opens in <b>${opensMonth(city, p.left)}</b></button>`).join('');
+    this.projects.innerHTML = list.map((p) => `<button class="chip" data-act="project" data-v="${p.id}">${p.level > 0 ? 'Flyover' : 'Underpass'}: opens in <b>${opensMonth(city, p.left, p.ends)}</b></button>`).join('');
   }
 
   private popover(env: UiEnv): void {

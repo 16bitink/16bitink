@@ -6,7 +6,7 @@ import { commitNetwork } from '../network';
 import type { City } from '../state';
 import { has, junctionById, openControls, openTools } from '../state';
 import { FLYOVER, SMART_SHARE } from '../tune';
-import { homesBeside, landFor, middle, needTool, nightRate, no, noAt, precast, priced, worksLeft, type Handler } from './shared';
+import { homesBeside, landFor, middle, needTool, nightRate, no, noAt, precast, priced, worksEnd, type Handler } from './shared';
 
 const MIN_GREEN = 0.1;
 const names: Readonly<Record<Control, string>> = { yield: 'a plain crossing', roundabout: 'a roundabout', signal: 'signals', smart: 'smart signals' };
@@ -70,7 +70,7 @@ export const flyover: Handler<'flyover'> = {
   },
   run(c, cmd, q) {
     const line = q.line ?? [];
-    c.projects = [...c.projects, { id: c.nextId, node: cmd.node, fromRoad: cmd.fromRoad, toRoad: cmd.toRoad, level: cmd.level, line, left: worksLeft(c, q.works) }];
+    c.projects = [...c.projects, { id: c.nextId, node: cmd.node, fromRoad: cmd.fromRoad, toRoad: cmd.toRoad, level: cmd.level, line, left: q.works, ends: worksEnd(c, q.works) }];
     c.nextId += 1;
     return middle(line);
   },

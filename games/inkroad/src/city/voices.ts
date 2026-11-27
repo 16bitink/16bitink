@@ -9,6 +9,7 @@ import type { City } from './state';
 import { lotById } from './state';
 import { householdOf } from './households';
 import { dayLine } from './views';
+import { busyWorn } from './rules/ageing';
 import { CELL } from '../sim/constants';
 
 const MAX_COMPLAINTS = 3;
@@ -40,9 +41,19 @@ function write(c: City, s: Sore, weight: number, i: number): Complaint {
   return { who: who.name, animal: who.animal, text, bar: s.bar, at: s.at, weight, ...(h ? { household: h.id } : {}), ...(day ? { day } : {}) };
 }
 
+/** A busy worn road speaks as loud as the Streets points it costs; a worn road nobody drives says nothing. */
+const WORN_VOICE = 4;
+const WORN_FROM = 0.3;
+function wornSores(c: City): readonly Sore[] {
+  return busyWorn(c).filter((h) => h.hurt >= WORN_FROM).map((h) => {
+    const at = h.road.line[Math.floor(h.road.line.length / 2)]!;
+    return { bar: 'streets', kind: 'worn', at, weight: h.hurt * WORN_VOICE, lot: null, n: Math.round((h.road.condition ?? 1) * 100) };
+  });
+}
+
 /** Street sores come from the map, not from trips. */
 function streetSores(c: City): readonly Sore[] {
-  const out: Sore[] = [];
+  const out: Sore[] = [...wornSores(c)];
   for (const r of c.net.roads) {
     if (r.works > 0) out.push({ bar: 'streets', kind: 'works', at: r.line[Math.floor(r.line.length / 2)]!, weight: 4, lot: null, n: 0 });
     if (r.type !== 'boulevard' && r.type !== 'highway') continue;
@@ -78,7 +89,7 @@ function happy(c: City): Complaint {
 export function worstSpots(c: City): readonly { readonly at: Pt; readonly text: string }[] {
   const why: Readonly<Record<string, string>> = {
     late: 'Long trips from', gaveUp: 'Drivers gave up near', stayed: 'People stopped leaving', search: 'No space to park at', walk: 'Parking far from',
-    illegal: 'Double parking at', none: 'Turned away at', pay: 'Too dear:', home: 'Charged at home:', fine: 'Fined too often at', noise: 'Noise by', works: 'Dust by',
+    illegal: 'Double parking at', none: 'Turned away at', pay: 'Too dear:', home: 'Charged at home:', fine: 'Fined too often at', noise: 'Noise by', works: 'Dust by', worn: 'Holes in the road by', pothole: 'A hole by',
   };
   return piles(c).slice(0, MAX_COMPLAINTS).map((p) => ({
     at: p.sore.at, text: `${why[p.sore.kind] ?? 'Trouble at'} ${(p.sore.lot !== null ? lotById(c, p.sore.lot)?.name : undefined) ?? nearName(c, p.sore.at)}`,

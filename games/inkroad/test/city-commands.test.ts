@@ -7,7 +7,7 @@ import { feelZone } from '../src/city/zone';
 import { linePath } from '../src/city/transit';
 import { settleSeason } from '../src/city/settle';
 import { catchChance } from '../src/city/legs';
-import { cityAtYear, inner, newCity, ok, runDay } from './city-helpers';
+import { cityAtYear, inner, newCity, ok, passSeason, runDay } from './city-helpers';
 
 const at = (v: ReturnType<typeof newCity>, gx: number, gy: number) => v.junctions.find((j) => j.cell.gx === gx && j.cell.gy === gy)!.id;
 const roadThrough = (v: ReturnType<typeof newCity>, gx: number, gy: number) =>
@@ -39,11 +39,11 @@ describe('roads', () => {
     expect(why(v, { t: 'kerb', road: roadThrough(v, 22, 12).id, on: true })).toMatch(/toolbox/);
   });
 
-  it('widens with three months of works, and the works end with the season', () => {
+  it('widens with a month of works, and the works end inside the day', () => {
     const v = cityAtYear(3);
     const r = roadThrough(v, 12, 18);
     ok(v, { t: 'upgrade', road: r.id, type: 'avenue' });
-    expect(v.roads.find((x) => x.id === r.id)!.works).toBe(3);
+    expect(v.roads.find((x) => x.id === r.id)!.works).toBe(1);
     expect(why(v, { t: 'upgrade', road: r.id, type: 'avenue' })).toMatch(/already/);
     runDay(v);
     expect(v.roads.find((x) => x.id === r.id)!.works).toBe(0);
@@ -191,13 +191,13 @@ describe('lines', () => {
     expect(q.warn).toMatch(/Council pays/);
     ok(v, cmd);
     expect(bestRide(inner(v), { x: 11 * 40, y: 14 * 40 }, { x: 44 * 40, y: 18 * 40 }, 'am')).toBeNull();
-    // Nine paydays.
-    for (let i = 0; i < 9; i++) settleSeason(inner(v));
+    // Nine months: three seasons of the clock.
+    for (let i = 0; i < 3; i++) passSeason(inner(v));
     expect(v.lines[0]!.works).toBe(0);
     const a = { x: 11 * 40, y: 14 * 40 };
     expect(bestRide(inner(v), a, { x: 44 * 40, y: 18 * 40 }, 'am')!.lines).toHaveLength(1);
     ok(v, draw(v, 'metro', [cell(22, 13), cell(22, 24)]));
-    for (let i = 0; i < 9; i++) settleSeason(inner(v));
+    for (let i = 0; i < 3; i++) passSeason(inner(v));
     expect(bestRide(inner(v), a, { x: 22 * 40, y: 25 * 40 }, 'am')!.changes).toBe(1);
   });
 

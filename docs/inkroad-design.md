@@ -76,7 +76,7 @@ Three research agents, plus spot checks. Agents read news and search summaries m
 3. Choose: signals (cheap, fair), a price on the car park drawing them in, a bus route, or a **flyover for that one turn**.
 4. Drag from the arrow's tail to its head. The game lays the ramps and pillars and shows the price and the months of works.
 5. Works close a lane and anger rises. The flyover opens and the arrow goes green.
-6. Every month ends on a payday (about once a minute): the bills, the Council's budget and what drivers paid land in the books, approval moves, and works count down.
+6. Every month ends on a payday (about once a minute): the bills, the Council's budget and what drivers paid land in the books, and approval moves.
 7. Two years later that district has apartments instead of villas, and the next junction down is red.
 
 **Building for one movement is the signature mechanic.** It is how real projects are described ("a bridge for the left turn from A to B"), it makes the player read traffic instead of adding lanes, and it's one drag on a phone. No freehand ramp drawing, no lane editor.
@@ -84,7 +84,7 @@ Three research agents, plus spot checks. Agents read news and search summaries m
 ## Time
 
 - **A season is one drawn day of about 3 minutes:** a workday of 120 s (dawn, morning peak, midday, evening peak, night) and a weekend day of 62 s. Four seasons make a year of about 12 minutes at 1×. Speeds: pause, 1×, 2×, 4×. You can build while paused.
-- **A year has 12 months, three a season, each ending on a payday** (the owner, November 27: four a year was too few). The Council's year starts in spring: March to May, June to August, September to November, December to February. Paydays come at quiet moments of the drawn day: after the morning peak (about 2 pm, 60 s), at the workday's midnight (120 s) and at the weekend's night (182 s, the review). About every 60 s at 1×, 15 s at 4×. Each pays a month's bills and a third of the budget, books what drivers paid since the last one, moves approval a third of the day's step, and counts works down a month. Works are quoted in whole months; the month under way when they start does not count. The HUD shows "Year 2, May" and "+7 next month". Weather, routines, the year's events, the art and the review stay seasonal.
+- **A year has 12 months, three a season, each ending on a payday** (the owner, November 27: four a year was too few). The Council's year starts in spring: March to May, June to August, September to November, December to February. Paydays come at quiet moments of the drawn day: after the morning peak (about 2 pm, 60 s), at the workday's midnight (120 s) and at the weekend's night (182 s, the review). About every 60 s at 1×, 15 s at 4×. Each pays a month's bills and a third of the budget, books what drivers paid since the last one, and moves approval a third of the day's step. **Works run on the clock, not the paydays** (the owner, November 27): a month of works is a fixed stretch of about 60 s from the moment they start, whenever in a month that is, and the road reopens there and then (cones go, a toast). Widening and repairing a road take one month and close it (night works keep it open by day); flyovers, lines and replacing a road take their longer builds, counted the same way. Not instant: a short closure keeps the timing choice (build in the evening, works by night) and the reopening moment. The HUD shows "Year 2, May" and "+7 next month". Weather, routines, the year's events, the art and the review stay seasonal.
 - **Night is the review.** Money, approval, the top three complaints. Prices can change only here, in fixed steps.
 - **Year end:** the Council's review, next year's Master Plan, the plate auction, and **a choice of 1 of 3 technologies**. It is also the save point.
 - **Ten years make a city.** Five cities × ten years = **50 years, the 50 levels**. City 1 (years 1–10) is free.
@@ -145,7 +145,7 @@ The owner's first playtest: "A building is in the way" on empty sand, and a road
 | **Trips** | Trips longer than people expect, cars that give up | Faster than expected, reliable |
 | **Parking** | No space, long walks, double parking | A space within a short walk |
 | **Cost** | Fees, tolls, fines and fares as a share of a trip; charging people at home | Permits, caps, off-peak prices, a free alternative route |
-| **Streets** | Road works, noise beside big roads, crashes | Quiet streets, night works, crossings, tunnels |
+| **Streets** | Road works, noise beside big roads, crashes, busy worn roads | Quiet streets, night works, crossings, tunnels, repairs |
 
 - **Council letters.** Approval under 40 at a season review brings a warning letter. **Three letters and you are replaced.** A year at 60 or more tears one up.
 - **Broke.** The first time, the Council lends you out of it and it costs a letter. Debt past the limit a second time and you are replaced.
@@ -166,7 +166,9 @@ The owner's first playtest: "A building is in the way" on empty sand, and a road
 | Plate auction | Once a year; pays more as the city gets richer | – |
 | Floating a company | Once per stream (parking, tolls): a lump sum | You keep a quarter of that stream from then on |
 
-**Out:** building, buying land (dear, and it hurts Streets), upkeep that grows with age, bus and metro running costs, inspectors, interest.
+**Out:** building, buying land (dear, and it hurts Streets), repairs, car parks' running costs, bus and metro running costs, inspectors, interest.
+
+**Roads cost nothing a month; they wear, and you mend them by hand** (the owner, November 27: "what's Upkeep, I'm spending a lot on this"; in his Saffron Bay year 2 upkeep was more than half of what came in). Every city's roads wear a little with age and mostly under wheels: in Saffron Bay the busiest streets need a first repair in about year 3, and a quiet street at the edge lasts the ten years. A road under 70 of 100 is slower and its drivers complain, **in proportion to how many of them there are**: a worn road nobody uses costs almost nothing, so leaving it is a fair choice, and the money goes to the busy ones. Tap a road: its condition (Good, Worn, Poor, Broken), what it costs in Streets, and Repair with its price and "1 month of road works, road closed". The Repairs map shows worn roads strong where they are busy and faint where nobody drives, Dewy names the worst busy one, and the books show Repairs on their own line. Cross Rivers keeps its own story: old roads at the start, faster wear, bridges worst, and Replace with the Council's match.
 
 **The yearly question:** what will I need in two years, and what am I willing to charge for now?
 

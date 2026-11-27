@@ -8,11 +8,12 @@ import type { City } from '../state';
 
 /**
  * What the ground does to roads: steep streets are slow (Seven Hills), worn
- * roads are slow (Cross Rivers), some water crossings are tunnels (Twin
+ * roads are slow (every city), some water crossings are tunnels (Twin
  * Isles). Runs on every network before the cars see it.
  */
 export const STEEP_SLOW = 0.4;
-export const WORN = { from: 0.6, floor: 0.62 } as const;
+/** Speed from under 70 (when drivers start to complain) down to half on a ruin: an untended busy road costs Trips too. */
+export const WORN = { from: 0.7, floor: 0.5 } as const;
 const START = { highway: 0.42, bridge: 0.48, low: 0.55, spread: 0.3 } as const;
 
 /** 1 on a sound road, down to the floor on a ruin. */
@@ -75,11 +76,13 @@ const speedFactor = (c: City, net: Network, r: Road): number =>
 /** The network with this city's ground in it. Same object when nothing differs. */
 export function shapeNet(c: City, net: Network): Network {
   const rules = c.def.rules;
-  if (!rules.steep && !rules.ageing && !rules.freeway && marks(c.def).tunnel.size === 0) return net;
+  // Roads wear in every city: once one has a condition its speed follows it (and comes back when mended).
+  const aged = net.roads.some((r) => r.condition !== undefined);
+  if (!rules.steep && !rules.ageing && !rules.freeway && !aged && marks(c.def).tunnel.size === 0) return net;
   const first = net.roads.every((r) => r.condition === undefined);
   const roads = net.roads.map((r) => marked(c, r, first));
   const changed = roads.some((r, i) => r !== net.roads[i]);
-  const links = rules.steep || rules.ageing ? slowLinks(c, net, roads) : net.links;
+  const links = rules.steep || rules.ageing || aged ? slowLinks(c, net, roads) : net.links;
   return changed || links !== net.links ? { ...net, roads: changed ? roads : net.roads, links } : net;
 }
 
