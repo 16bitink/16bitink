@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>InkRoad vehicle model: today vs the bicycle model</title>
+  <link rel="icon" href="data:,">
+  <style>
+    html, body { margin: 0; background: #1d1f22; color: #ddd; font: 13px/1.4 ui-monospace, Menlo, monospace; }
+    header { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 8px 12px; background: #2a2d31; }
+    header select, header button { font: inherit; background: #3a3e44; color: #eee; border: 1px solid #555; border-radius: 4px; padding: 3px 8px; }
+    main { padding: 8px; }
+    .panes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .pane h2 { margin: 0 0 4px; font-size: 14px; }
+    .pane h2.old { color: #ef8b5f; } .pane h2.new { color: #8fd16a; }
+    canvas.view { width: 100%; background: #c9bd98; border-radius: 4px; display: block; }
+    #timeline { width: 100%; height: 34px; background: #2a2d31; border-radius: 4px; cursor: pointer; display: block; margin-top: 6px; }
+    table { border-collapse: collapse; margin-top: 8px; }
+    td, th { border: 1px solid #444; padding: 2px 6px; text-align: right; }
+    th { color: #f0c674; font-weight: normal; }
+    td.bad { color: #ef6b5f; } td.ok { color: #8fbf6a; }
+    #notes { color: #aaa; margin-top: 6px; white-space: pre-wrap; }
+    #status { color: #aaa; }
+  </style>
+</head>
+<body>
+  <header>
+    <b>Vehicle model</b>
+    <select id="situation"></select>
+    <button id="play">Play</button>
+    <button id="back">&lt; frame</button>
+    <button id="fwd">frame &gt;</button>
+    <button id="restart">|&lt; start</button>
+    <label>speed <select id="speed"><option>0.1</option><option>0.25</option><option selected>0.5</option><option>1</option><option>2</option><option>4</option></select></label>
+    <label><input type="checkbox" id="trails" checked> trails</label>
+    <label><input type="checkbox" id="traffic" checked> other cars</label>
+    <span id="status"></span>
+  </header>
+  <main>
+    <div class="panes">
+      <div class="pane"><h2 class="old">Today (the game's motion, lab scenario)</h2><canvas class="view" id="old" width="720" height="480"></canvas></div>
+      <div class="pane"><h2 class="new">New: kinematic bicycle + tracker + Reeds–Shepp</h2><canvas class="view" id="new" width="720" height="480"></canvas></div>
+    </div>
+    <canvas id="timeline" width="1460" height="34"></canvas>
+    <div id="table"></div>
+    <div id="notes"></div>
+  </main>
+  <script type="module" src="./vehiclePage.ts"></script>
+</body>
+</html>
