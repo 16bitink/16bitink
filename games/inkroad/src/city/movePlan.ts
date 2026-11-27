@@ -155,7 +155,7 @@ function nearLine(q: MiddlePose, lane: LanePose): boolean {
 }
 
 /** The move into a space from the drawn pose in the lane. Null: no space drawn (the old door path). */
-export function planIn(c: City, e: Standing, lane: LanePose, uid = -1, gap: (at: Access, a: number) => number = () => 0): InPlan | null {
+export function planIn(c: City, e: Standing, lane: LanePose, uid = -1, gap: (at: Access, a: number) => number = () => 0, after = 0): InPlan | null {
   const t0 = performance.now();
   const p = paramsOf(e.kind);
   restAhead(c, e, lane, p);
@@ -168,14 +168,15 @@ export function planIn(c: City, e: Standing, lane: LanePose, uid = -1, gap: (at:
   const backIn = e.spot.kind === 'park' || e.spot.kind === 'home';
   // Across the road it stops in its lane and waits for its gap first (the wait is part of the move it plays).
   const at0 = road ? { road: road.id, s: project(road.line, lane).s } : null;
-  const play = (pause: number): Played => viaAisle(c, e, p, lane, space.pose, w, pause) ?? playInto(p, lane, space.pose, w, !space.fade, { turnaround: turn, backIn: backIn && !cross, forwardOnly: cross && !turn, pause }, lane.v ?? 0, lane.acc ?? 0);
-  let wait = cross && at0 ? gap(at0, lane.a) : 0;
+  const play = (pause: number): Played => viaAisle(c, e, p, lane, space.pose, w, pause) ?? playInto(p, lane, space.pose, w, !space.fade, { turnaround: turn, backIn: backIn && !cross, forwardOnly: (cross && !turn) || e.spot.kind === 'double', onRoad: e.spot.kind === 'double', pause }, lane.v ?? 0, lane.acc ?? 0);
+  // `after`: it stands that long first in any case (another move's body is in its way until then).
+  let wait = Math.max(after, cross && at0 ? gap(at0, lane.a) : 0);
   let played = play(wait);
   const side = road ? roadSide(road, lane) : 1;
   const over = !cross && e.spot.kind !== 'double' && reachesFar(played, road, lane, side, p.len, p.wid);
   // Its nose swings over the line (backing into a kerb space): it waits for a gap in the far lanes too.
   const late = over && at0 ? gap(at0, lane.a) : 0;
-  if (late > 0) { wait = late; played = play(late); }
+  if (late > wait) { wait = late; played = play(late); }
   const band = bandOf(road, lane, cross);
   const laneS = secondsUntilOut(played, band, p.len, p.wid);
   logMove({ what: 'in', kind: e.spot.kind, seconds: played.seconds, lane: laneS, fits: played.fits, ms: performance.now() - t0, word: played.word, from: lane, to: space.pose });

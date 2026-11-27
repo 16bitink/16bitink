@@ -104,7 +104,7 @@ function intoRuns(p: VehicleParams, from: Pose, slot: Pose, w: World, settle: bo
 }
 
 /** A move from a standing car into a space (or onto a stop on the road): planned and played. */
-export function playInto(p: VehicleParams, from: MiddlePose, to: MiddlePose, w: World, settle = true, o: PlanOptions & { readonly backIn?: boolean; readonly pause?: number } = {}, u0 = 0, a0 = 0): Played {
+export function playInto(p: VehicleParams, from: MiddlePose, to: MiddlePose, w: World, settle = true, o: PlanOptions & { readonly backIn?: boolean; readonly pause?: number; /** A stop on the road (double parking, a taxi): forward only, it rests where it brakes to. */ readonly onRoad?: boolean } = {}, u0 = 0, a0 = 0): Played {
   const a = rearPose(p, from), b = rearPose(p, to);
   // A few px off is no manoeuvre (the owner: a car a little off its line just stands there, or steers back driving).
   if (nearEnough(from, to) && u0 < ROLLING) return standingAt(p, from);
@@ -114,6 +114,8 @@ export function playInto(p: VehicleParams, from: MiddlePose, to: MiddlePose, w: 
   const brake: Run[] = stop > 0 ? [{ dir: 1, pts: samplePolyline([a, q], Math.max(u0, p.manoeuvre), 1).map((t) => ({ ...t, th: a.th })) }] : [];
   // Its stop on the road is just ahead on its line: it simply comes to rest (it stands where it stops).
   if (stop > 0 && nearEnough({ x: q.x + p.toMiddle * Math.cos(q.th), y: q.y + p.toMiddle * Math.sin(q.th), a: q.th }, to)) return playRuns({ ...standing(a), u: u0, a: a0 }, brake, p, true, '');
+  // A stop on the road never backs up: one already behind where its braking takes it is where it comes to rest.
+  if (stop > 0 && o.onRoad && (b.x - q.x) * Math.cos(q.th) + (b.y - q.y) * Math.sin(q.th) < NEAR_ALONG) return playRuns({ ...standing(a), u: u0, a: a0 }, brake, p, true, '');
   const r = intoRuns(p, q, b, w, settle, o);
   // No way at all: it stays where it is (never put anywhere), counted as not fitting.
   if (!r) return { ...standingAt(p, from), fits: false };

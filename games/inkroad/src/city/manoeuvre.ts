@@ -10,12 +10,19 @@ import { viewKind } from './stand';
 import { emit, lotById, type City } from './state';
 import { BAY_PX } from './tune';
 import { STEP } from '../sim/constants';
+import { pointAt } from '../sim/geom';
 import { endOf, KERB_OUT, planIn, planOut, spaceOf } from './movePlan';
 import { nearestRoad } from './moveGround';
+import { doorIn } from './door';
+import { unstand } from './stand';
+import { carById } from './households';
 import { halfWidth, laneOffset, lanesPerLink } from '../sim/roadGeom';
 import { GAME_PACE, GAP_S, R_MIN } from '../sim/kinematics';
 import { polyLength } from './geometry';
-import { lastPose, withPrefix } from '../sim/vehicle/played';
+import { joinPlayed, lastPose, withPrefix, type Played } from '../sim/vehicle/played';
+import { sizeOf } from '../sim/vehicleSize';
+import { LANE } from '../sim/constants';
+import { delayed } from '../sim/sweeps';
 
 /**
  * Parking moves (docs/inkroad-vehicle-model.md "Phase B"): each is planned and played by the vehicle model on the
@@ -210,8 +217,26 @@ export function turnIn(c: City, uid: number, e: Standing | null, hold?: number, 
   if (!e) { c.traffic.remove(uid); return; }
   const drawn = c.traffic.framesOf(uid);
   const lane = withMotion(c.traffic.poseOf(uid), drawn);
-  const plan = lane ? planIn(c, e, lane, uid, (at, a) => c.traffic.gapAcross(at, a, MOVE_GAP)) : null;
+  const gap = (at: Access, a: number): number => c.traffic.gapAcross(at, a, MOVE_GAP);
+  let first = lane ? planIn(c, e, lane, uid, gap) : null;
+  // The one collision rule: it waits in its lane until its body would touch no other move under way.
+  let after = first ? clearDelay(c, first.played, e) : 0;
+  // A stop on the road whose place a waiting car stands in: it stops past it instead (it cannot brake shorter), never on top of it.
+  const s0 = e.s;
+  for (let k = 1; lane && first && after >= SWEEP_MOST && e.spot.kind === 'double' && s0 !== undefined && k <= STOP_TRIES; k++) {
+    e.s = s0 + Math.sign(Math.cos(lane.a - roadHeading(c, e))) * k * (sizeOf(e.kind).len + STOP_GAP);
+    first = planIn(c, e, lane, uid, gap) ?? first;
+    after = clearDelay(c, first.played, e);
+  }
+  let plan = lane && first && after > first.wait ? planIn(c, e, lane, uid, gap, after) ?? first : first;
   if (!lane || !plan) { c.traffic.remove(uid); return; }
+  // No way into its space fits: another free space of the same place that a way fits into.
+  if ((!plan.played.fits || after >= SWEEP_MOST) && e.spot.layout) { const other = otherSlot(c, e, lane, uid, gap); if (other) { plan = other; after = 0; } }
+  // No way into its space fits (a body in the way, no ground for it): never left standing in the lane, it puts the
+  // car inside the building instead (its space is kept, and it comes out of its space later).
+  if ((!plan.played.fits || after >= SWEEP_MOST) && intoBuilding(c, uid, e, lane)) return;
+  // A stop on the road: the traffic keeps out of where it will come to rest too.
+  c.traffic.sweeps.put(e.uid, plan.played, 0, e.kind, false, undefined, e.spot.kind === 'double');
   const at = plan.cross;
   const wait = plan.wait;
   e.crossWait = wait;
@@ -220,7 +245,9 @@ export function turnIn(c: City, uid: number, e: Standing | null, hold?: number, 
   const seconds = hold ?? plan.lane;
   // Double-parked: the lane is blocked where it is drawn standing (a hidden stand-in), while the view shows this car.
   // A car stopped in the lane is a real obstacle there for as long as it stands (its stand-in goes when it pulls out).
-  if (blockAt) { c.traffic.remove(uid); e.blockUid = c.traffic.block(blockedAt(e, blockAt), STAND_HOLD, 4, e.kind); } else if (!c.traffic.park(uid, Math.max(seconds, STEP))) { c.traffic.remove(uid); return; }
+  // The car itself stands in for its body where it stopped (a stand-in put elsewhere would let followers drive into it).
+  if (blockAt && c.traffic.park(uid, STAND_HOLD)) e.blockUid = uid;
+  else if (blockAt) { c.traffic.remove(uid); e.blockUid = c.traffic.block(blockedAt(e, blockAt), STAND_HOLD, 4, e.kind); } else if (!c.traffic.park(uid, Math.max(seconds, STEP))) { c.traffic.remove(uid); return; }
   // A car stopped on the road comes to rest and stands there (its lane blocked `hold`); one crossing waits for its gap first.
   const stand = 0;
   // The view draws the car's last step first (it was still driving in it), then the move: no step skipped.
@@ -229,6 +256,56 @@ export function turnIn(c: City, uid: number, e: Standing | null, hold?: number, 
   e.stood = endOf(plan.played);
   e.readyAt = c.clock + move;
   tell(c, 'in', e, lane, seconds, move, { a: played, fade: plan.fade }, stand);
+}
+
+/** Free spaces tried at most when the car's own has no way in that fits. */
+const OTHER_SLOTS = 6;
+
+/** The plan into the nearest free space of the same place whose way in fits and touches no move under way (the car takes it). */
+function otherSlot(c: City, e: Standing, lane: LanePose, uid: number, gap: (at: Access, a: number) => number): InPlanOf | null {
+  const mine = e.slot;
+  const free = freeSlots(c, e.spot, null, e.kind).filter((k) => k !== mine).slice(0, OTHER_SLOTS);
+  for (const k of free) {
+    e.slot = k;
+    const p = planIn(c, e, lane, uid, gap);
+    if (p && p.played.fits && c.traffic.sweeps.hit(p.played, 0, e.kind, e.uid, false, false) < 0) { e.spot.ver += 1; c.day.parkingDirty = true; c.day.parkingNow = true; return p; }
+  }
+  e.slot = mine;
+  return null;
+}
+type InPlanOf = NonNullable<ReturnType<typeof planIn>>;
+
+/** An off-road place's building: the car turns in at its mouth and fades inside (src/city/door.ts). False: none, or no way in fits either. */
+function intoBuilding(c: City, uid: number, e: Standing, lane: LanePose): boolean {
+  const lot = e.spot.kind === 'home' || e.spot.kind === 'private' ? c.lots.find((l) => l.id === e.spot.id) : undefined;
+  const park = e.spot.kind === 'park' ? c.parks.find((p) => p.id === e.spot.id) : undefined;
+  const key = lot ? `lot:${lot.id}` : park ? `park:${park.id}` : null;
+  if (!key || !doorIn(c, uid, null, { kind: e.kind, tint: e.tint }, key, lane, false, e.uid)) return false;
+  // It is inside now, not in its space (a household car is off the map until next driven, as any car put in a garage).
+  unstand(c, e);
+  const car = carById(c, e.uid);
+  if (car) { car.where = null; car.away = true; }
+  c.day.parkingNow = true;
+  return true;
+}
+
+/** A stop on the road moved back this many times at most, by a body and this many px each time. */
+const STOP_TRIES = 3, STOP_GAP = 4;
+
+/** The heading of a road place's road where a standing car is. */
+function roadHeading(c: City, e: Standing): number {
+  const road = c.net.roads.find((r) => r.id === e.spot.id);
+  return road && e.s !== undefined ? pointAt(road.line, e.s).heading : 0;
+}
+
+/** Seconds between the looks of a move waiting for another move's body to pass, and the longest it waits. */
+const SWEEP_STEP = 0.5, SWEEP_MOST = 40;
+
+/** Seconds a move from here waits before its body touches no other move under way (src/sim/sweeps.ts). */
+function clearDelay(c: City, m: Played, e: Standing): number {
+  // A move in only passes the ways waiting cars will take (they are checked against it when they go).
+  for (let d = 0; d < SWEEP_MOST; d += SWEEP_STEP) if (c.traffic.sweeps.hit(m, d, e.kind, e.uid, false, false) < 0) return d;
+  return SWEEP_MOST;
 }
 
 /** The drawn car's speed at the end of its last step, measured on the frames the view drew, and its acceleration. */
@@ -251,6 +328,7 @@ function blockedAt(e: Standing, at: Access): Access {
 export function shoulderFrom(c: City, e: Standing, lane: LanePose, hold: number): void {
   const plan = planIn(c, e, lane);
   if (!plan) return;
+  c.traffic.sweeps.put(e.uid, delayed(plan.played, hold), 0, e.kind, false);
   const move = hold + plan.played.seconds;
   e.stood = endOf(plan.played);
   e.readyAt = c.clock + move;
@@ -270,7 +348,7 @@ export const pullingOut = (leg: Leg): Standing | null => {
  * the spawn is moved there (`edge.from`).
  */
 export function readyAtEdge(c: City, e: Standing, req: SpawnRequest): boolean {
-  if (e.edge) return c.clock >= e.edge.goAt - STEP / 2;
+  if (e.edge) return c.clock >= e.edge.goAt - STEP / 2 + 1e-9;
   if (e.readyAt !== undefined && c.clock < e.readyAt - STEP / 2) return false;
   // A neighbour turning in or driving off: wait for it, never sweep over it.
   if (!clearToLeave(c, e)) return false;
@@ -280,7 +358,9 @@ export function readyAtEdge(c: City, e: Standing, req: SpawnRequest): boolean {
   if (!plan) {
     // On its lane line already (a car stopped on the road): it simply drives off from where it stands.
     const here = e.stood ?? spaceOf(c, e, pose)?.pose ?? pose;
-    e.edge = { goAt: c.clock, lane: { x: here.x, y: here.y, a: here.a }, hold: STEP };
+    // Standing there in the lane until it can drive off: a body the traffic stops for.
+    c.traffic.sweeps.put(e.uid, standStill(here), 0, e.kind, true);
+    e.edge = { goAt: c.clock, lane: { x: here.x, y: here.y, a: here.a }, hold: STEP, at: { x: here.x, y: here.y, a: here.a } };
     tell(c, 'out', e, pose, STEP, STEP, { a: standStill(here), b: standStill(here) });
     e.spot.ver += 1;
     c.day.parkingDirty = true;
@@ -288,31 +368,63 @@ export function readyAtEdge(c: City, e: Standing, req: SpawnRequest): boolean {
   }
   // No way out fits now (a car in the way, a body standing in the lane): wait and look again, a while at most.
   // A turn round never goes through anything: it waits as long as it takes.
-  if (!(plan.plan.toEdge.fits && plan.plan.join.fits) && ((e.blocked ?? 0) < BLOCKED_TRIES || plan.turn)) {
+  // A way through a body is never taken: it waits as long as it takes, looking less often the longer it waits.
+  const unfit = !(plan.plan.toEdge.fits && plan.plan.join.fits);
+  if (unfit && ((e.blocked ?? 0) < BLOCKED_TRIES || plan.turn || hitsBody(plan.plan.toEdge) || hitsBody(plan.plan.join))) {
     e.blocked = (e.blocked ?? 0) + 1;
-    e.readyAt = c.clock + BLOCKED_RETRY;
+    e.readyAt = c.clock + Math.min(BLOCKED_MOST, BLOCKED_RETRY * Math.max(1, e.blocked - BLOCKED_TRIES));
     return false;
   }
-  e.blocked = undefined;
-  const seconds = Math.max(STEP, plan.plan.lane);
-  const move = plan.plan.toEdge.seconds + seconds;
+  // The one collision rule: never off its slot while its way out (or its wait at the edge) would touch another move.
+  const sw = c.traffic.sweeps;
+  if (sw.hit(plan.plan.toEdge, 0, e.kind, e.uid, true) >= 0 || sw.hit(plan.plan.join, plan.plan.toEdge.seconds, e.kind, e.uid) >= 0) {
+    e.swept = (e.swept ?? 0) + 1;
+    e.readyAt = c.clock + Math.min(BLOCKED_MOST / 2, BLOCKED_RETRY * e.swept);
+    return false;
+  }
+  e.swept = undefined;
   const end = lastPose(plan.plan.join);
   const lane = { x: end.x, y: end.y, a: end.th };
   const both = plan.turn;
   const start = lastPose(plan.plan.toEdge);
   const back = Math.max(0, (end.x - start.x) * Math.cos(end.th) + (end.y - start.y) * Math.sin(end.th)) + OWN_BACK;
-  e.edge = { goAt: c.clock + plan.plan.toEdge.seconds, lane, hold: seconds, from: plan.from, back, ...(plan.plan.cross ? { cross: plan.plan.cross } : {}), ...(both ? { both } : {}) };
+  // Its edge already in its lane (a space by the lane, a corner): it never waits there in the traffic's way, it goes
+  // only with the lane clear now, in one piece, the lane held from the start.
+  const deep = inLane(endOf(plan.plan.toEdge), lane, e.kind);
+  const seconds = Math.max(STEP, plan.plan.lane + (deep ? plan.plan.toEdge.seconds : 0));
+  const move = plan.plan.toEdge.seconds + Math.max(STEP, plan.plan.lane);
+  e.edge = { goAt: c.clock + (deep ? 0 : plan.plan.toEdge.seconds), lane, hold: seconds, from: plan.from, back, at: endOf(plan.plan.toEdge), join: deep ? joinPlayed(plan.plan.toEdge, plan.plan.join) : plan.plan.join, ...(plan.plan.cross ? { cross: plan.plan.cross } : {}), ...(both ? { both } : {}) };
+  if (deep && (!crossClear(c, e) || !sw.coming(e.edge.join!, e.kind))) { e.edge = undefined; e.readyAt = c.clock + COMING_RETRY; return false; }
+  e.blocked = undefined;
+  // Off a stop on the road (or turning round on it): the traffic keeps out of where it will still pass.
+  sw.put(e.uid, deep ? e.edge.join! : plan.plan.toEdge, 0, e.kind, !deep, deep ? undefined : plan.plan.join, true);
   e.spot.ver += 1;
   c.day.parkingDirty = true;
   tell(c, 'out', e, lane, seconds, move, { a: plan.plan.toEdge, b: plan.plan.join, fade: plan.plan.fade });
   return plan.plan.toEdge.seconds <= STEP / 2;
 }
 
+/** Px a body at the lane edge may reach into its lane's band before it stands in the traffic's way. */
+const EDGE_IN = 1;
+
+/** Does a body (its middle) reach into the lane band of `lane` by more than EDGE_IN px? */
+function inLane(q: { readonly x: number; readonly y: number; readonly a: number }, lane: { readonly x: number; readonly y: number; readonly a: number }, kind: Standing['kind']): boolean {
+  const z = sizeOf(kind);
+  const lat = Math.abs((q.x - lane.x) * -Math.sin(lane.a) + (q.y - lane.y) * Math.cos(lane.a));
+  const ext = (z.len * Math.abs(Math.sin(q.a - lane.a)) + z.wid * Math.abs(Math.cos(q.a - lane.a))) / 2;
+  return LANE / 2 - (lat - ext) > EDGE_IN;
+}
+
 /** Seconds a stopped car's stand-in holds its lane at most (it is taken away when the car pulls out). */
 const STAND_HOLD = 3600;
 
 /** A car whose way out does not fit looks again every BLOCKED_RETRY s, BLOCKED_TRIES times, then goes the best way there is. */
-const BLOCKED_RETRY = 1, BLOCKED_TRIES = 12;
+const BLOCKED_RETRY = 1, BLOCKED_TRIES = 12, BLOCKED_MOST = 10;
+/** Seconds a car whose lane is not clear enough to go in one piece looks again (often: the gap is short). */
+const COMING_RETRY = 1;
+
+/** A played move that does not fit because a body is in its way (not the ground's shape). */
+export const hitsBody = (m: Played): boolean => !m.fits && m.word.includes('hits the body');
 
 /** A played move of nothing: the car stands where it is. */
 const standStill = (q: { readonly x: number; readonly y: number; readonly a: number }): MovePlay['a'] => ({ frames: new Float64Array([q.x, q.y, q.a]), n: 1, seconds: 0, end: { x: q.x, y: q.y, th: q.a, u: 0, dir: 1, delta: 0, a: 0 }, fits: true, word: '' });
@@ -347,13 +459,43 @@ export function pulledOut(c: City, uid: number, e: Standing, seconds: number): v
 export function backIn(c: City, e: Standing | null): void {
   if (!e?.edge) return;
   const lane = e.edge.lane;
+  const at = e.edge.at ?? lane;
   e.edge = undefined;
   e.spot.ver += 1;
   c.day.parkingDirty = true;
-  if (!e.spot.cars.includes(e)) return;
-  const plan = planIn(c, e, lane);
-  if (!plan) return;
+  // The view is always told: a move left waiting at the edge would be drawn there for ever.
+  if (!e.spot.cars.includes(e)) { goneAtNight(c, { ...e, edge: { goAt: 0, lane, at } }); return; }
+  const plan = planIn(c, e, at);
+  if (!plan) { c.traffic.sweeps.drop(e.uid); standBack(c, { ...e, edge: { goAt: 0, lane, at } } as Standing); return; }
+  c.traffic.sweeps.put(e.uid, plan.played, 0, e.kind, false);
   e.stood = endOf(plan.played);
   e.readyAt = c.clock + plan.played.seconds;
   tell(c, 'in', e, lane, 0, plan.played.seconds, { a: plan.played, fade: plan.fade });
+}
+
+/**
+ * The small hours: a car still waiting at the lane edge (or on its way there) is back in its space, at once, and the
+ * view is told (it would draw it waiting there all night otherwise). Its move leaves the sweeps.
+ */
+export function standBack(c: City, e: Standing): void {
+  if (!e.edge && (e.readyAt === undefined || e.readyAt <= c.clock)) return;
+  c.traffic.sweeps.drop(e.uid);
+  const was = e.edge?.at;
+  e.edge = undefined;
+  e.readyAt = undefined;
+  e.stood = undefined;
+  const here = spaceOf(c, e)?.pose;
+  if (!here || !was) return;
+  tell(c, 'in', e, { x: here.x, y: here.y, a: here.a }, 0, 0, { a: standStill(here) });
+  c.day.parkingDirty = true;
+  c.day.parkingNow = true;
+}
+
+/** The small hours: a visitor's car still waiting at the lane edge is gone (faded where it waits), its move out of the sweeps. */
+export function goneAtNight(c: City, e: Standing): void {
+  c.traffic.sweeps.drop(e.uid);
+  const at = e.edge?.at;
+  if (!at) return;
+  // Not listed in any place any more: told as a move into no space (slot -1).
+  tell(c, 'in', { ...e, slot: -1 }, { x: at.x, y: at.y, a: at.a }, 0, 0, { a: standStill(at), fade: true });
 }

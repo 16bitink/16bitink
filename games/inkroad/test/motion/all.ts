@@ -5,5 +5,6 @@ import { CITY } from './scenarios.city';
 import { DRIVING } from './scenarios.driving';
 import { PARKING } from './scenarios.parking';
 import { TURNS } from './scenarios.turns';
+import { BODIES } from './scenarios.bodies';
 
-export const ALL_SCENARIOS: readonly Scenario[] = [...CORE, ...PARKING, ...DRIVING, ...CITY, ...TURNS];
+export const ALL_SCENARIOS: readonly Scenario[] = [...CORE, ...PARKING, ...DRIVING, ...CITY, ...TURNS, ...BODIES];

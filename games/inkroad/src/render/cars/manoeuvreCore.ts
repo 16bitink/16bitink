@@ -93,7 +93,7 @@ export class ManoeuvreCore<T> {
     m.phase = 'move';
     m.go = false;
     // A car waiting for a gap across the road (or double-parked a while) stands first: its clock starts below zero.
-    m.at = e.dir === 'in' ? -Math.max(0, e.wait ?? 0) : 0;
+    m.at = (e.dir === 'in' ? -Math.max(0, e.wait ?? 0) : 0) + Math.max(0, e.age ?? 0);
     const last = (m.b ?? m.a);
     const o = (last.n - 1) * 3;
     m.endX = last.frames[o]!; m.endY = last.frames[o + 1]!;
@@ -108,6 +108,7 @@ export class ManoeuvreCore<T> {
     if (!m || m.dir !== 'out') return;
     if (m.phase === 'move') { m.go = true; return; }
     this.begin(m);
+    m.at = Math.max(0, e.age ?? 0);
   }
 
   /** A day's end (or the weekend): nobody is left waiting at an edge. */

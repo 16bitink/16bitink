@@ -164,7 +164,9 @@ class CityGame implements CityView {
   drainEvents(): CityEvent[] {
     const out = this.c.events;
     this.c.events = [];
-    return out;
+    const now = this.c.clock;
+    // A move told before this step (in the warm-up before dawn) is that far along already.
+    return out.map((e) => ((e.t === 'park' || e.t === 'parkGo') && e.when !== undefined && now - e.when > STEP / 2 ? { ...e, age: now - e.when } : e));
   }
 
   movements(node: Id): readonly Movement[] {

@@ -135,4 +135,5 @@ export const roadById = (c: City, id: Id) => c.net.roads.find((r) => r.id === id
 export const junctionById = (c: City, id: Id) => c.net.junctions.find((j) => j.id === id);
 export const isOpen = (l: Lot): boolean => l.level > 0;
 
-export function emit(c: City, e: CityEvent): void { c.events.push(e); }
+/** Moves are stamped with the clock they were told at (the view starts one drained late that far in). */
+export function emit(c: City, e: CityEvent): void { c.events.push(e.t === 'park' || e.t === 'parkGo' ? { ...e, when: c.clock } : e); }

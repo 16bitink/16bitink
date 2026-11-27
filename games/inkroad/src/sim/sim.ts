@@ -8,6 +8,7 @@ import type { Pt } from './types';
 import type { Routes } from './routes';
 import type { Measure } from './measure';
 import type { Services } from './services';
+import type { Sweeps } from './sweeps';
 
 export interface Sim {
   world: World;
@@ -25,6 +26,8 @@ export interface Sim {
   readonly routes: Routes;
   readonly measure: Measure;
   readonly services: Services;
+  /** Every move played off the lanes, over time (src/sim/sweeps.ts). */
+  readonly sweeps: Sweeps;
   /** The city's parked cars round a box (src/sim/turning.ts plans turns clear of them). */
   parked?: (x0: number, y0: number, x1: number, y1: number) => readonly Body[];
 }

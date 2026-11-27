@@ -13,11 +13,12 @@ import type { Sim } from './sim';
 import { POSE } from './store';
 import type { World } from './vehicle/planner';
 import { playTurn, type MiddlePose } from './vehicle/moves';
-import type { Played } from './vehicle/played';
+import { PLAY_DT, type Played } from './vehicle/played';
 import { paramsOfKind } from './drawn';
-import type { Body } from './vehicleSize';
+import { sizeOf, type Body } from './vehicleSize';
 import { logMove } from './moveLog';
 import { VEHICLES } from './constants';
+import { IDM } from './tune';
 import type { VehicleKind } from './types';
 
 /** Px of kerb a body corner may touch, and the parking band streets and kerb roads have. */
@@ -50,14 +51,19 @@ export function roadWorld(sim: Sim, x0: number, y0: number, x1: number, y1: numb
   return { drivable, bodies: [...standingNear(sim, x0, y0, x1, y1, self), ...(sim.parked?.(x0 - REACH, y0 - REACH, x1 + REACH, y1 + REACH) ?? [])] };
 }
 
-/** Cars standing still near the box (not the car itself). */
+/**
+ * Cars near the box (not the car itself): a standing one where it is drawn, a moving one stretched over the road it
+ * needs to stop (a turn never starts in front of a car that could not stop short of it).
+ */
 function standingNear(sim: Sim, x0: number, y0: number, x1: number, y1: number, self: number): Body[] {
   const c = sim.cars, out: Body[] = [];
   for (let q = 0; q < c.count; q++) {
-    if (q === self || !c.alive[q] || c.state[q] === 4 || c.speed[q]! > 3 || c.z[q] !== 0) continue;
+    if (q === self || !c.alive[q] || c.state[q] === 4 || c.z[q] !== 0) continue;
     const x = c.x[q]!, y = c.y[q]!;
     if (x < x0 - REACH || x > x1 + REACH || y < y0 - REACH || y > y1 + REACH) continue;
-    out.push({ x, y, a: c.heading[q]!, len: c.len[q]!, wid: 8.3 });
+    const v = c.speed[q]!, a = c.heading[q]!, z = sizeOf(kindName(c.kind[q]!));
+    const stop = v > 3 ? (v * v) / (2 * IDM.brake) + IDM.standGap : 0;
+    out.push({ x: x + Math.cos(a) * stop / 2, y: y + Math.sin(a) * stop / 2, a, len: z.len + stop, wid: z.wid });
   }
   return out;
 }
@@ -88,6 +94,10 @@ export function startTurn(sim: Sim, i: number, to: Track, s0: number, wait: numb
   const m = playTurn(paramsOfKind(c.kind[i]!), from, goals, w);
   // A turn that would sweep through a car (or off the road) is not made: the car waits and looks again.
   if (!m || !m.played.fits) return null;
+  // Nor one that would touch another move under way (the one collision rule, src/sim/sweeps.ts).
+  const z = sizeOf(kindName(c.kind[i]!));
+  if (sim.sweeps.hit(m.played, sim.time + wait, z.len, z.wid, -c.uid[i]!) >= 0) return null;
+  sim.sweeps.put(-c.uid[i]!, m.played, sim.time + wait, z.len, z.wid, false, undefined, true);
   c.play[i] = m.played;
   c.playAt[i] = sim.time + wait;
   logMove({ what: 'turn', kind: kindName(c.kind[i]!), seconds: m.played.seconds, lane: wait + m.played.seconds, fits: m.played.fits, ms: 0, word: m.played.word });
@@ -106,8 +116,25 @@ export const turnLeft = (sim: Sim, i: number): number => {
   return p ? Math.max(0, sim.cars.playAt[i]! + p.seconds - sim.time) : 0;
 };
 
-/** A hidden stand-in holds lane t at s for `seconds` (the road a turning car's body sweeps). */
-export function standIn(sim: Sim, t: Track, s: number, seconds: number, kind: number): void {
+/**
+ * Px a turning car's body reaches behind a point on a track, over the frames of its turn from `t` seconds on, beyond
+ * `body` (half the drawn length): followers on that track keep their gap to the whole sweep, never to the sim's point
+ * alone (a three-point turn backs up over the lane behind it).
+ */
+export function sweepBehind(m: Played, t: number, track: Track, s: number, len: number, wid: number, body: number): number {
+  poseAt(track, s, POSE);
+  const ux = Math.cos(POSE.h), uy = Math.sin(POSE.h), px = POSE.x, py = POSE.y;
+  let most = 0;
+  for (let k = Math.max(0, Math.floor(t / PLAY_DT)); k < m.n; k += 3) {
+    const o = k * 3, x = m.frames[o]!, y = m.frames[o + 1]!, a = m.frames[o + 2]!;
+    const reach = (len * Math.abs(Math.cos(a - POSE.h)) + wid * Math.abs(Math.sin(a - POSE.h))) / 2;
+    most = Math.max(most, (px - x) * ux + (py - y) * uy + reach);
+  }
+  return Math.max(0, most - body);
+}
+
+/** A hidden stand-in holds lane t at s for `seconds` (the road a turning car's body sweeps), `lag` px of sweep behind it. */
+export function standIn(sim: Sim, t: Track, s: number, seconds: number, kind: number, lag = 0): void {
   const c = sim.cars;
   if (t.kind !== LANE_T) return;
   const q = c.take(kind);
@@ -118,6 +145,7 @@ export function standIn(sim: Sim, t: Track, s: number, seconds: number, kind: nu
   c.born[q] = sim.time;
   c.insert(q, t, s);
   c.link[q] = t.link;
+  c.lag[q] = lag;
 }
 
 const kindName = (k: number): VehicleKind => VEHICLES[k] as VehicleKind;

@@ -12,6 +12,7 @@ import { FRAME_STRIDE, SUB, type CarStore } from './store';
 import type { Track } from './track';
 import { followInto, startOn } from './vehicle/follow';
 import { playedAt, type MutablePose } from './vehicle/played';
+import { sweepBehind } from './turning';
 import { paramsOf, type VehicleParams } from './vehicle/params';
 import type { CarState, MutableCar } from './vehicle/bicycle';
 import { VEHICLES } from './constants';
@@ -199,7 +200,8 @@ function playStep(sim: Sim, i: number, p: VehicleParams): void {
   // The drawn car goes on from the turn's last frame shown, standing (the turn ends standing).
   store(c, i, { x: PLAY_AT.x - p.toMiddle * Math.cos(PLAY_AT.a), y: PLAY_AT.y - p.toMiddle * Math.sin(PLAY_AT.a), th: PLAY_AT.a, u: 0, dir: 1, delta: t0 + STEP >= m.seconds ? m.end.delta : 0, a: 0 });
   c.fOn[i] = 1;
-  c.lag[i] = 0;
+  // Followers keep back from the rest of the turn's sweep, not just from where it stands now.
+  c.lag[i] = sweepBehind(m, Math.max(0, t0 + STEP), c.track[i]!, c.s[i]!, p.len, p.wid, c.body[i]!);
   c.x[i] = PLAY_AT.x; c.y[i] = PLAY_AT.y; c.heading[i] = PLAY_AT.a; c.speed[i] = 0; c.z[i] = 0;
 }
 

@@ -1,4 +1,5 @@
 import type { Id, ParkedCar, ParkingView, VehicleKind } from '../sim/types';
+import { goneAtNight, standBack } from './manoeuvre';
 import type { Spot, Standing } from './day';
 import { distPt, polyLength } from './geometry';
 import { freeSlots, hasRoom, slotCount, spanOf, standS } from './slots';
@@ -89,8 +90,9 @@ export function clearStanding(c: City, keep: (e: Standing) => boolean = () => fa
   for (const s of c.day.spots.values()) {
     if (s.cars.length === 0 && s.used === 0) continue;
     for (const e of s.cars) if (!keep(e) && e.blockUid !== undefined && e.blockUid >= 0) { c.traffic.remove(e.blockUid); e.blockUid = undefined; }
+    for (const e of s.cars) if (!keep(e)) goneAtNight(c, e);
     s.cars = s.cars.filter(keep);
-    for (const e of s.cars) { e.edge = undefined; e.readyAt = undefined; }
+    for (const e of s.cars) standBack(c, e);
     s.used = s.cars.filter((e) => e.counted).length;
     s.ver += 1;
   }

@@ -3,6 +3,7 @@ import type { CarStore } from './store';
 import { ARC_T, EXIT_T, LANE_T, type Track } from './track';
 import { IDM } from './tune';
 import { capAhead } from './trackCaps';
+import { sweepGap } from './sweepLead';
 import type { Sim } from './sim';
 
 /** The piece after this one for car i, or null when it ends or isn't known. */
@@ -52,8 +53,16 @@ function take(gap: number, v: number, hard: boolean, own = 0): void {
   if (hard && gap < LEAD.hard) LEAD.hard = gap;
 }
 
-/** Find the car in front of i along its way. `open` = it may drive past the end of its lane. */
+/** Find what is in front of i along its way: the car ahead, or the body of a move played off the lanes (src/sim/sweepLead.ts). */
 export function look(sim: Sim, i: number, open: boolean): void {
+  lookLanes(sim, i, open);
+  const reach = Math.min(LEAD.gap, Math.max(IDM.lookMin, sim.cars.v[i]! * IDM.lookTime));
+  const d = sweepGap(sim, i, reach);
+  if (d < Infinity) take(d, 0, true);
+}
+
+/** Find the car in front of i along its way. `open` = it may drive past the end of its lane. */
+function lookLanes(sim: Sim, i: number, open: boolean): void {
   const c = sim.cars;
   const t = c.track[i]!;
   LEAD.gap = LEAD.hard = Infinity;

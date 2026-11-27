@@ -280,3 +280,43 @@ Every manoeuvre a drawn car makes is planned with Reeds–Shepp on the real grou
 - Cars stopped in the lane (double parking, taxis, pump queues, a driver who gave up) are a real obstacle for the whole stop: the stand-in stands exactly where the car is drawn, in its own direction's lane, as long as the vehicle, until the car leaves (`Standing.blockUid`, removed by `unstand`). A taxi or driver pulling over where the kerb is free pulls right in to the kerb with a forward S; otherwise it hugs the parked row. A car still rolling when it stops on the road comes to rest where its braking takes it. A nose swinging over the centre line waits for a gap too.
 - Played turns round are planned clear of the city's parked cars too (`Traffic.setParked`), never drawn when they do not fit (the car waits and looks again), and a pull-out that turns the car round never falls back to a path that does not fit.
 - The lab counts `bodies overlap` per frame (a car drawn through another for a second is 60, not 1).
+
+## Step 2, phase B, round 3: one collision rule (November 28, not committed)
+
+The owner kept finding cars drawn through cars in the replay. With overlaps counted per frame, a Saffron Y6 season had 37,672 overlap frames. `node dev/overlaps.mjs [case] [--top n] [--json]` (`dev/overlapsCli.ts`) breaks them down by cause from the same motion watch; `--pair a|b`, `--uid n`, `--slots` (off-road slots that reach onto a road) and `node dev/overlapSnap.mjs OUT.png <case> --snap frame,x,y[,r]` (a picture of the drawn bodies at one frame) were the tools. Almost all of the frames came from a few long incidents: two cars waiting on top of each other at a lane edge, a car left standing in the lane all day when its move in did not fit, a stand-in put 12 px from where its car was drawn, a view drawing a car waiting at an edge after the city had forgotten it.
+
+| Overlap frames by cause (before → after) | Saffron Y3 | Saffron Y6 | Old Harbour Y4 |
+|---|---|---|---|
+| manoeuvre vs manoeuvre | 137 → 0 | 8909 → 705 | 3002 → 1144 |
+| manoeuvre vs parked | 582 → 144 | 2223 → 1176 | 5069 → 2060 |
+| moving vs manoeuvre | 2143 → 663 | 2536 → 952 | 7586 → 899 |
+| played turn vs traffic | 1867 → 0 | 0 → 0 | 0 → 0 |
+| moving vs parked | 1254 → 0 | 1768 → 767 | 2478 → 0 |
+| just pulled out vs traffic | 398 → 40 | 265 → 185 | 948 → 179 |
+| moving cars in a junction box | 84 → 57 | 95 → 68 | 30 → 844 |
+| moving cars vs oncoming cars | 1541 → 669 | 927 → 689 | 1079 → 960 |
+| lane change, next lane | 0 → 0 | 0 → 0 | 0 → 69 |
+| a van, lorry or bus involved (any of the above) | 6774 → 3012 | 20949 → 20679 | 10242 → 3726 |
+| total | 14780 → 4585 | 37672 → 25221 | 30434 → 9881 |
+
+Cars only (no wide vehicle): 8006 → 1573, 16723 → 4542, 20192 → 6155. A season is chaotic (one gridlock is thousands of frames), so single numbers move between runs of different code; the cause rows are the measure.
+
+The wide remainder is mostly geometry: vans, lorries and buses are drawn 9.0–9.4 px wide in lanes 9 px apart (`WIDEST`, `src/sim/vehicleSize.ts`), so two of them side by side on an avenue or meeting on a street touch by 0.4–0.8 px whenever either is a hair off its line (most of Y6's 20679: buses and lorries side by side on the avenues and meeting oncoming). That waits for the owner's decision on their width.
+
+**What changed.**
+- **One collision rule** (`src/sim/sweeps.ts`, new): every move played off the lanes is put in `sim.sweeps` with its frames and its start time: moves into and out of spaces, a building's mouth, stops on the road, turns round on the road (`Traffic.sweeps`: `put`, `drop`, `hit`, `coming`). A new move is checked frame by frame, body box against body box, against all of them over time; a car waiting at the lane edge holds its last pose and reserves its way into the lane (`next`), whatever the time. A move into a space waits in its lane until it touches nothing (`clearDelay`, up to 40 s); a stop on the road whose place a waiting car stands in stops past it; a pull-out or a door move out that would touch one waits and looks again; a played turn that would is not made. A move whose way is blocked by a parked body is never taken: it waits as long as it takes (looking every 1 s, then less often), where before it went through after 12 tries.
+- **Moving cars and moves** (`src/sim/sweepLead.ts`, new): a driver looks along its way; where its body would touch a move's body, that is its leader, standing (`look`). For moves on the road (turns round, stops on the road, every way out into a lane: `ahead`) the traffic also keeps out of where the move will still pass. A pull-out never starts in front of a car that could not stop short of it, wherever that car comes from (a lane, a junction's turn: `comingClear`), and a turn round on the road is planned against moving cars stretched over their stopping distance.
+- **Turns round on the road**: followers keep their gap to the whole remaining sweep behind the turning car's point, not to its point (`sweepBehind`, the car's `lag`, the stand-in's too), and spawns count it.
+- **A car stopped in its lane is its own stand-in** (`turnIn`: the traffic car is held where it is); a stand-in put later is put exactly where it is asked (`standExact`). A stop on the road never backs up: a car rolling past its stop comes to rest where its braking takes it (`onRoad`).
+- **Edges in the lane**: a way out whose waiting pose is already in its lane band (a space by a corner) is driven in one piece, the lane clear and held from the start (`deep`).
+- **No car left in the lane**: a move into a space that does not fit (or waits for a waiting car for 40 s) puts the car into its building instead (`intoBuilding`: the car fades in at the mouth, leaves its space, a household car is off the map until next driven), where before it stood in the lane all day.
+- **The view is always told**: a car still waiting at an edge at night stands back in its space (or fades, a visitor), and `backIn` always tells the view (`standBack`, `goneAtNight`): before, the view drew a forgotten car waiting at the edge through the night and the next day. Moves told before the view drains its events (the warm-up before dawn) start that far in (`age`, stamped by `emit`).
+- **Planning bodies**: a road's places (double parking, the kerb) run its whole length, so their cars are judged near by where each stands (`bodiesNear` missed every double-parked car more than 470 px from the road's middle); lane changes need a gap for the drawn bodies.
+
+**New checks and tests.** Lab rule `drives against traffic (moving)` (`test/motion/checks.ts`: a moving car lined up with a road, away from junctions, facing against the lane it is in; none in any scenario, park.kerb.far-side included). Four scenarios with a body in the path (`test/motion/scenarios.bodies.ts`): a pull-out with a car broken down in front of its driveway, a forecourt in and out at once, two cars leaving one driveway, a follower behind a car backing into a kerb space. `test/vehicle/sweeps.test.ts`.
+
+**Lab** (defaults, overlap frames): drive.uturn.crossroads 542 → 0, park.taxi.pick 29 → 0, drive.deadend.turn 261 → 0, drive.jam.giveup 1895 → 1095, park.carpark.gate-aisle, park.double.park-leave, park.petrol.queue → 0. Rises: drive.lanes.change 25 → 137 (background cars at a lane change, not explained), drive.jam.giveup moving 338 → 462 (its manoeuvre overlaps fell 1557 → 633). Moving-car physics rules rose by a handful (Old Harbour: slip 6, steers too fast 2, jerks 5, too fast on a curve Saffron Y6 6 → 39): hard stops for a move's body.
+
+**Cost:** a city step is 0.80 / 2.21 / 1.02 ms (was 0.57 / 1.74 / 0.73) for the three seasons (`node dev/moves.mjs`): pull-outs that wait plan again when they look (backing off to 5–10 s), and the body checks (a circle test now goes first in `bodiesOverlap`).
+
+**Not done in this round** (next): followers overtaking a stopped car through a gap in the oncoming lane (they wait behind it, never through it); routing round the block instead of turning round on the road (a taxi facing away still turns round where no way round is reached); real aisles in car parks; conflicting junction turns granted together (the junction-box remainder); `drive.gate.inout` (445 frames, background cars at a gate's junction), `drive.t.all`, `drive.lanes.change`, `drive.works.closed`, `park.kerb.one-way` keep their moving-car overlaps.

@@ -15,6 +15,10 @@ import { startLinks } from './routes';
 import { createRng } from './rng';
 import { Routes } from './routes';
 import { Services } from './services';
+import { Sweeps } from './sweeps';
+import { comingClear } from './sweepLead';
+import { sizeOf } from './vehicleSize';
+import type { MoveSweeps } from './trafficTypes';
 import { stepSignals } from './signals';
 import type { Sim } from './sim';
 import { CarStore } from './store';
@@ -31,7 +35,7 @@ function createSim(net: Network, seed: number): Sim {
   const get = (): Sim => box.sim!;
   const sim: Sim = {
     world: buildWorld(net), cars: new CarStore(), rng: createRng(seed), time: 0, tick: 0, tollNow: 0, speed: 1, trucksAllowed: true,
-    arrivals: [], gaveUp: [], honks: [], routes: new Routes(get), measure: new Measure(get), services: new Services(get),
+    arrivals: [], gaveUp: [], honks: [], routes: new Routes(get), measure: new Measure(get), services: new Services(get), sweeps: new Sweeps(),
   };
   box.sim = sim;
   sim.routes.reset();
@@ -121,6 +125,7 @@ function step(sim: Sim): void {
   stepSignals(sim);
   sim.services.tick();
   stepCars(sim);
+  if (sim.tick % 10 === 0) sim.sweeps.prune(sim.time);
   sim.measure.tick(sim.tick);
   sim.routes.tick();
 }
@@ -214,8 +219,9 @@ function standExact(sim: Sim, i: number, at: Access): boolean {
     const t = l.lanes[l.carLanes - 1]!;
     const s = laneS(l, at.s);
     if (s < c.half[i]! || s > t.len - c.half[i]!) continue;
+    // Only a car standing right there keeps it out; one coming up behind (or already against it) must stop for it.
     let free = true;
-    for (let q = t.head; q >= 0; q = c.behind[q]!) if (Math.abs(c.s[q]! - s) - c.half[q]! - c.half[i]! < 0.5) { free = false; break; }
+    for (let q = t.head; q >= 0; q = c.behind[q]!) if (Math.abs(c.s[q]! - s) < 1 || (c.s[q]! > s && c.s[q]! - s - c.half[q]! - c.half[i]! < 0.5)) { free = false; break; }
     if (!free) continue;
     c.insert(i, t, s);
     c.link[i] = l.i;
@@ -227,6 +233,7 @@ function standExact(sim: Sim, i: number, at: Access): boolean {
 
 function clearAll(sim: Sim): void {
   const c = sim.cars;
+  sim.sweeps.clear();
   for (let i = 0; i < c.count; i++) c.drop(i);
   sim.arrivals = [];
   sim.gaveUp = [];
@@ -241,6 +248,16 @@ function carsOn(sim: Sim, road: number): number[] {
     for (const t of sim.world.linkById.get(id)?.lanes ?? []) for (let i = t.head; i >= 0; i = c.behind[i]!) out.push(c.uid[i]!);
   }
   return out;
+}
+
+/** The sweeps with times from now and sizes by kind (the city's view). */
+function sweepsOf(sim: Sim): MoveSweeps {
+  return {
+    put: (id, m, delay, kind, hold, next, ahead) => { const z = sizeOf(kind); sim.sweeps.put(id, m, sim.time + delay, z.len, z.wid, hold, next, ahead); },
+    drop: (id) => sim.sweeps.drop(id),
+    coming: (m, kind, self = -1) => { const z = sizeOf(kind); return comingClear(sim, m, z.len, z.wid, self); },
+    hit: (m, delay, kind, self, hold, reserve) => { const z = sizeOf(kind); return sim.sweeps.hit(m, sim.time + delay, z.len, z.wid, self, hold, reserve); },
+  };
 }
 
 export function createTraffic(net: Network, seed: number): Traffic {
@@ -260,6 +277,7 @@ export function createTraffic(net: Network, seed: number): Traffic {
     entryPose: (r) => poseFor(sim, r),
     block: (at, seconds, state, kind) => block(sim, at, seconds, state, kind),
     gapAcross: (at, heading, gap) => gapAcross(sim, at, heading, gap),
+    sweeps: sweepsOf(sim),
     holdAcross: (at, heading, seconds) => holdAcross(sim, at, heading, seconds),
     laneClear: (at, heading, back, ahead, seconds) => laneClear(sim, at, heading, back, ahead, seconds),
     setParked: (f) => { sim.parked = f; },

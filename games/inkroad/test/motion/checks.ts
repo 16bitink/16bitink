@@ -2,6 +2,8 @@
  * The motion lab's checks. The rules MotionWatch counts (slip, too tight, turns in place, reverse, curve speed, jumps,
  * oriented-box overlaps, cut-offs; test/motion-helpers.ts) plus two read off the trace here:
  * - drives on the left: a moving car on a two-way road, lined up with it and away from junctions, left of its middle;
+ * - drives against traffic: a moving car lined up with a road, away from junctions, facing against the lane it is in
+ *   (a one-way road's way, or its side of a two-way road's middle);
  * - crosses a kerb: a drawn car leaves or joins the road's paved band away from every way in (a block's or car park's
  *   access, a gate).
  * And helpers for a scenario's own expectations.
@@ -89,6 +91,21 @@ function waysIn(c: City): Pt[] {
 /** Spaces this near a road's line front onto it. */
 const FRONTAGE = 45;
 
+/** Px off a two-way road's middle a car must be to count as in one direction's lanes. */
+const SIDE_MIN = 2;
+
+/**
+ * Does a car (heading a) on this stretch face against the lane it is in? A one-way road runs along its line; on a
+ * two-way road the lanes right of the line (screen axes) run along it, those left of it against it.
+ */
+function againstTraffic(n: { readonly seg: Seg; readonly side: number }, a: number): boolean {
+  const cos = Math.cos(a) * n.seg.ux + Math.sin(a) * n.seg.uy;
+  if (Math.abs(cos) < ALIGNED) return false;
+  if (n.seg.road.oneWay) return cos < 0;
+  if (Math.abs(n.side) < SIDE_MIN) return false;
+  return Math.sign(n.side) !== Math.sign(cos);
+}
+
 /** The generic trace checks every scenario gets on top of MotionWatch's rules. */
 export function extraChecks(c: City, trace: readonly (readonly Sample[])[]): Violation[] {
   const segs = segments(c);
@@ -97,6 +114,7 @@ export function extraChecks(c: City, trace: readonly (readonly Sample[])[]): Vio
   const inJunction = (x: number, y: number): boolean => junctions.some((j) => Math.hypot(j.x - x, j.y - y) < j.r);
   const out: Violation[] = [];
   const left = new Set<number>();
+  const against = new Set<number>();
   const onRoad = new Map<number, boolean>();
   for (const row of trace) {
     if (!row) continue;
@@ -112,6 +130,10 @@ export function extraChecks(c: City, trace: readonly (readonly Sample[])[]): Vio
       if (was !== undefined && was !== paved && !doors.some((p) => Math.hypot(p.x - s.x, p.y - s.y) < ACCESS_R)) {
         out.push({ rule: `crosses a kerb (${s.state === 'manoeuvre' ? 'manoeuvre' : 'moving'})`, who: s.who, uid: s.uid, t: s.t, frame: s.frame, value: n.d, limit: band, x: s.x, y: s.y, a: s.a, detail: `${paved ? 'onto' : 'off'} road ${r.id} ${n.d.toFixed(1)} px from its middle, no way in near` });
       }
+      if (s.state === 'moving' && againstTraffic(n, s.a) && !inJunction(s.x, s.y) && n.d <= halfWidth(r) && r.level === 0) {
+        if (!against.has(s.uid)) out.push({ rule: 'drives against traffic (moving)', who: s.who, uid: s.uid, t: s.t, frame: s.frame, value: n.side, limit: 0, x: s.x, y: s.y, a: s.a, detail: `heading against road ${r.id}'s lane it is in` });
+        against.add(s.uid);
+      } else against.delete(s.uid);
       if (s.state !== 'moving' || r.oneWay || r.flyover || r.level !== 0 || inJunction(s.x, s.y) || n.d > halfWidth(r)) { left.delete(s.uid); continue; }
       const cos = Math.cos(s.a) * n.seg.ux + Math.sin(s.a) * n.seg.uy;
       if (Math.abs(cos) < ALIGNED) continue;

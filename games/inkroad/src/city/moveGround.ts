@@ -198,10 +198,12 @@ function bodiesNear(c: City, q: GroundAsk, b: Box): Body[] {
     if (near(b, t.x[i]!, t.y[i]!, REACH)) out.push(bodyAt(VEHICLES[t.kind[i]!] as VehicleKind, t.x[i]!, t.y[i]!, t.heading[i]!));
   }
   for (const s of c.day.spots.values()) {
-    if (!near(b, s.at.x, s.at.y, REACH + 400)) continue;
+    // A road's places (its kerb, its double-parked cars) run its whole length: only the cars themselves are judged near or not.
+    if (s.kind !== 'double' && s.kind !== 'kerb' && s.kind !== 'street' && !near(b, s.at.x, s.at.y, REACH + 400)) continue;
     for (const e of s.cars) {
-      if (e.uid === q.self || e.edge) continue;
-      const p = q.poseOf(e);
+      if (e.uid === q.self) continue;
+      // A car waiting at the lane edge stands there, not in its slot.
+      const p = e.edge ? e.edge.at ?? null : q.poseOf(e);
       if (p && near(b, p.x, p.y, REACH)) out.push(bodyAt(e.kind, p.x, p.y, p.a));
     }
   }

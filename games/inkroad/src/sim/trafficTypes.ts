@@ -1,3 +1,4 @@
+import type { Played } from './vehicle/played';
 /**
  * The two contracts inside the simulation:
  *   Network: the road graph as immutable values (src/sim/network*.ts)
@@ -122,6 +123,8 @@ export interface Traffic {
   setParked(bodies: (x0: number, y0: number, x1: number, y1: number) => readonly Body[]): void;
   /** Its own lanes at `at`: clear of bodies from `back` px behind to `ahead` px past, nobody arriving within `seconds` (a pull-out's lane time). */
   laneClear(at: Access, heading: number, back: number, ahead: number, seconds: number): boolean;
+  /** Every move played off the lanes, over time (src/sim/sweeps.ts): put one, drop one, and check a new one against them (`delay` s from now). */
+  readonly sweeps: MoveSweeps;
   /** Holds those other-way lanes at `at` for `seconds` (the body is in them). Returns how many lanes. */
   holdAcross(at: Access, heading: number, seconds: number): number;
   /** Buses, trams and school buses: drive the stops in a loop, pausing `dwell` at each. Returns a handle. */
@@ -144,6 +147,17 @@ export interface Traffic {
   /** Clear the day's measurements (dawn) or every car (night). */
   startDay(): void;
   endDay(): void;
+}
+
+/** The sweeps as the city sees them: times are seconds from now. Ids: the city's car uids (positive). */
+export interface MoveSweeps {
+  /** `next`: the move it makes after it has waited (reserved whatever the time). `ahead`: moving cars keep out of where it will still pass (a move on the road). */
+  put(id: number, m: Played, delay: number, kind: VehicleKind, hold: boolean, next?: Played, ahead?: boolean): void;
+  drop(id: number): void;
+  /** Could every moving car near still stop short of this move (from now)? `self`: its own traffic uid, if it has one. */
+  coming(m: Played, kind: VehicleKind, self?: number): boolean;
+  /** The id of a move the new one would touch, or -1. */
+  hit(m: Played, delay: number, kind: VehicleKind, self: number, hold?: boolean, reserve?: boolean): number;
 }
 
 /** traffic.ts exports createTraffic(net: Network, seed: number): Traffic */

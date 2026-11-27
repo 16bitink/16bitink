@@ -105,8 +105,9 @@ function fits(sim: Sim, i: number, toLane: number, s: number): boolean {
   const v = c.v[i]!;
   let b = t.head, a = -1;
   while (b >= 0 && c.s[b]! >= s) { a = b; b = c.behind[b]!; }
-  if (a >= 0 && c.s[a]! - s - c.half[a]! - c.half[i]! < IDM.standGap + Math.max(0, v - c.v[a]!) * 0.6) return false;
-  if (b >= 0 && s - c.s[b]! - c.half[b]! - c.half[i]! < IDM.standGap * 0.7 + Math.max(0, c.v[b]! - v) * 0.8 + c.v[b]! * 0.12) return false;
+  // A gap for the drawn bodies (longer than the sim's), not the points.
+  if (a >= 0 && c.s[a]! - s - c.body[a]! - c.body[i]! < IDM.standGap + Math.max(0, v - c.v[a]!) * 0.6) return false;
+  if (b >= 0 && s - c.s[b]! - c.body[b]! - c.body[i]! < IDM.standGap * 0.7 + Math.max(0, c.v[b]! - v) * 0.8 + c.v[b]! * 0.12) return false;
   return true;
 }
 

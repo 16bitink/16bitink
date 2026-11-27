@@ -66,7 +66,10 @@ function enter(c: City, leg: Leg, from: Access, to: Access): boolean {
   const pose = out?.edge?.lane;
   const req: SpawnRequest = { ...base, from: at, ...(hold > 0 ? { hold } : {}), ...(out?.edge && pose ? { pose } : {}) };
   if (out && !crossClear(c, out)) return false;
+  // Its way from the edge into the lane touches no other move under way (src/sim/sweeps.ts).
+  if (out?.edge?.join && (c.traffic.sweeps.hit(out.edge.join, 0, out.kind, out.uid) >= 0 || !c.traffic.sweeps.coming(out.edge.join, out.kind, out.blockUid))) return false;
   if (door && !doorReady(c, leg, req, look)) return false;
+  if (door && leg.door?.join && (c.traffic.sweeps.hit(leg.door.join, 0, look.kind, leg.door.uid) >= 0 || !c.traffic.sweeps.coming(leg.door.join, look.kind))) return false;
   // A car that stood in its lane takes its stand-in's place (put back if it cannot set off yet).
   const stood = out?.blockUid !== undefined && out.blockUid >= 0 ? c.traffic.poseOf(out.blockUid) : null;
   if (stood && out) c.traffic.remove(out.blockUid!);
@@ -74,7 +77,7 @@ function enter(c: City, leg: Leg, from: Access, to: Access): boolean {
   if (out && stood) out.blockUid = uid < 0 && 'road' in req.from ? c.traffic.block({ ...req.from, ...(out.side ? { dir: out.side } : {}) }, STAND_BACK, 4, out.kind) : undefined;
   if (uid < 0) return false;
   leg.uid = uid;
-  if (out) { crossHold(c, out); pulledOut(c, uid, out, hold); }
+  if (out) { crossHold(c, out); pulledOut(c, uid, out, hold); c.traffic.sweeps.drop(out.uid); if (out.edge?.join) c.traffic.sweeps.put(-uid, out.edge.join, 0, out.kind, false, undefined, true); }
   if (door) doorGone(c, leg, uid);
   c.day.drawn[dayKindAt(c.clock)] += 1;
   releaseSpot(c, leg);

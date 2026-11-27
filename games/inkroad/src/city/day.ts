@@ -1,3 +1,4 @@
+import type { Played } from '../sim/vehicle/played';
 import type { Access } from '../sim/trafficTypes';
 import type { SlotLayout } from '../sim/slotGeometry';
 import type { Bar, DayKind, Id, Pt, VehicleKind } from '../sim/types';
@@ -77,6 +78,8 @@ export interface Standing {
   spot: Spot;
   /** A car stopped in its lane: the uid of the hidden stand-in that blocks the lane where it stands. */
   blockUid?: number;
+  /** Times in a row its way out touched another move under way (it looks again less often). */
+  swept?: number;
   /** Times it looked for a way out that fits and found none (src/city/manoeuvre.ts readyAtEdge). */
   blocked?: number;
   /** Where its move in left it standing (the body's middle), drawn there exactly and left from there (src/city/movePlan.ts). */
@@ -86,7 +89,7 @@ export interface Standing {
   /** Seconds it stood in its lane waiting for a gap across the road before turning in: its stay starts after them. */
   crossWait?: number;
   /** Leaving: off the road at the lane edge (not drawn in `parking`, its slot still its own), ready for the lane at `goAt`, where it will stand. */
-  edge?: { readonly goAt: number; readonly lane: { readonly x: number; readonly y: number; readonly a: number }; /** Seconds the lane is held pulling out (the planned move's lane part). */ readonly hold?: number; /** It turns across the far lanes here. */ readonly cross?: Access; /** The lane access its spawn uses (the planned move joins the lane there). */ readonly from?: Access; /** It turns round on the road: both ways must be clear. */ readonly both?: boolean; /** Px of its lane behind the joining point its move sweeps (kept clear before it goes). */ readonly back?: number };
+  edge?: { readonly goAt: number; readonly lane: { readonly x: number; readonly y: number; readonly a: number }; /** Seconds the lane is held pulling out (the planned move's lane part). */ readonly hold?: number; /** It turns across the far lanes here. */ readonly cross?: Access; /** The lane access its spawn uses (the planned move joins the lane there). */ readonly from?: Access; /** It turns round on the road: both ways must be clear. */ readonly both?: boolean; /** Px of its lane behind the joining point its move sweeps (kept clear before it goes). */ readonly back?: number; /** Where it waits (its middle), and its played way from there into the lane. */ readonly at?: { readonly x: number; readonly y: number; readonly a: number }; readonly join?: Played };
 }
 
 /** A parking place: private spaces of a block, kerb bays, a car park. */
@@ -140,7 +143,9 @@ export interface Leg {
   /** The slot it was promised in `spot` (road places), or -1. */
   slot: number;
   /** A car with no space to pull out of comes out of a building's entrance (`door.ts`): its move, once told. */
-  door?: { readonly uid: number; readonly goAt: number; readonly lane: { readonly x: number; readonly y: number; readonly a: number }; readonly key: string; /** Seconds its spawn holds the lane (the move from the edge into it). */ readonly hold: number };
+  /** Clock of its next look out of a building whose way out was blocked. */
+  doorLook?: number;
+  door?: { readonly uid: number; readonly goAt: number; readonly lane: { readonly x: number; readonly y: number; readonly a: number }; readonly key: string; /** Seconds its spawn holds the lane (the move from the edge into it). */ readonly hold: number; /** Its played way from the edge into the lane. */ readonly join?: Played };
   /** A taxi on its way to fetch somebody: their ride home, set off from the kerb once it is there. */
   then?: Leg;
 }

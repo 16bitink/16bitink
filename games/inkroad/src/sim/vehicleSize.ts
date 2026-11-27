@@ -61,6 +61,9 @@ const radius = (b: Body, ax: number, ay: number): number => {
 /** Do two bodies overlap by more than `slack` px? (separating axis test) Pure. */
 export function bodiesOverlap(p: Body, q: Body, slack = 0): boolean {
   const dx = q.x - p.x, dy = q.y - p.y;
+  // Their circles apart: no overlap (most pairs end here, cheaply).
+  const r = (Math.sqrt(p.len * p.len + p.wid * p.wid) + Math.sqrt(q.len * q.len + q.wid * q.wid)) / 2;
+  if (dx * dx + dy * dy >= r * r) return false;
   for (const [ax, ay] of [...axes(p), ...axes(q)]) {
     if (Math.abs(dx * ax + dy * ay) >= radius(p, ax, ay) + radius(q, ax, ay) - slack) return false;
   }

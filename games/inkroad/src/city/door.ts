@@ -4,6 +4,7 @@ import type { VehicleKind } from '../sim/types';
 import type { Leg, Place } from './day';
 import { lotRect } from './geometry';
 import { planDoor } from './movePlan';
+import { hitsBody } from './manoeuvre';
 import { viewKind } from './stand';
 import { emit, type City } from './state';
 import type { MovePlay } from '../sim/types';
@@ -19,6 +20,8 @@ import type { Rect } from './geometry';
 
 /** Uids of door moves told before the car is on the road: above every traffic uid, below the fleet's (2^30 up). */
 const DOOR_UID = 0x2000_0000;
+/** Seconds between the looks of a car whose way out of a building is blocked by a parked car. */
+const DOOR_LOOK = 3;
 
 export interface Look { readonly kind: VehicleKind; readonly tint: number }
 
@@ -42,14 +45,17 @@ function rectOf(c: City, key: string): Rect | null {
 }
 
 /** The car turns in at the building's entrance along its played move, holding its lane while its body is in it. False: no door here. */
-export function doorIn(c: City, uid: number, leg: Leg, look: Look, at: string | null = doorKey(leg, true), pose: LanePose | null = null): boolean {
+export function doorIn(c: City, uid: number, leg: Leg | null, look: Look, at: string | null = leg ? doorKey(leg, true) : null, pose: LanePose | null = null, mustFit = false, car = uid): boolean {
   const key = at;
   const lane = key ? pose ?? c.traffic.poseOf(uid) : null;
   const rect = key ? rectOf(c, key) : null;
   if (!key || !lane || !rect) return false;
   const m = planDoor(c, rect, lane, 'in', look.kind, uid);
+  if (mustFit && !m.played.fits) return false;
   if (!c.traffic.park(uid, Math.max(STEP, m.lane))) c.traffic.remove(uid);
-  tell(c, 'in', uid, key, lane, m.lane, m.played.seconds, look, { a: m.played, fade: true });
+  c.traffic.sweeps.put(car, m.played, 0, look.kind, false);
+  // `car`: the view's car (a parked car's own id when it goes into its building instead of its space).
+  tell(c, 'in', car, key, lane, m.lane, m.played.seconds, look, { a: m.played, fade: true });
   return true;
 }
 
@@ -84,9 +90,17 @@ export function doorReady(c: City, leg: Leg, req: SpawnRequest, look: Look): boo
   const rect = key ? rectOf(c, key) : null;
   if (!key || !lane || !rect) return true;
   // Out of the mouth to the lane edge (it waits there for its gap), then into the lane, where its spawn stands that long.
-  const m = planDoor(c, rect, lane, 'out', look.kind, DOOR_UID + leg.tag);
+  const uid = DOOR_UID + leg.tag;
+  if (leg.doorLook !== undefined && c.clock < leg.doorLook) return false;
+  const m = planDoor(c, rect, lane, 'out', look.kind, uid);
+  // Never out through a parked car: it stays inside and looks again a little later.
+  if (hitsBody(m.toEdge) || hitsBody(m.played)) { leg.doorLook = c.clock + DOOR_LOOK; return false; }
+  // The one collision rule: it stays inside while its way out (or its wait at the edge) would touch another move.
+  const sw = c.traffic.sweeps;
+  if (sw.hit(m.toEdge, 0, look.kind, uid, true) >= 0 || sw.hit(m.played, m.toEdge.seconds, look.kind, uid) >= 0) return false;
+  sw.put(uid, m.toEdge, 0, look.kind, true, m.played);
   const end = lastPose(m.played);
-  leg.door = { uid: DOOR_UID + leg.tag, goAt: c.clock + m.toEdge.seconds, lane: { x: end.x, y: end.y, a: end.th }, key, hold: Math.max(STEP, m.lane) };
+  leg.door = { uid, goAt: c.clock + m.toEdge.seconds, lane: { x: end.x, y: end.y, a: end.th }, key, hold: Math.max(STEP, m.lane), join: m.played };
   tell(c, 'out', leg.door.uid, key, leg.door.lane, leg.door.hold, m.toEdge.seconds + leg.door.hold, look, { a: m.toEdge, b: m.played, fade: true });
   return m.toEdge.seconds <= STEP / 2;
 }
@@ -96,6 +110,9 @@ export function doorGone(c: City, leg: Leg, uid: number): void {
   const d = leg.door;
   if (!d) return;
   emit(c, { t: 'parkGo', car: d.uid, key: d.key, lane: c.traffic.poseOf(uid) ?? d.lane, seconds: d.hold, uid });
+  c.traffic.sweeps.drop(d.uid);
+  // Under its traffic uid: the car it becomes never takes its own way in for a body in its way.
+  if (d.join) c.traffic.sweeps.put(-uid, d.join, 0, 'car', false, undefined, true);
   leg.door = undefined;
 }
 
@@ -107,5 +124,6 @@ export function doorBack(c: City, leg: Leg, look: Look): void {
   leg.door = undefined;
   if (!rect) return;
   const m = planDoor(c, rect, d.lane, 'in', look.kind, d.uid);
+  c.traffic.sweeps.put(d.uid, m.played, 0, look.kind, false);
   tell(c, 'in', d.uid, d.key, d.lane, 0, m.played.seconds, look, { a: m.played, fade: true });
 }

@@ -4,7 +4,8 @@ import { plan } from './motion';
 import { DRIVEWAY, IDM } from './tune';
 import { gapAcross } from './crossing';
 import { project } from './geom';
-import { standIn, startTurn, TURN_GAP } from './turning';
+import { standIn, startTurn, sweepBehind, TURN_GAP } from './turning';
+import { paramsOfKind } from './drawn';
 
 /** A pull-out from the kerb is a forward S this many driveway lengths long: its bend stays near R_MIN, never a sideways hop. */
 const PULL_OUT_STRETCH = 2;
@@ -28,7 +29,8 @@ export function spaceAt(sim: Sim, t: Track, s: number, h: number, v: number): bo
   const c = sim.cars;
   for (let q = t.head; q >= 0; q = c.behind[q]!) {
     const d = c.s[q]! - s;
-    const gap = Math.abs(d) - c.half[q]! - h;
+    // A car ahead turning round sweeps behind its point (its lag): the gap is to the sweep.
+    const gap = Math.abs(d) - c.half[q]! - h - (d >= 0 ? Math.max(0, c.lag[q]!) : 0);
     if (d >= 0 ? gap < IDM.standGap : gap < IDM.standGap + Math.max(0, c.v[q]! - v) * MERGE_TIME) return false;
   }
   return true;
@@ -158,13 +160,14 @@ export function turnBack(sim: Sim, i: number): boolean {
   const wait = Math.max(gapAcross(sim, at, c.heading[i]!, TURN_GAP), gapAcross(sim, at, c.heading[i]! + Math.PI, TURN_GAP));
   const sOld = c.s[i]!;
   const r = startTurn(sim, i, to, Math.max(c.half[i]!, s - 8), wait);
-  if (!r || !spaceAt(sim, to, r.s, c.half[i]!, 0)) { c.play[i] = null; return false; }
+  if (!r || !spaceAt(sim, to, r.s, c.half[i]!, 0)) { c.play[i] = null; sim.sweeps.drop(-c.uid[i]!); return false; }
   c.unlink(i);
   c.insert(i, to, r.s);
   c.forget(i);
   c.v[i] = 0;
   c.playGoal[i] = -1;
-  standIn(sim, t, sOld, wait + r.played.seconds, c.kind[i]!);
+  const p = paramsOfKind(c.kind[i]!);
+  standIn(sim, t, sOld, wait + r.played.seconds, c.kind[i]!, sweepBehind(r.played, 0, t, sOld, p.len, p.wid, c.body[i]!));
   plan(sim, i, other);
   return true;
 }
