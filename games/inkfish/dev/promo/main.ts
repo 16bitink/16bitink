@@ -649,6 +649,35 @@ const SHORTS: Readonly<Record<string, () => Promise<Short>>> = {
     const { createInky } = await import('./inky/render');
     return createInky(ctx);
   },
+  dewykit: async () => {
+    const { createDewyKit } = await import('./devstory/dewykit/render');
+    return createDewyKit(ctx);
+  },
+  screenkit: async () => {
+    await loadCaptionFont();
+    const { createScreenKit } = await import('./devstory/screenkit/render');
+    return createScreenKit(ctx);
+  },
+  devquit: async () => {
+    await loadCaptionFont();
+    const { createDevQuit } = await import('./devquit/render');
+    return createDevQuit(ctx);
+  },
+  devweekend: async () => {
+    await loadCaptionFont();
+    const { createWeekend } = await import('./devweekend/render');
+    return createWeekend(ctx);
+  },
+  devkid: async () => {
+    await loadCaptionFont();
+    const { createDevkid } = await import('./devkid/render');
+    return createDevkid(ctx);
+  },
+  devducks: async () => {
+    await loadCaptionFont();
+    const { createDucks } = await import('./devducks/render');
+    return createDucks(ctx);
+  },
   crows: async () => {
     await loadCaptionFont();
     const { createCrows } = await import('./crows/render');

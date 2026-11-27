@@ -56,6 +56,7 @@ const VARIANTS = [
   { name: 'inkfish-how-deep', query: '&short=depth', start: 0 },
   { name: 'inkfish-fish-eat-birds', query: '&short=birds', start: 0 },
   { name: 'inkfish-anglerfish-light', query: '&short=light', start: 0 },
+  { name: 'inkfish-dewy-childhood', query: '&short=devkid', start: 0 },
   { name: 'inkfish-anglerfish-mates', query: '&short=mates', start: 0 },
   { name: 'inkfish-blobfish', query: '&short=blobfish', start: 0 },
   { name: 'inkfish-greenland-shark', query: '&short=greenland', start: 0 },
@@ -155,6 +156,9 @@ const VARIANTS = [
   { name: 'inkfish-monk-seal-eel', query: '&short=monkseal', start: 0 },
   { name: 'inkfish-inky-octopus-escape', query: '&short=inky', start: 0 },
   { name: 'inkroad-crows-traffic', query: '&short=crows', start: 0 },
+  { name: 'inkfish-dewy-ducks', query: '&short=devducks', start: 0 },
+  { name: 'inkfish-dewy-quit', query: '&short=devquit', start: 0 },
+  { name: 'inkfish-dewy-weekend', query: '&short=devweekend', start: 0 },
   // Long-form (16:9, not looping): recorded once from 0 to the end, its sound brought up to YouTube's -14 LUFS.
   // Only with --only (it takes ~25 minutes): a plain `pnpm promo` re-records the shorts.
   { name: 'inkfish-long-descent', page: 'longform.html', query: '&video=descent', start: 0, audioFilter: 'loudnorm=I=-14:TP=-1.5:LRA=11', onlyByName: true },
