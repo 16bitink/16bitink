@@ -41,3 +41,17 @@ describe('catching up on store purchases in the app', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 });
+
+describe('whether to offer the full game', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('offers it on the web and in an app that sells, never in an app that cannot', async () => {
+    const { canBuyHere } = await import('../src/lib/client/appBilling');
+    vi.stubGlobal('window', {});
+    expect(canBuyHere()).toBe(true);
+    vi.stubGlobal('window', { InkApp: { isApp: true, billing: 'play', getProducts: vi.fn(), purchase: vi.fn(), getPurchases: vi.fn() } });
+    expect(canBuyHere()).toBe(true);
+    vi.stubGlobal('window', { InkApp: { isApp: true, platform: 'ios' } });
+    expect(canBuyHere()).toBe(false);
+  });
+});

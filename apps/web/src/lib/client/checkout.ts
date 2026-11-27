@@ -34,7 +34,8 @@ export async function startCheckout(game: string): Promise<CheckoutResult> {
 /** In the app: the store's purchase sheet, for the signed-in player. */
 async function startAppPurchase(game: string): Promise<CheckoutResult> {
   const billing = appBilling();
-  if (!billing) return failed(game, 'Buying in this app is not available yet. Your purchases from 16bit.ink still unlock here.');
+  // Never reached from an offer (none shows without billing, see canBuyHere): just in case, no buying and no pointing elsewhere.
+  if (!billing) return failed(game, 'Buying is not available in this app yet.');
   const me = await fetchMe();
   if (!me?.id) return failed(game, me ? 'Sign in to buy the full game.' : 'Network error. Check your connection and try again.');
   trackCheckout(game);

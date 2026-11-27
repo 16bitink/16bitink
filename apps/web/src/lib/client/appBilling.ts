@@ -45,6 +45,13 @@ const inkApp = (): InkApp | undefined => (window as unknown as { InkApp?: InkApp
 /** Inside the app (where web checkout must never show). */
 export const inApp = (): boolean => inkApp()?.isApp === true;
 
+/**
+ * Whether the full game may be offered here: always on the web, and in an
+ * app only where it sells through the store. Elsewhere no offer shows at all:
+ * store review rejects a buy button that doesn't work.
+ */
+export const canBuyHere = (): boolean => !inApp() || appBilling() !== null;
+
 /** The app's store billing, when this app version can sell. */
 export function appBilling(): Billing | null {
   const app = inkApp();

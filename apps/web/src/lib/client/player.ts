@@ -2,7 +2,7 @@ import { isGameModule, isOfferPlace, type GameModule, type KeyValueStore } from 
 import { GAME_LOADERS } from '../../games/loaders';
 import { BUY_PARAM, isPendingBuy, signInUrl } from '../buyFlow';
 import { flushAnalytics, gameTag, track, trackGameEvent, trackLevelInput, trackPlayTime, trackSignIn, type LoadStage } from './analytics';
-import { syncAppPurchases, watchAppPurchases } from './appBilling';
+import { canBuyHere, syncAppPurchases, watchAppPurchases } from './appBilling';
 import { buyFullGame, fetchMe, startCheckout } from './checkout';
 import { pointerKind, watchLevelInput } from './levelInput';
 import { createHiddenTime, visibleMs } from './hiddenTime';
@@ -250,12 +250,15 @@ export function bootPlayer(game: string, fonts: readonly string[]): void {
         storage: safeStorage(userId),
         progress: progress ?? undefined,
         signedIn: me?.signedIn === true,
-        price: stage.dataset.price || undefined,
+        // Inside an app that can't sell (iOS, for now): no offer at all.
+        canBuy: canBuyHere(),
+        price: canBuyHere() ? stage.dataset.price || undefined : undefined,
         loadContent: () => getJson<unknown>(`/api/content/${encodeURIComponent(game)}`),
         daily: dailyGame(game) ? createDailyHost(game, rawStorage(), window.location) : undefined,
         // Only as a new chapter or level loads (see GameHost): never in the middle of play.
         filesMissing: () => void offerRefresh(stage, false),
         onBuy: (where) => {
+          if (!canBuyHere()) return;
           if (document.fullscreenElement) void document.exitFullscreen();
           void offerBuy(game, isOfferPlace(where) ? where : 'unknown');
         },
