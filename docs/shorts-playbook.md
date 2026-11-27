@@ -383,6 +383,7 @@ Four YouTube videos the user shared. The creators make money from Shorts coachin
 
 ## Rules for the next short
 
+- **Dev stories (Dewy) follow `docs/dev-stories.md`** (2026-11-27): the animal and the child's world first, the game as the answer, Dewy only on his "I built" lines, no laptop or UI in frame 1. The InkFish dev stories #145–148 (laptop, code, "I built") underperformed the channel; the InkCrab four (#149–152) test the new format. The story bank per game lives there too.
 - **10–13 seconds for story shorts without a voice, 18–20s for narrated ones** (the 20s clownfish held 98.7%; the 22s and 25s shorts dropped to 81–86%). Either way, one seamless loop: the last frame flows into the first (see the loop tests in `games/inkfish/test/promo*.test.ts`).
 - **Action from the first frame.** No question or explainer before something moves. The threat should already be on screen in frame 1. Since every short loops, choose the file's start point (`start` in `record.mjs`) to land just before the payoff, not at the story's beginning.
 - **The opening caption is a hook, not a setting.** "Seychelles. A young tern skims the sea…" reads like a documentary. Save the place name for after the payoff.

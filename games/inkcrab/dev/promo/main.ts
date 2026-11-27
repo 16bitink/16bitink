@@ -93,6 +93,27 @@ const SHORTS: Readonly<Record<string, () => Promise<Short>>> = {
     const { createHeronRat } = await import('./heronrat/render');
     return createHeronRat(ctx);
   },
+  // Dev stories told by Dewy about his son (#149–152): each folder owns its credit and captions.
+  crabtreasure: async () => {
+    await loadCaptionFont();
+    const { createCrabTreasure } = await import('./crabtreasure/render');
+    return createCrabTreasure(ctx);
+  },
+  crabmaldives: async () => {
+    await loadCaptionFont();
+    const { createCrabMaldives } = await import('./crabmaldives/render');
+    return createCrabMaldives(ctx);
+  },
+  crabnight: async () => {
+    await loadCaptionFont();
+    const { createCrabNight } = await import('./crabnight/render');
+    return createCrabNight(ctx);
+  },
+  crabdig: async () => {
+    await loadCaptionFont();
+    const { createCrabDig } = await import('./crabdig/render');
+    return createCrabDig(ctx);
+  },
 };
 
 const name = params.get('short') ?? 'kit';

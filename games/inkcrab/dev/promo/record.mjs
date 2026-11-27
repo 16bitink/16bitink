@@ -62,6 +62,10 @@ const VARIANTS = [
   { name: 'inkcrab-bird-snatch', query: '&short=birdsnatch', start: 0 },
   { name: 'inkcrab-heron-crab', query: '&short=heroncrab', start: 0 },
   { name: 'inkcrab-heron-rat', query: '&short=heronrat', start: 0 },
+  { name: 'inkcrab-dewy-treasure', query: '&short=crabtreasure', start: 0 },
+  { name: 'inkcrab-dewy-maldives', query: '&short=crabmaldives', start: 0 },
+  { name: 'inkcrab-dewy-night', query: '&short=crabnight', start: 0 },
+  { name: 'inkcrab-dewy-dig', query: '&short=crabdig', start: 0 },
 ];
 const chosen = only ? VARIANTS.filter((v) => v.name.includes(only)) : VARIANTS.filter((v) => !v.onlyByName);
 if (chosen.length === 0) throw new Error(`No variant name contains "${only}": ${VARIANTS.map((v) => v.name).join(', ')}`);
