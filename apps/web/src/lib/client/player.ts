@@ -128,12 +128,6 @@ export function bootPlayer(game: string, fonts: readonly string[]): void {
   void accessP.then(({ unlocked }) => showOwned(unlocked));
   const progressP = accountProgress(game);
   const meP = fetchMe();
-  // In the app: a store purchase not yet saved to the account (paid while offline, or pending) unlocks the game now.
-  const unlockedHere = (owned: string): void => {
-    if (owned === game) window.location.reload();
-  };
-  void meP.then((me) => (me?.signedIn ? syncAppPurchases(unlockedHere) : undefined));
-  watchAppPurchases(unlockedHere);
   if (isPendingBuy(window.location.search, game)) void resumeBuy(game, status, accessP);
   // The stats follow each press of play: how long until it showed, or how it failed or was left.
   let tag = gameTag(game, undefined);
@@ -174,6 +168,15 @@ export function bootPlayer(game: string, fonts: readonly string[]): void {
   // and once the game is mounted nothing here may reload the page out from under the player.
   let tapped = false;
   let playing = false;
+  // In the app: a store purchase saved only now (paid offline, or a pending payment that went through).
+  // On the splash a reload unlocks it at once; once play was tapped the player chooses when.
+  const unlockedHere = (owned: string): void => {
+    if (owned !== game) return;
+    if (!tapped) window.location.reload();
+    else offerUnlockedRefresh(stage);
+  };
+  void meP.then((me) => (me?.signedIn ? syncAppPurchases(unlockedHere) : undefined));
+  watchAppPurchases(unlockedHere);
   // Re-created on retry: a failed dynamic import stays rejected forever.
   let engineP = loadGame(game);
   // Failed before the player tapped: a page older than the deploy reloads onto the new one unseen.
@@ -328,6 +331,19 @@ async function offerRefresh(stage: HTMLElement, onlyIfNewer: boolean): Promise<v
   text.textContent = newer
     ? `A new version of ${stage.dataset.title ?? 'the game'} is out. Refresh to keep playing: your saved progress stays.`
     : "Some of the game's files didn't load. Check your connection, then refresh.";
+  go.addEventListener('click', () => window.location.reload(), { once: true });
+  card.hidden = false;
+  go.focus();
+}
+
+/** A purchase saved while the game runs: the Refresh card, never a reload under the player. */
+function offerUnlockedRefresh(stage: HTMLElement): void {
+  const card = document.getElementById('refresh');
+  const text = document.getElementById('refresh-text');
+  const go = document.getElementById('refresh-go');
+  if (refreshOffered || !card || !text || !go) return;
+  refreshOffered = true;
+  text.textContent = `The full ${stage.dataset.title ?? 'game'} is unlocked. Refresh to play it: your saved progress stays.`;
   go.addEventListener('click', () => window.location.reload(), { once: true });
   card.hidden = false;
   go.focus();

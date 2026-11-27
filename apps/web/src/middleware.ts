@@ -1,6 +1,7 @@
 import { defineMiddleware } from 'astro:middleware';
 import { clientIp } from './lib/clientIp';
 import { isForbiddenCrossOrigin } from './lib/originCheck';
+import { syncPlayRefundsDaily } from './lib/playRefunds';
 import { createRateLimiter, limitFor, type LimitedRoute, type RateLimiter } from './lib/rateLimit';
 import { shortLinkTarget } from './lib/shortLinks';
 
@@ -32,6 +33,8 @@ export const onRequest = defineMiddleware((context, next) => {
   if (!context.isPrerendered && isForbiddenCrossOrigin(context.request, context.url)) {
     return new Response(`Cross-site ${context.request.method} form submissions are forbidden`, { status: 403 });
   }
+  // Google Play refunds: synced in the background once a day, never holding up the request.
+  if (!context.isPrerendered) syncPlayRefundsDaily(Date.now());
   const route = limitFor(context.url.pathname);
   if (route && !context.isPrerendered) {
     const ip = clientIp(context.request, () => context.clientAddress);
