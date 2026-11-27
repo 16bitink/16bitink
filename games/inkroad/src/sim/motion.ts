@@ -116,6 +116,7 @@ function arrive(sim: Sim, i: number): void {
 export function move(sim: Sim, i: number): void {
   const c = sim.cars;
   if (c.play[i] && holdTurning(sim, i)) return;
+  if (c.playGoal[i] === WAIT_TURN && waitToTurn(sim, i)) return;
   const v = c.v[i]!, nv = c.nv[i]!;
   let ds = ((v + nv) / 2) * STEP;
   if (nv === 0 && v > 0) ds = Math.min(ds, (v * STEP) / 2);
@@ -155,12 +156,27 @@ function holdTurning(sim: Sim, i: number): boolean {
   return true;
 }
 
-/** Entering a dead end's three-point turn: plan it on the road and play it (src/sim/turning.ts). */
+/** Entering a dead end's three-point turn: plan it on the road and play it (src/sim/turning.ts); no clear way: it waits. */
 function turnOnto(sim: Sim, i: number, t: Track): void {
   const back = nextTrack(sim, i, t);
   if (!back) return;
   const r = startTurn(sim, i, back, 0, 0);
-  if (r) sim.cars.playGoal[i] = r.s;
+  sim.cars.playGoal[i] = r ? r.s : WAIT_TURN;
+}
+
+/** playGoal of a car standing at a dead end's turn, waiting for room to turn round (a car in the way). */
+const WAIT_TURN = -2;
+/** Seconds between its looks. */
+const TURN_LOOK = 1;
+
+/** Standing at the start of its turn until a turn that clears every body fits. True: still waiting. */
+function waitToTurn(sim: Sim, i: number): boolean {
+  const c = sim.cars;
+  const t = c.track[i]!;
+  c.v[i] = 0; c.travel[i] = 0; c.acc[i] = 0;
+  if (t.turnRound !== 'three') { c.playGoal[i] = -1; return false; }
+  if (Math.round(sim.time / STEP) % Math.round(TURN_LOOK / STEP) === 0) turnOnto(sim, i, t);
+  return true;
 }
 
 // ---------------------------------------------------------------- waiting

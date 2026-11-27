@@ -45,17 +45,18 @@ export interface Manoeuvre {
 /** Reverse costs this many times forward; a gear change costs this many body lengths; each radian turned this many px (longer and gentle beats short and twisty). */
 const REVERSE_PRICE = 1.6, CUSP_PRICE = 1.5, TURN_PRICE = 6;
 /**
- * No loops (the owner, phase B): a path turning more than LOOP_SHARE x its net heading change + LOOP_SLACK is a loop,
- * never taken unless the move is meant to turn the car round. LOOP_SLACK leaves room for a parallel park's S (two
- * arcs of up to ~50 degrees with no net change).
+ * No loops (the owner, phase B): a path whose heading sweeps more than its net change + LOOP_SLACK is a loop, never
+ * taken (a full circle to face the other way sweeps 360 for a net 180; an S left then right sweeps only one bend).
  */
-export const LOOP_SHARE = 1.5, LOOP_SLACK = (110 * Math.PI) / 180;
+export const LOOP_SLACK = (120 * Math.PI) / 180;
 /** Goals within this of the start's heading, ahead of it, are reached with a forward S only (no cusp, no reversing). */
 const S_ONLY = Math.PI / 4;
 
 export interface PlanOptions {
-  /** The move is meant to turn the car round (a three-point turn, a turn on the road): loops and cusps allowed. */
+  /** The move is meant to turn the car round (a three-point turn, a turn on the road): cusps and reversing across the road allowed. */
   readonly turnaround?: boolean;
+  /** Forward only (turning across the road into a space: one nose-first turn, never backing across a lane). */
+  readonly forwardOnly?: boolean;
 }
 
 /**
@@ -71,6 +72,19 @@ function swingsOf(p: RsPath): number {
   return n;
 }
 
+/**
+ * How far a candidate's heading sweeps (the range of its heading along the way, radians): an S (left then right)
+ * sweeps one bend, a full circle sweeps all of it, a three-point turn little more than its half circle.
+ */
+export function sweepOf(p: RsPath): number {
+  let th = 0, lo = 0, hi = 0;
+  p.lengths.forEach((l, i) => {
+    th += (p.ctypes[i] === 'L' ? 1 : p.ctypes[i] === 'R' ? -1 : 0) * l;
+    lo = Math.min(lo, th); hi = Math.max(hi, th);
+  });
+  return hi - lo;
+}
+
 /** Total turning of a candidate, radians (every arc's angle). */
 export const turningOf = (p: RsPath): number => p.lengths.reduce((n, l, i) => n + (p.ctypes[i] === 'S' ? 0 : Math.abs(l)), 0);
 
@@ -78,9 +92,11 @@ const wrapA = (a: number): number => Math.atan2(Math.sin(a), Math.cos(a));
 
 /** May this candidate run between these poses? No loops; a goal nearly ahead is a forward S. */
 function allowed(p: RsPath, a: Pose, b: Pose, o: PlanOptions): boolean {
-  if (o.turnaround) return true;
+  if (o.forwardOnly && p.lengths.some((l) => l < -1e-9)) return false;
   const net = Math.abs(wrapA(b.th - a.th));
-  if (turningOf(p) > LOOP_SHARE * net + LOOP_SLACK) return false;
+  // Never a loop, not even turning round: the heading never sweeps much more than the change it is for.
+  if (sweepOf(p) > net + LOOP_SLACK) return false;
+  if (o.turnaround) return true;
   const ahead = (b.x - a.x) * Math.cos(a.th) + (b.y - a.y) * Math.sin(a.th) > 0;
   return !(net < S_ONLY && ahead) || p.lengths.every((l) => l >= -1e-9);
 }
@@ -154,7 +170,7 @@ export function planManoeuvre(starts: readonly Offer[], goals: readonly Offer[],
     if (m && (!best || m.cost < best.cost)) best = m;
   }
   if (best) return best;
-  return cheapest(starts, goals, v, w, v.rPlan, false, o) ?? cheapest(starts, goals, v, w, v.rPlan, false, { turnaround: true });
+  return cheapest(starts, goals, v, w, v.rPlan, false, o) ?? cheapest(starts, goals, v, w, v.rPlan, false, { turnaround: true, forwardOnly: o.forwardOnly });
 }
 
 function cheapest(starts: readonly Offer[], goals: readonly Offer[], v: VehicleParams, w: World, r: number, mustFit: boolean, o: PlanOptions): Manoeuvre | null {

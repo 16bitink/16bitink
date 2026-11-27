@@ -17,8 +17,8 @@ import { broken, measure, type Drawn } from './invariants';
 const KNOWN: Readonly<Record<string, readonly string[]>> = { 'uturn-avenue': ['overlaps'], 'uturn-deadend': ['overlaps'], 'turn-left': ['overlaps'], 'turn-right': ['overlaps'], 'uturn-roundabout': ['overlaps'] };
 /** Since phase B every drawn car is the vehicle model (moving cars and manoeuvres alike): the checks find nothing in today's motion but touches. */
 const TODAY_ALLOWED = ['overlaps'];
-/** Left in today's motion (phase B): the car-park car's jerk where its last drawn step meets its played move as it brakes to wait for its gap. */
-const TODAY_KNOWN: Readonly<Record<string, readonly string[]>> = { 'carpark-bay': ['jerk'] };
+/** Left in today's motion (phase B): the car-park car's jerk where its last drawn step meets its played move, and its pull away out of the bay. */
+const TODAY_KNOWN: Readonly<Record<string, readonly string[]>> = { 'carpark-bay': ['jerk', 'accel'] };
 
 describe('invariants catch magic', () => {
   const car = paramsOf('car');

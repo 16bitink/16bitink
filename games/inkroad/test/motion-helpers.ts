@@ -47,13 +47,13 @@ const HOLDING = 4;
 const REVERSE_LIMIT = REVERSE_MAX * 1.02;
 /** Parking speeds (the owner, phase B): turning in 15 km/h (manoeuvres are driven at 9, under the 10 km/h of aisles), the last px into a space 5 km/h. */
 const KMH = 3.55 * 1.25 / 3.6;
-const TURN_IN_CAP = 15 * KMH, CREEP_CAP = 5 * KMH, CREEP_PX = 6, PARK_SLACK = 1.05;
+const TURN_IN_CAP = 15 * KMH, CREEP_CAP = 5 * KMH, CREEP_PX = 6, CREEP_S = 3, PARK_SLACK = 1.05;
 /** A manoeuvring car within this of its start line (px, rad) is still braking in its lane. */
 const ON_LINE = 2, ON_HEADING = 0.1;
 /** A reversing body may reach this far past the inner edge of its lane (paint). */
 const REVERSE_SLACK = 2;
-/** Loops: total turning over LOOP_SHARE x the net change + LOOP_SLACK (as the planner, src/sim/vehicle/planner.ts). */
-const LOOP_SHARE = 1.5, LOOP_SLACK = (110 * Math.PI) / 180;
+/** Loops: a heading sweep over the net change + LOOP_SLACK (as the planner, src/sim/vehicle/planner.ts), every move (turns round too). */
+const LOOP_SLACK = (120 * Math.PI) / 180;
 
 /** A move that turns the car round (its net heading change over 130 degrees): reversing across the road is its design. */
 const turnsRound = (m: Move<null>): boolean => {
@@ -170,7 +170,7 @@ export class MotionWatch {
   private readonly touching = new Set<string>();
   private readonly cutting = new Set<string>();
   private readonly handed = new Map<number, number>();
-  private readonly turning = new Map<number, { first: number; last: number; sum: number }>();
+  private readonly turning = new Map<number, { first: number; last: number; sum: number; th: number; lo: number; hi: number }>();
   private readonly across = new Set<string>();
   private frame = 0;
   steps = 0;
@@ -321,7 +321,8 @@ export class MotionWatch {
     const x0 = m.a.frames[0]!, y0 = m.a.frames[1]!, a0 = m.a.frames[2]!;
     const lat = Math.abs(-(b.x - x0) * Math.sin(a0) + (b.y - y0) * Math.cos(a0));
     if (m.dir === 'in' && m.phase === 'move' && lat < ON_LINE && Math.abs(turn(a0, b.a)) < ON_HEADING) return;
-    const end = m.dir === 'in' && Math.hypot(m.endX - b.x, m.endY - b.y) < CREEP_PX;
+    // The final creep: near its space at the very end of the move (a car passing by its space on the way to the aisle is not creeping in).
+    const end = m.dir === 'in' && m.at > m.a.seconds - CREEP_S && Math.hypot(m.endX - b.x, m.endY - b.y) < CREEP_PX;
     const cap = (end ? CREEP_CAP : TURN_IN_CAP) * PARK_SLACK;
     if (v > cap) this.flag('too fast while parking', 'manoeuvre', b.uid, `${v.toFixed(1)} px/s ${end ? 'creeping in' : 'manoeuvring'} ${what}`, b, v, cap);
   }
@@ -329,23 +330,25 @@ export class MotionWatch {
   /** Heading turned so far by each manoeuvring car (for the loops rule), from its first drawn frame. */
   private turned(m: Move<null>): void {
     const t = this.turning.get(m.uid);
-    if (!t) { this.turning.set(m.uid, { first: m.pa, last: m.pa, sum: 0 }); return; }
-    t.sum += Math.abs(turn(t.last, m.pa));
+    if (!t) { this.turning.set(m.uid, { first: m.pa, last: m.pa, sum: 0, th: 0, lo: 0, hi: 0 }); return; }
+    t.th += turn(t.last, m.pa);
+    t.lo = Math.min(t.lo, t.th); t.hi = Math.max(t.hi, t.th);
+    t.sum = t.hi - t.lo;
     t.last = m.pa;
   }
 
-  /** A move whose total turning is far beyond its net heading change looped (the owner: no loops, ever). */
+  /** A move whose heading swept far beyond its net change looped (the owner: no loops, ever; an S sweeps one bend, a circle all of it). */
   private ended(m: Move<null>): void {
     const t = this.turning.get(m.uid);
     this.turning.delete(m.uid);
     for (const k of [...this.across]) if (k.startsWith(`c${m.uid}|`)) this.across.delete(k);
     if (!t) return;
     const net = Math.abs(turn(t.first, t.last));
-    const most = LOOP_SHARE * net + LOOP_SLACK;
-    if (t.sum > most) this.flag('loops', 'manoeuvre', m.uid, `turned ${((t.sum * 180) / Math.PI).toFixed(0)} deg for a net ${((net * 180) / Math.PI).toFixed(0)} deg ${m.dir}/${m.a.word}`, { x: m.px, y: m.py, a: m.pa, ...sizeOf(m.kind as VehicleKind) }, t.sum, most);
+    const most = net + LOOP_SLACK;
+    if (t.sum > most) this.flag('loops', 'manoeuvre', m.uid, `swept ${((t.sum * 180) / Math.PI).toFixed(0)} deg for a net ${((net * 180) / Math.PI).toFixed(0)} deg ${m.dir}/${m.a.word}`, { x: m.px, y: m.py, a: m.pa, ...sizeOf(m.kind as VehicleKind) }, t.sum, most);
   }
 
-  /** Every moving or manoeuvring body against every other drawn body; new touches only. Plus cut-offs. */
+  /** Every moving or manoeuvring body against every other drawn body, each frame they overlap. Plus cut-offs. */
   private overlaps(drawn: readonly Drawn[]): void {
     const grid = new Map<number, Drawn[]>();
     const put = (b: Drawn): void => {
@@ -365,7 +368,8 @@ export class MotionWatch {
           if (bodiesOverlap(b, o, TOUCH)) {
             const key = b.id < o.id ? `${b.id}|${o.id}` : `${o.id}|${b.id}`;
             now.add(key);
-            if (!this.touching.has(key)) this.flag('bodies overlap', b.man || o.man ? 'manoeuvre' : 'moving', b.uid, `${key} at ${b.x.toFixed(0)},${b.y.toFixed(0)}`, b);
+            // Every frame two bodies overlap counts (the owner: one car drawn through another for a second is 60, not 1).
+            this.flag('bodies overlap', b.man || o.man ? 'manoeuvre' : 'moving', b.uid, `${key} at ${b.x.toFixed(0)},${b.y.toFixed(0)}`, b);
           }
         }
       }

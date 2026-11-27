@@ -5,6 +5,7 @@
  * src/city decides who drives, where they park and what it costs; Traffic only
  * moves what it is given and measures it.
  */
+import type { Body } from './vehicleSize';
 import type {
   CarsView, Cell, CellRect, Control, Id, Junction, JunctionStats, Level, Link, Movement, Pt, Road, RoadDef, RoadStats, RoadType, Terrain, VehicleKind,
 } from './types';
@@ -117,6 +118,8 @@ export interface Traffic {
   block(at: Access, seconds: number, state: 2 | 3 | 4, kind?: VehicleKind): number;
   /** Turning across the far side of a road at `at` (the car heading `heading`): seconds until its other-way lanes have a `gap`-second gap. */
   gapAcross(at: Access, heading: number, gap: number): number;
+  /** Where the cars standing in places are (the city's): a turn round on the road is planned clear of them too. */
+  setParked(bodies: (x0: number, y0: number, x1: number, y1: number) => readonly Body[]): void;
   /** Its own lanes at `at`: clear of bodies from `back` px behind to `ahead` px past, nobody arriving within `seconds` (a pull-out's lane time). */
   laneClear(at: Access, heading: number, back: number, ahead: number, seconds: number): boolean;
   /** Holds those other-way lanes at `at` for `seconds` (the body is in them). Returns how many lanes. */

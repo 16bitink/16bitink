@@ -1,3 +1,5 @@
+import { standPose } from './movePlan';
+import { bodyAt, type Body } from '../sim/vehicleSize';
 import { MONTHS_PER_SEASON, STEP } from '../sim/constants';
 import { setRoad } from '../sim/network';
 import { isPeak, NIGHT_END, PAYDAYS, periodAt, SEASON_END, WEEKEND_AT } from './clock';
@@ -46,6 +48,17 @@ function firstMorning<T>(c: City, plan: () => T): T {
 }
 
 /** Dawn: plan the day and open the roads. */
+/** The bodies of the cars standing in places within a box (where they are drawn). */
+function parkedIn(c: City, x0: number, y0: number, x1: number, y1: number): Body[] {
+  const out: Body[] = [];
+  for (const s of c.day.spots.values()) for (const e of s.cars) {
+    if (e.edge) continue;
+    const p = standPose(c, e);
+    if (p && p.x >= x0 && p.x <= x1 && p.y >= y0 && p.y <= y1) out.push(bodyAt(e.kind, p.x, p.y, p.a));
+  }
+  return out;
+}
+
 export function startDay(c: City): void {
   c.clock = -PREWARM;
   c.carry = 0;
@@ -163,6 +176,7 @@ export function stepDay(c: City): boolean {
   leaveAll(c);
   retryWaiting(c, every(c, RETRY_EVERY));
   holdCrossings(c);
+  c.traffic.setParked((x0, y0, x1, y1) => parkedIn(c, x0, y0, x1, y1));
   c.traffic.step();
   for (const a of c.traffic.drainArrivals()) arrive(c, a);
   for (const a of c.traffic.drainGaveUp()) gaveUp(c, a);

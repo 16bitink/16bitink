@@ -182,7 +182,9 @@ export function groundFor(c: City, q: GroundAsk): Ground {
   const rev = q.reverseOn;
   const own = rev ? segs.filter((s) => s.road.id === rev.road) : [];
   const edge = rev ? halfWidth(own[0]?.road ?? roadOf(c, rev.road)!) - LANE - REVERSE_SLACK : 0;
-  const reverse = rev ? (x: number, y: number): boolean => inPlace(x, y) || own.some((s) => { const o = offSeg(s, x, y); return o.t >= -0.05 && o.t <= 1.05 && o.d <= s.hw && o.lat * rev.side >= edge; }) : undefined;
+  // In a car park a car backs only within the park (out of its bay into the aisle), never out through its gate.
+  const backable = q.spot?.kind === 'park' && rects.length ? (x: number, y: number): boolean => rects.some((r) => inRect(r, x, y)) : inPlace;
+  const reverse = rev ? (x: number, y: number): boolean => backable(x, y) || own.some((s) => { const o = offSeg(s, x, y); return o.t >= -0.05 && o.t <= 1.05 && o.d <= s.hw && o.lat * rev.side >= edge; }) : undefined;
   return { drivable, bodies: bodiesNear(c, q, box), area: boxes, ...(reverse ? { reverse } : {}) };
 }
 

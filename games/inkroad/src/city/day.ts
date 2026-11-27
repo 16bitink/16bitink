@@ -75,6 +75,8 @@ export interface Standing {
   /** Counted in the place's `used` (a household's own car at home is not: it has its own space). */
   readonly counted: boolean;
   spot: Spot;
+  /** A car stopped in its lane: the uid of the hidden stand-in that blocks the lane where it stands. */
+  blockUid?: number;
   /** Times it looked for a way out that fits and found none (src/city/manoeuvre.ts readyAtEdge). */
   blocked?: number;
   /** Where its move in left it standing (the body's middle), drawn there exactly and left from there (src/city/movePlan.ts). */

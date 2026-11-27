@@ -47,7 +47,7 @@ export function roadWorld(sim: Sim, x0: number, y0: number, x1: number, y1: numb
     const t = Math.max(0, Math.min(1, ((x - s.ax) * s.dx + (y - s.ay) * s.dy) / s.l2));
     return Math.hypot(s.ax + s.dx * t - x, s.ay + s.dy * t - y) <= s.hw;
   }) || discs.some((j) => Math.hypot(j.x - x, j.y - y) <= j.radius + KERB);
-  return { drivable, bodies: standingNear(sim, x0, y0, x1, y1, self) };
+  return { drivable, bodies: [...standingNear(sim, x0, y0, x1, y1, self), ...(sim.parked?.(x0 - REACH, y0 - REACH, x1 + REACH, y1 + REACH) ?? [])] };
 }
 
 /** Cars standing still near the box (not the car itself). */
@@ -86,7 +86,8 @@ export function startTurn(sim: Sim, i: number, to: Track, s0: number, wait: numb
   const xs = [from.x, ...goals.map((g) => g.pose.x)], ys = [from.y, ...goals.map((g) => g.pose.y)];
   const w = roadWorld(sim, Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys), i);
   const m = playTurn(paramsOfKind(c.kind[i]!), from, goals, w);
-  if (!m) return null;
+  // A turn that would sweep through a car (or off the road) is not made: the car waits and looks again.
+  if (!m || !m.played.fits) return null;
   c.play[i] = m.played;
   c.playAt[i] = sim.time + wait;
   logMove({ what: 'turn', kind: kindName(c.kind[i]!), seconds: m.played.seconds, lane: wait + m.played.seconds, fits: m.played.fits, ms: 0, word: m.played.word });

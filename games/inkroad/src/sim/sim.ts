@@ -1,3 +1,4 @@
+import type { Body } from './vehicleSize';
 /** Everything one running Traffic holds, passed between its parts. */
 import type { Rng } from './rng';
 import type { CarStore } from './store';
@@ -24,6 +25,8 @@ export interface Sim {
   readonly routes: Routes;
   readonly measure: Measure;
   readonly services: Services;
+  /** The city's parked cars round a box (src/sim/turning.ts plans turns clear of them). */
+  parked?: (x0: number, y0: number, x1: number, y1: number) => readonly Body[];
 }
 
 export function receipt(sim: Sim, i: number): Arrival {

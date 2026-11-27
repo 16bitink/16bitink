@@ -75,8 +75,19 @@ function waysIn(c: City): Pt[] {
   for (const l of c.lots) at(l.access);
   for (const p of c.parks) at(p.access);
   for (const j of c.net.junctions) if (j.gate !== undefined) out.push({ x: j.x, y: j.y });
+  // Every space of a frontage (a driveway, a forecourt space, the sand by the road) is its own way in, where its column meets the road.
+  const segs = segments(c);
+  for (const spot of c.day.spots.values()) for (const p of spot.layout?.poses ?? []) {
+    const n = nearest(segs, p.x, p.y);
+    if (!n || n.d > FRONTAGE) continue;
+    const s = n.seg, along = Math.max(0, Math.min(s.len, (p.x - s.ax) * s.ux + (p.y - s.ay) * s.uy));
+    out.push({ x: s.ax + s.ux * along, y: s.ay + s.uy * along });
+  }
   return out;
 }
+
+/** Spaces this near a road's line front onto it. */
+const FRONTAGE = 45;
 
 /** The generic trace checks every scenario gets on top of MotionWatch's rules. */
 export function extraChecks(c: City, trace: readonly (readonly Sample[])[]): Violation[] {

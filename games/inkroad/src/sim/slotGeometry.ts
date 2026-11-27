@@ -46,11 +46,10 @@ export const GAP_ACROSS = 2.6;
 export const GAP_ALONG = 3;
 /** Lot edges (roads keep a cell off a lot, so the strip is wide). */
 const LOT_INSET = 9;
-/** Home bays stand nose to the road: the pitch is across the body. Forecourts stand along the edge: along the body. */
+/** Home bays stand nose to the road, a body across apart; forecourt spaces (square to the edge too) keep a body length apart. */
 export const NOSE_PITCH = PITCH_BODY.wid + GAP_ACROSS;
 export const SIDE_PITCH = PITCH_BODY.len + GAP_ALONG;
 const NOSE_GAP = 9;
-const SIDE_GAP = 6.5;
 /** Car park bays: nose to the aisle, rows facing each other. */
 const PARK_EDGE = 12;
 export const PARK_PITCH = PITCH_BODY.wid + GAP_ALONG;
@@ -58,7 +57,9 @@ const PARK_ROW_IN = 18;
 /** Kinds of car park with bays on the ground (the others take cars inside). */
 const SURFACE: ReadonlySet<CarParkKind> = new Set<CarParkKind>(['lot', 'ride']);
 /** The gate lane keeps this far from a bay's middle. */
-const GATE_CLEAR = PITCH_BODY.wid + 1.5;
+/** Room each side of the gate lane past the near row: a car leaving a bay by the gate swings round into the gate lane there (the owner, phase B). */
+const GATE_ROOM = 14;
+const GATE_CLEAR = PITCH_BODY.wid + 1.5 + GATE_ROOM;
 /** Car parks take cars and vans; lorries stand in front strips and at the kerb. */
 const PARK_MAX_LEN = sizeOf('van').len;
 /** Sand: lengthwise along the road, a little askew, each jittered a little; pitches hold the worst case of a car. */
@@ -132,25 +133,25 @@ export function lotEdge(lot: GardenLot, from: Pt | null): Edge {
   return garden && faced.ny < 0 ? facingEdge(rect, null) : faced;
 }
 
-function lotLayout(lot: GardenLot, nose: boolean, from: Pt | null): SlotLayout {
+/**
+ * A lot's spaces, square to its edge in front of it (the owner, phase B: forecourt spaces are square to the kerb). Home
+ * bays face out to the road (backed in, left forward); forecourt spaces face the building (entered nose first from
+ * either lane, left by backing into the near lane). A forecourt keeps the count it had when its cars stood along the
+ * edge (SIDE_PITCH apart), so the city's capacity is unchanged.
+ */
+function lotLayout(lot: GardenLot, home: boolean, from: Pt | null): SlotLayout {
   const e = lotEdge(lot, from);
-  const pitch = nose ? NOSE_PITCH : SIDE_PITCH;
-  const n = Math.max(0, Math.floor((e.len - LOT_INSET * 2) / pitch));
+  const n = Math.max(0, Math.floor((e.len - LOT_INSET * 2) / (home ? NOSE_PITCH : SIDE_PITCH)));
   const u0 = from ? (from.x - e.x) * e.tx + (from.y - e.y) * e.ty : e.len / 2;
   const gates = isGarden(lot) && e.ny > 0 ? gardenPlan(lot).gates.map((g) => g.x - e.x) : [];
-  const gap = nose ? NOSE_GAP : SIDE_GAP;
-  const along = Math.atan2(e.ty, e.tx);
+  const a = home ? Math.atan2(e.ny, e.nx) : Math.atan2(-e.ny, -e.nx);
   const row: RowSlot[] = [];
   for (let j = 0; j < n; j++) {
     const u = LOT_INSET + (j + 0.5) * ((e.len - LOT_INSET * 2) / n);
     if (gates.some((g) => Math.abs(u - g) <= GATE_W / 2 + PITCH_BODY.wid / 2)) continue;
-    // Along the edge cars face either way in turn: one from the lane that way backs in with an S, one from the other
-    // swings round into it forward (or turns round first: src/sim/parkPaths.ts). Facing all one way tipped the bots.
-    const dir = nose || j % 2 === 0 ? 1 : -1;
-    const a = nose ? Math.atan2(e.ny, e.nx) : along + (dir > 0 ? 0 : Math.PI);
-    row.push({ pose: { x: e.x + e.tx * u + e.nx * gap, y: e.y + e.ty * u + e.ny * gap, a }, u, rank: Math.abs(u - u0), dir });
+    row.push({ pose: { x: e.x + e.tx * u + e.nx * NOSE_GAP, y: e.y + e.ty * u + e.ny * NOSE_GAP, a }, u, rank: Math.abs(u - u0), dir: 1 });
   }
-  return fromRows([row], nose, pitch);
+  return fromRows([row], true, (e.len - LOT_INSET * 2) / Math.max(1, n));
 }
 
 // ---------------------------------------------------------------- car parks

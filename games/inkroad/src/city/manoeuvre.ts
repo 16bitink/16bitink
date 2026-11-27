@@ -28,6 +28,13 @@ export const across = (plan: { readonly cross: Access | null }): Access | null =
 
 /** Seconds of clear far lanes a driver wants before turning across them (3 s real, at the game's pace). */
 export const CROSS_GAP = GAP_S / GAME_PACE;
+/**
+ * A parking move crossing the far lanes is slow (it is in them for seconds, not a turn at speed): the gap it waits for
+ * is that much longer, so the cars coming can still be stopped by its hold (src/sim/crossing.ts holdAcross).
+ */
+const MOVE_GAP = CROSS_GAP + 2;
+/** Seconds a driver waits at the edge for a full gap across before it goes into a smaller one (held for it). */
+const CROSS_PATIENCE = 12;
 
 /** Px past its joining point a pull-out keeps its lane clear (its nose, and a little). */
 const OWN_AHEAD = 12;
@@ -40,8 +47,11 @@ export function crossClear(c: City, e: Standing): boolean {
   if (e.edge && own && !c.traffic.laneClear(own, e.edge.lane.a, e.edge.back ?? 0, OWN_AHEAD, CROSS_GAP)) return false;
   const at = e.edge?.cross;
   if (!at || !e.edge) return true;
+  // A driver that has waited long at the edge takes what comes: the cars there are stopped by its hold.
+  // A driver that has waited long at the edge takes what comes: the cars there are stopped by its hold.
+  if (c.clock - e.edge.goAt > CROSS_PATIENCE) return true;
   const a = e.edge.lane.a;
-  return c.traffic.gapAcross(at, a, CROSS_GAP) <= 0 && (!e.edge.both || c.traffic.gapAcross(at, a + Math.PI, CROSS_GAP) <= 0);
+  return c.traffic.gapAcross(at, a, MOVE_GAP) <= 0 && (!e.edge.both || c.traffic.gapAcross(at, a + Math.PI, MOVE_GAP) <= 0);
 }
 
 /** The far lanes are held while the body is in them. */
@@ -200,7 +210,7 @@ export function turnIn(c: City, uid: number, e: Standing | null, hold?: number, 
   if (!e) { c.traffic.remove(uid); return; }
   const drawn = c.traffic.framesOf(uid);
   const lane = withMotion(c.traffic.poseOf(uid), drawn);
-  const plan = lane ? planIn(c, e, lane, uid, (at, a) => c.traffic.gapAcross(at, a, CROSS_GAP)) : null;
+  const plan = lane ? planIn(c, e, lane, uid, (at, a) => c.traffic.gapAcross(at, a, MOVE_GAP)) : null;
   if (!lane || !plan) { c.traffic.remove(uid); return; }
   const at = plan.cross;
   const wait = plan.wait;
@@ -209,7 +219,8 @@ export function turnIn(c: City, uid: number, e: Standing | null, hold?: number, 
   // The lane part of the played move includes its stand for the gap.
   const seconds = hold ?? plan.lane;
   // Double-parked: the lane is blocked where it is drawn standing (a hidden stand-in), while the view shows this car.
-  if (blockAt) { c.traffic.remove(uid); c.traffic.block(blockedAt(e, blockAt), Math.max(seconds, STEP), 4, e.kind); } else if (!c.traffic.park(uid, Math.max(seconds, STEP))) { c.traffic.remove(uid); return; }
+  // A car stopped in the lane is a real obstacle there for as long as it stands (its stand-in goes when it pulls out).
+  if (blockAt) { c.traffic.remove(uid); e.blockUid = c.traffic.block(blockedAt(e, blockAt), STAND_HOLD, 4, e.kind); } else if (!c.traffic.park(uid, Math.max(seconds, STEP))) { c.traffic.remove(uid); return; }
   // A car stopped on the road comes to rest and stands there (its lane blocked `hold`); one crossing waits for its gap first.
   const stand = 0;
   // The view draws the car's last step first (it was still driving in it), then the move: no step skipped.
@@ -220,18 +231,20 @@ export function turnIn(c: City, uid: number, e: Standing | null, hold?: number, 
   tell(c, 'in', e, lane, seconds, move, { a: played, fade: plan.fade }, stand);
 }
 
-/** The drawn car's speed and acceleration at the end of its last step, measured on the frames the view drew. */
+/** The drawn car's speed at the end of its last step, measured on the frames the view drew, and its acceleration. */
 function withMotion(lane: LanePose | null, f: Float64Array | null): LanePose | null {
   if (!lane || !f || f.length < 9) return lane;
   const n = f.length / 3, dt = 1 / 60;
   const sp = (k: number): number => Math.hypot(f[k * 3]! - f[(k - 1) * 3]!, f[k * 3 + 1]! - f[(k - 1) * 3 + 1]!) / dt;
-  const v = sp(n - 1), acc = (v - sp(n - 2)) / dt;
-  return { ...lane, v, acc };
+  // Speed from the frames drawn; acceleration the drawn car's own (a finite difference of two frames is noise).
+  const v = sp(n - 1);
+  return { ...lane, v, acc: v > 0.5 ? lane.acc ?? 0 : 0 };
 }
 
 /** A car stopped on the road blocks its lane where it is drawn standing, not where it stopped. */
 function blockedAt(e: Standing, at: Access): Access {
-  return e.spot.kind === 'double' && e.lat !== undefined && e.s !== undefined && 'road' in at ? { ...at, s: e.s } : at;
+  // In the lanes it faces (its side), never the other way's.
+  return e.spot.kind === 'double' && e.lat !== undefined && e.s !== undefined && 'road' in at ? { ...at, s: e.s, ...(e.side ? { dir: e.side } : {}) } : at;
 }
 
 /** A car already off the road (the traffic let it go) is shown stopping at `lane`, standing `hold`, then onto the shoulder. */
@@ -274,7 +287,8 @@ export function readyAtEdge(c: City, e: Standing, req: SpawnRequest): boolean {
     return true;
   }
   // No way out fits now (a car in the way, a body standing in the lane): wait and look again, a while at most.
-  if (!(plan.plan.toEdge.fits && plan.plan.join.fits) && (e.blocked ?? 0) < BLOCKED_TRIES) {
+  // A turn round never goes through anything: it waits as long as it takes.
+  if (!(plan.plan.toEdge.fits && plan.plan.join.fits) && ((e.blocked ?? 0) < BLOCKED_TRIES || plan.turn)) {
     e.blocked = (e.blocked ?? 0) + 1;
     e.readyAt = c.clock + BLOCKED_RETRY;
     return false;
@@ -294,6 +308,9 @@ export function readyAtEdge(c: City, e: Standing, req: SpawnRequest): boolean {
   return plan.plan.toEdge.seconds <= STEP / 2;
 }
 
+/** Seconds a stopped car's stand-in holds its lane at most (it is taken away when the car pulls out). */
+const STAND_HOLD = 3600;
+
 /** A car whose way out does not fit looks again every BLOCKED_RETRY s, BLOCKED_TRIES times, then goes the best way there is. */
 const BLOCKED_RETRY = 1, BLOCKED_TRIES = 12;
 
@@ -301,7 +318,7 @@ const BLOCKED_RETRY = 1, BLOCKED_TRIES = 12;
 const standStill = (q: { readonly x: number; readonly y: number; readonly a: number }): MovePlay['a'] => ({ frames: new Float64Array([q.x, q.y, q.a]), n: 1, seconds: 0, end: { x: q.x, y: q.y, th: q.a, u: 0, dir: 1, delta: 0, a: 0 }, fits: true, word: '' });
 
 /** Px the sim's spawn pose may lie off the planned move's end before the move is planned again for it alone. */
-const SPAWN_MISS = 1.5;
+const SPAWN_MISS = 4;
 
 /** The move out, and the access the sim's spawn must use so it starts where the move ends. */
 function joinable(c: City, e: Standing, req: SpawnRequest, pose: LanePose): { plan: NonNullable<ReturnType<typeof planOut>>; from: Access; turn: boolean } | null {
@@ -309,6 +326,7 @@ function joinable(c: City, e: Standing, req: SpawnRequest, pose: LanePose): { pl
   if (!plan) return null;
   const here = e.stood ?? spaceOf(c, e, pose)?.pose;
   const turn = !!here && Math.cos(here.a - pose.a) < 0;
+  // The sim's car appears where the played move really ended (along its road).
   const from = 'road' in req.from ? { ...req.from, s: plan.s } : req.from;
   const spawn = 'road' in req.from ? c.traffic.entryPose({ ...req, from }) : pose;
   const end = lastPose(plan.join);

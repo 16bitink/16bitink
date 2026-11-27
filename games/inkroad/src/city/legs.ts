@@ -34,6 +34,8 @@ const PRICED_AWAY = 6;
 const MEMORY_NEW = 0.4;
 /** Seconds a car waits for a pump when all four are busy. */
 const PUMP_WAIT = 4;
+/** Seconds a stopped car's stand-in is put back for when it could not set off (it tries again). */
+const STAND_BACK = 3600;
 
 export { kindOf } from './vehicleKinds';
 
@@ -65,7 +67,11 @@ function enter(c: City, leg: Leg, from: Access, to: Access): boolean {
   const req: SpawnRequest = { ...base, from: at, ...(hold > 0 ? { hold } : {}), ...(out?.edge && pose ? { pose } : {}) };
   if (out && !crossClear(c, out)) return false;
   if (door && !doorReady(c, leg, req, look)) return false;
+  // A car that stood in its lane takes its stand-in's place (put back if it cannot set off yet).
+  const stood = out?.blockUid !== undefined && out.blockUid >= 0 ? c.traffic.poseOf(out.blockUid) : null;
+  if (stood && out) c.traffic.remove(out.blockUid!);
   const uid = c.traffic.spawn(door && leg.door ? { ...req, hold: leg.door.hold } : req);
+  if (out && stood) out.blockUid = uid < 0 && 'road' in req.from ? c.traffic.block({ ...req.from, ...(out.side ? { dir: out.side } : {}) }, STAND_BACK, 4, out.kind) : undefined;
   if (uid < 0) return false;
   leg.uid = uid;
   if (out) { crossHold(c, out); pulledOut(c, uid, out, hold); }

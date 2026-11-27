@@ -60,6 +60,8 @@ export function unstand(c: City, e: Standing): void {
   spot.cars.splice(i, 1);
   spot.ver += 1;
   if (e.counted) spot.used = Math.max(0, spot.used - 1);
+  // A car that stood in its lane takes its stand-in with it, however it goes.
+  if (e.blockUid !== undefined && e.blockUid >= 0) { c.traffic.remove(e.blockUid); e.blockUid = undefined; }
   c.day.parkingDirty = true;
 }
 
@@ -86,6 +88,7 @@ export function rehome(c: City, gone: Spot): void {
 export function clearStanding(c: City, keep: (e: Standing) => boolean = () => false): void {
   for (const s of c.day.spots.values()) {
     if (s.cars.length === 0 && s.used === 0) continue;
+    for (const e of s.cars) if (!keep(e) && e.blockUid !== undefined && e.blockUid >= 0) { c.traffic.remove(e.blockUid); e.blockUid = undefined; }
     s.cars = s.cars.filter(keep);
     for (const e of s.cars) { e.edge = undefined; e.readyAt = undefined; }
     s.used = s.cars.filter((e) => e.counted).length;

@@ -10,6 +10,8 @@ import { FRAME_STRIDE, SUB } from './store';
 import { Measure } from './measure';
 import { entryPose, exists, firstLink, place, reachableFrom, reachableTo, setDest, standAt, turnBack } from './place';
 import { relocate } from './relocate';
+import { laneS } from './world';
+import { startLinks } from './routes';
 import { createRng } from './rng';
 import { Routes } from './routes';
 import { Services } from './services';
@@ -199,8 +201,28 @@ function block(sim: Sim, at: Access, seconds: number, state: 2 | 3 | 4, kind: Ve
   c.until[i] = sim.time + seconds;
   c.born[i] = sim.time;
   c.tint[i] = sim.rng.int(6);
-  if (!standAt(sim, i, at)) { c.drop(i); return -1; }
+  // A car stopped in its lane is blocked just where it stands (a stand-in shifted along would let traffic through it).
+  if (!(state === 4 && standExact(sim, i, at)) && !standAt(sim, i, at)) { c.drop(i); return -1; }
   return c.uid[i]!;
+}
+
+/** Stand car i at `at` itself in the outer lane, if nobody's body is there (cars coming brake for it). */
+function standExact(sim: Sim, i: number, at: Access): boolean {
+  if ('gate' in at) return false;
+  const c = sim.cars;
+  for (const { l } of startLinks(sim.world, at)) {
+    const t = l.lanes[l.carLanes - 1]!;
+    const s = laneS(l, at.s);
+    if (s < c.half[i]! || s > t.len - c.half[i]!) continue;
+    let free = true;
+    for (let q = t.head; q >= 0; q = c.behind[q]!) if (Math.abs(c.s[q]! - s) - c.half[q]! - c.half[i]! < 0.5) { free = false; break; }
+    if (!free) continue;
+    c.insert(i, t, s);
+    c.link[i] = l.i;
+    pose(sim, i);
+    return true;
+  }
+  return false;
 }
 
 function clearAll(sim: Sim): void {
@@ -240,6 +262,7 @@ export function createTraffic(net: Network, seed: number): Traffic {
     gapAcross: (at, heading, gap) => gapAcross(sim, at, heading, gap),
     holdAcross: (at, heading, seconds) => holdAcross(sim, at, heading, seconds),
     laneClear: (at, heading, back, ahead, seconds) => laneClear(sim, at, heading, back, ahead, seconds),
+    setParked: (f) => { sim.parked = f; },
     addService: (r) => sim.services.add(r),
     removeService: (id) => sim.services.remove(id),
     serviceLap: (id) => sim.services.lap(id),

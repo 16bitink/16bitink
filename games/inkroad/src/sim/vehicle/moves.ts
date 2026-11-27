@@ -68,11 +68,11 @@ function settleRun(from: Pose, to: Pose, dir: 1 | -1, p: VehicleParams): Run {
 const ROLL = 24, ROLL_PRICE = 0.25, ROLL_BACK = 44, BACK_PRICE = 1.6;
 
 /** Start offers: where the car stands, and straight on along its heading while the body stays on the ground. */
-function rollOffers(p: VehicleParams, from: Pose, w: World): Offer[] {
+function rollOffers(p: VehicleParams, from: Pose, w: World, forwardOnly: boolean): Offer[] {
   const out: Offer[] = [{ pose: from, cost: 0 }];
   const c = Math.cos(from.th), s = Math.sin(from.th);
   // Straight on, or straight back a little in its own lane (backing up in its lane is allowed; a gear change is priced).
-  for (const way of [1, -1] as const) {
+  for (const way of forwardOnly ? ([1] as const) : ([1, -1] as const)) {
     for (let d = OFFER_STEP; d <= (way > 0 ? ROLL : ROLL_BACK); d += OFFER_STEP) {
       const q = { x: from.x + way * c * d, y: from.y + way * s * d, th: from.th };
       const end = way > 0 ? p.toMiddle + p.len / 2 : p.toMiddle - p.len / 2, side = p.wid / 2;
@@ -93,8 +93,9 @@ function straightRun(from: Pose, to: Pose, p: VehicleParams): Run {
 /** RS runs into a space from a standing car, with the settling straight. Null: no RS path at all. */
 function intoRuns(p: VehicleParams, from: Pose, slot: Pose, w: World, settle: boolean, o: PlanOptions & { readonly backIn?: boolean }): { runs: Run[]; m: Manoeuvre } | null {
   const goal = { ...slot, th: unwrapTo(from.th, slot.th) };
-  const goals = settle ? settleGoals(goal, o.backIn === true) : [{ pose: goal, cost: 0, excuse: goal }];
-  const starts = rollOffers(p, from, w);
+  const goals = (settle ? settleGoals(goal, o.backIn === true) : [{ pose: goal, cost: 0, excuse: goal }]).filter((g) => !o.forwardOnly || g.endDir !== -1);
+  // Backing up straight in its own lane first is allowed even when the move itself is forward only.
+  const starts = rollOffers(p, from, w, false);
   const m = planManoeuvre(starts, goals, p, w, o);
   if (!m) return null;
   const g = goals[m.to]!;
@@ -114,7 +115,8 @@ export function playInto(p: VehicleParams, from: MiddlePose, to: MiddlePose, w: 
   // Its stop on the road is just ahead on its line: it simply comes to rest (it stands where it stops).
   if (stop > 0 && nearEnough({ x: q.x + p.toMiddle * Math.cos(q.th), y: q.y + p.toMiddle * Math.sin(q.th), a: q.th }, to)) return playRuns({ ...standing(a), u: u0, a: a0 }, brake, p, true, '');
   const r = intoRuns(p, q, b, w, settle, o);
-  if (!r) return standingAt(p, to);
+  // No way at all: it stays where it is (never put anywhere), counted as not fitting.
+  if (!r) return { ...standingAt(p, from), fits: false };
   // It must stand first (waiting for a gap across the road): brake to a stop, stand, then go.
   if (o.pause && o.pause > 0) {
     const halt = brake.length ? playRuns({ ...standing(a), u: u0, a: a0 }, brake, p, true, '') : standingAt(p, from);

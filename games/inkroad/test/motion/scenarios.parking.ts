@@ -93,8 +93,10 @@ const reversedBefore = (r: RunResult, who: string, t: number): boolean => sample
 const FAR_SIDE: Scenario = {
   id: 'park.kerb.far-side',
   title: 'Kerb bay on the far kerb',
-  expect: 'A parks in a bay on the far (left) kerb only by going round (with no way round in the map: a turn round on the road, the road clear both ways), then backs in from its own lane; never across the oncoming lane head-on; leaves on its own side',
+  expect: 'A parks in a bay on the far (left) kerb only by going round the block (it comes back along the street the other way) and backs in from its own lane; never across the oncoming lane head-on, never a turn round in the road; leaves on its own side',
   ...STREET_EW,
+  // A street along row 7 joins the side streets: a block to drive round and come back along the street westbound.
+  roads: [...STREET_EW.roads, { cells: [[3, 7], [11, 7]] }],
   kerbs: [[6, 4]],
   // Every south (right-hand) slot is taken: the only free bays are on the north kerb.
   actors: [
@@ -103,7 +105,7 @@ const FAR_SIDE: Scenario = {
     { kind: 'through', id: 'B', at: 2.5, from: 'E', to: 'W' },
     { kind: 'through', id: 'C', at: 7, from: 'E', to: 'W' },
   ],
-  seconds: 90,
+  seconds: 130,
   expectations: (r) => {
     const ins = lastIn(r, 'A');
     const stood = lastParked(r, 'A');
@@ -112,7 +114,7 @@ const FAR_SIDE: Scenario = {
       parksIn(r, 'A', 'kerb:'),
       expect('A stands in a slot on the far (north) kerb', !!ins && ins.slot % 2 === 1 && !!stood && stood.y < mid, ins ? `slot ${ins.slot}, y ${stood?.y.toFixed(0) ?? '-'} vs middle ${mid.toFixed(0)}` : 'never turned in'),
       noHeadOnCrossing(r, 'A'),
-      leavesBy(r, 'A', 90),
+      leavesBy(r, 'A', 130),
       passesBy(r, 'B', 55),
       clean(r, 'A'),
     ];
@@ -247,7 +249,7 @@ const UNMARKED: Scenario = {
 const NEAR_LANE: Scenario = {
   id: 'park.forecourt.near-lane',
   title: 'Forecourt on the near side of the street',
-  expect: 'From the near lane A backs into a forecourt space with an S, square to the kerb; leaves forward',
+  expect: 'From the near lane A turns nose first into a forecourt space square to the kerb (it faces the building); leaves backing into the near lane, then forward',
   ...STREET_EW,
   // The shop is south of the street: on the right of an eastbound car.
   lots: [{ name: 'Shop', kind: 'shops', cell: [5, 5], w: 3, h: 2 }],
@@ -261,7 +263,7 @@ const NEAR_LANE: Scenario = {
     return [
       parksIn(r, 'A', 'lot:'),
       standsOffRoad(r, 'A'),
-      expect('A backs in', !!ins && reversedBefore(r, 'A', ins.t + 4), ins ? `in at ${ins.t.toFixed(1)} s, reversed ${reversedBefore(r, 'A', ins.t + 4)}` : 'never turned in'),
+      expect('A turns in nose first', !!ins && !reversedBefore(r, 'A', ins.t + 4), ins ? `in at ${ins.t.toFixed(1)} s, reversed ${reversedBefore(r, 'A', ins.t + 4)}` : 'never turned in'),
       expect('A stands square to the kerb', !!stood && offAxis(stood.a) > 1.2, stood ? `${(offAxis(stood.a) * 57.3).toFixed(0)} deg off the road` : 'never parked'),
       expect('A leaves forward', !!out && !samplesOf(r, 'A').some((s) => s.t >= out.t && s.gear === 'R' && s.state === 'moving'), out ? `out at ${out.t.toFixed(1)} s` : 'never set out'),
       leavesBy(r, 'A', 76),

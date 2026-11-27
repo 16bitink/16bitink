@@ -79,10 +79,10 @@ export const CARPARK_GATE: Scenario = {
   carParks: [{ kind: 'lot', at: [5, 1] }],
   actors: [{ kind: 'arrive', id: 'A', at: 0.5, from: 'W', home: 'E', lot: 'Shop', spot: { park: 0 }, stay: 25 }],
   flows: [{ from: 'E', to: 'W', every: 7, start: 3 }],
-  seconds: 76,
+  seconds: 100,
   expectations: (r) => {
     const c = (r.city as unknown as { c: import('../../src/city/state').City }).c;
-    return [parksIn(r, 'A', 'park:'), wasInside(r, 'A', lotRect(c.parks[0]!)), leavesBy(r, 'A', 76), clean(r, 'A')];
+    return [parksIn(r, 'A', 'park:'), wasInside(r, 'A', lotRect(c.parks[0]!)), leavesBy(r, 'A', 100), clean(r, 'A')];
   },
 };
 

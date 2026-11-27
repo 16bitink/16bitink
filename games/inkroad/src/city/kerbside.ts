@@ -10,11 +10,13 @@ import { accessExists } from './net';
 import { doubleSpot } from './fines';
 import { accessOf, accessPoint, pointOf } from './places';
 import { scoreLost } from './score';
-import { freeSlots, sAlong, sideHeading } from './slots';
+import { freeSlots, roadSlots, sAlong, sideHeading } from './slots';
 import { pointAt } from '../sim/geom';
 import { halfWidth, laneOffset, lanesPerLink } from '../sim/roadGeom';
 import { R_MIN } from '../sim/kinematics';
 import { DRIVEWAY } from '../sim/tune';
+import { KERB_OUT } from './movePlan';
+import type { Road } from '../sim/types';
 import { polyLength } from './geometry';
 import { sizeOf } from '../sim/vehicleSize';
 import { MOTION_SWITCHES } from '../sim/switches';
@@ -181,7 +183,11 @@ export function stopOnRoad(c: City, e: Standing | null, pose: { readonly x: numb
   // The shoulder is the paved edge at most (the owner, phase B: a car stops in its lane, a little toward the kerb at
   // most; parked cars stand in the kerb's band beyond it).
   const edge = Math.max(0, halfWidth(road) - Math.abs(lane) - sizeOf(e.kind).wid / 2 - EDGE_GAP);
-  const lat = shoulder ? lane + side * Math.min(DRIVEWAY.slide, edge) : lane;
+  // A taxi or a driver pulling over where the kerb is free pulls right in to the kerb, out of the lane (a forward S);
+  // otherwise (double parking, a full kerb) it stops in its lane hugging the parked row (the paved edge), straight.
+  const kerbLat = halfWidth(road) + KERB_OUT;
+  const inKerb = shoulder && !road.oneWay && (road.kerb || road.type === 'street') && kerbFree(c, road, side, sAlong(road, pose), sizeOf(e.kind).len) && clearAhead(c, pose, sizeOf(e.kind).len);
+  const lat = inKerb ? side * kerbLat : lane + side * Math.min(DRIVEWAY.slide, edge);
   const d = Math.abs(lat - here);
   const run = d < SAME_LINE ? 0 : 2 * R_MIN * Math.sin(d >= 2 * R_MIN ? Math.PI / 2 : Math.acos(1 - d / (2 * R_MIN))) + S_ROOM;
   // From where it really is (not the stand-in's spacing), and never onto a car already standing on that line ahead.
@@ -200,6 +206,34 @@ export function stopOnRoad(c: City, e: Standing | null, pose: { readonly x: numb
   e.shoulder = shoulder;
   e.spot.ver += 1;
 }
+
+/** Is the kerb on `side` free of standing cars along `len` px ahead of s (and a little behind)? */
+function kerbFree(c: City, road: Road, side: number, s: number, len: number): boolean {
+  for (const spot of c.day.spots.values()) {
+    if ((spot.kind !== 'kerb' && spot.kind !== 'street' && spot.kind !== 'double') || spot.id !== road.id) continue;
+    for (const o of spot.cars) {
+      const os = o.s ?? (spot.kind !== 'double' ? roadSlots(c, spot)[o.slot]?.s : undefined);
+      const oside = o.side ?? (spot.kind !== 'double' ? roadSlots(c, spot)[o.slot]?.side : undefined);
+      if (os === undefined || oside !== side || (spot.kind === 'double' && !o.shoulder)) continue;
+      if (Math.abs(os - (s + side * KERB_REACH)) < len + KERB_REACH) return false;
+    }
+  }
+  return true;
+}
+/** No car on the road in the stretch ahead its forward S to the kerb sweeps (a car stuck in a queue stays in its lane). */
+function clearAhead(c: City, pose: { readonly x: number; readonly y: number; readonly a: number }, len: number): boolean {
+  const t = c.traffic.cars;
+  for (let i = 0; i < t.count; i++) {
+    if (t.alive[i] !== 1) continue;
+    const dx = t.x[i]! - pose.x, dy = t.y[i]! - pose.y;
+    const along = dx * Math.cos(pose.a) + dy * Math.sin(pose.a), lat = -dx * Math.sin(pose.a) + dy * Math.cos(pose.a);
+    if (along > 1 && along < KERB_REACH + len && Math.abs(lat) < 6) return false;
+  }
+  return true;
+}
+
+/** Px ahead of where it stops that a car pulling in to the kerb uses (its forward S). */
+const KERB_REACH = 30;
 
 /** Px a car on the shoulder keeps from the paved edge. */
 const EDGE_GAP = 0.3;

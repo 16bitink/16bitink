@@ -157,9 +157,10 @@ function nearLine(q: MiddlePose, lane: LanePose): boolean {
 /** The move into a space from the drawn pose in the lane. Null: no space drawn (the old door path). */
 export function planIn(c: City, e: Standing, lane: LanePose, uid = -1, gap: (at: Access, a: number) => number = () => 0): InPlan | null {
   const t0 = performance.now();
+  const p = paramsOf(e.kind);
+  restAhead(c, e, lane, p);
   const space = spaceOf(c, e, lane);
   if (!space) return null;
-  const p = paramsOf(e.kind);
   const road = moveRoad(c, e);
   const cross = e.spot.kind !== 'double' && isAcross(road, lane, space.pose);
   const turn = turnsRound(lane, space.pose);
@@ -167,16 +168,39 @@ export function planIn(c: City, e: Standing, lane: LanePose, uid = -1, gap: (at:
   const backIn = e.spot.kind === 'park' || e.spot.kind === 'home';
   // Across the road it stops in its lane and waits for its gap first (the wait is part of the move it plays).
   const at0 = road ? { road: road.id, s: project(road.line, lane).s } : null;
-  const wait = cross && at0 ? gap(at0, lane.a) : 0;
-  const played = viaAisle(c, e, p, lane, space.pose, w, wait) ?? playInto(p, lane, space.pose, w, !space.fade, { turnaround: turn, backIn, pause: wait }, lane.v ?? 0, lane.acc ?? 0);
+  const play = (pause: number): Played => viaAisle(c, e, p, lane, space.pose, w, pause) ?? playInto(p, lane, space.pose, w, !space.fade, { turnaround: turn, backIn: backIn && !cross, forwardOnly: cross && !turn, pause }, lane.v ?? 0, lane.acc ?? 0);
+  let wait = cross && at0 ? gap(at0, lane.a) : 0;
+  let played = play(wait);
   const side = road ? roadSide(road, lane) : 1;
   const over = !cross && e.spot.kind !== 'double' && reachesFar(played, road, lane, side, p.len, p.wid);
+  // Its nose swings over the line (backing into a kerb space): it waits for a gap in the far lanes too.
+  const late = over && at0 ? gap(at0, lane.a) : 0;
+  if (late > 0) { wait = late; played = play(late); }
   const band = bandOf(road, lane, cross);
   const laneS = secondsUntilOut(played, band, p.len, p.wid);
   logMove({ what: 'in', kind: e.spot.kind, seconds: played.seconds, lane: laneS, fits: played.fits, ms: performance.now() - t0, word: played.word, from: lane, to: space.pose });
   const at = road ? { road: road.id, s: project(road.line, lane).s } : null;
   return { played, lane: e.spot.kind === 'double' ? played.seconds : laneS, cross: (cross || over) && at ? at : null, fade: space.fade, wait };
 }
+
+/**
+ * A car stopping on the road (double parking, a taxi, a pump queue) still rolling comes to rest where its comfortable
+ * braking takes it, never past its stop and back: its stop moves on along the road to there.
+ */
+function restAhead(c: City, e: Standing, lane: LanePose, p: VehicleParams): void {
+  if (e.spot.kind !== 'double' || e.s === undefined) return;
+  const road = roadOf(c, e.spot.id);
+  const goal = spaceOf(c, e, lane)?.pose;
+  const v = lane.v ?? 0;
+  if (!road || !goal || v < 0.5) return;
+  const stop = (v * v) / (2 * p.planBrake * REST_SHARE) + 1;
+  const along = (goal.x - lane.x) * Math.cos(lane.a) + (goal.y - lane.y) * Math.sin(lane.a);
+  if (along >= stop) return;
+  const way = Math.cos(lane.a - pointAt(road.line, e.s).heading) >= 0 ? 1 : -1;
+  e.s = Math.min(polyLength(road.line) - JUNCTION_CLEAR / 2, Math.max(JUNCTION_CLEAR / 2, e.s + way * (stop - along)));
+}
+/** As src/sim/vehicle/moves.ts: braking gentler than the planned most. */
+const REST_SHARE = 0.7;
 
 /** Px along the aisle past a bay's column a car drives before it backs into the bay. */
 const AISLE_PAST = 22;
