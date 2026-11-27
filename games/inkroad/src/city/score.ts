@@ -38,6 +38,8 @@ const feltOf = (leg: Leg): number => weightOf(leg) * TRIP_FELT[leg.tour.purpose]
 const LONGEST_TALE = 45;
 /** A trip that arrived after `seconds`. */
 export function scoreTrip(c: City, leg: Leg, seconds: number): void {
+  // A taxi to or from its base is nobody's trip (kerbside.ts): never judged, also when the night or a jam ends it.
+  if (leg.tour.deadhead) return;
   const s = c.day.stats;
   const ratio = seconds / Math.max(1, leg.free);
   const rel = ratio / c.expect.trip;
@@ -54,6 +56,7 @@ export function scoreTrip(c: City, leg: Leg, seconds: number): void {
 
 /** A car that gave up, or a trip that never began. */
 export function scoreLost(c: City, leg: Leg, at: Pt, kind: 'gaveUp' | 'stayed'): void {
+  if (leg.tour.deadhead) return;
   const s = c.day.stats;
   s.count += 1;
   if (kind === 'gaveUp') s.gaveUp += 1; else s.stayed += 1;
