@@ -83,8 +83,12 @@ export async function confirmPurchase(p: AppPurchase, product?: AppProduct): Pro
 
 const PENDING = 'Your purchase is pending. The game unlocks as soon as Google Play confirms the payment.';
 
-/** Buys `game` through the app's store, for the signed-in `userId`; reloads the page once it is unlocked. */
-export async function buyInApp(billing: Billing, game: string, userId: string): Promise<{ readonly error?: string }> {
+/**
+ * Buys `game` through the app's store, for the signed-in `userId`. `unlocked`
+ * once the server has saved it: the caller decides what then (a page reloads;
+ * a game being played offers a Refresh instead, never reloading under the player).
+ */
+export async function buyInApp(billing: Billing, game: string, userId: string): Promise<{ readonly error?: string; readonly unlocked?: boolean }> {
   const [product] = await billing.getProducts([game]).catch(() => [] as AppProduct[]);
   let result: AppPurchaseResult;
   try {
@@ -97,8 +101,25 @@ export async function buyInApp(billing: Billing, game: string, userId: string): 
   const confirmed = await confirmPurchase(result.purchase, product);
   if ('error' in confirmed) return confirmed;
   if (confirmed.status === 'pending') return { error: PENDING };
-  window.location.reload();
-  return {};
+  return { unlocked: true };
+}
+
+const prices = new Map<string, Promise<string | null>>();
+
+/**
+ * The price the store will charge for `game`, as it shows it (local currency
+ * and all), or null where the app doesn't sell or the store can't say. Asked
+ * once per page: the offers show it instead of the site's own price.
+ */
+export function storePrice(game: string): Promise<string | null> {
+  const billing = appBilling();
+  if (!billing) return Promise.resolve(null);
+  let price = prices.get(game);
+  if (!price) {
+    price = billing.getProducts([game]).then((ps) => ps.find((p) => p.game === game)?.price || null, () => null);
+    prices.set(game, price);
+  }
+  return price;
 }
 
 /** The store's product for each game, so a confirm can carry its price (for the sales stats). Empty when the store can't say. */

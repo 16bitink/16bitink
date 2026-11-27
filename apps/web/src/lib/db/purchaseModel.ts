@@ -17,6 +17,7 @@ const purchaseSchema = new Schema<PurchaseDoc>(
     livemode: { type: Boolean, required: true },
     status: { type: String, required: true, enum: ['paid', 'refunded', 'disputed'] },
     paidAt: { type: Date, required: true },
+    free: { type: Boolean },
   },
   { timestamps: true, collection: 'purchases' },
 );

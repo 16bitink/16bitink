@@ -77,7 +77,7 @@ describe.skipIf(!uri)('purchase repository (MongoDB)', () => {
     expect(await findPurchase('cs_nope')).toBeNull();
   });
 
-  it('counts live sales in the period by game, never test-mode ones or refunds as takings', async () => {
+  it('counts live sales in the period by game, never test-mode or free ones, or refunds as takings', async () => {
     // Far from the other tests' dates, so only these count.
     const at = (day: number): Date => new Date(Date.UTC(2031, 0, day));
     const live = { ...record, livemode: true, paymentIntent: null };
@@ -87,6 +87,8 @@ describe.skipIf(!uri)('purchase repository (MongoDB)', () => {
     await savePurchase({ ...live, sessionId: 'cs_test_s4', paidAt: at(4), game: 'inkcrab' });
     await savePurchase({ ...live, sessionId: 'cs_test_s5', paidAt: at(5), livemode: false });
     await savePurchase({ ...live, sessionId: 'cs_test_s6', paidAt: at(20) });
+    // A promo code: owned, but no sale.
+    await savePurchase({ ...live, sessionId: 'cs_test_s7', paidAt: at(5), amount: 0, free: true });
     expect(await salesByGame({ from: at(1), to: at(10) })).toEqual([
       { game: 'inkfish', currency: 'usd', paid: 2, refunded: 1, amount: 898 },
       { game: 'inkcrab', currency: 'usd', paid: 1, refunded: 0, amount: 499 },

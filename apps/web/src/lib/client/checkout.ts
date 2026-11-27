@@ -4,6 +4,8 @@ import { appBilling, buyInApp, inApp } from './appBilling';
 
 interface CheckoutResult {
   readonly error?: string;
+  /** In the app: the store purchase is saved, and the game is the player's now (what to do next is the caller's). */
+  readonly unlocked?: boolean;
 }
 
 /**

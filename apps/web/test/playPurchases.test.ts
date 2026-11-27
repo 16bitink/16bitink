@@ -1,7 +1,7 @@
 import { generateKeyPairSync, createVerify } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 import { playClient, tokenAssertion, type PlayProductPurchase } from '../src/lib/googlePlay';
-import { gameForPlayProduct, minorUnits, playTokenId, playVerdict, voidedIds } from '../src/lib/playPurchases';
+import { gameForPlayProduct, minorUnits, playProductId, playTokenId, playVerdict, UNKNOWN_CURRENCY, voidedIds } from '../src/lib/playPurchases';
 import { ownedGames, type PurchaseRecord } from '../src/lib/purchases';
 
 const user = { userId: '65f0c0ffee0000000000aa01', email: 'Fish@Example.com' };
@@ -16,6 +16,12 @@ describe('Play products', () => {
     expect(gameForPlayProduct('inkfish')).toBeNull();
     expect(gameForPlayProduct('nope_full')).toBeNull();
     expect(gameForPlayProduct('all_full')).toBeNull();
+  });
+
+  it('spells a hyphenated slug with underscores, as Play product ids must, and maps it back', () => {
+    expect(playProductId('pixel-quill')).toBe('pixel_quill_full');
+    expect(playProductId('inkfish')).toBe('inkfish_full');
+    expect(gameForPlayProduct('pixel-quill_full')).toBeNull();
   });
 });
 
@@ -34,7 +40,19 @@ describe('a Play purchase', () => {
 
   it('never goes to another account than the one the app tagged it with', () => {
     expect(playVerdict({ ...paid, obfuscatedExternalAccountId: '65f0c0ffee0000000000bb02' }, { game: 'inkfish', token: 'tok', user })).toEqual({ ok: false, status: 'other-account' });
-    expect(playVerdict({ ...paid, obfuscatedExternalAccountId: undefined }, { game: 'inkfish', token: 'tok', user })).toEqual({ ok: false, status: 'other-account' });
+  });
+
+  it('gives an untagged purchase (a promo code redeemed in the Play Store) to the signed-in player', () => {
+    for (const tag of [undefined, '']) {
+      const v = playVerdict({ ...paid, obfuscatedExternalAccountId: tag, purchaseType: 1 }, { game: 'inkfish', token: 'tok', user });
+      expect(v.ok && v.record).toMatchObject({ userId: user.userId, livemode: true, free: true });
+    }
+  });
+
+  it('saves a paid sale whose price the app could not report with no currency, not as a free dollar sale', () => {
+    const v = playVerdict(paid, { game: 'inkfish', token: 'tok', user });
+    expect(v.ok && v.record).toMatchObject({ amount: 0, currency: UNKNOWN_CURRENCY, livemode: true });
+    expect(v.ok && v.record.free).toBeUndefined();
   });
 
   it('waits for a pending payment and refuses a cancelled one', () => {
@@ -45,11 +63,13 @@ describe('a Play purchase', () => {
   it('marks a license tester purchase as test mode, with no money', () => {
     const v = playVerdict({ ...paid, purchaseType: 0 }, { game: 'inkfish', token: 'tok', user, price: { amount: 4.99, currency: 'USD' } });
     expect(v.ok && v.record).toMatchObject({ livemode: false, amount: 0 });
+    // Test mode already keeps it out of the sales: not marked free on top.
+    expect(v.ok && v.record.free).toBeUndefined();
   });
 
-  it('counts a promo code as owned but free', () => {
+  it('counts a promo code as owned but free, out of the sales', () => {
     const v = playVerdict({ ...paid, purchaseType: 1 }, { game: 'inkfish', token: 'tok', user, price: { amount: 4.99, currency: 'USD' } });
-    expect(v.ok && v.record).toMatchObject({ livemode: true, amount: 0 });
+    expect(v.ok && v.record).toMatchObject({ livemode: true, amount: 0, free: true });
   });
 
   it('keys a purchase without an order id (a promo code may have none) by its hashed token', () => {

@@ -31,6 +31,8 @@ export interface PurchaseRecord {
   readonly livemode: boolean;
   readonly status: PurchaseStatus;
   readonly paidAt: Date;
+  /** No money changed hands, though the game is really owned (a Play promo code): left out of the sales stats. */
+  readonly free?: boolean;
 }
 
 /** The fields of a Stripe Checkout Session we read. */

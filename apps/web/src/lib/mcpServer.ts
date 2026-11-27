@@ -140,7 +140,7 @@ export function buildMcpServer(admin: McpAdmin, origin: string): McpServer {
     title: 'Traffic report',
     description: 'Visitors, players and play time on 16bit.ink over the last N days, per game; by first page; and by referring site '
       + '(null = typed in, apps, bookmarks; a short link like 16bit.ink/fish, or any page opened with ?via=<tag>, shows as "16bit.ink/<tag>"). '
-      + 'Also live sales per game (amount in cents) and which home page cards get clicked. Use it to see whether outreach brings people and buyers.',
+      + 'Also live sales per game (amount in cents; Play promo codes left out; currency "xxx" is a Play sale whose price the app could not report) and which home page cards get clicked. Use it to see whether outreach brings people and buyers.',
     inputSchema: { days: z.number().int().min(1).max(365).optional().describe('How many days back (default 7)') },
     annotations: { readOnlyHint: true },
   }, async (args) => guarded('traffic', async () => {
