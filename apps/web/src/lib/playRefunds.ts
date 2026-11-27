@@ -2,7 +2,7 @@ import { db } from './db';
 import { setPaymentStatus } from './db/purchaseRepo';
 import { optionalEnv } from './env';
 import { play } from './play';
-import { playPurchaseId } from './playPurchases';
+import { voidedIds } from './playPurchases';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -17,7 +17,8 @@ export async function syncPlayRefunds(): Promise<{ voided: number; revoked: numb
   await db();
   let revoked = 0;
   for (const v of voided) {
-    if (v.orderId) revoked += await setPaymentStatus(playPurchaseId(v.orderId), 'refunded');
+    // Saved under its order id, or its token's hash when Google gave no order id.
+    for (const id of voidedIds(v)) revoked += await setPaymentStatus(id, 'refunded');
   }
   console.info('[play-refunds] synced', { voided: voided.length, revoked });
   return { voided: voided.length, revoked };

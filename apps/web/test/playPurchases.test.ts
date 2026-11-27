@@ -1,7 +1,7 @@
 import { generateKeyPairSync, createVerify } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 import { playClient, tokenAssertion, type PlayProductPurchase } from '../src/lib/googlePlay';
-import { gameForPlayProduct, minorUnits, playVerdict } from '../src/lib/playPurchases';
+import { gameForPlayProduct, minorUnits, playTokenId, playVerdict, voidedIds } from '../src/lib/playPurchases';
 import { ownedGames, type PurchaseRecord } from '../src/lib/purchases';
 
 const user = { userId: '65f0c0ffee0000000000aa01', email: 'Fish@Example.com' };
@@ -21,7 +21,7 @@ describe('Play products', () => {
 
 describe('a Play purchase', () => {
   it('becomes a paid record for the buyer, keyed and refunded by its order', () => {
-    const v = playVerdict(paid, { game: 'inkfish', user, price: { amount: 4.99, currency: 'USD' } });
+    const v = playVerdict(paid, { game: 'inkfish', token: 'tok', user, price: { amount: 4.99, currency: 'USD' } });
     expect(v).toEqual({
       ok: true,
       record: {
@@ -33,27 +33,40 @@ describe('a Play purchase', () => {
   });
 
   it('never goes to another account than the one the app tagged it with', () => {
-    expect(playVerdict({ ...paid, obfuscatedExternalAccountId: '65f0c0ffee0000000000bb02' }, { game: 'inkfish', user })).toEqual({ ok: false, status: 'other-account' });
-    expect(playVerdict({ ...paid, obfuscatedExternalAccountId: undefined }, { game: 'inkfish', user })).toEqual({ ok: false, status: 'other-account' });
+    expect(playVerdict({ ...paid, obfuscatedExternalAccountId: '65f0c0ffee0000000000bb02' }, { game: 'inkfish', token: 'tok', user })).toEqual({ ok: false, status: 'other-account' });
+    expect(playVerdict({ ...paid, obfuscatedExternalAccountId: undefined }, { game: 'inkfish', token: 'tok', user })).toEqual({ ok: false, status: 'other-account' });
   });
 
   it('waits for a pending payment and refuses a cancelled one', () => {
-    expect(playVerdict({ ...paid, purchaseState: 2 }, { game: 'inkfish', user })).toEqual({ ok: false, status: 'pending' });
-    expect(playVerdict({ ...paid, purchaseState: 1 }, { game: 'inkfish', user })).toEqual({ ok: false, status: 'cancelled' });
+    expect(playVerdict({ ...paid, purchaseState: 2 }, { game: 'inkfish', token: 'tok', user })).toEqual({ ok: false, status: 'pending' });
+    expect(playVerdict({ ...paid, purchaseState: 1 }, { game: 'inkfish', token: 'tok', user })).toEqual({ ok: false, status: 'cancelled' });
   });
 
   it('marks a license tester purchase as test mode, with no money', () => {
-    const v = playVerdict({ ...paid, purchaseType: 0 }, { game: 'inkfish', user, price: { amount: 4.99, currency: 'USD' } });
+    const v = playVerdict({ ...paid, purchaseType: 0 }, { game: 'inkfish', token: 'tok', user, price: { amount: 4.99, currency: 'USD' } });
     expect(v.ok && v.record).toMatchObject({ livemode: false, amount: 0 });
   });
 
   it('counts a promo code as owned but free', () => {
-    const v = playVerdict({ ...paid, purchaseType: 1 }, { game: 'inkfish', user, price: { amount: 4.99, currency: 'USD' } });
+    const v = playVerdict({ ...paid, purchaseType: 1 }, { game: 'inkfish', token: 'tok', user, price: { amount: 4.99, currency: 'USD' } });
     expect(v.ok && v.record).toMatchObject({ livemode: true, amount: 0 });
   });
 
-  it('refuses a purchase without an order id', () => {
-    expect(playVerdict({ ...paid, orderId: undefined }, { game: 'inkfish', user })).toEqual({ ok: false, status: 'invalid' });
+  it('keys a purchase without an order id (a promo code may have none) by its hashed token', () => {
+    const v = playVerdict({ ...paid, orderId: undefined, purchaseType: 1 }, { game: 'inkfish', token: 'tok', user });
+    expect(v.ok && v.record).toMatchObject({ sessionId: playTokenId('tok'), paymentIntent: playTokenId('tok'), livemode: true });
+    // The token itself is never stored: only its hash.
+    expect(playTokenId('tok')).toBe('play:token:1a7674eb4ee78df7e1ac439a93c3fa8e3c945784d4dec9fd8e3011738b2f1d62');
+  });
+
+  it('refuses a purchase without a time', () => {
+    expect(playVerdict({ ...paid, purchaseTimeMillis: undefined }, { game: 'inkfish', token: 'tok', user })).toEqual({ ok: false, status: 'invalid' });
+  });
+
+  it('finds a voided purchase under either id it may have been saved with', () => {
+    expect(voidedIds({ orderId: 'GPA.1', purchaseToken: 'tok' })).toEqual(['play:GPA.1', playTokenId('tok')]);
+    expect(voidedIds({ purchaseToken: 'tok' })).toEqual([playTokenId('tok')]);
+    expect(voidedIds({})).toEqual([]);
   });
 
   it('stores prices in the smallest currency unit', () => {

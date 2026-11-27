@@ -87,6 +87,13 @@ describe('POST /api/app/purchase', () => {
     expect(acknowledge).not.toHaveBeenCalled();
   });
 
+  it('saves a purchase Google gives no order id, under its hashed token', async () => {
+    getProductPurchase.mockResolvedValue({ ...PAID, orderId: undefined, purchaseType: 1 });
+    expect((await call({ productId: 'inkfish_full', token: 'tok' })).status).toBe(200);
+    expect(savePurchase).toHaveBeenCalledWith(expect.objectContaining({ sessionId: expect.stringMatching(/^play:token:[0-9a-f]{64}$/) }));
+    expect(acknowledge).toHaveBeenCalled();
+  });
+
   it('answers pending without saving', async () => {
     getProductPurchase.mockResolvedValue({ ...PAID, purchaseState: 2 });
     const res = await call({ productId: 'inkfish_full', token: 'tok' });
@@ -130,8 +137,8 @@ describe('POST /api/app/play-refunds', () => {
 
   it('revokes every voided order', async () => {
     const res = await sync(`Bearer ${'s'.repeat(40)}`);
-    expect(await res.json()).toEqual({ success: true, data: { voided: 3, revoked: 2 } });
-    expect(setPaymentStatus.mock.calls).toEqual([['play:GPA.1', 'refunded'], ['play:GPA.2', 'refunded']]);
+    expect(await res.json()).toEqual({ success: true, data: { voided: 3, revoked: 3 } });
+    expect(setPaymentStatus.mock.calls.map(([id]) => id)).toEqual(['play:GPA.1', expect.stringMatching(/^play:token:[0-9a-f]{64}$/), 'play:GPA.2']);
     // No start time: Google refuses one older than 30 days, and its default is the last 30.
     expect(voidedSince).toHaveBeenCalledWith();
   });

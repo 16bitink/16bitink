@@ -45,7 +45,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       throw err;
     }
 
-    const verdict = playVerdict(purchase, { game, user, price });
+    const verdict = playVerdict(purchase, { game, token, user, price });
     if (!verdict.ok) {
       switch (verdict.status) {
         case 'pending':
@@ -55,7 +55,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
         case 'other-account':
           return fail(409, 'This purchase belongs to another 16bit.ink account. Sign in with that account to play it.');
         default:
-          throw new Error('Google Play returned a purchase without an order id or time');
+          throw new Error('Google Play returned a purchase without a purchase time');
       }
     }
 

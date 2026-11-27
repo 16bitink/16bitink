@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { findGame, isPurchasable } from '../data/games';
 import type { PlayProductPurchase } from './googlePlay';
 import type { PurchaseRecord } from './purchases';
@@ -9,7 +10,9 @@ import type { UserId } from './userId';
  *
  * Each game sells one non-consumable product, `<slug>_full`. A Play purchase
  * keeps the record shape of a Stripe one: its id, and the "payment" a refund
- * names, are both `play:<orderId>`, so refunds reuse setPaymentStatus.
+ * names, are both `play:<orderId>`, so refunds reuse setPaymentStatus. A
+ * purchase Google gives no order id (a promo code may come without one) is
+ * `play:token:<sha256 of its token>` instead.
  */
 
 export const PLAY_PREFIX = 'play:';
@@ -25,6 +28,14 @@ export function gameForPlayProduct(productId: string): string | null {
 
 export const playPurchaseId = (orderId: string): string => `${PLAY_PREFIX}${orderId}`;
 
+/** The id of a purchase without an order id: its token, hashed (tokens are long, and secret enough not to store as is). */
+export const playTokenId = (token: string): string => `${PLAY_PREFIX}token:${createHash('sha256').update(token).digest('hex')}`;
+
+/** The purchase ids a voided purchase may have been saved under. */
+export function voidedIds(v: { readonly orderId?: string; readonly purchaseToken?: string }): string[] {
+  return [...(v.orderId ? [playPurchaseId(v.orderId)] : []), ...(v.purchaseToken ? [playTokenId(v.purchaseToken)] : [])];
+}
+
 export const isPlayPurchase = (r: Pick<PurchaseRecord, 'sessionId'>): boolean => r.sessionId.startsWith(PLAY_PREFIX);
 
 /** A license tester's purchase: no money changed hands. */
@@ -36,6 +47,8 @@ export type PlayVerdict =
 
 export interface PlayContext {
   readonly game: string;
+  /** The purchase token Google was asked about. */
+  readonly token: string;
   readonly user: { readonly userId: UserId; readonly email: string };
   /** The price the store showed the buyer, as the app reported it (stats only: never trusted for access). */
   readonly price?: { readonly amount: number; readonly currency: string };
@@ -51,8 +64,8 @@ export function playVerdict(p: PlayProductPurchase, ctx: PlayContext): PlayVerdi
   if (p.purchaseState !== 0) return { ok: false, status: 'cancelled' };
   if (p.obfuscatedExternalAccountId !== ctx.user.userId) return { ok: false, status: 'other-account' };
   const paidMs = Number(p.purchaseTimeMillis);
-  if (!p.orderId || !Number.isFinite(paidMs)) return { ok: false, status: 'invalid' };
-  const id = playPurchaseId(p.orderId);
+  if (!Number.isFinite(paidMs)) return { ok: false, status: 'invalid' };
+  const id = p.orderId ? playPurchaseId(p.orderId) : playTokenId(ctx.token);
   // Promo codes and license testers pay nothing.
   const charged = p.purchaseType === undefined && ctx.price ? ctx.price : null;
   return {
