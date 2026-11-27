@@ -349,7 +349,8 @@ function offerUnlockedRefresh(stage: HTMLElement): void {
   text.textContent = `The full ${stage.dataset.title ?? 'game'} is unlocked. Refresh to play it: your saved progress stays.`;
   go.addEventListener('click', () => window.location.reload(), { once: true });
   card.hidden = false;
-  go.focus();
+  // No go.focus(), unlike offerRefresh: the game is still playing, and Phaser listens for keys on
+  // the whole window, so a Space or Enter meant for the game would press Refresh mid-level.
 }
 
 /** The splash's price line, once ownership is known: "unlocked" for an owner, else the price (also when the check failed). */
