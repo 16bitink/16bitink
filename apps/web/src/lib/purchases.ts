@@ -1,10 +1,12 @@
 import { findGame } from '../data/games';
 import { isPass } from '../data/pass';
 import { isPaidSession, type FulfilOptions, type SessionLike } from './fulfil';
+import { isPlayPurchase } from './playPurchases';
 import { isUserId, type UserId } from './userId';
 
 /**
- * Purchases as we keep them: one record per paid Stripe Checkout Session.
+ * Purchases as we keep them: one record per paid Stripe Checkout Session,
+ * or per Google Play order from the Android app (lib/playPurchases.ts).
  * Pure rules only; storage is in db/purchaseRepo.ts.
  */
 
@@ -65,7 +67,8 @@ export function purchaseFromSession(s: CheckoutSessionLike): PurchaseRecord | nu
 
 /** The games (and the pass) these purchases still own (refunds and chargebacks drop out). */
 export function ownedGames(records: readonly PurchaseRecord[], opts: FulfilOptions): string[] {
-  const games = records.filter((r) => r.status === 'paid' && (r.livemode || opts.allowTestMode)).map((r) => r.game);
+  const counts = (r: PurchaseRecord): boolean => r.livemode || opts.allowTestMode || (opts.allowPlayTests === true && isPlayPurchase(r));
+  const games = records.filter((r) => r.status === 'paid' && counts(r)).map((r) => r.game);
   return [...new Set(games)];
 }
 

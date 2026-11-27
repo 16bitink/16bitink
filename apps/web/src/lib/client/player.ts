@@ -2,6 +2,7 @@ import { isGameModule, isOfferPlace, type GameModule, type KeyValueStore } from 
 import { GAME_LOADERS } from '../../games/loaders';
 import { BUY_PARAM, isPendingBuy, signInUrl } from '../buyFlow';
 import { flushAnalytics, gameTag, track, trackGameEvent, trackLevelInput, trackPlayTime, trackSignIn, type LoadStage } from './analytics';
+import { syncAppPurchases, watchAppPurchases } from './appBilling';
 import { buyFullGame, fetchMe, startCheckout } from './checkout';
 import { pointerKind, watchLevelInput } from './levelInput';
 import { createHiddenTime, visibleMs } from './hiddenTime';
@@ -127,6 +128,12 @@ export function bootPlayer(game: string, fonts: readonly string[]): void {
   void accessP.then(({ unlocked }) => showOwned(unlocked));
   const progressP = accountProgress(game);
   const meP = fetchMe();
+  // In the app: a store purchase not yet saved to the account (paid while offline, or pending) unlocks the game now.
+  const unlockedHere = (owned: string): void => {
+    if (owned === game) window.location.reload();
+  };
+  void meP.then((me) => (me?.signedIn ? syncAppPurchases(unlockedHere) : undefined));
+  watchAppPurchases(unlockedHere);
   if (isPendingBuy(window.location.search, game)) void resumeBuy(game, status, accessP);
   // The stats follow each press of play: how long until it showed, or how it failed or was left.
   let tag = gameTag(game, undefined);

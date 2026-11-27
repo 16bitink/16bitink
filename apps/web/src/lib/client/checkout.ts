@@ -1,12 +1,17 @@
 import { signInToBuyUrl } from '../buyFlow';
 import { trackBuy, trackCheckout, type BuyPlace } from './analytics';
+import { appBilling, buyInApp, inApp } from './appBilling';
 
 interface CheckoutResult {
   readonly error?: string;
 }
 
-/** Asks our server for a Stripe Checkout URL for `game` and navigates to it. */
+/**
+ * Asks our server for a Stripe Checkout URL for `game` and navigates to it.
+ * Inside the app, the app's store sells it instead: Stripe never shows there.
+ */
 export async function startCheckout(game: string): Promise<CheckoutResult> {
+  if (inApp()) return startAppPurchase(game);
   try {
     const res = await fetch('/api/checkout', {
       method: 'POST',
@@ -24,6 +29,17 @@ export async function startCheckout(game: string): Promise<CheckoutResult> {
   } catch {
     return failed(game, 'Network error. Check your connection and try again.');
   }
+}
+
+/** In the app: the store's purchase sheet, for the signed-in player. */
+async function startAppPurchase(game: string): Promise<CheckoutResult> {
+  const billing = appBilling();
+  if (!billing) return failed(game, 'Buying in this app is not available yet. Your purchases from 16bit.ink still unlock here.');
+  const me = await fetchMe();
+  if (!me?.id) return failed(game, me ? 'Sign in to buy the full game.' : 'Network error. Check your connection and try again.');
+  trackCheckout(game);
+  const result = await buyInApp(billing, game, me.id);
+  return result.error ? failed(game, result.error) : result;
 }
 
 /** Checkout couldn't open: counted, and the reason passed on to show the player. */

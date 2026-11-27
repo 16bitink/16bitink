@@ -42,7 +42,8 @@ async function refunded(sessionId: string): Promise<boolean> {
 export async function accountGames(email: string, userId: UserId, url: URL): Promise<string[]> {
   await claimPurchasesByEmail(email, userId);
   const [purchases, granted] = await Promise.all([findPurchasesFor(userId), grantedGames(userId)]);
-  return playableFrom(libraryOf(purchases, granted, { allowTestMode: isLocalHost(url.hostname) }));
+  const opts = { allowTestMode: isLocalHost(url.hostname), allowPlayTests: optionalEnv('PLAY_TEST_PURCHASES') === 'true' };
+  return playableFrom(libraryOf(purchases, granted, opts));
 }
 
 /**
