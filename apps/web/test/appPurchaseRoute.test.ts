@@ -9,7 +9,9 @@ const savePurchase = vi.fn();
 const findPurchase = vi.fn();
 const setPaymentStatus = vi.fn();
 
-vi.mock('../src/lib/env', () => ({ optionalEnv: () => undefined, requireSecret: () => 's'.repeat(40) }));
+const requireSecret = vi.fn((_name: string) => 's'.repeat(40));
+
+vi.mock('../src/lib/env', () => ({ optionalEnv: () => undefined, requireSecret: (name: string) => requireSecret(name) }));
 vi.mock('../src/lib/owner', () => ({ currentUser: (...a: unknown[]) => currentUser(...a) }));
 vi.mock('../src/lib/db', () => ({ db: async () => undefined }));
 vi.mock('../src/lib/db/purchaseRepo', () => ({
@@ -107,6 +109,17 @@ describe('POST /api/app/play-refunds', () => {
   beforeEach(() => {
     voidedSince.mockReset().mockResolvedValue([{ orderId: 'GPA.1' }, { purchaseToken: 'no-order' }, { orderId: 'GPA.2' }]);
     setPaymentStatus.mockReset().mockResolvedValue(1);
+  });
+
+  it('says so when the sync secret is missing or weak', async () => {
+    requireSecret.mockImplementationOnce(() => {
+      throw new Error('PLAY_SYNC_SECRET must be at least 32 characters');
+    });
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const res = await sync(`Bearer ${'s'.repeat(40)}`);
+    expect(res.status).toBe(503);
+    expect(await res.json()).toMatchObject({ success: false, error: expect.stringContaining('PLAY_SYNC_SECRET') });
+    expect(voidedSince).not.toHaveBeenCalled();
   });
 
   it('needs the sync secret', async () => {

@@ -8,10 +8,10 @@ export const prerender = false;
 
 const digest = (v: string): Buffer => createHash('sha256').update(v).digest();
 
-function authorized(request: Request): boolean {
+function authorized(request: Request, secret: string): boolean {
   const header = request.headers.get('authorization') ?? '';
   const given = header.startsWith('Bearer ') ? header.slice(7) : '';
-  return given.length > 0 && timingSafeEqual(digest(given), digest(requireSecret('PLAY_SYNC_SECRET')));
+  return given.length > 0 && timingSafeEqual(digest(given), digest(secret));
 }
 
 /**
@@ -20,7 +20,15 @@ function authorized(request: Request): boolean {
  * running it by hand or from a scheduler.
  */
 export const POST: APIRoute = async ({ request }) => {
-  if (!authorized(request)) return fail(401, 'Unauthorized');
+  let secret: string;
+  try {
+    secret = requireSecret('PLAY_SYNC_SECRET');
+  } catch (err) {
+    // Missing or too short: say so, instead of an unhandled 500.
+    console.error('[app/play-refunds] not set up', err instanceof Error ? err.message : err);
+    return fail(503, 'Refund sync is not set up: PLAY_SYNC_SECRET is missing or too short.');
+  }
+  if (!authorized(request, secret)) return fail(401, 'Unauthorized');
   try {
     return json({ success: true, data: await syncPlayRefunds() });
   } catch (err) {
