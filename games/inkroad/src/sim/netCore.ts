@@ -1,9 +1,11 @@
 /** Building network values: nodes and roads in, links, arms and radii out. Pure. */
+import { MOTION_SWITCHES } from './switches';
 import { LANE, ROADS } from './constants';
 import { angleDiff, cellPt, dist, lineLength, reverseLine, sameCell, smoothLine, offsetLine } from './geom';
 import { backwardLink, forwardLink, halfWidth, laneOffset, lanesPerLink } from './roadGeom';
 import type { Cell, Control, Id, Junction, Link, Road, RoadType } from './types';
 import type { Network } from './trafficTypes';
+import { R_MIN } from './kinematics';
 
 export interface NodeCore {
   readonly id: Id;
@@ -25,6 +27,8 @@ export const WORKS_SLOW = 0.6;
 export const RING_EXTRA = 10;
 export const RING_EDGE = 3;
 const JUNCTION_PAD = 5;
+/** Junctions big enough for a R_MIN right turn (with FILLET 15 in src/render/ground/roadShape.ts). */
+export const roomyCorners = (): boolean => MOTION_SWITCHES.ROOMY_CORNERS;
 const MAX_REACH = 2.1;
 
 export function draftOf(net: Network): Draft {
@@ -109,7 +113,12 @@ function junctionRadius(node: NodeCore, arms: readonly Road[]): number {
     if (gap > 2.6) return;
     need = Math.max(need, Math.min((halfWidth(r) + halfWidth(ground[k]!)) / 2 / Math.tan(gap / 2), widest * MAX_REACH));
   });
-  return need + JUNCTION_PAD;
+  // A right turn from the rightmost lane is an arc about the corner: its radius is the lane end's distance from the
+  // middle less the lane's offset, and a real car needs R_MIN (docs/inkroad-build.md "Car motion rules").
+  // Off for now: the bigger junctions cost the bots (nothing lost in year 3, beginner year 6); see the build doc.
+  if (!roomyCorners()) return need + JUNCTION_PAD;
+  const right = Math.max(...ground.map((r) => laneOffset(r, lanesPerLink(r) - 1)));
+  return Math.max(need + JUNCTION_PAD, R_MIN + right);
 }
 
 const PAIR = (135 * Math.PI) / 180;

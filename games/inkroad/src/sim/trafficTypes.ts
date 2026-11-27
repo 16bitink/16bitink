@@ -63,7 +63,8 @@ export interface NetworkApi {
 // ---------------------------------------------------------------- traffic
 
 /** A place on a road where cars enter and leave: a driveway, a car park, a kerb bay, or a map gate (gate node id). */
-export type Access = { readonly road: Id; readonly s: number } | { readonly gate: Id };
+/** A place on a road (`dir`: only the lanes running with the road's line, 1, or against it, -1), or a gate. */
+export type Access = { readonly road: Id; readonly s: number; readonly dir?: 1 | -1 } | { readonly gate: Id };
 
 export interface SpawnRequest {
   readonly from: Access;
@@ -109,6 +110,12 @@ export interface Traffic {
   entryPose(r: SpawnRequest): LanePose | null;
   /** Double-parked or broken down: the lane is blocked there for `seconds`. Gone when the time is up. */
   block(at: Access, seconds: number, state: 2 | 3 | 4): number;
+  /** A car pulling out (held, state 4) holds its lane at least `seconds` from now. */
+  holdLonger(uid: number, seconds: number): void;
+  /** Turning across the far side of a road at `at` (the car heading `heading`): seconds until its other-way lanes have a `gap`-second gap. */
+  gapAcross(at: Access, heading: number, gap: number): number;
+  /** Holds those other-way lanes at `at` for `seconds` (the body is in them). Returns how many lanes. */
+  holdAcross(at: Access, heading: number, seconds: number): number;
   /** Buses, trams and school buses: drive the stops in a loop, pausing `dwell` at each. Returns a handle. */
   addService(r: { readonly stops: readonly Access[]; readonly kind: VehicleKind; readonly dwell: number; readonly vehicles: number; readonly tag: number }): number;
   removeService(id: number): void;

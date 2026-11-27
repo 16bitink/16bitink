@@ -13,7 +13,8 @@
     "dev": "vite dev --port 5181",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "lab": "node dev/lab.mjs"
+    "lab": "node dev/lab.mjs",
+    "motion": "node dev/motion.mjs"
   },
   "dependencies": {
     "@16bitink/game-sdk": "workspace:*",

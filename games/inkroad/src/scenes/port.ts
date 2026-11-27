@@ -38,6 +38,8 @@ export interface Ghost {
   readonly at: Pt;
   /** True while the finger is still down (show the price, not yet Build). */
   readonly dragging: boolean;
+  /** A road with fixed points: the bar offers Undo (drop the last point). */
+  readonly undoable?: boolean;
 }
 
 /** What a tap picked, or the UI selected. `at` is filled by the world. */
@@ -71,6 +73,10 @@ export interface WorldPort {
   readonly ghost: Ghost | null;
   readonly selection: Selection;
   readonly overlay: Overlay;
+  /** The last pointer was a finger. */
+  readonly touch: boolean;
+  /** Points fixed so far on the road in hand (0 when none). */
+  readonly points: number;
   /** Replace the callbacks (a UI made after the world). */
   setCallbacks(c: WorldCallbacks): void;
   /** Swap the city (load, retry a year, next city). Keeps the camera if the map is the same. */
@@ -84,8 +90,12 @@ export interface WorldPort {
   /** Build the ghost. city.apply's answer, or null when there is no ghost. */
   confirm(): Quote | null;
   cancel(): void;
-  /** Bus and metro lines: drop the last tapped stop. */
+  /** Esc or a right click: drop the ghost, else put the tool down, else close the selection. False when there was nothing to step back from. */
+  back(): boolean;
+  /** Drop the last tapped stop of a line, or the last fixed point of a road (Backspace). */
   undoStop(): void;
+  /** Enter: a road stops following the pointer. False when there was nothing to finish. */
+  finish(): boolean;
   /** Show this junction's arrows; with a movement, go straight to its ghost, else wait for the player to pick one. */
   startFlyover(node: Id, move?: { readonly fromRoad: Id; readonly toRoad: Id } | null, level?: 1 | -1): void;
   /** Glide to a place; zoom in CSS px per plan px. */

@@ -17,7 +17,7 @@ describe('the beach on screen', () => {
     for (const v of ['sell', 'public', 'out']) expect(html).toContain(`data-act="beach" data-v="${v}"`);
     expect(html).toMatch(/leans to selling/);
     expect(html).toMatch(/approval is 52\. Under 60/);
-    for (const who of ['Sulo', 'Pim', 'Zaza']) expect(html).toContain(who);
+    for (const who of ['Sulo', 'Pim', 'Dewy']) expect(html).toContain(who);
     expect(beachCard(env, { ...CASE, lean: 'public', follows: true, approval: 64 })).toMatch(/leans to a public beach.*will follow your advice/s);
     expect(html).not.toMatch(/[–—]/);
     expect(beachCard({ ...env, phone: true }, CASE)).toMatch(/leans to selling.*Under 60.*data-v="public"/s);

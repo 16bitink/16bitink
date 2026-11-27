@@ -6,8 +6,8 @@ export const SAFFRON_YEARS: readonly YearDef[] = [
     year: 1, name: 'The Roundabout', cannotLose: true, grant: 45,
     intro: [
       { who: 'sulo', text: 'Welcome, Director. I would have come in person, but I am stuck at the crossroads.' },
-      { who: 'zaza', text: 'I can hear it from here. Forty horns and one very angry goose.' },
-      { who: 'zaza', text: 'Tap the red crossroads. The arrows show who is waiting.' },
+      { who: 'dewy', text: 'I can hear it from here. Forty horns and one very angry goose.' },
+      { who: 'dewy', text: 'Tap the red crossroads. The arrows show who is waiting.' },
     ],
     tools: ['street', 'remove', 'junction'], controls: ['yield', 'roundabout'], parks: [], policies: [],
     coach: [
@@ -53,7 +53,7 @@ export const SAFFRON_YEARS: readonly YearDef[] = [
     year: 4, name: 'Office Hours', grant: 60,
     intro: [
       { who: 'sulo', text: 'Everybody in the new offices starts at nine. Nobody asked the roads.' },
-      { who: 'zaza', text: 'A signal can give the busy road more green. Good when one side is heavier.' },
+      { who: 'dewy', text: 'A signal can give the busy road more green. Good when one side is heavier.' },
       { who: 'pim', text: 'Or the lorries could come at night. They are all bringing paperclips anyway.' },
     ],
     tools: [], controls: ['signal'], policies: ['truckHours', 'taxis'],
@@ -79,7 +79,7 @@ export const SAFFRON_YEARS: readonly YearDef[] = [
   {
     year: 6, name: 'Over the Top', grant: 90,
     intro: [
-      { who: 'zaza', text: "Sometimes one left turn ruins everybody's morning. Lift it over the top." },
+      { who: 'dewy', text: "Sometimes one left turn ruins everybody's morning. Lift it over the top." },
       { who: 'pim', text: 'Flyovers cost real money. And two seasons of dust. I have already sneezed.' },
     ],
     tools: ['flyover'], policies: ['nightWorks'],
@@ -106,7 +106,7 @@ export const SAFFRON_YEARS: readonly YearDef[] = [
     year: 8, name: 'Mall Season', grant: 130,
     intro: [
       { who: 'miko', text: 'The mall opens. It has a ski slope, a whale, and not enough parking.' },
-      { who: 'zaza', text: 'Remember our first roundabout? It is about to remember us.' },
+      { who: 'dewy', text: 'Remember our first roundabout? It is about to remember us.' },
     ],
     tools: ['underpass'], parks: ['multi', 'under'],
     coach: [{ text: 'Multi-storey car parks hold far more cars on the same sand.', tool: 'parking', until: 'toolPicked:parking' }],
@@ -132,7 +132,7 @@ export const SAFFRON_YEARS: readonly YearDef[] = [
     year: 10, name: 'The Grand Fair', grant: 170,
     intro: [
       { who: 'sulo', text: 'The whole world is coming to the Fair. I left home last week to be on time.' },
-      { who: 'zaza', text: 'Everything you built, all at once. My ears are ready.' },
+      { who: 'dewy', text: 'Everything you built, all at once. My ears are ready.' },
     ],
     tools: [],
     goal: { kind: 'approval', target: 48, text: 'Approval at 48 or more' },

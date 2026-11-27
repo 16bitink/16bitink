@@ -10,7 +10,7 @@ const COMPASS = ['East', 'South', 'West', 'North'] as const;
 export const TOP_MOVEMENTS = 3;
 const FEW = 4; // cars seen before anyone can judge
 
-const PICK_YEAR = 1; // of the first city: Zaza points at one
+const PICK_YEAR = 1; // of the first city: Dewy points at one
 
 function choices(c: PanelCtx, j: Junction): string {
   const open = CONTROL_ORDER.filter((id) => id === j.control || c.city.controls.includes(id));
@@ -27,7 +27,7 @@ function choice(c: PanelCtx, j: Junction, id: Control, f: Inflow, pick: boolean)
   const right = cur ? '<em class="now">Here now</em>' : q.cost > 0 ? `<span class="coin">${num(q.cost)}</span>` : '<em>free</em>';
   const told = cur || f.cars < FEW ? '' : `<span class="eff ${eff}">${q.ok ? EFFECT_WORDS[eff] : esc(q.why ?? 'Not yet')}</span>`;
   return `<button class="btn choice${cur ? ' on' : ''}${pick ? ' pick' : ''}" data-act="control" data-v="${id}" ${cur || !q.ok ? 'disabled' : ''}>
-    ${CONTROL_ICONS[id]}<span class="ctext"><span class="cname"><b>${CONTROL_NAMES[id]}</b><span class="cprice">${right}</span></span><span>${CONTROL_WORDS[id]}</span>${told}${works}</span>${pick ? '<span class="ribbon">Zaza: this one!</span>' : ''}</button>`;
+    ${CONTROL_ICONS[id]}<span class="ctext"><span class="cname"><b>${CONTROL_NAMES[id]}</b><span class="cprice">${right}</span></span><span>${CONTROL_WORDS[id]}</span>${told}${works}</span>${pick ? '<span class="ribbon">Dewy: this one!</span>' : ''}</button>`;
 }
 
 /** The compass side of a road as it leaves a junction. */

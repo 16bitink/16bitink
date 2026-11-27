@@ -160,6 +160,7 @@ export function stepDay(c: City): boolean {
   depart(c);
   leaveAll(c);
   retryWaiting(c, every(c, RETRY_EVERY));
+  holdCrossings(c);
   c.traffic.step();
   for (const a of c.traffic.drainArrivals()) arrive(c, a);
   for (const a of c.traffic.drainGaveUp()) gaveUp(c, a);
@@ -179,3 +180,10 @@ export function endDay(c: City): void {
   for (const leg of c.day.legs) if (!leg.done) lateLeg(c, leg);
 }
 
+/** Cars that waited for their gap across the road now hold the far lanes while their bodies are in them. */
+function holdCrossings(c: City): void {
+  const due = c.day.crossings.filter((k) => k.from <= c.clock + 1e-6);
+  if (due.length === 0) return;
+  c.day.crossings = c.day.crossings.filter((k) => k.from > c.clock + 1e-6);
+  for (const k of due) c.traffic.holdAcross(k.at, k.a, k.seconds);
+}

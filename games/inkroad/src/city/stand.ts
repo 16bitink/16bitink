@@ -25,6 +25,8 @@ function placeOnRoad(c: City, e: Standing, at: number | undefined): void {
   const spot = e.spot;
   e.s = undefined;
   e.side = undefined;
+  e.lat = undefined;
+  e.shoulder = undefined;
   if (!ROAD_KINDS.has(spot.kind)) return;
   const road = c.net.roads.find((r) => r.id === spot.id);
   if (!road) return;
@@ -100,7 +102,7 @@ export const viewKind = (k: VehicleKind): ParkedCar['kind'] => (VIEW_KINDS.has(k
 
 function parkedOf(e: Standing): ParkedCar {
   const span = spanOf(e.spot, e.slot, e.kind);
-  return { uid: e.uid, tint: e.tint, kind: viewKind(e.kind), slot: e.slot, ...(span.length > 1 ? { span } : {}), ...(e.household !== undefined ? { household: e.household } : {}), ...(e.s !== undefined ? { s: e.s, side: e.side ?? 1 } : {}) };
+  return { uid: e.uid, tint: e.tint, kind: viewKind(e.kind), slot: e.slot, ...(span.length > 1 ? { span } : {}), ...(e.household !== undefined ? { household: e.household } : {}), ...(e.s !== undefined ? { s: e.s, side: e.side ?? 1 } : {}), ...(e.lat !== undefined ? { lat: e.lat } : {}) };
 }
 
 function viewOf(s: Spot): ParkingView {

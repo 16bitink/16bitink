@@ -17,7 +17,16 @@ export class FakeWorld implements WorldPort {
   handleEvents(_l: readonly CityEvent[]): void {}
   confirm() { const g = this.ghost; this.ghost = null; return g ? g.quote : null; }
   cancel(): void { this.ghost = null; }
+  back(): boolean {
+    if (this.ghost) { this.ghost = null; return true; }
+    if (this.tool) { this.tool = null; return true; }
+    if (this.selection) { this.selection = null; return true; }
+    return false;
+  }
   undoStop(): void {}
+  finish(): boolean { return false; }
+  touch = false;
+  points = 0;
   startFlyover(): void {}
   carAt(): Pt | null { return null; }
   talker(): null { return null; }

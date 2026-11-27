@@ -89,6 +89,7 @@ class World implements WorldPort {
       scene.fit(s.w, s.h, s.dpr);
       this.scene = scene;
       this.desk = new Desk(scene, this.cb);
+      this.desk.touch = isPhone({ width: s.w, height: s.h });
       this.game.scene.add('World', scene, true);
     });
     if (this.dead) return;
@@ -104,7 +105,8 @@ class World implements WorldPort {
     const rig = scene.rig;
     this.pointer = new PointerRig(this.game.canvas, {
       tap: (p, touch) => { desk.touch = touch; desk.tap(rig.toPlan(p)); },
-      dragStart: (p, map) => !map && desk.dragStart(rig.toPlan(p)),
+      back: () => { desk.back(); },
+      dragStart: (p, map, touch) => { desk.touch = touch; return !map && desk.dragStart(rig.toPlan(p)); },
       drag: (p) => desk.drag(rig.toPlan(p)),
       dragEnd: (p) => desk.dragEnd(rig.toPlan(p)),
       dragCancel: () => desk.dragCancel(),
@@ -133,6 +135,8 @@ class World implements WorldPort {
 
   get tool(): WorldPort['tool'] { return this.desk?.tool ?? null; }
   get ghost(): WorldPort['ghost'] { return this.desk?.ghost ?? null; }
+  get touch(): boolean { return this.desk?.touch ?? false; }
+  get points(): number { return this.desk?.points ?? 0; }
   get selection(): WorldPort['selection'] { return this.scene?.selection ?? null; }
 
   setCallbacks(c: WorldCallbacks): void { this.cb = c; this.desk?.setCallbacks(c); }
@@ -155,7 +159,9 @@ class World implements WorldPort {
   handleEvents: WorldPort['handleEvents'] = (list) => this.when((s) => s.play(list));
   confirm: WorldPort['confirm'] = () => this.desk?.confirm() ?? null;
   cancel(): void { this.desk?.cancel(); }
+  back(): boolean { return this.desk?.back() ?? false; }
   undoStop(): void { this.desk?.undo(); }
+  finish(): boolean { return this.desk?.finish() ?? false; }
   startFlyover: WorldPort['startFlyover'] = (node, move = null, level = 1) => this.when((_s, d) => d.startFlyover(node, move, level));
   focusOn: WorldPort['focusOn'] = (at, o = {}) => this.when((s) => s.rig.focus(at, o.zoom, o.ms ?? FOCUS_MS));
   overview(ms = FOCUS_MS): void { this.when((s) => s.rig.overview(ms)); }

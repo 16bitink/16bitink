@@ -3,7 +3,8 @@ import { createCity } from '../src/city/city';
 import { lotRect } from '../src/city/geometry';
 import { PAID_CITIES } from '../content/paid';
 import { pathPose, type Step } from '../src/render/cars/manoeuvrePath';
-import { CAR_HALF_W, layoutPlace, makeGeo } from '../src/render/cars/parkingSlots';
+import { CAR_HALF_W, layoutPlace, makeGeo, modeOf } from '../src/render/cars/parkingSlots';
+import { laneOffset, lanesPerLink } from '../src/sim/roadGeom';
 import { pointAt } from '../src/render/geom';
 import type { CityView, ParkingView } from '../src/sim/types';
 import { cityAtYear, inner } from './city-helpers';
@@ -53,14 +54,16 @@ function wallHits(v: CityView): string[] {
       if (!s) return;
       const bad = corners(s.x, s.y, s.a).map(inside).find((id) => id !== null);
       if (bad != null) out.push(`${spot.key}#${k} parked inside lot ${bad}`);
+      // The car stands in the outer lane on its right, where the traffic stops it (the road's middle is nobody's lane).
+      const outer = laneOffset(road, lanesPerLink(road) - 1);
       for (const a of [along, along + Math.PI]) {
-        const lane = { x: p.x, y: p.y, a };
+        const lane = { x: p.x - Math.sin(a) * outer, y: p.y + Math.cos(a) * outer, a };
         for (let f = 0; f <= FRAMES; f++) {
-          const at = pathPose('bay', lane, s, f / FRAMES, step, 0.3);
+          const at = pathPose(modeOf(spot.kind), lane, s, f / FRAMES, step, 0.3);
           const hit = corners(at.x, at.y, at.a).map(inside).find((id) => id !== null);
           if (hit != null) { out.push(`${spot.key}#${k} path frame ${f} inside lot ${hit}`); break; }
         }
-        const end = pathPose('bay', lane, s, 1, step, 0.3);
+        const end = pathPose(modeOf(spot.kind), lane, s, 1, step, 0.3);
         if (Math.hypot(end.x - s.x, end.y - s.y) > 0.01 || Math.abs(end.a - s.a) > 0.01) out.push(`${spot.key}#${k} ends off its picture`);
       }
     });

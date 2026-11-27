@@ -5,7 +5,7 @@ All webp. Made by `games/inkroad/dev/art/ui/cut.py` from `dev/art/ui/raw/` (Elev
 ## portraits/ (bust, facing slightly right, 320 px tall, width varies, bottom-aligned)
 | Key | Use |
 |---|---|
-| zaza, zaza_upset | Fennec fox traffic engineer: normal, upset |
+| dewy, dewy_upset | Fennec fox traffic engineer: normal, upset |
 | miko, miko_upset | Meerkat head of parking |
 | juma, juma_upset | Camel, buses and metro |
 | pim, pim_upset | Jerboa treasurer |

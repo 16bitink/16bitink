@@ -2,7 +2,7 @@ import { esc } from '../dom';
 import { pic } from '../pics';
 
 export const OFFICIALS = {
-  zaza: { name: 'Zaza', job: 'Traffic engineer' },
+  dewy: { name: 'Dewy', job: 'Traffic engineer' },
   miko: { name: 'Miko', job: 'Head of parking' },
   juma: { name: 'Juma', job: 'Buses and metro' },
   pim: { name: 'Pim', job: 'Treasurer' },

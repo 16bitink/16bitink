@@ -13,8 +13,10 @@ const FLING_WINDOW_MS = 80;
 
 export interface PointerHooks {
   tap(p: Pt, touch: boolean): void;
+  /** A right click that did not move the map: step back (drop the road, put the tool down). */
+  back(): void;
   /** One pointer starts to drag. `map`: it should move the map (right or middle button, or no tool wants it). Return true to take it. */
-  dragStart(from: Pt, map: boolean): boolean;
+  dragStart(from: Pt, map: boolean, touch: boolean): boolean;
   drag(p: Pt): void;
   dragEnd(p: Pt): void;
   dragCancel(): void;
@@ -78,7 +80,7 @@ export class PointerRig {
     if (!f.moved) {
       f.moved = true;
       const map = e.pointerType === 'mouse' && (e.buttons & 6) !== 0;
-      if (this.mode === 'none') this.mode = this.hooks.dragStart(f.start, map) ? 'tool' : 'map';
+      if (this.mode === 'none') this.mode = this.hooks.dragStart(f.start, map, e.pointerType !== 'mouse') ? 'tool' : 'map';
     }
     if (this.mode === 'tool') this.hooks.drag(p);
     else {
@@ -102,7 +104,7 @@ export class PointerRig {
     this.fingers.delete(e.pointerId);
     if (this.mode === 'pinch') { if (this.fingers.size === 0) this.mode = 'none'; else for (const q of this.fingers.values()) { q.moved = true; this.mode = 'map'; } return; }
     const p = this.at(e);
-    if (!f.moved) { if (this.enabled && e.button !== 2) this.hooks.tap(p, e.pointerType !== 'mouse'); }
+    if (!f.moved) { if (this.enabled) { if (e.button === 2) this.hooks.back(); else this.hooks.tap(p, e.pointerType !== 'mouse'); } }
     else if (this.mode === 'tool') this.hooks.dragEnd(p);
     else this.throwMap(e.timeStamp);
     this.mode = 'none';

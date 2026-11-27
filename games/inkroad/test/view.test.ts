@@ -272,8 +272,8 @@ describe('tools', () => {
     expect(last.oneWay).toBe(true);
     tool.cancel();
     expect(t.asked[t.asked.length - 1]).toBeNull();
-    tool.tap(at(1, 1));
-    expect(t.hints).toHaveLength(1);
+    tool.tap(at(1, 1)); // a click on empty ground starts a road, with no refusal
+    expect(t.hints).toHaveLength(0);
   });
   it('places a car park under the finger and drags it on', () => {
     const t = ctx();

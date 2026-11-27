@@ -139,7 +139,7 @@ function open(c: City, b: BeachDef): void {
   // A surface car park that was here already is beach parking now.
   c.parks = c.parks.map((p) => (!p.beach && beachServed(c, p.kind, p) ? { ...p, beach: true } : p));
   c.approval = clamp(c.approval + BEACH.ribbon, 0, 100);
-  emit(c, { t: 'toast', who: 'zaza', text: `${b.name} is everyone's. Everyone will come by car, I can already hear them.` });
+  emit(c, { t: 'toast', who: 'dewy', text: `${b.name} is everyone's. Everyone will come by car, I can already hear them.` });
 }
 
 /** The first dawn: nobody asked the Director in time, so the Council goes its way. The sale is written into the season's books. */

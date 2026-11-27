@@ -22,6 +22,7 @@ export const SAMPLE = 4;
 export const MIN_LANE = 24;
 export const CONFLICT_DIST = 7;
 export const TURN = { lateral: 100, min: 20, straight: 0.35 } as const;
+/** The swing to the kerb before a driveway or a kerbside stop (40 px would keep its bend under R_MIN; see the build doc). */
 export const DRIVEWAY = { speed: 18, slide: 13, length: 26 } as const;
 export const CHANGE = { length: 40, short: 22, time: 0.8, every: 5, minSpeed: 8, gain: 26, urgent: 90 } as const;
 export const YIELD = { gap: 1.7, courtesy: 11, near: 34, stop: 9, oneByOne: 1.5 } as const;

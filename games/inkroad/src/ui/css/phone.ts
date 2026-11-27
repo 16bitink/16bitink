@@ -32,7 +32,8 @@ export const PHONE_CSS = `
 .ikr.phone .sel{right:58px;top:60px;width:min(300px,52vw);max-height:calc(100% - 66px)}
 .ikr.phone.hassel .ovs{display:none}
 .ikr.phone .ticker{left:60px;bottom:6px;max-width:44vw;min-height:48px}
-.ikr.phone .ghostbar{bottom:6px;padding:6px 10px;gap:10px}
+.ikr.phone .ghostbar,.ikr.phone .hintbar{bottom:6px;padding:6px 10px;gap:10px}
+.ikr.phone .ghostbar .btn,.ikr.phone .hintbar .btn{min-height:44px;min-width:44px}
 .ikr.phone.hasghost .ticker{display:none}
 .ikr.phone .card{padding:16px 18px 14px;gap:10px}
 .ikr.phone .card h2{font-size:22px}

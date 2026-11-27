@@ -132,6 +132,84 @@ The owner, on screenshots of a nursery and petrol station facing open sand with 
 - **Neighbours and long vehicles.** A slot next to a car that is turning in or driving off is chosen last, and a car waits to pull out only while a touching neighbour on its own row is moving where it would move (`clearToLeave` in `src/city/slots.ts`, from the sweeps in `src/sim/slotGeometry.ts`: a bay car keeps its column, a kerb or forecourt car its length plus the swing past it, a car park's cars share the aisle); it retries on the normal cadence. The renderer's draw-time hold stays as the last safeguard, and a held-back car catches up gently. Vans and lorries take their slot and the next on their row (`ParkedCar.span`) and stand between the two; a lone slot never takes one, and lorries never use car parks.
 - **One source of truth for spaces (November 27).** `src/sim/slotGeometry.ts` (pure, no Phaser) lays out every home, forecourt, surface car park and beach: the city's capacity is exactly its drawn slots (`Spot.layout`, `spaces` never more) and the renderer draws exactly those slots. Pitches hold a car with a visible gap. A two-row car park keeps a gate lane clear in its near row; a car drives through the gate, along the aisle and backs into its bay (`aisleRoute`), at `AISLE_SPEED`. `test/parking-drawable.test.ts` checks every listed car is drawn and no two bodies overlap, spans included.
 
+## Car motion rules (the owner, November 27)
+
+The owner, on screenshots of cars crossing both lanes diagonally into a forecourt and through a taxi: "this still makes movements that are not possible for real cars… let's rebuild it, here are some more screenshots of impossible magic cars".
+
+The rules (kinematic bicycle model, IDM, SUMO practice), in plan px: the drawn car is 16 px = 4.5 m, so 1 m = 3.56 px (`src/sim/kinematics.ts`).
+1. A car moves only along its heading, forward or in reverse: no sideways slip (test: heading within 0.1 rad of each frame's move).
+2. Heading changes only while moving; radius never under `R_MIN` = 5.2 m = 18.5 px (test: 90% of it).
+3. Reverse only inside a parking move, at walking pace: 1.5 m/s = 5.3 px/s, played at `GAME_PACE` (below).
+4. Speed on a curve at most √(a·R), a = 3 m/s² = 10.7 px/s², played at `GAME_PACE`² (the sim's own corner rule, `TURN.lateral` 100 px/s²).
+5. Pulling over (a kerbside stop, double parking, a pump queue) is a forward S, not a slide.
+6. Turning across the oncoming lane waits for a 3 s gap and holds that lane while crossing.
+7. No two bodies overlap, moving, manoeuvring or parked.
+8. Into and out of a space along arcs of at least R_MIN and straights, gears explicit: back into a kerb space with an S from a point ahead of it, line up on a bay's column and go straight in, square to the kerb.
+9. Drive on the right; turns start and end in the proper lane.
+
+**How it is built.** `src/sim/drivePath.ts` (Dubins CSC words, arcs, straights, gears, a path played backwards), `src/sim/parkPaths.ts` (the moves: kerb S, bay column, a bay along its road, car park gate and aisle, double parking, a mouth, a three-point turn where no U fits), `src/sim/parkMove.ts` (`planMove`, paces and the time each gear leg takes). The renderer (`manoeuvrePath.ts`, pure `manoeuvreCore.ts`) draws exactly that path, heading on its tangent. Moving cars glide between sim steps along a Hermite curve whose tangents are the two headings (`glide.ts`), so no step shows a slide. Forecourt cars all face the way the near lane runs (`slotGeometry.ts`): from that lane a car backs in with an S, from the far lane it swings round forward.
+
+**How it is tested.** `test/motion.test.ts` (with `motion-helpers.ts`) plays the teleport test's three seasons and samples every drawn car at 6 frames a sim step through the renderer's own pure code, counting each rule. It is a ratchet (counts may not rise; `MOTION_STRICT=1` wants zero). `MOTION_LOG=n MOTION_RULE=slip` prints the cases; `MOTION_PLAN=1` compares the city's seconds with the drawn plan's. Where and in which situation: the motion lab (docs/inkroad-motion-lab.md, `npm run motion`, dev/motion.html), tiny scripted scenarios through the same code.
+
+| Rule (Saffron Y3 / Y6 / Old Harbour Y4) | before | after |
+|---|---|---|
+| slip, manoeuvring | 5097 / 12105 / 12879 | 1 / 4 / 0 |
+| too tight, manoeuvring | 2609 / 5757 / 5704 | 21 / 64 / 30 |
+| turns in place, manoeuvring | 126 / 324 / 275 | 5 / 27 / 15 |
+| slip, moving | 4283 / 10762 / 6840 | 265 / 103 / 205 |
+| too fast on a curve, moving (played pace) | 16050 / 71766 / 28002 (at real pace) | 365 / 1824 / 850 |
+| too tight, moving (junction corners) | 8436 / 22428 / 15000 | 8319 / 25089 / 15983 |
+| reverse too fast + jumps, manoeuvring | 3328 / 7798 / 6854 (reverse) | 6543 / 16940 / 14965 |
+| bodies overlap, manoeuvring / moving | 61, 124 / 277, 583 / 512, 290 | 132, 136 / 607, 1013 / 1495, 365 |
+| cuts across without a gap | 41 / 339 / 385 | 77 / 560 / 792 |
+
+**Round 2 (November 27): in the code, switched off until the bots are rebalanced.**
+- `GAME_PACE` 1.25 is measured, not picked: a street's free speed is 62 px/s against a real 50 km/h street (49.4 px/s). An avenue gives 1.35, a highway 1.15. Manoeuvres play at this pace: reverse 6.7 px/s, forward 17.5 px/s on an R_MIN arc.
+- `PLANNED_TIMES` (`src/city/manoeuvre.ts`) is off. When on, the lane is held only while the body is in it (`roadSplit`, `src/sim/parkMove.ts`), and the off-road part runs unheld. It also does these:
+  - Off-road arrivals stop by their slot's column.
+  - Kerb cars stop and pull out an S ahead of their slot.
+  - Double-parking and door moves are timed from their paths.
+  - Pull-outs hold as long as the real spawn pose needs (`holdLonger`).
+  - A car turning across the road waits for a 2.4 s gap (3 s real) and holds the far lanes (`src/sim/crossing.ts`).
+  With it on, the drawn path's own pace is kept, but the paths are long and the holds with them:
+  - home bays: 13 s held, about 110 px of path;
+  - forecourts: 8 to 9 s held;
+  - leaving a street space: 10 s held;
+  - double parking: 25 s of drive, three-point turns when it leaves the other way.
+  The beginner bot falls from year 7 to year 3; neither the crossing waits nor the door holds cause this. Next: shorter paths (pull-out direction for double parking, forecourt aim), then switch it on.
+- `ROOMY_CORNERS` (`src/sim/netCore.ts`, with `FILLET` 15 in `roadShape.ts`) is off. It grows a junction until a right turn is an R_MIN arc: too tight (moving) in Saffron year 3 falls from 6.3k to 4.2k. Its cost: the do-nothing city is lost in year 3 and the beginner bot ends in year 6.
+- Fixed in the engine: forecourt cars alternate their facing again (facing all one way lost the do-nothing city in year 3). The far-lane case uses a three-point turn (`kTurn`).
+- A kerb pull-out S is now 2 driveway lengths long, and a redirect slide stretches with its offset.
+
+| Rule (Saffron Y3 / Y6 / Old Harbour Y4), final with both switches off | count |
+|---|---|
+| slip, manoeuvring | 13 / 23 / 16 |
+| too tight, manoeuvring | 77 / 151 / 166 |
+| turns in place, manoeuvring | 10 / 36 / 23 |
+| reverse too fast + jumps, manoeuvring (the city's short holds) | 6935 / 18121 / 18231 |
+| too fast on a curve, manoeuvring | 1547 / 4589 / 3728 |
+| slip, moving | 274 / 107 / 202 |
+| too tight, moving | 8195 / 24655 / 15950 |
+| too fast on a curve, moving (at 1.25 pace; the sim corners at 100 px/s²) | 12758 / 56848 / 20917 |
+| bodies overlap, manoeuvring / moving | 167, 142 / 570, 1014 / 1537, 346 |
+| cuts across without a gap | 83 / 558 / 1123 |
+
+**Fix round 1 (November 27): behaviour bugs, proven in the motion lab (docs/inkroad-motion-lab.md).**
+- Buses (on, the default): a bus never turns round on the road. `turnBack` (a slide into the other lane, drawn as 226 frames of reversing) is gone from `src/sim/services.ts`; when a stop has no way on, the bus drives to the nearest gate ahead and turns round beyond the map edge (`GATE_TURN` 6 s hidden, the same vehicle), then comes back in. A long vehicle's stop is never past the point its front can reach (`src/sim/motion.ts` `plan`), so a bus by a big junction still arrives. drive.bus.stop: 692 violations to PASS (defaults), and PASS with the switches on.
+- `GAP_ACCEPT` (`src/sim/switches.ts`), separate from PLANNED_TIMES, off for now:
+  - A left turn at a junction waits for 3 s real (`LEFT_GAP` 2.4 s) before every oncoming car, not only the first of its lane (`oncomingGap`, `src/sim/grant.ts`). At equal priority, straight-ahead traffic goes before an oncoming left turner (it used to stop at its line for him by ticket order).
+  - Turning into or out of a place across the far lanes waits for the gap and holds them with the fixed times too (`src/city/manoeuvre.ts`). The look sees past the junction behind (`arrivals`, `src/sim/crossing.ts`). A car that waited still stays as long (`crossWait`).
+  - A kerb slot on a two-way road is aimed at, and left from, in the lanes on its side (`Access.dir`, `runsWith` in `src/sim/routes.ts`, `destDir`). Where no way round exists (`reachableTo`), it falls back to either way, as before.
+  - Its cost, Saffron seed 1: nobody is lost in year 3, not 4. The beginner falls from year 7 to 6, greedy from 4 to 3, and the planner from 2.3 to 1.7 plates a year. The do-nothing city sits on a knife edge between years 3 and 4, so it waits for the rebalance with the other two.
+- Left (lab): the dead-end turnaround (the lone car double-parks, then a squeezed three-point turn), the jam give-up (no shoulder), the pull-outs (reverse out of kerb stops), bodies through bodies, and the shapes of standing cars (forecourt parallel, van across slots). park.forecourt.far-lane now stands in its lane until B passes, but `firstManoeuvre` counts that stand as the turn. park.kerb.far-side has no way round in its map: side streets end at gates, and U-turns are only at dead ends and rings.
+
+**Fix round 1b (November 27, unfinished: the motion ratchet and the season test are red, see the last bullet).**
+- Root cause found for taxis, jam give-ups, pump queues and double parking (`double` spots): the sim draws a car arriving at a destination slid `DRIVEWAY.slide` (13 px) toward the kerb, while the double pose was the middle of the lane, at the same point: the drawn path went sideways (a spin of loops in 1 s, the taxi's ghost at the kerb) both in and out. Now (`ROAD_STOPS`, new in `src/sim/switches.ts`, off, in the lab's 'on' set): `stopOnRoad` (`src/city/kerbside.ts`) records where the car really stands (`Standing.lat`, `ParkedCar.lat`, `doublePose`/`doubleSlots`): a taxi or a driver who gave up on the shoulder line, a double-parked car or pump queue in its lane, with a forward S ahead when it has to move across; its lane block is where it is drawn; it leaves the way it faces (`facing`, `Access.dir`) to the nearest gate ahead (`nearestGate` with a heading); a car facing away from its way on turns round timed by its drawn path.
+- Bare kerbs (`street`): a new `pullover` mode (`src/sim/parkMove.ts`, `pullIn` in `parkPaths.ts`) stops behind the space and pulls in with a forward S; kerb and street cars join the lane ahead of their slot (`aheadOf`, now with the true sideways distance, one-way streets and room before the junction) and leave with a straight forward S (`plainS`), never overshooting and backing up. One-way kerbs face the way the street runs.
+- Lab, ROAD_STOPS on with the other three: drive.jam.giveup and park.taxi.drop meet every behaviour expectation (only the generic arrival swerve and squeezed fixed moves stay); park.street.unmarked and park.kerb.one-way meet theirs; park.taxi.pick still turns round (it arrives facing away from its rider's way: a three-point turn is real driving, the expectation asks for forward only).
+- Red when this round stopped: some per-rule counts rose in the 'on' set (KNOWN not lowered yet), park.street.unmarked rose 135 to 153 with every switch off (an ungated change in the street path, not found), and `test/motion.test.ts` is over its ceilings (was not run before this round, so it may have been red already). Left: the dead end (needs a real turnaround: `kTurn`'s three 60-degree arcs end where they began on a narrow street), forecourt square-to-kerb, the van across two slots, the far-lane `firstManoeuvre` check, the catalogue generator (`npm run motion -- table`).
+- Fixed after 1b: with every switch off the game is again exactly as before 1b (`test/motion.test.ts` green, every lab defaults count equal to KNOWN). The ungated change was `modeOf` in `src/render/cars/parkingSlots.ts`: gating `pullover` had dropped `street` from `parallel`, so bare-kerb cars were drawn as bays. `aheadOf`'s new sideways distance, one-way direction and junction room now run only with ROAD_STOPS (PLANNED_TIMES alone is as before). With ROAD_STOPS a car stopped facing a dead end keeps either lane (`facing`, src/city/manoeuvre.ts): drive.deadend.turn 421 to 165 (122 before 1b). park.taxi.pick's expectation is now 'pulled out forward or turned round with a three-point turn at walking pace' (no way round in its map). Still red in the 'on' set: park.kerb.one-way 160 (121), park.street.unmarked 30 (29), park.taxi.drop 53 (50), drive.deadend.turn 165 (122): each is the moving car's curve speed on the new forward S or lane change. `npm run motion -- table` prints the lab catalogue.
+
 ## Difficulty after the realism work (November 27)
 
 The owner kept all the realism (drawn capacity only, the lane holds, nothing vanishes) and asked for the game's own difficulty back. Measured on Saffron Bay seed 1, each mechanism switched off alone in a scratch copy (all bots, years 1 to 10; planner = its mean approval in years 4 to 10, 52 before this pass):

@@ -74,6 +74,7 @@ export class App {
     this.offKeys = bindKeys({
       setSpeed: (s) => this.session?.setSpeed(s), hasCity: () => this.session !== null && this.escSpeed === null,
       togglePause: () => this.togglePause(), menu: () => this.openEsc(), mute: () => this.toggleSound(),
+      back: () => this.session?.world.back() ?? false,
     });
     addEventListener('resize', this.layout);
     addEventListener('blur', this.onBlur);

@@ -8,6 +8,7 @@ import { POSE } from './store';
 import { LANE_T, TURN_T, poseAt, type Track } from './track';
 import { ANGER_FULL, DRIVEWAY, HONK_AT, REROUTE_AFTER } from './tune';
 import { laneS, type LinkRt } from './world';
+import { runsWith } from './routes';
 
 const TINY = 1e-3;
 const CRAWL = 4;
@@ -26,16 +27,17 @@ export function plan(sim: Sim, i: number, l: LinkRt): void {
     c.destAt[i] = l.lanes[0]!.len - 1;
     return;
   }
-  if (c.destRoad[i] === l.road.id) {
+  if (c.destRoad[i] === l.road.id && runsWith(l, c.destDir[i])) {
     const at = laneS(l, c.destS[i]!);
     const t = c.track[i]!;
     if (t.link !== l.i || c.s[i]! <= at + 2) {
       c.destLink[i] = l.i;
-      c.destAt[i] = Math.max(at, t.link === l.i ? c.s[i]! : 0);
+      // A long vehicle's front stops at the lane's end: its stop is never further on than its body lets it reach.
+      c.destAt[i] = Math.min(l.lanes[0]!.len - c.half[i]! - 1, Math.max(at, t.link === l.i ? c.s[i]! : 0));
       return;
     }
   }
-  c.field[i] = sim.routes.keyFor(c.destRoad[i]!, c.destNode[i]!, c.value[i]!, c.kind[i]!);
+  c.field[i] = sim.routes.keyFor(c.destRoad[i]!, c.destNode[i]!, c.value[i]!, c.kind[i]!, c.destDir[i]);
   c.opt[i] = sim.routes.choose(c.field[i]!, c.value[i]!, l, c.uid[i]!);
 }
 

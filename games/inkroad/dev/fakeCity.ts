@@ -18,7 +18,7 @@ const TECHS: TechDef[] = [
 export function fakeYear(year: number): YearDef {
   return {
     year, name: ['The Roundabout', 'No Space at the Market', 'The Fine Print', 'Office Hours'][year - 1] ?? `Year ${year}`,
-    intro: [{ who: 'zaza', text: 'Welcome, Director! The roundabout is already sulking.' }, { who: 'pim', text: 'We have 300 coins and a lot of opinions.' }, { who: 'sulo', text: 'I am late. The traffic. Carry on.' }],
+    intro: [{ who: 'dewy', text: 'Welcome, Director! The roundabout is already sulking.' }, { who: 'pim', text: 'We have 300 coins and a lot of opinions.' }, { who: 'sulo', text: 'I am late. The traffic. Carry on.' }],
     tools: TOOLS_BY_YEAR[year - 1] ?? [], plan: ['Year 3: the office district opens', 'Year 4: the first buses'], grant: 60,
     goal: { kind: 'wait', target: 20, text: 'Mean wait at the roundabout under 20 s' },
     events: [], cannotLose: year === 1,

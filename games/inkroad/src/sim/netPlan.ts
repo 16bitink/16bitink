@@ -88,7 +88,9 @@ function touching(net: Network, cells: readonly Cell[]): Touch {
     const j = at.get(key(c));
     const end = i === 0 || i === cells.length - 1;
     if (j) {
-      nodes.push(i);
+      // A dead end the new road ends on becomes a bend, not a junction.
+      const bend = end && j.arms.length === 1 && j.gate === undefined && !j.ramp;
+      if (!bend) nodes.push(i);
       if (j.ramp) no ??= refuse('A flyover ramp is here', c);
       else if (j.arms.length + (end ? 1 : 2) > MAX_ARMS) no ??= refuse('This junction is full: six roads meet here', c);
       return;

@@ -41,7 +41,7 @@ export type Target =
 /** Extra drawing on the map: a dashed line with a word, or a quiet ring. */
 export type Mark = { readonly line: readonly Pt[]; readonly label?: string; /** How it is today: quieter. */ readonly old?: boolean } | { readonly ring: Pt; readonly r: number };
 
-export type Who = 'zaza' | 'miko' | 'juma' | 'pim' | 'sulo';
+export type Who = 'dewy' | 'miko' | 'juma' | 'pim' | 'sulo';
 export interface Bullet { readonly icon: string; readonly text: string }
 
 type Say = string | ((v: GuideView, m: Memo) => string);

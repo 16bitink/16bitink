@@ -104,7 +104,7 @@ def bottom_canvas(im, scale, w, h):
 
 def portraits():
     items = grid_items(load("portraits"), 2, 5)
-    names = ["zaza", "miko", "juma", "pim", "sulo"]
+    names = ["dewy", "miko", "juma", "pim", "sulo"]
     for col, n in enumerate(names):
         a, b = items[(0, col)], items[(1, col)]
         s = 320 / max(a.height, b.height)

@@ -103,7 +103,7 @@ export class Runner {
     this.done.add(s.id);
     const said = seen ? s.reward?.(v, this.memo) ?? null : null;
     this.move();
-    this.reward = said ? { text: said, who: s.who ?? 'zaza', until: nowMs + REWARD_MS } : null;
+    this.reward = said ? { text: said, who: s.who ?? 'dewy', until: nowMs + REWARD_MS } : null;
     this.remember(this.step === null);
   }
 
@@ -162,7 +162,7 @@ export class Runner {
     const m = this.memo;
     const h = this.hinting ? s.hint : undefined;
     return {
-      id: s.id, kind: 'step', who: s.who ?? 'zaza', why: text(s.why, v, m), say: h?.say ?? text(s.say, v, m), bullets: s.bullets ?? [], ok: s.ok ?? null,
+      id: s.id, kind: 'step', who: s.who ?? 'dewy', why: text(s.why, v, m), say: h?.say ?? text(s.say, v, m), bullets: s.bullets ?? [], ok: s.ok ?? null,
       target: h?.target ?? s.target?.(v, m) ?? null, marks: s.marks?.(v, m) ?? [], look: s.look?.(v, m) ?? null,
       pause: !!s.pause && !this.released, dim: !!s.pause && !this.released && !this.hinting, rate: s.rate?.(v) ?? 1,
     };

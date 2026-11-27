@@ -18,7 +18,7 @@ export const HILLS_YEARS: readonly YearDef[] = [
     year: 1, name: 'Seven, Roughly', cannotLose: true, grant: 80,
     intro: [
       { who: 'sulo', text: 'Seven hills. We counted on a clear day and found nine, but the stamps were printed.' },
-      { who: 'zaza', text: 'Every cart in town crosses at one red corner to reach the bridge. A roundabout helps. A second way round helps more.' },
+      { who: 'dewy', text: 'Every cart in town crosses at one red corner to reach the bridge. A roundabout helps. A second way round helps more.' },
     ],
     tools: ['street', 'avenue', 'remove', 'junction'], controls: ['yield', 'roundabout', 'signal'], parks: [], policies: ['truckHours'],
     coach: [
@@ -46,7 +46,7 @@ export const HILLS_YEARS: readonly YearDef[] = [
     year: 3, name: 'A Van of One\'s Own', grant: 100,
     intro: [
       { who: 'juma', text: 'The minibuses were here first. They stop where you wave, wave where you stop, and will tell you so.' },
-      { who: 'zaza', text: 'License them, buy them out, or run a bus that beats them. They hate the third one most.' },
+      { who: 'dewy', text: 'License them, buy them out, or run a bus that beats them. They hate the third one most.' },
     ],
     tools: ['bus'], policies: ['taxis'],
     coach: [{ text: 'Run a bus where a minibus runs. Tap a minibus line to license or buy it out.', tool: 'bus', until: 'toolPicked:bus' }],
@@ -84,7 +84,7 @@ export const HILLS_YEARS: readonly YearDef[] = [
   {
     year: 6, name: 'Up and Over', grant: 130,
     intro: [
-      { who: 'zaza', text: 'The school stands on a hill. Forty parents, one stair, and a goat at the top who has opinions.' },
+      { who: 'dewy', text: 'The school stands on a hill. Forty parents, one stair, and a goat at the top who has opinions.' },
       { who: 'miko', text: 'We cannot put a deck on a hill. We can put the turn under it.' },
     ],
     tools: ['underpass'], parks: ['multi'],
@@ -98,7 +98,7 @@ export const HILLS_YEARS: readonly YearDef[] = [
     year: 7, name: 'A Price for the View', grant: 140,
     intro: [
       { who: 'pim', text: 'Charge one bridge and leave the other free. Everyone will say it is unfair. Half will use the free one.' },
-      { who: 'zaza', text: 'The free bridge jams, the dear bridge sulks. Find the price where both are slow in a polite way.' },
+      { who: 'dewy', text: 'The free bridge jams, the dear bridge sulks. Find the price where both are slow in a polite way.' },
     ],
     tools: ['toll'],
     coach: [{ text: 'Put a gate on one bridge and watch where the cars go.', tool: 'toll', until: 'toolPicked:toll' }],
@@ -124,7 +124,7 @@ export const HILLS_YEARS: readonly YearDef[] = [
     year: 9, name: 'The Long Stair', grant: 180,
     intro: [
       { who: 'miko', text: 'Derby night. Forty thousand fans, one stadium and every van in the city, parked as an act of loyalty.' },
-      { who: 'zaza', text: 'Give the old streets back to feet. The goats have already moved in.' },
+      { who: 'dewy', text: 'Give the old streets back to feet. The goats have already moved in.' },
     ],
     tools: ['square'],
     coach: [{ text: 'Find a street the cars can do without and give it to the feet.', tool: 'square', until: 'built' }],
@@ -137,7 +137,7 @@ export const HILLS_YEARS: readonly YearDef[] = [
     year: 10, name: 'Seven Hills, One Table', grant: 200,
     intro: [
       { who: 'sulo', text: 'The Council sits at last, all seven hills round one table. The table is on a slope. Everything slides to Plane Hill.' },
-      { who: 'zaza', text: 'Two bridges, a ferry, a bus lane, a metro and a price. Listen. Almost music.' },
+      { who: 'dewy', text: 'Two bridges, a ferry, a bus lane, a metro and a price. Listen. Almost music.' },
     ],
     tools: [],
     goal: { kind: 'approval', target: 48, text: 'Approval at 48 or more' },

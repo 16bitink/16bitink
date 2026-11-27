@@ -19,7 +19,7 @@ export function yearStartCard(env: UiEnv): string {
   const body = `${said ? `<div class="speakers">${speaker(said.who, said.text)}</div>` : ''}<div class="brief">
     ${line(pic(`city-${city.def.number}`, 'round'), 'This year', b.now)}
     ${line(GOAL_ICON, 'Your goal', b.goal)}
-    ${line(pic(toolIcon ? `tool-${toolIcon}` : 'portrait-zaza'), 'You can now', b.can)}</div>`;
+    ${line(pic(toolIcon ? `tool-${toolIcon}` : 'portrait-dewy'), 'You can now', b.can)}</div>`;
   return cardHtml({
     title: `Year ${shownYear(city)}: ${def?.name ?? city.def.name}`, sub: city.def.name, cls: 'start', body,
     foot: `${def?.cannotLose ? '<span class="grow small dim">You cannot lose this year.</span>' : ''}<button class="btn go big" data-act="next">Start the year</button>`,

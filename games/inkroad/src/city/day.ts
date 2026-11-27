@@ -68,13 +68,19 @@ export interface Standing {
   slot: number;
   s?: number;
   side?: -1 | 1;
+  /** A car stopped in the lane (double): px sideways of the road line where it stands (signed like the line's right), where it really stopped. */
+  lat?: number;
+  /** A car stopped in the lane that pulled onto the shoulder (a taxi at the kerb, a driver who gave up): it rejoins from there. */
+  shoulder?: boolean;
   /** Counted in the place's `used` (a household's own car at home is not: it has its own space). */
   readonly counted: boolean;
   spot: Spot;
   /** Clock until which it is still turning in: it may not leave before. */
   readyAt?: number;
+  /** Seconds it stood in its lane waiting for a gap across the road before turning in: its stay starts after them. */
+  crossWait?: number;
   /** Leaving: off the road at the lane edge (not drawn in `parking`, its slot still its own), ready for the lane at `goAt`, where it will stand. */
-  edge?: { readonly goAt: number; readonly lane: { readonly x: number; readonly y: number; readonly a: number } };
+  edge?: { readonly goAt: number; readonly lane: { readonly x: number; readonly y: number; readonly a: number }; /** Seconds the lane is held pulling out (the planned move's lane part). */ readonly hold?: number; /** It turns across the far lanes here. */ readonly cross?: Access };
 }
 
 /** A parking place: private spaces of a block, kerb bays, a car park. */
@@ -177,6 +183,8 @@ export interface Day {
   parkingDirty: boolean;
   /** A car turned into or out of a space this step: the view is rebuilt before the step ends. */
   parkingNow: boolean;
+  /** Far lanes to hold for a car turning across them, from clock `from` (it waited for its gap). */
+  crossings: { readonly from: number; readonly at: Access; readonly a: number; readonly seconds: number }[];
 }
 
 const tally = (): Tally => ({ sum: 0, w: 0 });
@@ -189,7 +197,7 @@ export const emptyStats = (): DayStats => ({
 export const emptyDay = (): Day => ({
   plan: [], next: 0, legs: [], waiting: [], stays: [], spots: new Map(), stats: emptyStats(),
   agenda: [], red: new Set(), shared: [], moneyMade: 0, sampled: 0, retimed: new Set(), period: '',
-  chains: new Map(), workChains: new Map(), drawn: { work: 0, weekend: 0 }, pumps: new Map(), parkingDirty: true, parkingNow: false,
+  chains: new Map(), workChains: new Map(), drawn: { work: 0, weekend: 0 }, pumps: new Map(), parkingDirty: true, parkingNow: false, crossings: [],
 });
 
 export function add(t: Tally, v: number, w = 1): void { t.sum += v * w; t.w += w; }

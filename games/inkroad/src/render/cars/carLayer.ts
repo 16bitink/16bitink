@@ -6,6 +6,7 @@ import { clamp, type Box } from '../geom';
 import type { AtlasFrame } from '../atlas';
 import type { Pictures } from '../pictures';
 import { projectAngle, projectY, TILT } from '../projection';
+import { glideAt, type Glide, type GlidePose } from './glide';
 import { buildCarAtlas, carOrigin, headingFrame, HEADINGS, paintOf, type CarFrames } from './carAtlas';
 
 /**
@@ -24,23 +25,17 @@ const EASE_RATE = 0.2;
 /** CarsView.state of a car parking or leaving a space. */
 const HOLDING = 4;
 
-interface Slot {
+interface Slot extends Glide {
   img: Phaser.GameObjects.Image;
   uid: number;
-  x0: number; y0: number; z0: number; a0: number;
-  x1: number; y1: number; z1: number; a1: number;
   kind: number; tint: number; frame: number; deck: boolean; born: number;
   slowing: boolean; speed: number;
   /** In state 4 (parking or leaving): the manoeuvre layer draws it, this one waits where it is. */
   held: boolean;
 }
 
-const turn = (a: number, b: number): number => {
-  let d = (b - a) % (Math.PI * 2);
-  if (d > Math.PI) d -= Math.PI * 2;
-  if (d < -Math.PI) d += Math.PI * 2;
-  return d;
-};
+/** Scratch pose of the glide (one frame at a time). */
+const AT: GlidePose = { x: 0, y: 0, z: 0, a: 0 };
 
 export interface CarPose { readonly x: number; readonly y: number; readonly z: number; readonly a: number; readonly len: number; readonly wid: number; readonly slowing: boolean }
 
@@ -134,8 +129,8 @@ export class CarLayer {
       const o = this.origins[s.kind]!;
       s.img.setOrigin(o.x, o.y);
     } else {
-      s.x0 += (s.x1 - s.x0) * t; s.y0 += (s.y1 - s.y0) * t; s.z0 += (s.z1 - s.z0) * t;
-      s.a0 += turn(s.a0, s.a1) * t;
+      glideAt(s, t, AT);
+      s.x0 = AT.x; s.y0 = AT.y; s.z0 = AT.z; s.a0 = AT.a;
     }
     s.x1 = x; s.y1 = y; s.z1 = z; s.a1 = a;
     const v = c.speed[i]!;
@@ -145,14 +140,12 @@ export class CarLayer {
 
   private draw(s: Slot, t: number, view: Box, alpha: number): void {
     if (s.uid === 0 || s.held) return;
-    const x = s.x0 + (s.x1 - s.x0) * t;
-    const y = s.y0 + (s.y1 - s.y0) * t;
-    const z = s.z0 + (s.z1 - s.z0) * t;
+    const { x, y, z, a } = glideAt(s, t, AT);
     const seen = z > UNDER && x > view.x0 && x < view.x1 && y > view.y0 && y < view.y1 && !(z < 0.5 && this.hidden(x, y));
     if (s.img.visible !== seen) s.img.setVisible(seen);
     if (!seen) return;
     this.drawn++;
-    const { index, rest } = headingFrame(s.a0 + turn(s.a0, s.a1) * t);
+    const { index, rest } = headingFrame(a);
     if (index !== s.frame) this.setFrame(s, index);
     const step = (index * Math.PI * 2) / HEADINGS;
     s.img.setPosition(x, projectY(y, Math.max(0, z)));
@@ -186,10 +179,8 @@ export class CarLayer {
     if (!s || s.uid === 0 || !s.img.visible) return false;
     const t = clamp(this.sinceStep / this.interval, 0, 1);
     const f = this.frames[s.kind]?.[0];
-    out.x = s.x0 + (s.x1 - s.x0) * t;
-    out.y = s.y0 + (s.y1 - s.y0) * t;
-    out.z = s.z0 + (s.z1 - s.z0) * t;
-    out.a = s.a0 + turn(s.a0, s.a1) * t;
+    glideAt(s, t, AT);
+    out.x = AT.x; out.y = AT.y; out.z = AT.z; out.a = AT.a;
     out.len = f?.len ?? 14;
     out.wid = f?.wid ?? 7;
     out.slowing = s.slowing;

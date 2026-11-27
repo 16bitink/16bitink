@@ -6,7 +6,7 @@ export const ISLES_YEARS: readonly YearDef[] = [
     year: 1, name: 'The Only Bridge', cannotLose: true, grant: 65,
     intro: [
       { who: 'sulo', text: 'Two islands, one bridge. I have been on it since breakfast. Please send breakfast.' },
-      { who: 'zaza', text: 'Both ends of the bridge are red. Land here costs more than the road on top of it.' },
+      { who: 'dewy', text: 'Both ends of the bridge are red. Land here costs more than the road on top of it.' },
     ],
     tools: ['street', 'avenue', 'remove', 'junction'], controls: ['yield', 'roundabout', 'signal'], parks: [], policies: [],
     coach: [
@@ -34,7 +34,7 @@ export const ISLES_YEARS: readonly YearDef[] = [
     year: 3, name: 'Room for Forty', grant: 75,
     intro: [
       { who: 'juma', text: 'One bus is as long as two cars and holds forty residents. Thirty eight if they bring noodles.' },
-      { who: 'zaza', text: 'Give them another way across now. Next year we make cars dear.' },
+      { who: 'dewy', text: 'Give them another way across now. Next year we make cars dear.' },
     ],
     tools: ['bus', 'buslane'],
     coach: [{ text: 'Run a bus from the west homes, over the bridge, to the offices.', tool: 'bus', until: 'toolPicked:bus' }],
@@ -60,7 +60,7 @@ export const ISLES_YEARS: readonly YearDef[] = [
     year: 5, name: 'The Wet Short Cut', grant: 90,
     intro: [
       { who: 'sulo', text: 'The tunnel is open. It is dry. Please stop asking if it is dry.' },
-      { who: 'zaza', text: 'Now two crossings feed the same streets. Turns can dive too, and a dive needs hardly any land.' },
+      { who: 'dewy', text: 'Now two crossings feed the same streets. Turns can dive too, and a dive needs hardly any land.' },
     ],
     tools: ['underpass'], policies: ['nightWorks'],
     coach: [{ text: 'Tap the worst junction, then drag its reddest arrow to send that turn under the ground.', at: 'worstJunction', tool: 'underpass', until: 'toolPicked:underpass' }],
@@ -73,7 +73,7 @@ export const ISLES_YEARS: readonly YearDef[] = [
     year: 6, name: 'Prices With Eyes', grant: 95,
     intro: [
       { who: 'pim', text: 'A toll that watches the road. Slow road, price up. Fast road, price down. Nobody to shout at!' },
-      { who: 'zaza', text: 'All the gates talk on one wire. Keep the crossings moving and leave one way that is free.' },
+      { who: 'dewy', text: 'All the gates talk on one wire. Keep the crossings moving and leave one way that is free.' },
     ],
     tools: ['toll'],
     coach: [{ text: 'Put a gate on the bridge or in the tunnel and let it follow the speed.', tool: 'toll', until: 'toolPicked:toll' }],
@@ -110,7 +110,7 @@ export const ISLES_YEARS: readonly YearDef[] = [
   {
     year: 9, name: 'A Street for Feet', grant: 130,
     intro: [
-      { who: 'zaza', text: 'We have dug, priced and floated. Now try less road. I can hear somebody playing a flute.' },
+      { who: 'dewy', text: 'We have dug, priced and floated. Now try less road. I can hear somebody playing a flute.' },
       { who: 'miko', text: 'It is me. I had a free hour. An hour, Director!' },
     ],
     tools: ['square'],
@@ -124,7 +124,7 @@ export const ISLES_YEARS: readonly YearDef[] = [
     year: 10, name: 'Two Isles, One City', grant: 150,
     intro: [
       { who: 'sulo', text: 'Boat Week. Every guest comes by causeway, which I feel misses the point.' },
-      { who: 'zaza', text: 'Bridge, tunnel, boat, train and a price that watches. Listen. Almost music.' },
+      { who: 'dewy', text: 'Bridge, tunnel, boat, train and a price that watches. Listen. Almost music.' },
     ],
     tools: [],
     goal: { kind: 'approval', target: 50, text: 'Approval at 50 or more' },

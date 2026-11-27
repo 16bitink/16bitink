@@ -6,7 +6,7 @@ export const RIVERS_YEARS: readonly YearDef[] = [
     year: 1, name: 'Built to Last Forty Years', cannotLose: true, grant: 80,
     intro: [
       { who: 'sulo', text: 'All our roads were built in one great summer. Forty one years ago. The warranty was forty.' },
-      { who: 'zaza', text: 'The freeway meets the main street and nobody gives way. I can hear the bridge thinking. Bridges should not think.' },
+      { who: 'dewy', text: 'The freeway meets the main street and nobody gives way. I can hear the bridge thinking. Bridges should not think.' },
     ],
     tools: ['street', 'avenue', 'remove', 'junction'], controls: ['yield', 'roundabout', 'signal'], parks: [], policies: ['truckHours'],
     coach: [
@@ -78,7 +78,7 @@ export const RIVERS_YEARS: readonly YearDef[] = [
   {
     year: 6, name: 'The Noisy Cut', grant: 130,
     intro: [
-      { who: 'zaza', text: 'The freeway is loud. The people living next to it are louder. The ducks, who live under it, are the loudest.' },
+      { who: 'dewy', text: 'The freeway is loud. The people living next to it are louder. The ducks, who live under it, are the loudest.' },
       { who: 'sulo', text: 'The Council has voted that one piece may go. I abstained. I was late.' },
     ],
     tools: ['boulevard'],
@@ -90,7 +90,7 @@ export const RIVERS_YEARS: readonly YearDef[] = [
   {
     year: 7, name: 'The Dip', grant: 140,
     intro: [
-      { who: 'zaza', text: 'Digging a freeway up is a bit like a haircut. It looks awful until the third day.' },
+      { who: 'dewy', text: 'Digging a freeway up is a bit like a haircut. It looks awful until the third day.' },
       { who: 'sulo', text: 'Approval will dip while it is dug. Hold your nerve. Hold mine too, if you are passing.' },
     ],
     tools: ['square'],
@@ -103,7 +103,7 @@ export const RIVERS_YEARS: readonly YearDef[] = [
   {
     year: 8, name: 'High Water', grant: 150,
     intro: [
-      { who: 'zaza', text: 'The two rivers met in the underpass overnight. They shook hands and stayed.' },
+      { who: 'dewy', text: 'The two rivers met in the underpass overnight. They shook hands and stayed.' },
       { who: 'miko', text: 'Three cars floated out. We gave them parking tickets. They were too wet to argue.' },
     ],
     tools: ['underpass'], parks: ['ride'],
@@ -130,7 +130,7 @@ export const RIVERS_YEARS: readonly YearDef[] = [
     year: 10, name: 'Where the Rivers Meet', grant: 180,
     intro: [
       { who: 'sulo', text: 'Ten years of review. The freeway is a boulevard, the bridges are new, and I was only late twice.' },
-      { who: 'zaza', text: 'Listen. A bridge that does not creak, a street that does not roar. Almost silence.' },
+      { who: 'dewy', text: 'Listen. A bridge that does not creak, a street that does not roar. Almost silence.' },
     ],
     tools: [],
     goal: { kind: 'approval', target: 46, text: 'Approval at 46 or more' },

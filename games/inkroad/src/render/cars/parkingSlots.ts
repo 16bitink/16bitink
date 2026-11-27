@@ -6,7 +6,6 @@ export { facingEdge } from '../../sim/slotGeometry';
 import type { BeachView, CarPark, CityView, Id, Lot, ParkedCar, ParkingView, Pt, Road } from '../../sim/types';
 import { lineLength, pointAt } from '../geom';
 import { BAY } from '../ground/roadExtras';
-import { hash2 } from '../noise';
 
 /**
  * Where each parked car of a place stands, in plan (world units, y not yet projected).
@@ -33,10 +32,6 @@ export interface ParkingGeo {
 export const CAR_HALF_W = 3.6;
 export const KERB_STRIPE = 1.1;
 export const JUNCTION_CLEAR = 36;
-/** Street cars stand askew up to this much, and always at least SHOVE_MIN px further out from the road (so a skewed body still clears the lane). */
-const STREET_ASKEW = 0.25;
-const SHOVE_MIN = 1.2;
-const STREET_SHOVE = 2;
 export function makeGeo(city: Pick<CityView, 'roads' | 'lots' | 'carParks' | 'beaches'>): ParkingGeo {
   return {
     roads: new Map(city.roads.map((r) => [r.id, r])),
@@ -54,8 +49,10 @@ const none = (n: number): Slots => new Array<null>(n).fill(null);
 export const slotOf = (c: ParkedCar, i: number): number => c.slot ?? i;
 
 /** How a car moves into and out of a place: swinging in along the kerb or a forecourt's edge (their slots lie along it), turning into a bay, or into a car park's mouth. */
-export type Mode = 'parallel' | 'bay' | 'enter' | 'double' | 'aisle';
-export const modeOf = (kind: ParkingView['kind']): Mode => (kind === 'double' ? 'double' : kind === 'kerb' || kind === 'street' || kind === 'private' ? 'parallel' : 'bay');
+export type { Mode } from '../../sim/parkMove';
+import type { Mode } from '../../sim/parkMove';
+import { MOTION_SWITCHES } from '../../sim/switches';
+export const modeOf = (kind: ParkingView['kind']): Mode => (kind === 'double' ? 'double' : kind === 'street' && MOTION_SWITCHES.ROAD_STOPS ? 'pullover' : kind === 'kerb' || kind === 'street' || kind === 'private' ? 'parallel' : 'bay');
 
 /** The slots for every car of one place. */
 export function layoutPlace(v: ParkingView, geo: ParkingGeo): Slots {
@@ -131,16 +128,15 @@ function roadSlots(v: ParkingView, geo: ParkingGeo): Slots {
   });
 }
 
-/** The skew and sideways offset of a street slot: fixed by (road, slot), so they never change. */
-export function streetLoose(roadId: number, slot: number): { readonly turn: number; readonly shove: number } {
-  return { turn: (hash2(roadId, slot, 13) - 0.5) * 2 * STREET_ASKEW, shove: SHOVE_MIN + hash2(roadId, slot, 11) * STREET_SHOVE };
-}
+export { streetLoose } from '../../sim/roadSlots';
+import { streetLoose } from '../../sim/roadSlots';
 
 function standing(road: Road, along: number, side: number, slot: number, street: boolean): Slot {
   const p = pointAt(road.line, along);
   const loose = street ? streetLoose(road.id, slot) : { turn: 0, shove: 0 };
   const q = at(p, side * (kerbOffset(road) + loose.shove));
-  return { x: q.x, y: q.y, a: p.a + (side < 0 ? Math.PI : 0) + loose.turn };
+  // A one-way street's cars on both kerbs face the way it runs.
+  return { x: q.x, y: q.y, a: p.a + (side < 0 && !(road.oneWay && MOTION_SWITCHES.ROAD_STOPS) ? Math.PI : 0) + loose.turn };
 }
 
 function doubleSlots(v: ParkingView, geo: ParkingGeo): Slots {
@@ -151,8 +147,9 @@ function doubleSlots(v: ParkingView, geo: ParkingGeo): Slots {
   return v.cars.map((c) => {
     const side = c.side ?? 1;
     const s = c.s ?? len / 2;
-    const p = pointAt(road.line, Math.min(len - JUNCTION_CLEAR, Math.max(JUNCTION_CLEAR, s)));
-    const off = side > 0 ? laneOffset(road, outer) : road.oneWay ? laneOffset(road, 0) : -laneOffset(road, outer);
+    // Where it really stopped (lat, src/city/moveTimes.ts doublePose): it stands there; else its outer lane's middle.
+    const p = pointAt(road.line, c.lat !== undefined ? Math.min(len, Math.max(0, s)) : Math.min(len - JUNCTION_CLEAR, Math.max(JUNCTION_CLEAR, s)));
+    const off = c.lat ?? (side > 0 ? laneOffset(road, outer) : road.oneWay ? laneOffset(road, 0) : -laneOffset(road, outer));
     const q = at(p, off);
     return { x: q.x, y: q.y, a: p.a + (side < 0 ? Math.PI : 0) };
   });

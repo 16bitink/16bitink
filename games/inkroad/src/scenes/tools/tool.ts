@@ -10,6 +10,8 @@ export interface ToolCtx {
   readonly arrows: Arrows;
   /** Plan px a finger covers now (grows as you zoom out). */
   readonly slack: number;
+  /** The last pointer was a finger: no hover, a drag pans the map, taps place points. */
+  readonly touch: boolean;
   /** Show (or with null clear) what would be built. Returns the quote. */
   propose(cmd: Command | null, label: string, at: Pt, dragging: boolean): Quote | null;
   hint(text: string): void;
@@ -29,6 +31,10 @@ export interface Tool {
   /** After Build: what to keep on screen. */
   built(cmd: Command): void;
   undo?(): void;
+  /** Enter: stop following the pointer. False when there was nothing to finish. */
+  finish?(): boolean;
+  /** Points fixed so far on the road being drawn (0 when none). */
+  readonly points?: number;
   /** The flyover tool: start at this junction, at once with this movement. */
   startAt?(node: Id, move?: { readonly fromRoad: Id; readonly toRoad: Id } | null): void;
   readonly picked?: Movement | null;

@@ -31,6 +31,7 @@ export class Desk {
       get city() { return scene.city; },
       get ghosts() { return scene.ghosts; },
       get arrows() { return scene.arrows; },
+      get touch() { return self.touch; },
       get slack() { return (self.touch ? FINGER_CSS : MOUSE_CSS) / scene.rig.zoom; },
       propose: (cmd, label, at, dragging) => this.propose(cmd, label, at, dragging),
       hint: (t) => this.cb.onHint?.(t),
@@ -65,7 +66,7 @@ export class Desk {
   private propose(cmd: Command | null, label: string, at: Pt, dragging: boolean): Quote | null {
     if (!cmd) { this.setGhost(null); return null; }
     const quote = this.scene.city.quote(cmd);
-    this.setGhost({ cmd, quote, label, at, dragging });
+    this.setGhost({ cmd, quote, label, at, dragging, undoable: this.points > 0 });
     return quote;
   }
 
@@ -94,6 +95,20 @@ export class Desk {
   }
 
   undo(): void { this.handler?.undo?.(); }
+
+  /** Enter: stop following the pointer so the bar offers Build. False when nothing was following. */
+  finish(): boolean { return this.handler?.finish?.() ?? false; }
+
+  /** Points fixed so far on the road in hand. */
+  get points(): number { return this.handler?.points ?? 0; }
+
+  /** Esc or a right click: drop the road being drawn, else put the tool down, else close the selection. False when there was nothing to undo. */
+  back(): boolean {
+    if (this.ghost) { this.cancel(); return true; }
+    if (this.tool !== null) { this.setTool(null); return true; }
+    if (this.scene.selection) { this.select(null); return true; }
+    return false;
+  }
 
   // -------------------------------------------------------------- the pointer, plan px
 

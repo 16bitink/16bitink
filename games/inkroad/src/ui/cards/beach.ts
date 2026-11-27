@@ -13,7 +13,7 @@ function ways(b: BeachCase, phone: boolean): string {
   const open = ['Everyone comes, most of all on summer middays', 'You may build beach parking beside it, and charge', 'Enough spaces: Parking and Streets rise. Too few: cars circle the shore road'];
   const short = (items: readonly string[]): readonly string[] => (phone ? items.filter((_, i) => i !== 1) : items);
   const way = (title: string, cls: string, talk: string, items: readonly string[]): string => `<div class="way ${cls}"><h3>${title}</h3>${talk}${list(items)}</div>`;
-  return `<div class="ways">${way('Sell it', 'sell', speaker('pim', BEACH_SPEECH.pim(b.share)), short(sold))}${way('Open it to everyone', 'open', speaker('zaza', BEACH_SPEECH.zaza), short(open))}</div>`;
+  return `<div class="ways">${way('Sell it', 'sell', speaker('pim', BEACH_SPEECH.pim(b.share)), short(sold))}${way('Open it to everyone', 'open', speaker('dewy', BEACH_SPEECH.dewy), short(open))}</div>`;
 }
 
 const leanText = (b: BeachCase): string => `The Council leans to ${b.lean === 'sell' ? 'selling' : 'a public beach'}.`;

@@ -4,7 +4,7 @@ import { esc } from './dom';
 /**
  * Every picture the UI shows, behind one manifest. Files live in src/ui/img
  * (see its LIST.md); a key maps to a file by name:
- *   portrait-zaza, portrait-sulo_stern   portraits/   the five officials (and moods)
+ *   portrait-dewy, portrait-sulo_stern   portraits/   the five officials (and moods)
  *   resident-hedgehog                    portraits/   a resident's bust (Complaint.animal)
  *   tool-street, group-roads, ov-flow, bar-trips   tools/
  *   tech-<TechDef.icon>                  tech/

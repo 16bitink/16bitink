@@ -3,7 +3,7 @@ import { Cards } from './cards';
 import { CarBubble } from './carBubble';
 import { div, Dirty, esc, Router } from './dom';
 import { pct, signed } from './format';
-import { GhostBar, KindBar } from './ghostBar';
+import { GhostBar, HintBar, KindBar } from './ghostBar';
 import { goalInfo } from '../guide/goalInfo';
 import type { Store } from '../guide/progress';
 import { Advisor } from './guide/advisor';
@@ -33,6 +33,7 @@ export class Play {
   private readonly toolbar: Toolbar;
   private readonly tray: Tray;
   private readonly ghost: GhostBar;
+  private readonly hint: HintBar;
   private readonly kinds: KindBar;
   private readonly sel: SelectionPanel;
   readonly guide: GuideUi;
@@ -65,6 +66,7 @@ export class Play {
       this.env().acts.sfx('error');
       this.toast(why);
     });
+    this.hint = new HintBar(div(this.hud, 'hintbar paper'), router, world);
     this.kinds = new KindBar(div(this.hud, 'kinds paper'), router, world);
     this.sel = new SelectionPanel(div(this.hud, 'sel paper'), router, world, () => ({ city: this.env().city, acts: this.env().acts, world: this.env().world }));
     this.projects = div(this.hud, 'projects');
@@ -79,6 +81,13 @@ export class Play {
     this.guide = new GuideUi(root, env, store);
     this.advisor = new Advisor(this.hud, router, env, (t) => this.guide.tip(t));
     this.hud.hidden = true;
+    if (typeof addEventListener === 'function') {
+      addEventListener('keydown', (e) => {
+        const t = e.target as HTMLElement | null;
+        if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'BUTTON')) return;
+        this.key(e);
+      });
+    }
   }
 
   private proxyActs(): PlayActs {
@@ -92,6 +101,14 @@ export class Play {
       this.cards.hide();
       this.guide.hide();
     }
+  }
+
+  /** Enter finishes the road being drawn, then builds it; Backspace drops its last point. Not while a card is up. */
+  key(e: { readonly key: string; preventDefault(): void }): void {
+    const world = this.env().world;
+    if (this.hud.hidden || this.cards.kind !== null || !world?.tool || document.querySelector('.card.esc')) return;
+    if (e.key === 'Enter') { if (!world.finish()) this.ghost.build(); }
+    else if (e.key === 'Backspace') { e.preventDefault(); world.undoStop(); }
   }
 
   /** A line at the top; `who` (an official) shows their face. Picking the zone tool says where its price is set. */
@@ -130,6 +147,7 @@ export class Play {
     if (this.dirty.changed('zone', world?.tool === 'zone') && world?.tool === 'zone') this.toast('The zone charge is set at the night review', 'miko');
     this.tray.update(city.complaints, city.letters, world?.overlay ?? 'none', nowMs, !!city.special?.ageing);
     this.ghost.update(world?.ghost ?? null, city.money);
+    this.hint.update(world?.tool ?? null, !!world?.ghost, world?.touch ?? false, world?.points ?? 0);
     this.kinds.update(world?.tool ?? null, city.parkKinds, !!world?.ghost);
     const sel = world?.selection ?? null;
     const lifting = world?.tool === 'flyover' || world?.tool === 'underpass'; // the arrows are what matters then

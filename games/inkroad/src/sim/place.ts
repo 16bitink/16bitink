@@ -2,10 +2,13 @@
 import { hash01 } from './rng';
 import { plan } from './motion';
 import { DRIVEWAY, IDM } from './tune';
+
+/** A pull-out from the kerb is a forward S this many driveway lengths long: its bend stays near R_MIN, never a sideways hop. */
+const PULL_OUT_STRETCH = 2;
 import { pose } from './motion';
 import { LANE_T, POSE_ZERO, poseAt, type Track } from './track';
 import { laneS, type LinkRt } from './world';
-import { startLinks } from './routes';
+import { runsWith, startLinks } from './routes';
 import type { Sim } from './sim';
 import type { Access } from './trafficTypes';
 
@@ -27,8 +30,8 @@ export function spaceAt(sim: Sim, t: Track, s: number, h: number, v: number): bo
 
 export function setDest(sim: Sim, i: number, to: Access): void {
   const c = sim.cars;
-  if ('gate' in to) { c.destNode[i] = to.gate; c.destRoad[i] = -1; c.destS[i] = 0; }
-  else { c.destRoad[i] = to.road; c.destNode[i] = -1; c.destS[i] = to.s; }
+  if ('gate' in to) { c.destNode[i] = to.gate; c.destRoad[i] = -1; c.destS[i] = 0; c.destDir[i] = 0; }
+  else { c.destRoad[i] = to.road; c.destNode[i] = -1; c.destS[i] = to.s; c.destDir[i] = to.dir ?? 0; }
 }
 
 /** Does the destination still exist? */
@@ -39,15 +42,31 @@ export function exists(sim: Sim, a: Access): boolean {
 /** Best link to set off on, or null when there is no way there. */
 export function firstLink(sim: Sim, from: Access, to: Access, value: number, kind: number): LinkRt | null {
   const destRoad = 'road' in to ? to.road : -1, destNode = 'gate' in to ? to.gate : -1;
-  const key = sim.routes.keyFor(destRoad, destNode, value, kind);
+  const key = sim.routes.keyFor(destRoad, destNode, value, kind, 'road' in to ? to.dir : 0);
   let best: LinkRt | null = null, bestCost = 1e6;
   for (const { l, part } of startLinks(sim.world, from)) {
     let cost = 1e6;
-    if ('road' in to && 'road' in from && l.road.id === to.road && laneS(l, to.s) >= laneS(l, from.s) + 2) cost = 0;
+    if ('road' in to && 'road' in from && l.road.id === to.road && runsWith(l, to.dir) && laneS(l, to.s) >= laneS(l, from.s) + 2) cost = 0;
     else for (const o of l.opts) cost = Math.min(cost, l.time * (1 - part) + o.delay + sim.routes.costFrom(key, value, o.to));
     if (cost < bestCost) { best = l; bestCost = cost; }
   }
   return best;
+}
+
+/** Without its way (`dir`) when that way cannot be reached from `from` (no way round): the road either way, as before. */
+export function reachableTo(sim: Sim, from: Access, to: Access, value: number, kind: number): { from: Access; to: Access } {
+  const directed = ('road' in from && !!from.dir) || ('road' in to && !!to.dir);
+  if (!directed || firstLink(sim, from, to, value, kind)) return { from, to };
+  const loose = (a: Access): Access => ('road' in a && a.dir ? { road: a.road, s: a.s } : a);
+  return { from: loose(from), to: loose(to) };
+}
+
+/** Can a car on link `l` still get to `to` the way it asks? */
+export function reachableFrom(sim: Sim, l: LinkRt | undefined, to: Access, value: number, kind: number): boolean {
+  if (!l || !('road' in to) || !to.dir) return true;
+  if (l.road.id === to.road && runsWith(l, to.dir)) return true;
+  const key = sim.routes.keyFor(to.road, -1, value, kind, to.dir);
+  return l.opts.some((o) => sim.routes.costFrom(key, value, o.to) < 1e5);
 }
 
 /** Candidate lanes for an entry: kerb lane at driveways; any lane at gates, emptiest first. */
@@ -95,7 +114,7 @@ export function entryPose(l: LinkRt, from: Access, bus: boolean): { x: number; y
 function fromKerb(sim: Sim, i: number, t: Track, s: number): void {
   const c = sim.cars;
   poseAt(t, s, POSE_ZERO);
-  c.slideFrom(i, POSE_ZERO.x - Math.sin(POSE_ZERO.h) * DRIVEWAY.slide, POSE_ZERO.y + Math.cos(POSE_ZERO.h) * DRIVEWAY.slide, POSE_ZERO.h, DRIVEWAY.length * 1.3);
+  c.slideFrom(i, POSE_ZERO.x - Math.sin(POSE_ZERO.h) * DRIVEWAY.slide, POSE_ZERO.y + Math.cos(POSE_ZERO.h) * DRIVEWAY.slide, POSE_ZERO.h, DRIVEWAY.length * PULL_OUT_STRETCH);
 }
 
 /** No two drivers are the same. */

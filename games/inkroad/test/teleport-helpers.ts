@@ -155,7 +155,7 @@ export class TeleportWatch {
       }
       if (m.state === 4) continue; // holding its lane: the manoeuvre draws it, from the pose the 'park' event gave
       const d = Math.hypot(m.x - was.x, m.y - was.y);
-      const allowed = (Math.max(m.v, was.v) + ACCEL * STEP) * STEP * Math.max(1, this.v.weather?.speed ?? 1) + JUMP_SLACK;
+      const allowed = (Math.max(m.v, was.v) + ACCEL * STEP) * STEP * Math.max(1, this.c.weather.speed) + JUMP_SLACK;
       if (d > allowed) this.flag(why || 'moving car jumps', uid, `${d.toFixed(1)}px > ${allowed.toFixed(1)} state ${was.state}->${m.state}`);
     }
     for (const [uid, m] of this.moving) {

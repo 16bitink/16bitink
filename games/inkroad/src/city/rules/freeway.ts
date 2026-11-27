@@ -81,7 +81,7 @@ function openPark(c: City, r: Road): void {
     access: blockAccess(c.net, at), district: 'New Green', variant: n,
   };
   c.lots = [...c.lots, park];
-  emit(c, { t: 'toast', who: 'zaza', text: `${park.name} is open where the freeway was. I can hear a duck. One duck!` });
+  emit(c, { t: 'toast', who: 'dewy', text: `${park.name} is open where the freeway was. I can hear a duck. One duck!` });
 }
 
 /** Free ground beside the old freeway, the nearest to its middle. */

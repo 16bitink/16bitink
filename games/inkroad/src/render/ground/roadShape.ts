@@ -1,3 +1,4 @@
+import { MOTION_SWITCHES } from '../../sim/switches';
 import type { CityView, Id, Junction, Link, Pt, Road } from '../../sim/types';
 import { halfWidth, lanesPerLink, MEDIAN } from '../../sim/roadGeom';
 import { CELL, LANE } from '../../sim/constants';
@@ -14,7 +15,8 @@ import { bucket } from './wornRoads';
  * are rounded kerbs, so any number of arms at any angle meets cleanly.
  */
 export const KERB_W = 5.5;
-const FILLET = 11;
+/** Kerb corners (15 with ROOMY_CORNERS in src/sim/netCore.ts, so a R_MIN right turn keeps its body off the kerb). */
+const fillet = (): number => (MOTION_SWITCHES.ROOMY_CORNERS ? 15 : 11);
 const MAX_CORNER = 3.2; // of the wider half width: sharper corners are cut off there
 const PARALLEL = 0.12;
 const FLARE = 17;
@@ -110,8 +112,8 @@ function cornerCurve(c: Pt, p: Arm, q: Arm): Corner {
   const sharp = x !== null && Math.abs(x.tp) <= limit && Math.abs(x.tq) <= limit;
   // An outer corner (the edges meet behind the middle): round it through the true corner, not a flat bevel.
   const outer = sharp && x.tp < 0 && x.tq < 0;
-  const from = at(c, p.a, outer ? Math.min(p.len, Math.max(0, x.tp + FILLET)) : Math.min(p.len, tp + FILLET), p.half);
-  const to = at(c, q.a, outer ? Math.min(q.len, Math.max(0, x.tq + FILLET)) : Math.min(q.len, tq + FILLET), -q.half);
+  const from = at(c, p.a, outer ? Math.min(p.len, Math.max(0, x.tp + fillet())) : Math.min(p.len, tp + fillet()), p.half);
+  const to = at(c, q.a, outer ? Math.min(q.len, Math.max(0, x.tq + fillet())) : Math.min(q.len, tq + fillet()), -q.half);
   const ctrl = sharp ? at(c, p.a, x.tp, p.half) : { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 };
   return { from, ctrl, to, tp, tq };
 }
@@ -208,7 +210,7 @@ function joinShape(j: Junction, roads: ReadonlyMap<Id, Road>): JunctionShape | n
   else if (kind === 'gate') path = new Path2D();
   else if (narrows(arms)) ({ path, pts } = taperPath(c, arms[0]!, arms[1]!));
   else ({ path, pts } = plainPath(c, arms));
-  const reach = j.radius + FLARE + FILLET;
+  const reach = j.radius + FLARE + fillet();
   const box = boxOf([c, ...pts, { x: c.x - reach, y: c.y - reach }, { x: c.x + reach, y: c.y + reach }], KERB_W + 4);
   const sig = `${j.id}:${j.control}:${j.radius.toFixed(1)}:${j.works}:${arms.map((a) => `${a.road.id},${a.road.type},${a.half},${a.a.toFixed(2)},${a.road.oneWay ? 1 : 0}`).join('/')}`;
   return { j, kind, arms, path, box, sig };

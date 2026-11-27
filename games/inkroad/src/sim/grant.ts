@@ -1,9 +1,12 @@
 /** Right of way: who may leave the stop line now. */
-import { ENTRY_T, LANE_T, type Track } from './track';
+import { ENTRY_T, LANE_T, poseAt, type Track } from './track';
 import { IDM, PATIENCE, RING, SIGNAL, YIELD } from './tune';
 import { ringExitLane } from './ringBuild';
 import type { NodeRt, OutOpt } from './world';
 import type { Sim } from './sim';
+import { MOTION_SWITCHES } from './switches';
+import { GAME_PACE, GAP_S } from './kinematics';
+import { POSE } from './store';
 
 /** Distance from the front bumper to the stop line. */
 export const toLine = (sim: Sim, i: number): number => sim.cars.track[i]!.len - sim.cars.s[i]! - sim.cars.half[i]!;
@@ -103,6 +106,43 @@ function turnClear(sim: Sim, i: number, conn: Track, n: NodeRt, d: number): bool
   if (n.kind === 'signal' && conn.left && d < YIELD.stop && Math.min(n.lightFor, sim.time - c.ticket[i]!) > (n.j.control === 'smart' ? SIGNAL.smartCourtesy : SIGNAL.courtesy)) c.courtesy[i] = 1;
   const gap = n.kind === 'signal' ? SIGNAL.leftGap : gapNow(sim.time - c.ticket[i]!, YIELD.gap);
   for (const x of conn.conflicts) if (yieldsTo(sim, i, conn, x.other, n, d, gap)) return false;
+  if (conn.left && MOTION_SWITCHES.GAP_ACCEPT && !oncomingGap(sim, i, conn, n, d)) return false;
+  return true;
+}
+
+/** Seconds of clear oncoming traffic a left turner wants: 3 s real, at the game's pace (src/sim/kinematics.ts). */
+export const LEFT_GAP = GAP_S / GAME_PACE;
+/** Oncoming: the other movement's lane runs within this cosine of straight at us. */
+const ONCOMING_COS = -0.7;
+/** Oncoming cars further off than this (seconds) never matter. */
+const LOOK_S = 8;
+
+const endHeading = (t: Track): number => { poseAt(t, t.len, POSE); return POSE.h; };
+/** The two movements come from lanes facing each other across the junction. */
+const oncoming = (a: Track, b: Track): boolean => Math.cos(endHeading(b.from!) - endHeading(a.from!)) < ONCOMING_COS;
+
+/**
+ * A left turn across the oncoming lanes: every oncoming car (not only the first of its lane, which `yieldsTo` asks)
+ * must be at least LEFT_GAP behind the moment this car reaches the line. Patience shrinks it as it does a yield's.
+ */
+function oncomingGap(sim: Sim, i: number, conn: Track, n: NodeRt, d: number): boolean {
+  const c = sim.cars;
+  const mine = Math.max(0, d) / Math.max(20, c.v[i]!);
+  const gap = gapNow(sim.time - c.ticket[i]!, LEFT_GAP);
+  for (const x of conn.conflicts) {
+    const other = x.other, from = other.from!;
+    if (other.left || other.prio < conn.prio || !oncoming(conn, other)) continue;
+    if (n.kind === 'signal' && !greenFor(n, from, sim)) continue;
+    for (let q = from.head; q >= 0; q = c.behind[q]!) {
+      if (c.granted[q]) continue;
+      const o = c.opt[q];
+      if (o && o.conn[from.lane] !== other) continue;
+      const theirs = Math.max(0, toLine(sim, q)) / Math.max(14, c.v[q]!);
+      if (theirs > mine + LOOK_S) break;
+      if (q === from.head && c.courtesy[i]) continue;
+      if (theirs < mine + gap) return false;
+    }
+  }
   return true;
 }
 
@@ -121,6 +161,8 @@ function yieldsTo(sim: Sim, i: number, conn: Track, other: Track, n: NodeRt, d: 
     const theirs = dq / Math.max(14, c.v[q]!);
     return theirs < mine + gap && hasRoom(sim, q, other.to!);
   }
+  // Same priority: straight-ahead traffic goes before an oncoming left turner (who waits for its gap, oncomingGap).
+  if (MOTION_SWITCHES.GAP_ACCEPT && conn.left !== other.left && oncoming(conn, other)) return conn.left;
   return dq < YIELD.near && c.ticket[q]! > 0 && (c.ticket[q]! < c.ticket[i]! || (c.ticket[q] === c.ticket[i] && q < i)) && hasRoom(sim, q, other.to!);
 }
 

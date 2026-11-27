@@ -12,11 +12,11 @@ export const BEACH_COMPLAINTS: Readonly<Record<string, readonly string[]>> = {
   ],
 };
 
-/** Pim likes the money, Zaza likes the sea, Sulo reads it out. */
+/** Pim likes the money, Dewy likes the sea, Sulo reads it out. */
 export const BEACH_SPEECH = {
   sulo: (name: string) => `The Council must decide what becomes of ${name}. We have sat on it, and it was sandy.`,
   pim: (share: number) => `Sell it! ${share} coins, just for us. I have already sewn a pocket.`,
-  zaza: 'Keep it open. The sea is the only thing here that does not honk.',
+  dewy: 'Keep it open. The sea is the only thing here that does not honk.',
 } as const;
 
 export const LEAN_WHY = {

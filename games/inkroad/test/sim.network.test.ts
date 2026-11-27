@@ -38,6 +38,18 @@ describe('network', () => {
     expect(junctionAt(back, c(2, 5))).toBeUndefined();
   });
 
+  it('links a dead end to a road one cell away', () => {
+    const net = createNetwork(land(20, 12), [
+      { cells: [[2, 1], [2, 10]], type: 'street' },
+      { cells: [[3, 5], [12, 5]], type: 'street' },
+    ], []);
+    const plan = planRoad(net, [c(2, 5), c(3, 5)], 'street');
+    expect(plan.why).toBeUndefined();
+    const next = addRoad(net, plan);
+    expect(junctionAt(next, c(3, 5))!.arms.length).toBe(2);
+    expect(junctionAt(next, c(2, 5))!.arms.length).toBe(3);
+  });
+
   it('refuses bad roads with a reason', () => {
     const map = land(20, 12).map((r, y) => (y === 6 ? `~~~~${r.slice(4, 12)}~#ph....` : r));
     const net = createNetwork(map, [{ cells: [[1, 1], [10, 1]], type: 'street' }], []);

@@ -360,7 +360,7 @@ export type CityEvent =
    *   lists it from this step (its slot stays its own). It then waits at the edge for its `parkGo`.
    * A car that gives up waiting at the edge gets an 'in' with seconds 0 (no lane hold) back into its slot.
    */
-  | { readonly t: 'park'; readonly dir: 'in' | 'out'; readonly car: number; readonly key: string; readonly slot: number; readonly lane: { readonly x: number; readonly y: number; readonly a: number }; readonly seconds: number; /** The whole move, at least `seconds`: the lane is held only for the part of it in the lane (the start of 'in', the end of 'out'); the rest happens off the road. */ readonly move?: number; readonly tint: number; readonly kind: ParkedCar['kind'] }
+  | { readonly t: 'park'; readonly dir: 'in' | 'out'; readonly car: number; readonly key: string; readonly slot: number; readonly lane: { readonly x: number; readonly y: number; readonly a: number }; readonly seconds: number; /** The whole move, at least `seconds`: the lane is held only for the part of it in the lane (the start of 'in', the end of 'out'); the rest happens off the road. */ readonly move?: number; /** Px along the drawn path where the lane part ends ('in') or begins ('out'). */ readonly split?: number; /** Seconds it stands first, waiting for a gap across the road. */ readonly wait?: number; readonly tint: number; readonly kind: ParkedCar['kind'] }
   /**
    * The car waiting at the lane edge after its 'out' found its gap: from the edge into `lane` over `seconds` (the lane
    * held, car state 4), then it drives off as a moving car. Comes `move - seconds` after the 'out' when the lane is
@@ -525,6 +525,8 @@ export interface ParkedCar {
   /** Road kinds (kerb, street, double): px along road.line where it stands, and the side (1 = right of the line's direction). */
   readonly s?: number;
   readonly side?: -1 | 1;
+  /** Double: px sideways of the line (right of its direction) where it stopped; absent: the middle of its outer lane. */
+  readonly lat?: number;
   /** Its own space in the place, 0..slots-1, kept until it leaves: neighbours never shift, gaps stay. */
   readonly slot?: number;
   /** A vehicle longer than a bay (van, lorry): every slot it covers, its own first (the next one on its side). */
@@ -651,7 +653,7 @@ export interface YearDef {
   readonly year: number; // 1..10
   readonly name: string;
   /** Shown on the year card: who speaks and what (animals, 1–3 short lines). */
-  readonly intro: readonly { readonly who: 'zaza' | 'miko' | 'juma' | 'pim' | 'sulo'; readonly text: string }[];
+  readonly intro: readonly { readonly who: 'dewy' | 'miko' | 'juma' | 'pim' | 'sulo'; readonly text: string }[];
   readonly tools: readonly ToolId[]; // opened this year
   /** Coach steps shown while playing, in order. `when` is a coach condition id. */
   readonly coach?: readonly { readonly text: string; readonly at?: 'worstJunction' | 'market' | 'tool'; readonly tool?: ToolId; readonly until: string }[];

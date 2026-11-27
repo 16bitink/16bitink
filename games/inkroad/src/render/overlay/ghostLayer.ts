@@ -17,6 +17,9 @@ const RAMP_SHARE = 0.3;
 /** Footprints in cells. */
 export const PARK_CELLS: Readonly<Record<CarParkKind, readonly [number, number]>> = { lot: [3, 2], ride: [4, 3], multi: [2, 2], under: [2, 2] };
 
+/** A grid dot's radius, plan px. */
+const DOT_RADIUS = 5.5;
+
 export class GhostLayer {
   private readonly g: Phaser.GameObjects.Graphics;
   private readonly tag: Phaser.GameObjects.Text;
@@ -111,10 +114,11 @@ export class GhostLayer {
     if (last && q) this.say(q, last);
   }
 
-  /** The vertex under the pointer, before anything is drawn. */
-  dot(at: Pt, onRoad: boolean): void {
+  /** The vertex under the pointer, before anything is drawn. `radius` in plan px (bigger under a finger). */
+  dot(at: Pt, onRoad: boolean, radius = DOT_RADIUS): void {
     const p = project(at);
-    this.g.fillStyle(PAPER_HEX, 0.9).fillCircle(p.x, p.y, 5.5).lineStyle(2, onRoad ? OK_HEX : INK_HEX, 0.9).strokeCircle(p.x, p.y, 5.5);
+    const r = Math.max(DOT_RADIUS, radius);
+    this.g.fillStyle(PAPER_HEX, 0.9).fillCircle(p.x, p.y, r).lineStyle(2, onRoad ? OK_HEX : INK_HEX, 0.9).strokeCircle(p.x, p.y, r);
   }
 
   /** The grid near the pointer, faint. */

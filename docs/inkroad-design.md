@@ -245,7 +245,7 @@ One small broken piece of city, a fixed budget, the same for everyone on a date.
 Animals, as in the other games. Names use plain letters.
 
 - **You:** the Director, never seen. Your desk, your plate.
-- **Zaza, a fennec fox:** traffic engineer. Big ears, hears every horn. Teaches roads.
+- **Dewy, a fennec fox:** traffic engineer. Big ears, hears every horn. Teaches roads.
 - **Miko, a meerkat:** head of parking. Meerkats stand lookout, so the inspectors are all meerkats.
 - **Juma, a camel:** buses and metro. Carries everyone, complains about nothing.
 - **Pim, a jerboa:** the treasurer. Panics about money.

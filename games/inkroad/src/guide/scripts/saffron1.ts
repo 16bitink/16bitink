@@ -101,7 +101,7 @@ const SUMMER: readonly Step[] = [
     marks: planMark, target: () => ({ t: 'tool', tool: 'street' }), until: (v, m) => v.tool === 'street' || drawn(v, m),
   },
   {
-    id: 'drag', stage: 2, pause: true, why: (v) => (v.ghost && !v.ghost.dragging ? 'Not quite. One end on each ring.' : 'Roads are drawn with one drag.'), say: 'Press one ring, drag to the other, let go.',
+    id: 'drag', stage: 2, pause: true, why: (v) => (v.ghost && !v.ghost.dragging ? 'Not quite. One end on each ring.' : 'A road runs from one point to another.'), say: 'Click or tap one ring, then the other. Click it again to finish.',
     skipIf: (v, m) => m.lastRoad === undefined || (noDetour(v) && !drawn(v, m)), target: (v) => { const p = plan(v); return p ? { t: 'drag', line: lineOf(p) } : null; }, look: planLook,
     until: (v, m) => goodGhost(v) || drawn(v, m), back: { when: (v) => v.tool !== 'street', to: 'pick-street' },
   },

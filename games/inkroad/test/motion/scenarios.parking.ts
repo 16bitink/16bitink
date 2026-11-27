@@ -1,0 +1,326 @@
+/**
+ * Motion lab scenarios: the parking group (see docs/inkroad-motion-lab.md and the worked examples in scenarios.ts).
+ * Add each scenario to PARKING, and where it still breaks rules, its ratchet in KNOWN_PARKING (counts per rule, failing expectations).
+ *
+ * The kerb place of the main street has 11 slots (even = right of an eastbound car = south, odd = north); to make a car
+ * take a given slot the others are filled with parked cars (`fillExcept`).
+ */
+import { pointAlong } from '../../src/city/geometry';
+import { BAY_PX } from '../../src/sim/roadSlots';
+import { roadSlots } from '../../src/city/slots';
+import { CROSS_GAP } from '../../src/city/manoeuvre';
+import type { City } from '../../src/city/state';
+import type { Actor, Expectation, RunResult, Sample, Scenario } from './lab';
+import type { KnownSets } from './known';
+import { brakesUnder, clean, expect, firstManoeuvre, leavesBy, parkIns, parkOuts, parksIn, passesBy, samplesOf, standsOffRoad } from './checks';
+
+const STREET_EW = {
+  size: [14, 9] as const,
+  roads: [{ cells: [[0, 4], [13, 4]] as const }, { cells: [[3, 4], [3, 8]] as const }, { cells: [[11, 4], [11, 8]] as const }],
+  gates: [{ id: 'W', cell: [0, 4] as const }, { id: 'E', cell: [13, 4] as const }, { id: 'SW', cell: [3, 8] as const }, { id: 'SE', cell: [11, 8] as const }],
+  lots: [{ name: 'Shop', kind: 'shops' as const, cell: [5, 1] as const, w: 3, h: 2 }],
+};
+
+const KERB_SLOTS = 11;
+const inner = (r: RunResult): City => (r.city as unknown as { c: City }).c;
+
+/** Parked cars in every slot of the kerb through (6, 4) except `free` (the others are standing there when the day starts). */
+function fillExcept(free: readonly number[]): Actor[] {
+  const out: Actor[] = [];
+  for (let k = 0; k < KERB_SLOTS; k++) if (!free.includes(k)) out.push({ kind: 'parked', id: `p${k}`, spot: { kerb: [6, 4] }, slot: k, lot: 'Shop' });
+  return out;
+}
+
+/** Where a slot of a place stands: px along the plan, and which side of the road (+1: south of an eastbound line). */
+function slotAt(r: RunResult, key: string, slot: number): { x: number; y: number; side: number } {
+  const c = inner(r);
+  const spot = c.day.spots.get(key)!;
+  const road = c.net.roads.find((x) => x.id === spot.id)!;
+  const sl = roadSlots(c, spot)[slot]!;
+  const p = pointAlong(road.line, sl.s);
+  return { x: p.x, y: p.y, side: sl.side };
+}
+
+/** y of the middle of the main street (the long horizontal road). */
+function midY(r: RunResult): number {
+  const road = inner(r).net.roads.find((x) => x.line.length >= 2 && Math.abs(x.line[0]!.y - x.line[x.line.length - 1]!.y) < 1 && Math.abs(x.line[0]!.x - x.line[x.line.length - 1]!.x) > 150)!;
+  return road.line[0]!.y;
+}
+
+/** Where `who` stood: its last drawn frame before it set out of its place (or before the end). Parked or still easing into the slot. */
+const lastParked = (r: RunResult, who: string): Sample | undefined => {
+  const out = parkOuts(r, who)[0];
+  return samplesOf(r, who).filter((s) => s.state !== 'moving' || out === undefined || s.t < out.t).filter((s) => out === undefined || s.t < out.t).pop();
+};
+/** No two bodies overlap anywhere in the run (standing neighbours included). */
+function noOverlap(r: RunResult): Expectation {
+  const hits = r.violations.filter((v) => v.rule.startsWith('bodies overlap'));
+  return expect('no two bodies overlap', hits.length === 0, hits.length ? `${hits.length}, first ${hits[0]!.who} at ${hits[0]!.t.toFixed(1)} s` : 'none');
+}
+
+const lastIn = (r: RunResult, who: string) => parkIns(r, who).pop();
+
+/** Heading off the road's axis (rad, 0..pi/2) of a pose on the east-west street. */
+const offAxis = (a: number): number => Math.acos(Math.min(1, Math.abs(Math.cos(a))));
+
+/**
+ * Crossing the street's middle line between the two junctions at more than `maxOff` rad off the road's axis: nose
+ * across the lanes, head-on at whatever is coming. Returns the crossings.
+ */
+function crossings(r: RunResult, who: string, maxOff: number): Sample[] {
+  const mid = midY(r);
+  const bad: Sample[] = [];
+  const byUid = new Map<number, Sample[]>();
+  for (const s of samplesOf(r, who)) if (s.state !== 'parked') (byUid.get(s.uid) ?? byUid.set(s.uid, []).get(s.uid)!).push(s);
+  for (const list of byUid.values()) {
+    for (let i = 1; i < list.length; i++) {
+      const a = list[i - 1]!, b = list[i]!;
+      if ((a.y - mid) * (b.y - mid) > 0 || a.x < 140 || a.x > 320) continue;
+      if (offAxis(b.a) > maxOff) bad.push(b);
+    }
+  }
+  return bad;
+}
+
+/** It never drives nose-across over the middle line (off the axis by 40 degrees or more), parking or pulling out. */
+function noHeadOnCrossing(r: RunResult, who: string): Expectation {
+  const bad = crossings(r, who, 0.7);
+  return expect(`${who} never crosses the oncoming lane head-on`, bad.length === 0, bad.length ? `${bad.length} frames, first at ${bad[0]!.t.toFixed(1)} s heading ${(offAxis(bad[0]!.a) * 57.3).toFixed(0)} deg off the road` : 'no crossing nose-across');
+}
+
+/** At the time `t` the actor's gear was R at some frame (it reversed). */
+const reversedBefore = (r: RunResult, who: string, t: number): boolean => samplesOf(r, who).some((s) => s.t < t && s.gear === 'R');
+
+const FAR_SIDE: Scenario = {
+  id: 'park.kerb.far-side',
+  title: 'Kerb bay on the far kerb',
+  expect: 'A parks in a bay on the far (left) kerb only by going round, never across the oncoming lane head-on; leaves on its own side',
+  ...STREET_EW,
+  kerbs: [[6, 4]],
+  // Every south (right-hand) slot is taken: the only free bays are on the north kerb.
+  actors: [
+    ...fillExcept([1, 3, 5, 7, 9]),
+    { kind: 'arrive', id: 'A', at: 0.5, from: 'W', home: 'E', lot: 'Shop', spot: { kerb: [6, 4] }, stay: 8 },
+    { kind: 'through', id: 'B', at: 2.5, from: 'E', to: 'W' },
+    { kind: 'through', id: 'C', at: 7, from: 'E', to: 'W' },
+  ],
+  seconds: 50,
+  expectations: (r) => {
+    const ins = lastIn(r, 'A');
+    const stood = lastParked(r, 'A');
+    const mid = midY(r);
+    return [
+      parksIn(r, 'A', 'kerb:'),
+      expect('A stands in a slot on the far (north) kerb', !!ins && ins.slot % 2 === 1 && !!stood && stood.y < mid, ins ? `slot ${ins.slot}, y ${stood?.y.toFixed(0) ?? '-'} vs middle ${mid.toFixed(0)}` : 'never turned in'),
+      noHeadOnCrossing(r, 'A'),
+      leavesBy(r, 'A', 50),
+      passesBy(r, 'B', 30),
+      clean(r, 'A'),
+    ];
+  },
+};
+
+/** A one-way street eastbound (every road along row 4 one-way), bays on both kerbs. */
+export const ONE_WAY_DRAFT: Scenario = {
+  id: 'park.kerb.one-way',
+  title: 'Kerb bays on a one-way street, both kerbs',
+  expect: 'On a one-way street A parks on either kerb, front first in the direction of travel, and pulls out forward',
+  ...STREET_EW,
+  roads: [
+    { cells: [[0, 4], [3, 4]], oneWay: true }, { cells: [[3, 4], [11, 4]], oneWay: true }, { cells: [[11, 4], [13, 4]], oneWay: true },
+    { cells: [[3, 4], [3, 8]] }, { cells: [[11, 4], [11, 8]] },
+  ],
+  kerbs: [[6, 4]],
+  // Only slot 0 (south kerb) and slot 5 (north kerb) are free: A and C take one each.
+  actors: [
+    ...fillExcept([0, 5]),
+    { kind: 'arrive', id: 'A', at: 0.5, from: 'W', home: 'E', lot: 'Shop', spot: { kerb: [6, 4] }, stay: 8 },
+    { kind: 'arrive', id: 'C', at: 4, from: 'W', home: 'E', lot: 'Shop', spot: { kerb: [6, 4] }, stay: 8 },
+  ],
+  seconds: 50,
+  expectations: (r) => {
+    const mid = midY(r);
+    const sides = ['A', 'C'].map((w) => lastParked(r, w)).map((s) => (s ? (s.y < mid ? 'north' : 'south') : '-'));
+    const out: Expectation[] = [expect('A and C use both kerbs', sides.includes('north') && sides.includes('south'), `A ${sides[0]}, C ${sides[1]}`)];
+    for (const who of ['A', 'C']) {
+      const stood = lastParked(r, who);
+      // Front first in the direction of travel: standing nose east, never backed in, and out the same way.
+      out.push(parksIn(r, who, 'kerb:'));
+      out.push(expect(`${who} stands nose east, front first`, !!stood && Math.cos(stood.a) > 0.9 && !reversedBefore(r, who, parkIns(r, who)[0]?.t ?? 0), stood ? `heading ${(stood.a * 57.3).toFixed(0)} deg` : 'never parked'));
+      const out0 = parkOuts(r, who)[0];
+      out.push(expect(`${who} pulls out forward`, !!out0 && !samplesOf(r, who).some((s) => s.t >= out0.t && s.gear === 'R'), out0 ? `out at ${out0.t.toFixed(1)} s` : 'never set out'));
+      out.push(leavesBy(r, who, 50), clean(r, who));
+    }
+    return out;
+  },
+};
+
+const LEAVE_BUSY: Scenario = {
+  id: 'park.kerb.leave-busy',
+  title: 'Leaving a kerb bay into a busy lane',
+  expect: 'A in a kerb bay waits at its slot until the lane has a 3 s gap, then pulls out; no car behind brakes over 400 px/s²',
+  ...STREET_EW,
+  kerbs: [[6, 4]],
+  // Z stays parked on the north kerb all the way (the lab reads who has left the map off the last frame, which must hold a car).
+  actors: [{ kind: 'parked', id: 'A', spot: { kerb: [6, 4] }, slot: 4, lot: 'Shop', leaveAt: 3.5, to: 'E' }, { kind: 'parked', id: 'Z', spot: { kerb: [6, 4] }, slot: 9, lot: 'Shop' }],
+  flows: [{ from: 'W', to: 'E', every: 4, start: 0, until: 24 }],
+  seconds: 40,
+  expectations: (r) => {
+    const turn = firstManoeuvre(r, 'A');
+    const out = parkOuts(r, 'A')[0];
+    const slot = slotAt(r, 'kerb:' + [...inner(r).day.spots.keys()].find((k) => k.startsWith('kerb:'))!.slice(5), 4);
+    // The nearest approach of each background car to A's slot: none within CROSS_GAP s after A set out.
+    const passes = new Map<number, { t: number; d: number }>();
+    for (const s of samplesOf(r, 'bg')) {
+      const d = Math.hypot(s.x - slot.x, s.y - slot.y);
+      const have = passes.get(s.uid);
+      if (!have || d < have.d) passes.set(s.uid, { t: s.t, d });
+    }
+    const times = [...passes.values()].map((p) => p.t);
+    const soonest = turn === undefined ? undefined : Math.min(...times.filter((t) => t > turn), Infinity);
+    return [
+      expect('A had to wait: a car was due past its slot when it was asked to leave', times.some((t) => t > 3.5 && t < 3.5 + CROSS_GAP + 1), `cars pass at ${times.map((t) => t.toFixed(1)).join(', ')} s`),
+      expect('A sets out only with a 3 s gap in the lane', turn !== undefined && (soonest === undefined || soonest - turn >= CROSS_GAP), `A out at ${turn?.toFixed(1) ?? '-'} s, next car at its slot ${soonest !== undefined && isFinite(soonest) ? soonest.toFixed(1) : '-'} s`),
+      expect('A set out of its slot', !!out, out ? `${out.t.toFixed(1)} s` : 'never'),
+      leavesBy(r, 'A', 40),
+      brakesUnder(r, 'bg', 400),
+      clean(r, 'A'),
+    ];
+  },
+};
+
+const NEIGHBOUR_SWAP: Scenario = {
+  id: 'park.kerb.neighbour-swap',
+  title: 'B leaves a bay while A arrives for the one beside it',
+  expect: 'B leaves a bay while A arrives for the one beside it: no overlap, A waits for B to clear, both in R_MIN arcs',
+  ...STREET_EW,
+  kerbs: [[6, 4]],
+  // Slot 2 is the only free one; slot 4 (its neighbour on the south kerb) holds B, who leaves just as A comes.
+  actors: [
+    ...fillExcept([2, 4]),
+    { kind: 'parked', id: 'B', spot: { kerb: [6, 4] }, slot: 4, lot: 'Shop', leaveAt: 3.5, to: 'E' },
+    { kind: 'arrive', id: 'A', at: 0.5, from: 'W', home: 'E', lot: 'Shop', spot: { kerb: [6, 4] }, stay: 8 },
+  ],
+  seconds: 40,
+  expectations: (r) => {
+    const mine = parkIns(r, 'A').pop();
+    const bOut = parkOuts(r, 'B')[0];
+    const bMoving = samplesOf(r, 'B').filter((s) => s.state === 'manoeuvre');
+    const b0 = bMoving[0]?.t, b1 = bMoving[bMoving.length - 1]?.t;
+    const aTurn = firstManoeuvre(r, 'A');
+    const together = mine !== undefined && b0 !== undefined && b1 !== undefined && mine.t >= b0 - 3 && (aTurn ?? 0) <= b1 + 3;
+    return [
+      parksIn(r, 'A', 'kerb:'),
+      expect('B pulled out of the bay next to the one A took', !!bOut && !!mine && Math.abs(mine.slot - 4) <= 2, `B out ${bOut?.t.toFixed(1) ?? '-'} s, A slot ${mine?.slot ?? '-'}`),
+      expect('A arrived while B was leaving', together, `B manoeuvres ${b0?.toFixed(1) ?? '-'}..${b1?.toFixed(1) ?? '-'} s, A turns at ${aTurn?.toFixed(1) ?? '-'} s, in ${mine?.t.toFixed(1) ?? '-'} s`),
+      leavesBy(r, 'A', 40),
+      leavesBy(r, 'B', 40),
+      noOverlap(r),
+      clean(r, 'A'),
+      clean(r, 'B'),
+    ];
+  },
+};
+
+const UNMARKED: Scenario = {
+  id: 'park.street.unmarked',
+  title: 'Bare kerb, no bays',
+  expect: 'A pulls over to a bare kerb (no bays) with a forward S, stops parallel, later pulls out forward',
+  ...STREET_EW,
+  actors: [{ kind: 'arrive', id: 'A', at: 0.5, from: 'W', home: 'E', lot: 'Shop', spot: { street: [6, 4] }, stay: 8 }],
+  flows: [{ from: 'W', to: 'E', every: 6, start: 6 }],
+  seconds: 40,
+  expectations: (r) => {
+    const ins = parkIns(r, 'A')[0];
+    const stood = lastParked(r, 'A');
+    const out = parkOuts(r, 'A')[0];
+    return [
+      parksIn(r, 'A', 'street:'),
+      expect('A stops parallel to the kerb', !!stood && offAxis(stood.a) < 0.45, stood ? `${(offAxis(stood.a) * 57.3).toFixed(0)} deg off the road` : 'never parked'),
+      expect('A pulls over with a forward S, not reversing in', !!ins && !reversedBefore(r, 'A', ins.t + 3), ins ? `in at ${ins.t.toFixed(1)} s` : 'never turned in'),
+      expect('A pulls out forward', !!out && !samplesOf(r, 'A').some((s) => s.t >= out.t && s.gear === 'R'), out ? `out at ${out.t.toFixed(1)} s` : 'never set out'),
+      leavesBy(r, 'A', 40),
+      clean(r, 'A'),
+    ];
+  },
+};
+
+const NEAR_LANE: Scenario = {
+  id: 'park.forecourt.near-lane',
+  title: 'Forecourt on the near side of the street',
+  expect: 'From the near lane A backs into a forecourt space with an S, square to the kerb; leaves forward',
+  ...STREET_EW,
+  // The shop is south of the street: on the right of an eastbound car.
+  lots: [{ name: 'Shop', kind: 'shops', cell: [5, 5], w: 3, h: 2 }],
+  actors: [{ kind: 'arrive', id: 'A', at: 0.5, from: 'W', home: 'E', lot: 'Shop', spot: { lot: 'Shop' }, stay: 8 }],
+  flows: [{ from: 'E', to: 'W', every: 7, start: 3 }],
+  seconds: 36,
+  expectations: (r) => {
+    const ins = parkIns(r, 'A')[0];
+    const stood = lastParked(r, 'A');
+    const out = parkOuts(r, 'A')[0];
+    return [
+      parksIn(r, 'A', 'lot:'),
+      standsOffRoad(r, 'A'),
+      expect('A backs in', !!ins && reversedBefore(r, 'A', ins.t + 4), ins ? `in at ${ins.t.toFixed(1)} s, reversed ${reversedBefore(r, 'A', ins.t + 4)}` : 'never turned in'),
+      expect('A stands square to the kerb', !!stood && offAxis(stood.a) > 1.2, stood ? `${(offAxis(stood.a) * 57.3).toFixed(0)} deg off the road` : 'never parked'),
+      expect('A leaves forward', !!out && !samplesOf(r, 'A').some((s) => s.t >= out.t && s.gear === 'R' && s.state === 'moving'), out ? `out at ${out.t.toFixed(1)} s` : 'never set out'),
+      leavesBy(r, 'A', 36),
+      clean(r, 'A'),
+    ];
+  },
+};
+
+const VAN: Scenario = {
+  id: 'park.van.two-slots',
+  title: 'A van takes two kerb slots',
+  expect: 'A van (or lorry) takes two kerb slots, its body inside both, neighbours never overlap it',
+  ...STREET_EW,
+  kerbs: [[6, 4]],
+  // Slots 4 and 6 (the south kerb, side by side) are free; 2 and 8 hold cars either side.
+  actors: [
+    ...fillExcept([4, 6]),
+    { kind: 'arrive', id: 'A', at: 0.5, from: 'W', home: 'E', lot: 'Shop', spot: { kerb: [6, 4] }, stay: 8, vehicle: 'van' },
+  ],
+  seconds: 40,
+  expectations: (r) => {
+    const ins = lastIn(r, 'A');
+    const stood = lastParked(r, 'A');
+    const key = ins?.key ?? '';
+    const lo = ins && inner(r).day.spots.has(key) ? slotAt(r, key, 4) : undefined;
+    const hi = ins && inner(r).day.spots.has(key) ? slotAt(r, key, 6) : undefined;
+    // Its body reaches into the painted bay of each of the two slots (a bay is BAY_PX wide).
+    const reach = (p: { x: number }): boolean => !!stood && stood.x + stood.len / 2 > p.x - BAY_PX / 2 && stood.x - stood.len / 2 < p.x + BAY_PX / 2;
+    const covers = !!lo && !!hi && reach(lo) && reach(hi);
+    return [
+      parksIn(r, 'A', 'kerb:'),
+      expect('the van stands across both free slots', covers, stood && lo && hi ? `van ${(stood.x - stood.len / 2).toFixed(0)}..${(stood.x + stood.len / 2).toFixed(0)}, slots at ${lo.x.toFixed(0)} and ${hi.x.toFixed(0)}` : 'no van or no slots'),
+      noOverlap(r),
+      leavesBy(r, 'A', 40),
+      clean(r, 'A'),
+    ];
+  },
+};
+
+export const PARKING: readonly Scenario[] = [FAR_SIDE, ONE_WAY_DRAFT, LEAVE_BUSY, NEIGHBOUR_SWAP, UNMARKED, NEAR_LANE, VAN];
+
+export const KNOWN_PARKING: KnownSets = {
+  defaults: {
+    'park.kerb.far-side': {counts:{'too fast on a curve (moving)':24,'too tight (moving)':10,'bodies overlap (moving)':1,'bodies overlap (manoeuvre)':6,'jumps (manoeuvre)':30,'too tight (manoeuvre)':2,'reverse too fast (manoeuvre)':79,'too fast on a curve (manoeuvre)':57,'crosses a kerb (manoeuvre)':2},failing:['A never crosses the oncoming lane head-on','A breaks no motion rule']},
+    'park.kerb.leave-busy': {counts:{'too fast on a curve (manoeuvre)':5,'jumps (manoeuvre)':8,'bodies overlap (manoeuvre)':1,'reverse too fast (manoeuvre)':32},failing:['A sets out only with a 3 s gap in the lane','A breaks no motion rule']},
+    'park.kerb.neighbour-swap': {counts:{'too fast on a curve (manoeuvre)':26,'jumps (manoeuvre)':16,'reverse too fast (manoeuvre)':111,'too tight (moving)':13,'too fast on a curve (moving)':15},failing:['A breaks no motion rule','B breaks no motion rule']},
+    'park.street.unmarked': {counts:{'too fast on a curve (moving)':23,'too tight (moving)':11,'reverse too fast (manoeuvre)':77,'too fast on a curve (manoeuvre)':16,'jumps (manoeuvre)':8},failing:['A pulls over with a forward S, not reversing in','A pulls out forward','A breaks no motion rule']},
+    'park.forecourt.near-lane': {counts:{'too fast on a curve (moving)':25,'too tight (moving)':11,'jumps (manoeuvre)':26,'too fast on a curve (manoeuvre)':5,'reverse too fast (manoeuvre)':7,'crosses a kerb (manoeuvre)':2},failing:['A stands square to the kerb','A breaks no motion rule']},
+    'park.van.two-slots': {counts:{'too fast on a curve (moving)':24,'too tight (moving)':10,'reverse too fast (manoeuvre)':79,'too fast on a curve (manoeuvre)':19,'jumps (manoeuvre)':8},failing:['the van stands across both free slots','A breaks no motion rule']},
+    'park.kerb.one-way': { counts: {'too fast on a curve (moving)': 81, 'too tight (moving)': 18, 'bodies overlap (manoeuvre)': 3, 'jumps (manoeuvre)': 38, 'too tight (manoeuvre)': 2, 'too fast on a curve (manoeuvre)': 83, 'reverse too fast (manoeuvre)': 157, 'crosses a kerb (manoeuvre)': 2}, failing: ['A stands nose east, front first', 'A pulls out forward', 'A breaks no motion rule', 'C pulls out forward', 'C breaks no motion rule'] },
+  },
+  on: {
+    'park.kerb.far-side': {counts:{'too fast on a curve (moving)':26,'too tight (moving)':8,'bodies overlap (moving)':2,'bodies overlap (manoeuvre)':6,'crosses a kerb (manoeuvre)':2},failing:['A never crosses the oncoming lane head-on','A breaks no motion rule']},
+    'park.kerb.leave-busy': {counts:{},failing:[]},
+    'park.kerb.neighbour-swap': {counts:{'too fast on a curve (moving)':16,'too tight (moving)':17},failing:['A breaks no motion rule']},
+    'park.street.unmarked': { counts: {'too fast on a curve (moving)': 22, 'too tight (moving)': 8}, failing: ['A breaks no motion rule'] }, // fix round 1b follow-up: ROAD_STOPS joined the 'on' set
+    'park.forecourt.near-lane': {counts:{'too fast on a curve (moving)':25,'too tight (moving)':9,'crosses a kerb (manoeuvre)':2,'cuts across without a gap (manoeuvre)':1},failing:['A stands square to the kerb','A leaves and is gone by 36 s','A breaks no motion rule']},
+    'park.van.two-slots': {counts:{'too fast on a curve (moving)':24,'too tight (moving)':10},failing:['the van stands across both free slots','A breaks no motion rule']},
+    'park.kerb.one-way': { counts: {'too fast on a curve (moving)': 132, 'too tight (moving)': 20, 'bodies overlap (moving)': 2, 'bodies overlap (manoeuvre)': 4, 'cuts across without a gap (manoeuvre)': 2}, failing: ['A breaks no motion rule', 'C breaks no motion rule'] }, // fix round 1b follow-up: ROAD_STOPS joined the 'on' set
+  },
+};

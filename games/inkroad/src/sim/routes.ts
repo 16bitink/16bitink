@@ -2,10 +2,14 @@
 import { hash01 } from './rng';
 import { ROUTE, TRUCK } from './tune';
 import { laneS, type LinkRt, type OutOpt, type World } from './world';
+import { isForward } from './roadGeom';
 import type { Sim } from './sim';
 import type { Access, Trip } from './trafficTypes';
 
-interface Field { cost: Float64Array; at: number; used: number; readonly dest: number; readonly gate: boolean; readonly value: number; readonly truck: boolean }
+interface Field { cost: Float64Array; at: number; used: number; readonly dest: number; readonly dir: number; readonly gate: boolean; readonly value: number; readonly truck: boolean }
+
+/** Does this link run the way `dir` asks (1: with the road's line, -1: against it, none: either)? */
+export const runsWith = (l: LinkRt, dir: number | undefined): boolean => !dir || (isForward(l.link) ? 1 : -1) === dir;
 
 const UNREACHABLE = 1e6;
 const MAX_HOPS = 80;
@@ -28,10 +32,10 @@ export class Routes {
     this.bans = net.roads.some((r) => r.truckBan);
   }
 
-  keyFor(destRoad: number, destNode: number, value: number, kind: number): string {
+  keyFor(destRoad: number, destNode: number, value: number, kind: number, dir = 0): string {
     const tolled = this.tolls && this.sim().tollNow > 0;
     const cls = tolled ? Math.max(-6, Math.min(6, Math.round(Math.log2(Math.max(1e-4, value)) * 1.5))) : 0;
-    return `${destRoad >= 0 ? `r${destRoad}` : `g${destNode}`}|${cls}|${this.bans && kind === TRUCK ? 1 : 0}`;
+    return `${destRoad >= 0 ? `r${destRoad}` : `g${destNode}`}|${cls}|${this.bans && kind === TRUCK ? 1 : 0}|${dir > 0 ? 1 : dir < 0 ? -1 : 0}`;
   }
 
   private field(key: string, value: number): Field {
@@ -39,7 +43,8 @@ export class Routes {
     let f = this.fields.get(key);
     if (!f) {
       const gate = key[0] === 'g';
-      f = { cost: new Float64Array(sim.world.links.length), at: -1e9, used: sim.time, dest: parseInt(key.slice(1), 10), gate, value: Math.max(1e-4, value), truck: key.endsWith('1') };
+      const parts = key.split('|');
+      f = { cost: new Float64Array(sim.world.links.length), at: -1e9, used: sim.time, dest: parseInt(key.slice(1), 10), dir: Number(parts[3] ?? 0), gate, value: Math.max(1e-4, value), truck: parts[2] === '1' };
       this.fields.set(key, f);
       this.compute(f);
     }
@@ -66,7 +71,7 @@ export class Routes {
     const heap = this.heap;
     heap.clear();
     for (const l of links) {
-      const here = f.gate ? l.link.to === f.dest : l.road.id === f.dest;
+      const here = f.gate ? l.link.to === f.dest : l.road.id === f.dest && runsWith(l, f.dir);
       if (!here) continue;
       cost[l.i] = this.linkCost(l, f) * (f.gate ? 1 : 0.5);
       heap.push(cost[l.i]!, l.i);
@@ -120,12 +125,12 @@ export class Routes {
     const starts = startLinks(w, from);
     const destRoad = 'road' in to ? to.road : -1, destNode = 'gate' in to ? to.gate : -1;
     if (starts.length === 0 || (destRoad >= 0 ? !w.roadById.has(destRoad) : !w.nodeById.has(destNode))) return none;
-    const key = this.keyFor(destRoad, destNode, value, 0);
+    const key = this.keyFor(destRoad, destNode, value, 0, 'road' in to ? to.dir : 0);
     const f = this.field(key, value);
     let best: LinkRt | null = null, bestCost = UNREACHABLE, direct = false;
     for (const { l, part } of starts) {
       const cost = this.linkCost(l, f) * (1 - part);
-      if ('road' in to && 'road' in from && l.road.id === to.road && laneS(l, to.s) >= laneS(l, from.s)) {
+      if ('road' in to && 'road' in from && l.road.id === to.road && runsWith(l, to.dir) && laneS(l, to.s) >= laneS(l, from.s)) {
         const d = this.linkCost(l, f) * ((laneS(l, to.s) - laneS(l, from.s)) / l.lanes[0]!.len);
         if (d < bestCost) { best = l; bestCost = d; direct = true; }
         continue;
@@ -165,7 +170,10 @@ export function startLinks(w: World, a: Access): { l: LinkRt; part: number }[] {
   if ('gate' in a) return (w.nodeById.get(a.gate)?.outs ?? []).map((l) => ({ l, part: 0 }));
   const r = w.roadById.get(a.road);
   if (!r) return [];
-  return r.links.map((id) => w.linkById.get(id)!).map((l) => ({ l, part: laneS(l, a.s) / l.lanes[0]!.len }));
+  const all = r.links.map((id) => w.linkById.get(id)!);
+  // A car standing on one kerb sets off the way it faces (when told), never across the road.
+  const own = a.dir ? all.filter((l) => runsWith(l, a.dir)) : all;
+  return (own.length > 0 ? own : all).map((l) => ({ l, part: laneS(l, a.s) / l.lanes[0]!.len }));
 }
 
 /** Binary heap of (key, value) pairs. */

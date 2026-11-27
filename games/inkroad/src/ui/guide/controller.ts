@@ -28,7 +28,7 @@ const MAX_LOOK_ZOOM = 2.4;
 const MIN_LOOK_ZOOM = 0.7;
 const STOPPED_MS = 1500;
 const PARTS: readonly Part[] = ['approval', 'goal', 'speed', 'ovs', 'ticker', 'advisor', 'forecast'];
-const NONE: Frame = { id: '', kind: 'tip', who: 'zaza', why: '', say: '', bullets: [], ok: null, target: null, marks: [], look: null, pause: false, dim: false, rate: 1 };
+const NONE: Frame = { id: '', kind: 'tip', who: 'dewy', why: '', say: '', bullets: [], ok: null, target: null, marks: [], look: null, pause: false, dim: false, rate: 1 };
 
 /** The guide on screen: asks the runner what to show, stops time, moves the camera, draws. */
 export class GuideUi {
@@ -57,7 +57,7 @@ export class GuideUi {
     this.box.hidden = true;
     new Router(this.el).add({
       gok: () => this.ok(),
-      gskip: () => { this.runner.skip(); this.env().acts.toast('Ask me any time: tap What now?', 'zaza'); },
+      gskip: () => { this.runner.skip(); this.env().acts.toast('Ask me any time: tap What now?', 'dewy'); },
     });
   }
 
@@ -143,7 +143,7 @@ export class GuideUi {
     if (t && (nowMs > t.until0 || t.until(v))) this.tipNow = null;
     if (this.tipNow && (!step || !step.pause || step.id === 'find-it')) {
       const tip = this.tipNow;
-      return { ...NONE, id: `tip${tip.id}`, who: tip.who ?? 'zaza', why: tip.why ?? '', say: tip.say(v), ok: 'OK', target: tip.target(v), look: tip.look ?? null, pause: step?.pause ?? false };
+      return { ...NONE, id: `tip${tip.id}`, who: tip.who ?? 'dewy', why: tip.why ?? '', say: tip.say(v), ok: 'OK', target: tip.target(v), look: tip.look ?? null, pause: step?.pause ?? false };
     }
     return step && this.stopped(step, v, nowMs) ? { ...step, id: `${step.id}!`, why: 'Time is stopped.', say: 'Press 1x to let it run.', target: { t: 'ui', sel: ['[data-k=sp1]'], tap: true } } : step;
   }

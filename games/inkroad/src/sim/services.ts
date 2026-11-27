@@ -1,13 +1,16 @@
 /** Buses, trams and school buses: vehicles that loop through stops, pausing at each. */
 import { MINIBUS_TINT } from './constants';
 import { plan } from './motion';
-import { exists, firstLink, place, setDest, turnBack } from './place';
+import { exists, firstLink, place, setDest, spaceAt } from './place';
+import { LANE_T } from './track';
 import { kindIndex } from './tune';
 import type { Sim } from './sim';
 import type { Access } from './trafficTypes';
+import type { LinkRt } from './world';
 import type { VehicleKind } from './types';
 
-interface Vehicle { uid: number; stop: number; lapAt: number; laps: number; readyAt: number }
+/** `turning`: on its way to a gate to turn round beyond the map edge (a terminus loop), then on to its stop. */
+interface Vehicle { uid: number; stop: number; lapAt: number; laps: number; readyAt: number; turning?: boolean }
 interface Service {
   readonly id: number;
   stops: readonly Access[];
@@ -21,7 +24,8 @@ interface Service {
 const RETRY = 1;
 const LAP_KEEP = 0.6;
 const BUS_VALUE = 1;
-const TURN_SAVES = 8;
+/** Seconds a bus spends turning round beyond the map edge (its terminus loop), hidden, before it comes back in. */
+const GATE_TURN = 6;
 const NO_WAY = 1e6;
 
 export class Services {
@@ -101,12 +105,13 @@ export class Services {
     return s && v ? { s, v } : null;
   }
 
-  /** Car i reached its stop: pause, then on to the next. */
+  /** Car i reached its stop (or the gate it turns round at): pause, then on to the next. */
   atStop(i: number): void {
     const sim = this.sim(), c = sim.cars;
     const hit = this.find(i);
     if (!hit) { c.drop(i); return; }
     const { s, v } = hit;
+    if (v.turning) { this.turnAtGate(i, s, v); return; }
     c.until[i] = sim.time + s.dwell;
     c.stuck[i] = 0;
     c.waited[i] = 0;
@@ -124,20 +129,44 @@ export class Services {
     setDest(sim, i, s.stops[v.stop]!);
     const l = sim.world.links[c.link[i]!]!;
     plan(sim, i, l);
-    this.turnIfBetter(i, s.stops[(v.stop + s.stops.length - 1) % s.stops.length]!, s.stops[v.stop]!);
+    // No way on to the next stop without turning: it never reverses along the road, it goes round at a gate.
+    if (!c.opt[i] && c.destLink[i]! < 0) this.toGate(i, v, l);
   }
 
-  /** At the end of a line the vehicle turns round, if that saves real time. */
-  private turnIfBetter(i: number, from: Access, to: Access): void {
+  /** The nearest gate it can drive on to from link `l` (the line's terminus loop), or nothing (it waits as before). */
+  private toGate(i: number, v: Vehicle, l: LinkRt): void {
     const sim = this.sim(), c = sim.cars;
-    const here = sim.world.links[c.link[i]!]!;
-    if (c.destLink[i]! >= 0) return;
-    const best = firstLink(sim, from, to, BUS_VALUE, c.kind[i]!);
-    if (!best || best.i === here.i || best.road.id !== here.road.id) return;
-    const key = sim.routes.keyFor(c.destRoad[i]!, c.destNode[i]!, BUS_VALUE, c.kind[i]!);
-    const ahead = Math.min(...here.opts.map((o) => sim.routes.costFrom(key, BUS_VALUE, o.to)), NO_WAY);
-    const back = Math.min(...best.opts.map((o) => sim.routes.costFrom(key, BUS_VALUE, o.to)), best.road.id === c.destRoad[i] ? 0 : NO_WAY);
-    if (ahead > back + TURN_SAVES) turnBack(sim, i);
+    let best = -1, bestCost = NO_WAY;
+    for (const n of sim.world.nodes) {
+      if (n.kind !== 'gate' || n.outs.length === 0) continue;
+      const key = sim.routes.keyFor(-1, n.j.id, BUS_VALUE, c.kind[i]!);
+      const cost = l.node.j.id === n.j.id ? 0 : Math.min(NO_WAY, ...l.opts.map((o) => sim.routes.costFrom(key, BUS_VALUE, o.to)));
+      if (cost < bestCost) { best = n.j.id; bestCost = cost; }
+    }
+    if (best < 0) return;
+    v.turning = true;
+    setDest(sim, i, { gate: best });
+    plan(sim, i, l);
+  }
+
+  /** At the gate: round beyond the map edge, hidden for GATE_TURN s, then back in on the gate's way in. */
+  private turnAtGate(i: number, s: Service, v: Vehicle): void {
+    const sim = this.sim(), c = sim.cars;
+    const node = sim.world.nodeById.get(c.destNode[i]!);
+    const out = node?.outs[0];
+    const lane = out?.lanes[c.bus[i] ? out.lanes.length - 1 : out.carLanes - 1];
+    const at = c.half[i]! + 2;
+    if (!out || !lane || lane.kind !== LANE_T || !spaceAt(sim, lane, at, c.half[i]!, 0)) { c.until[i] = sim.time + RETRY; return; }
+    c.unlink(i);
+    c.insert(i, lane, at);
+    c.link[i] = out.i;
+    c.v[i] = 0;
+    c.state[i] = 4;
+    c.until[i] = sim.time + GATE_TURN;
+    c.stuck[i] = 0;
+    c.waited[i] = 0;
+    v.turning = false;
+    setDest(sim, i, s.stops[v.stop]!);
   }
 
   /** A service vehicle stuck for good starts again from its next stop. */

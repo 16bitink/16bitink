@@ -44,7 +44,7 @@ How to write a city (3 to 5) without touching the engine. Read [inkroad-design.m
 3. **At least three answers.** `--families` plays the year with only building, only pricing, only transit, only rules, from the same start. From year 5 at least three should gain 3 or more over doing nothing.
 4. **A goal the beginner can just reach and `nobody` can't.** Kinds: `wait@gx,gy`, `worstWait`, `found@<lot kind>`, `foundIn@<district>`, `double`, `fined`, `riders`, `share`, `lost`, `onTime`, `approval`, `bar:trips|parking|cost|streets`, `support` (zone vote). Count-like kinds are "at most", shares are "at least". Read in the year's last season.
 5. New homes spread over the map and arrive in small steps: 8 to 20 cells a year early, 30 late. Start blocks at level 1; the city grows them.
-6. Texts: animals only, short, dry, one joke a line, plain A to Z names, no em or en dashes, no real places, money, religion or brands. Speakers: zaza (roads), miko (parking), juma (transit), pim (money), sulo (Council).
+6. Texts: animals only, short, dry, one joke a line, plain A to Z names, no em or en dashes, no real places, money, religion or brands. Speakers: dewy (roads), miko (parking), juma (transit), pim (money), sulo (Council).
 
 Tools at most 12 to 14 a city, one new idea a year. `controls`, `parks` and `policies` list what else opens (a kind no year lists is open from year 1). Coach `until`: `selected:junction`, `controlChanged`, `built` (a road change), `toolPicked:<tool>`, `review`; anything else waits 30 s. Event kinds are in `src/city/happenings.ts`, commissions in `src/city/commissions.ts`.
 

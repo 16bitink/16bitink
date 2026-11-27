@@ -1,0 +1,255 @@
+import type { CityEvent, VehicleKind } from '../../sim/types';
+import { clamp } from '../geom';
+import { bodiesOverlap, sizeOf } from './carSize';
+import { pathPose, type Pose, type Step } from './manoeuvrePath';
+import type { Placed } from './parkedCars';
+
+/**
+ * The pure half of the manoeuvre layer (no Phaser): which cars are turning into or out of their spaces, and where
+ * each is drawn this frame. The city says `park in` the moment a car arrives (it is already in its slot, which
+ * stays hidden) or `park out` when its pull-out starts; this plays the move in between over the sim seconds the
+ * city gives it. `src/render/cars/manoeuvres.ts` dresses the pictures; the motion tests drive this directly.
+ */
+type ParkEvent = Extract<CityEvent, { t: 'park' }>;
+type GoEvent = Extract<CityEvent, { t: 'parkGo' }>;
+
+/** Where parked cars stand (the parked-car layer), and its hold on a car's picture while the move draws it. */
+export interface Places {
+  poseOf(uid: number): Placed | undefined;
+  door(key: string): Placed | undefined;
+  hold(uid: number): void;
+  unhold(uid: number): void;
+}
+
+/** More than a city ever moves at once; past it a move is skipped (and the car would jump). */
+const MAX_ACTIVE = 1024;
+/** A car park's mouth: the point it drives to is this far inside the edge. */
+const MOUTH_IN = 5;
+/** An 'in' that names no move time still takes this long. */
+const MIN_MOVE = 0.6;
+const MIN_PHASE = 0.05;
+/** Two moving cars never show on top of each other: the later one holds back along its path, this much of its progress at a time. */
+const BACK_OFF = 0.04;
+/** A car held back never catches up faster than its planned pace (the paces are the car motion rules'). */
+const CATCH_UP = 1;
+/** Sim seconds a held-back car may run late before its move is called over. */
+const HELD_MAX = 30;
+/** Bodies may touch this much (px) before they count as overlapping. */
+const TOUCH = 0.4;
+const MAX_BLINKERS = 64;
+
+/** move: slot and lane edge by the parking path; wait: standing at the edge for its `parkGo`; go: edge into the lane. */
+export type Phase = 'move' | 'wait' | 'go';
+
+export interface Move<T> {
+  /** The renderer's picture (null in tests). */
+  readonly tag: T;
+  uid: number;
+  dir: 'in' | 'out';
+  kind: string;
+  tint: number;
+  mode: Placed['mode'];
+  via: Placed['via'];
+  seconds: number;
+  at: number;
+  from: Pose;
+  to: Pose;
+  phase: Phase;
+  /** Share of the whole move spent in the lane; the rest is off the road. */
+  h: number;
+  /** Px along the path where the lane part ends ('in') or begins ('out'), as the city planned it. */
+  split: number | undefined;
+  /** A `parkGo` that came while the car was still on its way to the edge. */
+  go: { seconds: number; x: number; y: number; a: number } | null;
+  /** The pose drawn this frame, and the frame it was drawn in (to keep two moving cars apart). */
+  px: number;
+  py: number;
+  pa: number;
+  alpha: number;
+  blink: -1 | 0 | 1;
+  drawn: number;
+  /** Share of this phase last drawn (a held-back car is behind its clock). */
+  shown: number;
+}
+
+export interface Blinker { x: number; y: number; a: number; len: number; wid: number; side: -1 | 0 | 1 }
+
+const blank = (): Pose => ({ x: 0, y: 0, a: 0 });
+
+export class ManoeuvreCore<T> {
+  private readonly pool: Move<T>[] = [];
+  private live = 0;
+  private readonly step: Step = { x: 0, y: 0, a: 0, alpha: 1, blink: 0 };
+  /** Fed to the lights: the blinkers of the cars moving now. */
+  readonly blinkers: Blinker[] = [];
+  private blinkCount = 0;
+  private frame = 0;
+
+  constructor(private readonly places: Places, private readonly make: () => T, private readonly onEnd: (m: Move<T>) => void = () => {}) {}
+
+  get active(): number { return this.live; }
+  /** Move i of the active ones (0..active-1). */
+  at(i: number): Move<T> { return this.pool[i]!; }
+
+  /** A city event. Anything that cannot be laid out is skipped quietly. */
+  start(e: ParkEvent): void {
+    if (!(e.seconds >= 0)) return;
+    // slot -1: a car with no space drawn turns into (or comes out of) a building's entrance.
+    const placed = e.slot < 0 ? this.places.door(e.key) : this.places.poseOf(e.car);
+    if (!placed) return;
+    this.drop(e.car);
+    if (this.live >= MAX_ACTIVE) return;
+    const m = this.pool[this.live] ?? this.grow();
+    if (!this.aim(m, e, placed)) return;
+    m.uid = e.car;
+    m.dir = e.dir;
+    m.kind = e.kind;
+    m.tint = e.tint;
+    m.mode = placed.mode;
+    m.via = placed.via;
+    m.phase = 'move';
+    m.go = null;
+    m.shown = 0;
+    m.drawn = -1;
+    // A car waiting for a gap across the road stands first: its clock starts below zero.
+    const wait = e.dir === 'in' ? Math.max(0, e.wait ?? 0) : 0;
+    const move = (e.move ?? e.seconds) - wait, lane = e.seconds - wait;
+    m.split = e.split;
+    m.h = move > 0 ? Math.min(1, Math.max(0, lane) / move) : 0.5;
+    m.seconds = e.dir === 'in' ? (move > 0 ? move : MIN_MOVE) : Math.max(MIN_PHASE, move - lane);
+    m.at = -wait;
+    this.live++;
+    if (e.dir === 'in' && e.slot >= 0) this.places.hold(e.car);
+    this.draw(m, 0);
+  }
+
+  /** The car at the lane edge is released: it moves into the lane, then drives off as a moving car. */
+  go(e: GoEvent): void {
+    const m = this.find(e.car);
+    if (!m || m.dir !== 'out' || !(e.seconds >= 0)) return;
+    if (m.phase === 'move') { m.go = { seconds: e.seconds, x: e.lane.x, y: e.lane.y, a: e.lane.a }; return; }
+    this.begin(m, e.lane, e.seconds);
+  }
+
+  /** A day's end (or the weekend): nobody is left waiting at an edge. */
+  dropWaiting(): void {
+    for (let i = this.live - 1; i >= 0; i--) if (this.pool[i]!.phase === 'wait') this.finish(i);
+  }
+
+  /** `seconds`: sim seconds since last frame (zero while paused). */
+  update(seconds: number): void {
+    this.blinkCount = 0;
+    this.frame++;
+    for (let i = this.live - 1; i >= 0; i--) {
+      const m = this.pool[i]!;
+      if (m.phase === 'wait') { this.draw(m, 0); continue; }
+      m.at += seconds;
+      // Over only once the drawn car got there too (a held-back one finishes its path first).
+      if (m.at >= m.seconds && (m.shown >= 1 || m.at >= m.seconds + HELD_MAX) && !this.next(m)) { this.finish(i); continue; }
+      this.draw(m, seconds);
+    }
+    this.blinkers.length = this.blinkCount;
+  }
+
+  clear(): void {
+    for (let i = this.live - 1; i >= 0; i--) this.finish(i);
+    this.blinkers.length = 0;
+  }
+
+  private grow(): Move<T> {
+    const m: Move<T> = { tag: this.make(), uid: 0, dir: 'in', kind: 'car', tint: 0, mode: 'parallel', via: undefined, seconds: 1, at: 0, from: blank(), to: blank(), phase: 'move', h: 0.5, split: undefined, go: null, px: 0, py: 0, pa: 0, alpha: 1, blink: 0, drawn: -1, shown: 0 };
+    this.pool.push(m);
+    return m;
+  }
+
+  /** Sets the two ends: the lane pose and the slot pose (a car park's mouth when it has no bays). */
+  private aim(m: Move<T>, e: ParkEvent, p: Placed): boolean {
+    const lane = e.lane;
+    if (!Number.isFinite(lane.x) || !Number.isFinite(lane.y)) return false;
+    m.from.x = lane.x; m.from.y = lane.y; m.from.a = lane.a;
+    if (p.mode !== 'enter') { m.to.x = p.x; m.to.y = p.y; m.to.a = p.a; return true; }
+    if (!p.rect) return false;
+    const r = p.rect;
+    const ex = clamp(lane.x, r.x, r.x + r.w), ey = clamp(lane.y, r.y, r.y + r.h);
+    const heading = Math.atan2(r.y + r.h / 2 - ey, r.x + r.w / 2 - ex);
+    m.to.x = ex + Math.cos(heading) * MOUTH_IN; m.to.y = ey + Math.sin(heading) * MOUTH_IN; m.to.a = heading;
+    return true;
+  }
+
+  private find(uid: number): Move<T> | undefined {
+    for (let i = 0; i < this.live; i++) if (this.pool[i]!.uid === uid) return this.pool[i];
+    return undefined;
+  }
+
+  private drop(uid: number): void {
+    for (let i = 0; i < this.live; i++) if (this.pool[i]!.uid === uid) { this.finish(i); return; }
+  }
+
+  /** The 'out' move ends at the edge, where the car waits (or goes at once if its release already came). */
+  private next(m: Move<T>): boolean {
+    if (m.phase !== 'move' || m.dir !== 'out') return false;
+    if (m.go) { this.begin(m, m.go, m.go.seconds); m.go = null; return m.seconds > 0; }
+    m.phase = 'wait';
+    m.at = 0;
+    m.shown = 0;
+    return true;
+  }
+
+  /** From the edge into the lane pose `lane` over `seconds` (zero: the car is there at once). */
+  private begin(m: Move<T>, lane: Pose, seconds: number): void {
+    m.from.x = lane.x; m.from.y = lane.y; m.from.a = lane.a;
+    m.phase = 'go';
+    m.at = 0;
+    m.shown = 0;
+    m.seconds = seconds;
+  }
+
+  private finish(i: number): void {
+    const m = this.pool[i]!;
+    this.onEnd(m);
+    if (m.dir === 'in') this.places.unhold(m.uid);
+    const last = this.live - 1;
+    if (i !== last) { this.pool[i] = this.pool[last]!; this.pool[last] = m; }
+    this.live--;
+  }
+
+  /** Progress along the whole path at share `k` of the current phase. 'out': slot to the lane edge (the off-road share of the path, backwards), wait there, then edge to lane. */
+  private progress(m: Move<T>, k: number): number {
+    return m.dir === 'in' ? k : m.phase === 'move' ? 1 - k * (1 - m.h) : m.phase === 'wait' ? m.h : m.h * (1 - k);
+  }
+
+  /** Is the pose in `s` on top of another moving car drawn this frame? */
+  private blocked(m: Move<T>, s: Step): boolean {
+    const me = { x: s.x, y: s.y, a: s.a, ...sizeOf(m.kind as VehicleKind) };
+    for (let i = 0; i < this.live; i++) {
+      const n = this.pool[i]!;
+      if (n === m || n.drawn !== this.frame) continue;
+      if (bodiesOverlap(me, { x: n.px, y: n.py, a: n.pa, ...sizeOf(n.kind as VehicleKind) }, TOUCH)) return true;
+    }
+    return false;
+  }
+
+  private pose(m: Move<T>, k: number): Step {
+    return pathPose(m.mode, m.from, m.to, this.progress(m, k), this.step, m.h, m.via, m.dir, m.split);
+  }
+
+  private draw(m: Move<T>, seconds: number): void {
+    let k = Math.min(clamp(m.at / m.seconds, 0, 1), m.shown + (CATCH_UP * seconds) / m.seconds);
+    let s = this.pose(m, k);
+    // Draw-time safeguard (the engine may let neighbours move at once): hold back along the path until clear.
+    if (m.phase !== 'wait') {
+      while (k > 0 && this.blocked(m, s)) {
+        k = Math.max(0, k - BACK_OFF);
+        s = this.pose(m, k);
+      }
+    }
+    m.px = s.x; m.py = s.y; m.pa = s.a; m.alpha = s.alpha; m.blink = s.blink; m.drawn = this.frame;
+    if (m.phase !== 'wait') m.shown = k;
+    if (s.blink === 0 || this.blinkCount >= MAX_BLINKERS) return;
+    const b = (this.blinkers[this.blinkCount] ??= { x: 0, y: 0, a: 0, len: 14, wid: 7, side: 0 });
+    b.x = s.x; b.y = s.y; b.a = s.a;
+    // Backing up swings the nose the other way; a car pulling out signals to the lane.
+    b.side = m.dir === 'in' ? s.blink : (-s.blink as -1 | 1);
+    this.blinkCount++;
+  }
+}

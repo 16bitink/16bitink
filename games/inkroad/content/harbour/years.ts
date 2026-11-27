@@ -7,7 +7,7 @@ export const HARBOUR_YEARS: readonly YearDef[] = [
     intro: [
       { who: 'sulo', text: 'Old Harbour. Founded eight hundred years ago, by people with one donkey.' },
       { who: 'sulo', text: 'One cross in the middle, one traffic light. I bought it myself. It is very red.' },
-      { who: 'zaza', text: 'No circle fits between these walls. But there used to be lanes on both sides. Somebody put flower pots in them.' },
+      { who: 'dewy', text: 'No circle fits between these walls. But there used to be lanes on both sides. Somebody put flower pots in them.' },
     ],
     tools: ['street', 'avenue', 'remove', 'junction', 'oneway'], controls: ['yield', 'roundabout', 'signal'], parks: [], policies: [],
     coach: [
@@ -74,7 +74,7 @@ export const HARBOUR_YEARS: readonly YearDef[] = [
   {
     year: 6, name: 'The Square', grant: 100,
     intro: [
-      { who: 'zaza', text: 'Close a street to cars and something odd happens. People come.' },
+      { who: 'dewy', text: 'Close a street to cars and something odd happens. People come.' },
       { who: 'juma', text: 'And geese. Mostly geese.' },
     ],
     tools: ['square'], policies: ['nightWorks'],
@@ -98,7 +98,7 @@ export const HARBOUR_YEARS: readonly YearDef[] = [
   {
     year: 8, name: 'Below the Wall', grant: 120,
     intro: [
-      { who: 'zaza', text: 'No decks over old roofs. But one turn can go under the ground, quietly.' },
+      { who: 'dewy', text: 'No decks over old roofs. But one turn can go under the ground, quietly.' },
       { who: 'sulo', text: 'If you find a ship down there, it is mine.' },
     ],
     tools: ['underpass'], parks: ['multi'],
@@ -124,7 +124,7 @@ export const HARBOUR_YEARS: readonly YearDef[] = [
     year: 10, name: 'A Thousand Candles', grant: 150,
     intro: [
       { who: 'sulo', text: 'Eight hundred years, I said. I miscounted. We are a thousand, and there is cake.' },
-      { who: 'zaza', text: 'Every guest is coming through the same three gates. I can hear them singing already.' },
+      { who: 'dewy', text: 'Every guest is coming through the same three gates. I can hear them singing already.' },
     ],
     tools: [],
     goal: { kind: 'approval', target: 48, text: 'Approval at 48 or more' },

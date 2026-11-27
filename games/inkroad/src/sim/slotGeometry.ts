@@ -140,7 +140,9 @@ function lotLayout(lot: GardenLot, nose: boolean, from: Pt | null): SlotLayout {
   for (let j = 0; j < n; j++) {
     const u = LOT_INSET + (j + 0.5) * ((e.len - LOT_INSET * 2) / n);
     if (gates.some((g) => Math.abs(u - g) <= GATE_W / 2 + PITCH_BODY.wid / 2)) continue;
-    const dir = j % 2 === 0 ? 1 : -1;
+    // Along the edge cars face either way in turn: one from the lane that way backs in with an S, one from the other
+    // swings round into it forward (or turns round first: src/sim/parkPaths.ts). Facing all one way tipped the bots.
+    const dir = nose || j % 2 === 0 ? 1 : -1;
     const a = nose ? Math.atan2(e.ny, e.nx) : along + (dir > 0 ? 0 : Math.PI);
     row.push({ pose: { x: e.x + e.tx * u + e.nx * gap, y: e.y + e.ty * u + e.ny * gap, a }, u, rank: Math.abs(u - u0), dir });
   }

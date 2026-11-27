@@ -57,3 +57,21 @@ export function streetSlot(len: number, count: number, k: number, road: number):
 /** Every slot of a road place. */
 export const roadSlotsOf = (kind: 'kerb' | 'street', len: number, count: number, road: number): RoadSlot[] =>
   Array.from({ length: count }, (_, k) => (kind === 'kerb' ? kerbSlot(len, count, k) : streetSlot(len, count, k, road)));
+
+/** Street cars stand askew up to this much, and always at least SHOVE_MIN px further out from the road (so a skewed body still clears the lane). */
+export const STREET_ASKEW = 0.25;
+export const SHOVE_MIN = 1.2;
+export const STREET_SHOVE = 2;
+
+/** A fixed hash of two ints and a seed, 0..1 (the same as src/render/noise.ts hash2). */
+function hashSlot(x: number, y: number, seed: number): number {
+  let h = Math.imul(x | 0, 374761393) ^ Math.imul(y | 0, 668265263) ^ Math.imul(seed | 0, 1274126177);
+  h = Math.imul(h ^ (h >>> 13), 1103515245);
+  h ^= h >>> 16;
+  return (h >>> 0) / 4294967296;
+}
+
+/** The skew and sideways offset of a street slot: fixed by (road, slot), so they never change. */
+export function streetLoose(roadId: number, slot: number): { readonly turn: number; readonly shove: number } {
+  return { turn: (hashSlot(roadId, slot, 13) - 0.5) * 2 * STREET_ASKEW, shove: SHOVE_MIN + hashSlot(roadId, slot, 11) * STREET_SHOVE };
+}

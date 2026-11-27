@@ -23,6 +23,8 @@ export class CarStore implements CarsView {
   readonly tint = new Uint8Array(MAX_CARS);
   readonly anger = f32();
   readonly blinker = new Int8Array(MAX_CARS);
+  /** The destination's lanes: 0 either way, 1 with the road's line, -1 against it. */
+  readonly destDir = new Int8Array(MAX_CARS);
   readonly state = new Uint8Array(MAX_CARS);
   readonly uid = new Uint32Array(MAX_CARS);
   // driving
@@ -97,7 +99,7 @@ export class CarStore implements CarsView {
     for (const a of [this.offX, this.offY, this.offH, this.offLeft, this.anger, this.z, this.speed]) a[i] = 0;
     this.offLen[i] = 1;
     this.ahead[i] = this.behind[i] = this.service[i] = this.destLink[i] = this.destRoad[i] = this.destNode[i] = this.link[i] = -1;
-    this.courtesy[i] = this.granted[i] = this.arrived[i] = this.state[i] = this.tint[i] = 0;
+    this.courtesy[i] = this.granted[i] = this.arrived[i] = this.state[i] = this.tint[i] = this.destDir[i] = 0;
     this.blinker[i] = 0;
     return i;
   }

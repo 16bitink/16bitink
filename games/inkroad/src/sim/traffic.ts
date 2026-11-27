@@ -1,10 +1,11 @@
 /** The Traffic contract: cars on a network, one step at a time. */
+import { gapAcross, holdAcross } from './crossing';
 import { STEP } from './constants';
 import { angleDiff } from './geom';
 import { considerLane, think } from './drive';
 import { feel, move, plan, pose } from './motion';
 import { Measure } from './measure';
-import { entryPose, exists, firstLink, place, setDest, standAt, turnBack } from './place';
+import { entryPose, exists, firstLink, place, reachableFrom, reachableTo, setDest, standAt, turnBack } from './place';
 import { relocate } from './relocate';
 import { createRng } from './rng';
 import { Routes } from './routes';
@@ -91,9 +92,10 @@ function poseOf(sim: Sim, uid: number): LanePose | null {
 }
 
 /** Where a pull-out spawn of `r` would stand, without making it. */
-function poseFor(sim: Sim, r: SpawnRequest): LanePose | null {
-  const kind = kindIndex(r.kind);
-  if (!exists(sim, r.from) || !exists(sim, r.to) || 'gate' in r.from) return null;
+function poseFor(sim: Sim, req: SpawnRequest): LanePose | null {
+  const kind = kindIndex(req.kind);
+  if (!exists(sim, req.from) || !exists(sim, req.to) || 'gate' in req.from) return null;
+  const r = { ...req, ...reachableTo(sim, req.from, req.to, req.value, kind) };
   const l = firstLink(sim, r.from, r.to, r.value, kind);
   return l ? entryPose(l, r.from, isBus(kind)) : null;
 }
@@ -109,9 +111,10 @@ function step(sim: Sim): void {
   sim.routes.tick();
 }
 
-function spawn(sim: Sim, r: SpawnRequest): number {
-  const kind = kindIndex(r.kind);
-  if ((kind === TRUCK && !sim.trucksAllowed) || !exists(sim, r.from) || !exists(sim, r.to)) return -1;
+function spawn(sim: Sim, req: SpawnRequest): number {
+  const kind = kindIndex(req.kind);
+  if ((kind === TRUCK && !sim.trucksAllowed) || !exists(sim, req.from) || !exists(sim, req.to)) return -1;
+  const r = { ...req, ...reachableTo(sim, req.from, req.to, req.value, kind) };
   const l = firstLink(sim, r.from, r.to, r.value, kind);
   if (!l) return -1;
   const c = sim.cars;
@@ -134,6 +137,9 @@ function spawn(sim: Sim, r: SpawnRequest): number {
  * Slide from the pose drawn before a redirect to the pose drawn after it. The new pose is measured whole (with the
  * kerb swing toward the new place), so a swing that stays is not added twice: the car never jumps.
  */
+/** Px of slide per px of offset to undo (smoothstep's steepest slope is 1.5 per unit). */
+const SLIDE_PER_PX = 2;
+
 function slideFromDrawn(sim: Sim, i: number, x: number, y: number, h: number): void {
   const c = sim.cars;
   c.offLeft[i] = 0;
@@ -141,15 +147,18 @@ function slideFromDrawn(sim: Sim, i: number, x: number, y: number, h: number): v
   c.offX[i] = x - c.x[i]!;
   c.offY[i] = y - c.y[i]!;
   c.offH[i] = angleDiff(c.heading[i]!, h);
-  c.offLeft[i] = CHANGE.length;
-  c.offLen[i] = CHANGE.length;
+  // A long way to undo is undone over a longer stretch: the drawn car never runs backward or jumps (slope under 1).
+  const over = Math.max(CHANGE.length, Math.hypot(c.offX[i]!, c.offY[i]!) * SLIDE_PER_PX);
+  c.offLeft[i] = over;
+  c.offLen[i] = over;
   c.x[i] = x; c.y[i] = y; c.heading[i] = h;
 }
 
-function redirect(sim: Sim, uid: number, to: Access): boolean {
+function redirect(sim: Sim, uid: number, want: Access): boolean {
   const c = sim.cars;
   const i = c.slotOf.get(uid);
-  if (i === undefined || !exists(sim, to)) return false;
+  if (i === undefined || !exists(sim, want)) return false;
+  const to = reachableFrom(sim, sim.world.links[c.link[i]!], want, c.value[i]!, c.kind[i]!) || !('road' in want) ? want : { road: want.road, s: want.s };
   const t = c.track[i]!;
   const x = c.x[i]!, y = c.y[i]!, h = c.heading[i]!;
   setDest(sim, i, to);
@@ -217,6 +226,9 @@ export function createTraffic(net: Network, seed: number): Traffic {
     poseOf: (uid) => poseOf(sim, uid),
     entryPose: (r) => poseFor(sim, r),
     block: (at, seconds, state) => block(sim, at, seconds, state),
+    holdLonger: (uid, seconds) => { const i = sim.cars.slotOf.get(uid); if (i !== undefined && sim.cars.state[i] === 4) sim.cars.until[i] = Math.max(sim.cars.until[i]!, sim.time + seconds); },
+    gapAcross: (at, heading, gap) => gapAcross(sim, at, heading, gap),
+    holdAcross: (at, heading, seconds) => holdAcross(sim, at, heading, seconds),
     addService: (r) => sim.services.add(r),
     removeService: (id) => sim.services.remove(id),
     serviceLap: (id) => sim.services.lap(id),

@@ -12,7 +12,7 @@ import { pic } from '../pics';
 import type { UiEnv } from '../types';
 import type { Tip } from './controller';
 
-/** Zaza's button and her list: the three worst things now, where, why, and what may be done. */
+/** Dewy's button and his list: the three worst things now, where, why, and what may be done. */
 const EVERY_MS = 1500;
 const PANEL_MS = 3000;
 const IDLE_MS = 25_000;
@@ -38,7 +38,7 @@ export class Advisor {
     this.btn.dataset.act = 'adv';
     this.btn.setAttribute('role', 'button');
     this.btn.setAttribute('aria-label', 'What now?');
-    this.btn.innerHTML = `${pic('portrait-zaza')}<span class="t">What now?</span><span class="n" hidden></span>`;
+    this.btn.innerHTML = `${pic('portrait-dewy')}<span class="t">What now?</span><span class="n" hidden></span>`;
     this.panel = div(hud, 'adv paper');
     this.panel.hidden = true;
     router.add({
@@ -119,7 +119,7 @@ export class Advisor {
     this.close();
     if (a.act.t === 'night') {
       this.pins = [...this.pins, a.act];
-      return acts.toast('Noted. I will remind you at the review.', 'zaza');
+      return acts.toast('Noted. I will remind you at the review.', 'dewy');
     }
     const t = startAnswer(a, this.env());
     if (t) this.tip(t);
@@ -142,7 +142,7 @@ export class Advisor {
 
 function calm(city: CityView): string {
   const a = lookAhead(city);
-  return `<div class="prob"><div class="ph">${pic('portrait-zaza')}<div><b>${esc(a.title)}</b></div></div><ul>${a.lines.map((l) => `<li>${esc(l)}</li>`).join('')}</ul></div>`;
+  return `<div class="prob"><div class="ph">${pic('portrait-dewy')}<div><b>${esc(a.title)}</b></div></div><ul>${a.lines.map((l) => `<li>${esc(l)}</li>`).join('')}</ul></div>`;
 }
 
 const hasGhost = (v: GuideView): boolean => !!v.ghost && !v.ghost.dragging && v.ghost.quote.ok;
@@ -169,7 +169,7 @@ function startAnswer(a: Answer, env: UiEnv): Tip | null {
     }
     case 'street': {
       world.setTool('street');
-      return { ...base, say: buildOr('Drag from one ring to the other.'), target: (v) => (hasGhost(v) && v.ghost?.cmd.t === 'road' && joins(v.ghost.cmd.cells, x.plan) ? BUILD : { t: 'drag', line: lineOf(x.plan) }), until: drew('street'), look: lineOf(x.plan) };
+      return { ...base, say: buildOr('Click or tap one ring, then the other. Click it again to finish.'), target: (v) => (hasGhost(v) && v.ghost?.cmd.t === 'road' && joins(v.ghost.cmd.cells, x.plan) ? BUILD : { t: 'drag', line: lineOf(x.plan) }), until: drew('street'), look: lineOf(x.plan) };
     }
     case 'park': {
       world.setTool('parking', { park: x.kind });

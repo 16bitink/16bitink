@@ -1,17 +1,17 @@
 import type { Speed } from '../ui/types';
 
-export interface KeyActs { setSpeed(s: Speed): void; togglePause(): void; menu(): void; mute(): void; hasCity(): boolean }
+export interface KeyActs { setSpeed(s: Speed): void; togglePause(): void; menu(): void; mute(): void; hasCity(): boolean; back(): boolean }
 
 const NUMBER_SPEED: Readonly<Record<string, Speed>> = { '1': 1, '2': 2, '3': 4 };
 
-/** Space pauses, 1 to 3 pick the speed, Esc opens the menu, M mutes. Returns the remover. */
+/** Space pauses, 1 to 3 pick the speed, M mutes. Esc steps back (the road being drawn, then the tool, then the selection), then opens the menu. Returns the remover. */
 export function bindKeys(a: KeyActs): () => void {
   const onKey = (e: KeyboardEvent): void => {
     const t = e.target as HTMLElement | null;
     if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
     if (e.key === 'm' || e.key === 'M') return a.mute();
     if (!a.hasCity()) return;
-    if (e.key === 'Escape') return a.menu();
+    if (e.key === 'Escape') return void (a.back() || a.menu());
     if (e.key === ' ') {
       e.preventDefault();
       return a.togglePause();

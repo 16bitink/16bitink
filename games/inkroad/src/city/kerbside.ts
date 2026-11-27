@@ -10,7 +10,14 @@ import { accessExists } from './net';
 import { doubleSpot } from './fines';
 import { accessOf, accessPoint, pointOf } from './places';
 import { scoreLost } from './score';
-import { freeSlots, sAlong } from './slots';
+import { freeSlots, sAlong, sideHeading } from './slots';
+import { pointAt } from '../sim/geom';
+import { laneOffset, lanesPerLink } from '../sim/roadGeom';
+import { R_MIN } from '../sim/kinematics';
+import { DRIVEWAY } from '../sim/tune';
+import { polyLength } from './geometry';
+import { sizeOf } from '../sim/vehicleSize';
+import { MOTION_SWITCHES } from '../sim/switches';
 import { legKind } from './vehicleKinds';
 import type { City } from './state';
 import type { Choice } from './modes';
@@ -29,12 +36,14 @@ const GAVE_UP_HOLD = 3;
 
 const TAXI: Choice = { mode: 'taxi', minutes: 0, seconds: 0, coins: 0, spot: null, lines: [] };
 
-/** The open map gate nearest a point (a taxi's base), or null. */
-export function nearestGate(c: City, at: { readonly x: number; readonly y: number }): Place | null {
+/** The open map gate nearest a point (a taxi's base), or null. With a heading, only gates ahead of it count when there are any. */
+export function nearestGate(c: City, at: { readonly x: number; readonly y: number }, a?: number): Place | null {
   let best: Place | null = null;
   let d = Infinity;
-  for (const j of c.net.junctions) {
-    if (!j.gate || !accessExists(c.net, { gate: j.id })) continue;
+  const ahead = (j: { readonly x: number; readonly y: number }): boolean => a === undefined || (j.x - at.x) * Math.cos(a) + (j.y - at.y) * Math.sin(a) > 0;
+  const open = c.net.junctions.filter((j) => j.gate && accessExists(c.net, { gate: j.id }));
+  const pool = open.some(ahead) ? open.filter(ahead) : open;
+  for (const j of pool) {
     const e = distPt({ x: j.x, y: j.y }, at);
     if (e < d) { d = e; best = { gate: j.id }; }
   }
@@ -54,7 +63,8 @@ const kerbOf = (c: City, p: Place): Extract<Access, { road: number }> | null => 
 /** After `hold` seconds where it stands, a car with nobody to wait for drives off by road to the nearest gate. */
 export function sendAway(c: City, e: Standing, like: Tour, hold: number): void {
   const from = standingAccess(c, e);
-  const gate = nearestGate(c, accessPoint(c, from));
+  // A car stopped on the road drives on the way it faces (to the nearest gate ahead), never turning round in the street.
+  const gate = nearestGate(c, accessPoint(c, from), facingOf(c, e));
   if (!gate) return;
   const away = newLeg(c, emptyTour(gate, gate, like), true, TAXI);
   c.day.stays.push({ leg: away, until: c.clock + hold + 1, spot: null, from, parked: e });
@@ -76,11 +86,13 @@ export function taxiArrive(c: City, leg: Leg, a: Arrival): void {
   const rider = leg.then;
   const hold = rider ? TAXI_PICK : TAXI_DROP;
   const e = road ? standHere(c, leg, a, doubleSpot(c, road.road), false, road.s) : null;
+  // A taxi pulls to the kerb (where the sim draws it stopping): it stands there, never back out into the lane.
+  stopOnRoad(c, e, c.traffic.poseOf(a.uid), true);
   finish(c, leg, a.uid, e, hold, road ?? undefined);
   if (rider) {
     // Their ride starts at the kerb: the taxi's way there is the taxi's, as when taxis came out of the door.
     const ride: Leg = { ...rider, start: c.clock, leaving: e };
-    drive(c, ride, road ?? accessOf(c, leg.target), accessOf(c, rider.tour.from));
+    drive(c, ride, e && MOTION_SWITCHES.ROAD_STOPS ? standingAccess(c, e) : road ?? accessOf(c, leg.target), accessOf(c, rider.tour.from));
     return;
   }
   if (leg.out) stayThere(c, leg, null, accessOf(c, leg.target));
@@ -107,6 +119,8 @@ export function pullOver(c: City, leg: Leg, a: Arrival): { readonly e: Standing;
   const e = standHere(c, leg, a, doubleSpot(c, road.id), false, at.s);
   if (!e) return null;
   const pose = c.traffic.poseOf(a.uid);
+  // It stood in the lane: onto the shoulder ahead of it with a forward S.
+  stopOnRoad(c, e, pose ?? { x: a.at.x, y: a.at.y, a: a.a ?? 0 }, true);
   finish(c, leg, a.uid, e, GAVE_UP_HOLD, at);
   // The traffic may have let the car go already: it is shown stopping where it was last drawn all the same.
   if (!pose) shoulderFrom(c, e, { x: a.at.x, y: a.at.y, a: a.a ?? 0 }, GAVE_UP_HOLD);
@@ -150,3 +164,50 @@ function stopInLane(c: City, leg: Leg, a: Arrival): boolean {
   return true;
 }
 
+
+/**
+ * A car stopped on the road (double): it stands where it really is. In the lane (`shoulder` false: double parking, a
+ * pump queue) it is the middle of its outer lane; on the shoulder (a taxi at the kerb, a driver who gave up) the line
+ * the sim draws a car arriving at, or leaving, the kerb (DRIVEWAY.slide outside the lane). When the car is drawn
+ * elsewhere across the road, its place is a forward S ahead of it, never beside it (no sideways step, no reversing).
+ */
+export function stopOnRoad(c: City, e: Standing | null, pose: { readonly x: number; readonly y: number; readonly a: number } | null, shoulder: boolean): void {
+  const road = e && e.s !== undefined ? c.net.roads.find((r) => r.id === e.spot.id) : undefined;
+  if (!e || !road || !pose || e.s === undefined || !MOTION_SWITCHES.ROAD_STOPS) return;
+  const side = sideHeading(road, e.s, pose.a);
+  const p = pointAt(road.line, e.s);
+  const here = (pose.x - p.x) * -Math.sin(p.heading) + (pose.y - p.y) * Math.cos(p.heading);
+  const lane = road.oneWay ? laneOffset(road, side > 0 ? lanesPerLink(road) - 1 : 0) : side * laneOffset(road, lanesPerLink(road) - 1);
+  const lat = shoulder ? lane + side * DRIVEWAY.slide : lane;
+  const d = Math.abs(lat - here);
+  const run = d < SAME_LINE ? 0 : 2 * R_MIN * Math.sin(d >= 2 * R_MIN ? Math.PI / 2 : Math.acos(1 - d / (2 * R_MIN))) + S_ROOM;
+  // From where it really is (not the stand-in's spacing), and never onto a car already standing on that line ahead.
+  let at = sAlong(road, pose) + side * run;
+  const room = sizeOf(e.kind).len + S_ROOM;
+  for (const o of e.spot.cars) {
+    if (o === e || o.s === undefined || o.lat === undefined || o.side !== side || Math.abs(o.lat - lat) > SAME_LANE) continue;
+    if (Math.abs(o.s - at) < (room + sizeOf(o.kind).len) / 2) at = o.s - side * (room + sizeOf(o.kind).len) / 2;
+  }
+  // No room for the S before a junction's corner: it stands where it stopped (the S would end on the junction).
+  const len = polyLength(road.line);
+  const room2 = at >= ROAD_END && at <= len - ROAD_END;
+  e.s = room2 ? at : sAlong(road, pose);
+  e.side = side;
+  e.lat = room2 ? lat : here;
+  e.shoulder = shoulder;
+  e.spot.ver += 1;
+}
+
+/** Px sideways under which a car already stands on its line; px of room past a forward S. */
+const SAME_LINE = 0.5;
+const S_ROOM = 2;
+/** Px sideways within which two stopped cars share a line. */
+const SAME_LANE = 6;
+/** Px from a road's end a stopped car keeps clear (the renderer's JUNCTION_CLEAR). */
+const ROAD_END = 36;
+
+/** The heading of a car standing on the road (its side of the road line), if it stands on one. */
+function facingOf(c: City, e: Standing): number | undefined {
+  const road = e.spot.kind === 'double' && e.s !== undefined && e.side !== undefined && e.lat !== undefined ? c.net.roads.find((r) => r.id === e.spot.id) : undefined;
+  return road && e.s !== undefined ? pointAt(road.line, e.s).heading + (e.side! < 0 ? Math.PI : 0) : undefined;
+}

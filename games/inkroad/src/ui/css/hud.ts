@@ -56,9 +56,9 @@ export const HUD_CSS = `
 .ikr .ticker .pic{width:36px;height:36px;flex:none;border-radius:6px}
 .ikr .ticker p{font:700 20px/1.05 var(--hand)}
 .ikr .ticker small{display:block;font:600 var(--fs-s)/1.2 var(--sans);color:var(--ink2)}
-.ikr .ghostbar{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);display:flex;gap:14px;align-items:center;padding:10px 14px;max-width:min(680px,94vw)}
-.ikr .ghostbar .info{display:flex;flex-direction:column;gap:2px;min-width:0}
-.ikr .ghostbar b{font:800 18px/1.1 var(--serif)}
+.ikr .ghostbar,.ikr .hintbar{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);display:flex;gap:14px;align-items:center;padding:10px 14px;max-width:min(680px,94vw)}
+.ikr .ghostbar .info,.ikr .hintbar .info{display:flex;flex-direction:column;gap:2px;min-width:0}
+.ikr .ghostbar b,.ikr .hintbar b{font:800 18px/1.1 var(--serif)}
 .ikr .ghostbar .why{color:var(--ochre);font-weight:600;font-size:var(--fs-s)}
 .ikr .kinds{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);display:flex;gap:8px;padding:8px 10px}
 .ikr .sel{position:absolute;right:98px;top:82px;width:330px;max-height:calc(100% - 160px);overflow:auto;padding:14px 16px 16px;overscroll-behavior:contain;touch-action:pan-y}
@@ -122,7 +122,7 @@ export const HUD_CSS = `
 
 .ikr .iconbtn.lab{width:72px;height:64px;flex-direction:column;gap:2px;display:flex;align-items:center;justify-content:center;padding-top:2px}
 .ikr .iconbtn.lab .pic{width:34px;height:34px}
-.ikr .hasghost .ticker,.ikr.carding .sel,.ikr.carding .ticker,.ikr.carding .ghostbar,.ikr.carding .kinds{display:none}
+.ikr .hasghost .ticker,.ikr.carding .sel,.ikr.carding .ticker,.ikr.carding .ghostbar,.ikr.carding .hintbar,.ikr.carding .kinds{display:none}
 .ikr .projects{position:absolute;left:calc(var(--toolsw,180px) + 260px);top:82px;display:flex;gap:6px;flex-wrap:wrap;max-width:46vw}
 .ikr .projects .chip{cursor:pointer;background:var(--paper);min-height:34px;padding:2px 12px 2px 4px}
 .ikr .projects .chip b{font-weight:800}

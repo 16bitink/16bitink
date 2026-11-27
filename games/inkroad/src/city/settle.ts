@@ -64,7 +64,7 @@ function advanceWorks(c: City): void {
   });
   for (const p of due) {
     const plan = planFlyover(net, p.node, p.fromRoad, p.toRoad, p.level);
-    if (!plan.ok) { earn(c, 'grant', FLYOVER.base); emit(c, { t: 'toast', who: 'zaza', text: 'The flyover lost its road. The Council gave part of the money back.' }); continue; }
+    if (!plan.ok) { earn(c, 'grant', FLYOVER.base); emit(c, { t: 'toast', who: 'dewy', text: 'The flyover lost its road. The Council gave part of the money back.' }); continue; }
     net = addFlyover(net, plan);
     const road = net.roads[net.roads.length - 1]!;
     emit(c, { t: 'opened', road: road.id, at: plan.line[Math.floor(plan.line.length / 2)] ?? { x: 0, y: 0 } });
