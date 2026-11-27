@@ -49,7 +49,7 @@ function cars(list: readonly { x: number; y?: number; v: number; a?: number; z?:
   return {
     count: n, alive: new Uint8Array(n).fill(1), x: Float32Array.from(list, (c) => c.x), y: Float32Array.from(list, (c) => c.y ?? 0), heading: Float32Array.from(list, (c) => c.a ?? 0),
     z: Float32Array.from(list, (c) => c.z ?? 0), speed: Float32Array.from(list, (c) => c.v), kind: new Uint8Array(n), tint: new Uint8Array(n), anger: new Float32Array(n),
-    blinker: new Int8Array(n), state: new Uint8Array(n), uid: new Uint32Array(n),
+    blinker: new Int8Array(n), state: new Uint8Array(n), uid: new Uint32Array(n), frames: new Float64Array(n * 28), sub: 6,
   };
 }
 

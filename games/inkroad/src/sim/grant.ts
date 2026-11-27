@@ -205,7 +205,7 @@ function ringClear(sim: Sim, i: number, conn: Track, n: NodeRt, d: number): bool
   const tail = arm.arc.tail;
   if (tail >= 0 && c.s[tail]! - c.half[tail]! + c.v[tail]! * 0.6 < c.len[i]! * 0.7) return false;
   const gap = gapNow(sim.time - c.ticket[i]!, RING.gap);
-  const mine = (Math.max(0, d) + conn.len) / 30;
+  const mine = timeTo(Math.max(0, d) + conn.len, c.v[i]!, conn.vmax);
   let back = 0;
   for (let k = 0; k < arms.length && back < RING.back; k++) {
     const at = arms[(conn.arm - k + arms.length) % arms.length]!;
@@ -218,6 +218,14 @@ function ringClear(sim: Sim, i: number, conn: Track, n: NodeRt, d: number): bool
     back += at.span.len;
   }
   return true;
+}
+
+/** Seconds to drive `d` px from speed v, pulling away at the sim's rate up to `top` (an entry's own cap). */
+export function timeTo(d: number, v: number, top: number): number {
+  const vt = Math.max(top, v, 1);
+  const ramp = (vt * vt - v * v) / (2 * IDM.accel);
+  if (ramp >= d) return (Math.sqrt(v * v + 2 * IDM.accel * d) - v) / IDM.accel;
+  return (vt - v) / IDM.accel + (d - ramp) / vt;
 }
 
 /** The same for cars already on their way in at an earlier arm. */
@@ -247,6 +255,7 @@ function anyBlocks(sim: Sim, t: Track, back: number, hops: number, arms: number,
 /** A ring car `dq` px before our entry: would it reach it close to when we do? */
 function blocks(sim: Sim, q: number, dq: number, mine: number, gap: number): boolean {
   const c = sim.cars;
-  const v = Math.max(RING.assume, c.v[q]!);
+  // A slow ring car is about to pick up to the ring's own speed (never assumed faster than the ring is driven).
+  const v = Math.max(Math.min(RING.assume, c.track[q]!.vmax), c.v[q]!);
   return (dq - c.half[q]!) / v < mine + gap * RING.ahead && (dq + c.half[q]!) / v > mine - gap * RING.behind;
 }

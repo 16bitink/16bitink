@@ -142,7 +142,8 @@ export function relocate(sim: Sim, next: World): void {
     const at = nearestLane(next, c.x[i]!, c.y[i]!, c.heading[i]!, c.z[i]!, (t, s) => overlaps(sim, i, t, s));
     if (!at) { giveUp(sim, i); continue; }
     c.insert(i, at.t, at.s);
-    c.slideFrom(i, c.x[i]!, c.y[i]!, c.heading[i]!, SLIDE);
+    c.forget(i);
+    c.slideFrom(i, c.rx[i]!, c.ry[i]!, SLIDE);
   }
   for (const { i } of all) if (c.alive[i]) replan(sim, i, old);
 }

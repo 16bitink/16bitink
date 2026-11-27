@@ -1,17 +1,23 @@
 /** Every car, as struct of arrays, and the queue operations that keep lanes ordered. */
-import { MAX_CARS } from './constants';
-import { angleDiff } from './geom';
-import { slideLength } from './kinematics';
+import { MAX_CARS, VEHICLES } from './constants';
+import { shiftLength } from './vehicle/shift';
 import { LANE_T, poseAt, type Pose, type Track } from './track';
 import { LENGTH_OF, SPEED_OF, isBus } from './tune';
-import type { CarsView } from './types';
+import { sizeOf } from './vehicleSize';
+import type { CarsView, VehicleKind } from './types';
+
+const BODY_HALF: readonly number[] = VEHICLES.map((k) => sizeOf(k as VehicleKind).len / 2);
 import type { OutOpt } from './world';
 
 const f32 = (): Float32Array => new Float32Array(MAX_CARS);
 const f64 = (): Float64Array => new Float64Array(MAX_CARS);
 const i32 = (): Int32Array => new Int32Array(MAX_CARS);
+/** Drawn sub-steps per sim step (1/60 played s) and numbers per drawn frame. */
+export const SUB = 6;
+export const FRAME_STRIDE = 4;
 
 export class CarStore implements CarsView {
+  readonly sub = SUB;
   count = 0;
   active = 0;
   readonly alive = new Uint8Array(MAX_CARS);
@@ -33,9 +39,13 @@ export class CarStore implements CarsView {
   readonly s = f64();
   readonly v = f64();
   readonly nv = f64(); // speed wanted next
+  readonly acc = f64(); // acceleration this step (jerk-limited)
   readonly room = f64(); // hard limit on this step's travel
   readonly len = f32();
   readonly half = f32();
+  /** Half the drawn body's length (src/sim/vehicleSize.ts), and px the drawn car is behind its sim point (+) or past it (-). */
+  readonly body = f32();
+  readonly lag = f32();
   readonly vf = f32(); // driver's speed factor
   readonly hw = f32(); // driver's headway factor
   readonly ahead = i32();
@@ -49,12 +59,31 @@ export class CarStore implements CarsView {
   readonly ticket = f64();
   /** A left-turner held up on green long enough that the others let it go. */
   readonly courtesy = new Uint8Array(MAX_CARS);
-  // sideways offset that fades as the car drives on
+  // sideways offset that fades as the car drives on: a quintic in progress, ending at offEnd (px along its track)
   readonly offX = f32();
   readonly offY = f32();
-  readonly offH = f32();
-  readonly offLeft = f32();
+  readonly offEnd = f64();
   readonly offLen = f32();
+  // the reference pose of the body's middle (src/sim/motion.ts pose); x, y and heading above are where it is drawn
+  readonly rx = f32();
+  readonly ry = f32();
+  readonly rh = f32();
+  // the drawn car (src/sim/drawn.ts): rear axle, heading, speed, wheel angle, acceleration; fOn: 0 new, 1 driving, 2 held
+  readonly fx = f64();
+  readonly fy = f64();
+  readonly fth = f64();
+  readonly fu = f64();
+  readonly fdelta = f64();
+  readonly fa = f64();
+  readonly fOn = new Uint8Array(MAX_CARS);
+  /** Tracks it came by (the rear axle may still be on them), newest first. */
+  readonly hist0: (Track | null)[] = new Array<Track | null>(MAX_CARS).fill(null);
+  readonly hist1: (Track | null)[] = new Array<Track | null>(MAX_CARS).fill(null);
+  /** Speed at the start of this step and px driven in it (the drawn car's sub-steps ramp between them). */
+  readonly v0 = f64();
+  readonly travel = f64();
+  /** Drawn frames: SUB + 1 per car (frame 0 = the last of the step before), x, y, heading, z each. */
+  readonly frames = new Float64Array(MAX_CARS * (SUB + 1) * FRAME_STRIDE);
   // the trip
   readonly destRoad = i32(); // road id, or -1 for a gate
   readonly destNode = i32(); // gate node id, or -1
@@ -90,6 +119,8 @@ export class CarStore implements CarsView {
     this.kind[i] = kind;
     this.len[i] = LENGTH_OF[kind]!;
     this.half[i] = LENGTH_OF[kind]! / 2;
+    this.body[i] = BODY_HALF[kind]!;
+    this.lag[i] = 0;
     this.vf[i] = SPEED_OF[kind]!;
     this.bus[i] = isBus(kind) ? 1 : 0;
     this.hw[i] = 1;
@@ -97,8 +128,9 @@ export class CarStore implements CarsView {
     this.opt[i] = this.outTo[i] = this.exitBy[i] = null;
     this.field[i] = '';
     for (const a of [this.s, this.v, this.nv, this.waited, this.stuck, this.linkWait, this.tolls, this.until, this.ticket, this.destS, this.destAt, this.rerouted]) a[i] = 0;
-    for (const a of [this.offX, this.offY, this.offH, this.offLeft, this.anger, this.z, this.speed]) a[i] = 0;
-    this.offLen[i] = 1;
+    for (const a of [this.offX, this.offY, this.offEnd, this.offLen, this.anger, this.z, this.speed, this.v0, this.travel, this.acc]) a[i] = 0;
+    this.fOn[i] = 0;
+    this.hist0[i] = this.hist1[i] = null;
     this.ahead[i] = this.behind[i] = this.service[i] = this.destLink[i] = this.destRoad[i] = this.destNode[i] = this.link[i] = -1;
     this.courtesy[i] = this.granted[i] = this.arrived[i] = this.state[i] = this.tint[i] = this.destDir[i] = 0;
     this.blinker[i] = 0;
@@ -170,17 +202,29 @@ export class CarStore implements CarsView {
     this.s[i] = s;
   }
 
-  /** Start a sideways slide from where the car is drawn now to its new place. */
-  slideFrom(i: number, x: number, y: number, h: number, over: number): void {
+  /** Start a sideways slide of the reference from its pose before (x, y) to the car's new place: no step in it. */
+  slideFrom(i: number, x: number, y: number, over: number): void {
     poseAt(this.track[i]!, this.s[i]!, POSE);
     this.offX[i] = x - POSE.x;
     this.offY[i] = y - POSE.y;
-    this.offH[i] = angleDiff(POSE.h, h);
-    // Never a sideways move tighter than a car turns (a lane change, a redirect, a kerb swing).
-    const len = Math.max(over, slideLength(Math.hypot(this.offX[i]!, this.offY[i]!)));
-    this.offLeft[i] = len;
+    // Never a sideways move tighter than a car turns, nor one its wheels can't follow at its speed.
+    const len = Math.max(over, shiftLength(Math.hypot(this.offX[i]!, this.offY[i]!), this.v[i]!));
+    this.offEnd[i] = this.s[i]! + len;
     this.offLen[i] = len;
   }
+
+  /** Px of slide still ahead of the car. */
+  sliding(i: number): number { return this.offEnd[i]! - this.s[i]!; }
+
+  /** The car moves on to the next track: its offset and the track it left come along. */
+  hop(i: number, from: Track): void {
+    this.offEnd[i] = this.offEnd[i]! - from.len;
+    this.hist1[i] = this.hist0[i]!;
+    this.hist0[i] = from;
+  }
+
+  /** Put on another track that doesn't continue the one before (a lane change, a rebuilt road): no way back along it. */
+  forget(i: number): void { this.hist0[i] = this.hist1[i] = null; }
 }
 
 export const STAND = 3.5;

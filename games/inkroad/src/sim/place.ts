@@ -6,6 +6,8 @@ import { DRIVEWAY, IDM } from './tune';
 /** A pull-out from the kerb is a forward S this many driveway lengths long: its bend stays near R_MIN, never a sideways hop. */
 const PULL_OUT_STRETCH = 2;
 import { pose } from './motion';
+import { speedAhead } from './path';
+import { capAhead } from './trackCaps';
 import { LANE_T, POSE_ZERO, poseAt, type Track } from './track';
 import { laneS, type LinkRt } from './world';
 import { closedForWorks } from './roadGeom';
@@ -105,6 +107,8 @@ export function place(sim: Sim, i: number, l: LinkRt, from: Access, still = fals
     if (!gate && !still) fromKerb(sim, i, t, s);
     drivers(sim, i);
     plan(sim, i, l);
+    // Never faster than it could brake for the curves ahead or the line at the lane's end (it enters the map at a speed it could have had).
+    c.v[i] = Math.min(c.v[i]!, speedAhead(sim, i, c.v[i]!), capAhead(t, s, IDM.brake * 0.6), Math.sqrt(2 * IDM.brake * 0.6 * Math.max(0, t.len - s)));
     pose(sim, i);
     return true;
   }
@@ -122,7 +126,7 @@ export function entryPose(l: LinkRt, from: Access, bus: boolean): { x: number; y
 function fromKerb(sim: Sim, i: number, t: Track, s: number): void {
   const c = sim.cars;
   poseAt(t, s, POSE_ZERO);
-  c.slideFrom(i, POSE_ZERO.x - Math.sin(POSE_ZERO.h) * DRIVEWAY.slide, POSE_ZERO.y + Math.cos(POSE_ZERO.h) * DRIVEWAY.slide, POSE_ZERO.h, DRIVEWAY.length * PULL_OUT_STRETCH);
+  c.slideFrom(i, POSE_ZERO.x - Math.sin(POSE_ZERO.h) * DRIVEWAY.slide, POSE_ZERO.y + Math.cos(POSE_ZERO.h) * DRIVEWAY.slide, DRIVEWAY.length * PULL_OUT_STRETCH);
 }
 
 /** No two drivers are the same. */
@@ -143,11 +147,12 @@ export function turnBack(sim: Sim, i: number): boolean {
   const to = other.lanes[c.bus[i] ? other.lanes.length - 1 : other.carLanes - 1]!;
   const s = to.len * (1 - c.s[i]! / t.len);
   if (!spaceAt(sim, to, s, c.half[i]!, 0)) return false;
-  const x = c.x[i]!, y = c.y[i]!, h = c.heading[i]!;
+  const x = c.rx[i]!, y = c.ry[i]!;
   c.unlink(i);
   c.insert(i, to, s);
+  c.forget(i);
   c.v[i] = 0;
-  c.slideFrom(i, x, y, h, DRIVEWAY.length * 1.2);
+  c.slideFrom(i, x, y, DRIVEWAY.length * 1.2);
   plan(sim, i, other);
   return true;
 }

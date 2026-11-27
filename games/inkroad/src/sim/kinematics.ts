@@ -24,5 +24,3 @@ export const GAME_PACE = 1.25;
 export const REVERSE_PLAYED = REVERSE_MAX * GAME_PACE;
 export const A_LAT_PLAYED = A_LAT * GAME_PACE * GAME_PACE;
 
-/** Px a smoothstep sideways slide of `d` px needs so its sharpest bend (6·d/L²) is no tighter than R_MIN. */
-export const slideLength = (d: number): number => Math.sqrt(6 * Math.abs(d) * R_MIN);

@@ -1,10 +1,9 @@
 /** The Traffic contract: cars on a network, one step at a time. */
 import { gapAcross, holdAcross } from './crossing';
 import { STEP } from './constants';
-import { angleDiff } from './geom';
-import { slideLength } from './kinematics';
 import { considerLane, think } from './drive';
 import { feel, move, plan, pose } from './motion';
+import { drawStep } from './drawn';
 import { Measure } from './measure';
 import { entryPose, exists, firstLink, place, reachableFrom, reachableTo, setDest, standAt, turnBack } from './place';
 import { relocate } from './relocate';
@@ -48,7 +47,7 @@ function stepCars(sim: Sim): void {
     if (!feel(sim, i)) continue;
     if ((i + sim.tick) % CHANGE.every === 0) considerLane(sim, i);
   }
-  for (let i = 0; i < c.count; i++) if (c.alive[i]) think(sim, i);
+  for (let i = 0; i < c.count; i++) if (c.alive[i]) { think(sim, i); c.v0[i] = c.v[i]!; c.travel[i] = 0; }
   // Leaders first within a track, so a queue moves off together.
   for (const t of sim.world.tracks) {
     for (let i = t.head; i >= 0;) {
@@ -57,7 +56,7 @@ function stepCars(sim: Sim): void {
       i = behind;
     }
   }
-  for (let i = 0; i < c.count; i++) if (c.alive[i]) pose(sim, i);
+  for (let i = 0; i < c.count; i++) if (c.alive[i]) { pose(sim, i); drawStep(sim, i); }
 }
 
 /** A car that pulled out of a space has held its lane long enough: it drives off. False: it was only standing there. */
@@ -141,19 +140,14 @@ function spawn(sim: Sim, req: SpawnRequest): number {
 /** Px of slide per px of offset to undo (smoothstep's steepest slope is 1.5 per unit). */
 const SLIDE_PER_PX = 2;
 
-function slideFromDrawn(sim: Sim, i: number, x: number, y: number, h: number): void {
+function slideFromDrawn(sim: Sim, i: number, x: number, y: number): void {
   const c = sim.cars;
-  c.offLeft[i] = 0;
+  c.offLen[i] = 0;
   pose(sim, i);
-  c.offX[i] = x - c.x[i]!;
-  c.offY[i] = y - c.y[i]!;
-  c.offH[i] = angleDiff(c.heading[i]!, h);
-  // A long way to undo is undone over a longer stretch: the drawn car never runs backward or jumps (slope under 1).
-  const off = Math.hypot(c.offX[i]!, c.offY[i]!);
-  const over = Math.max(CHANGE.length, off * SLIDE_PER_PX, slideLength(off));
-  c.offLeft[i] = over;
-  c.offLen[i] = over;
-  c.x[i] = x; c.y[i] = y; c.heading[i] = h;
+  // A long way to undo is undone over a longer stretch (slope under 1); slideFrom adds the model's own length.
+  const off = Math.hypot(x - c.rx[i]!, y - c.ry[i]!);
+  c.slideFrom(i, x, y, Math.max(CHANGE.length, off * SLIDE_PER_PX));
+  pose(sim, i);
 }
 
 function redirect(sim: Sim, uid: number, want: Access): boolean {
@@ -162,13 +156,13 @@ function redirect(sim: Sim, uid: number, want: Access): boolean {
   if (i === undefined || !exists(sim, want)) return false;
   const to = reachableFrom(sim, sim.world.links[c.link[i]!], want, c.value[i]!, c.kind[i]!) || !('road' in want) ? want : { road: want.road, s: want.s };
   const t = c.track[i]!;
-  const x = c.x[i]!, y = c.y[i]!, h = c.heading[i]!;
+  const x = c.rx[i]!, y = c.ry[i]!;
   setDest(sim, i, to);
   c.state[i] = 1;
   if (!c.arrived[i]) {
     // Its kerb swing toward the old place is undone smoothly, never in one step.
     if (t.kind === LANE_T && !c.granted[i]) plan(sim, i, sim.world.links[t.link]!);
-    if (t.kind === LANE_T) slideFromDrawn(sim, i, x, y, h);
+    if (t.kind === LANE_T) slideFromDrawn(sim, i, x, y);
     return true;
   }
   const l = sim.world.links[t.link]!;
@@ -176,7 +170,7 @@ function redirect(sim: Sim, uid: number, want: Access): boolean {
   c.arrived[i] = 0;
   c.stuck[i] = 0;
   plan(sim, i, l);
-  slideFromDrawn(sim, i, x, y, h);
+  slideFromDrawn(sim, i, x, y);
   if (c.opt[i] || c.destLink[i]! >= 0 || turnBack(sim, i)) return true;
   c.arrived[i] = 1;
   return false;

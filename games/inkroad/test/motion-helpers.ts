@@ -1,6 +1,6 @@
 /**
  * The motion watch: plays a city season step by step and samples every drawn car at render-frame resolution, through
- * the renderer's own pure code (`glideAt` for moving cars as in carLayer.ts, `ManoeuvreCore` + `pathPose` for cars
+ * the renderer's own pure code (`drawnAt`, the vehicle model's frames, for moving cars as in carLayer.ts, `ManoeuvreCore` + `pathPose` for cars
  * turning in and out, `layoutPlace` for parked cars as in parkedCars.ts). It counts breaches of the car motion rules
  * (src/sim/kinematics.ts, docs/inkroad-build.md "Car motion rules").
  */
@@ -10,7 +10,8 @@ import { lotRect } from '../src/city/geometry';
 import { layoutPlace, makeGeo, modeOf, type ParkingGeo } from '../src/render/cars/parkingSlots';
 import type { Placed } from '../src/render/cars/parkedCars';
 import { ManoeuvreCore, type Move, type Places } from '../src/render/cars/manoeuvreCore';
-import { glideAt, turn, type Glide, type GlidePose } from '../src/render/cars/glide';
+import { drawnAt, turn, type DrawnPose } from '../src/render/cars/drawnPose';
+import { PhysWatch } from './vehicle/frameRules';
 import { bodiesOverlap, sizeOf, type Body } from '../src/sim/vehicleSize';
 import { A_LAT_PLAYED as A_LAT, R_MIN, REVERSE_PLAYED as REVERSE_MAX } from '../src/sim/kinematics';
 import { UNDER } from '../src/render/deckHeight';
@@ -41,7 +42,9 @@ const TELEPORT = 60;
 const HOLDING = 4;
 const GRID = 32;
 
-export type Rule = 'jumps' | 'slip' | 'turns in place' | 'too tight' | 'too fast on a curve' | 'reverse on the road' | 'reverse too fast' | 'bodies overlap' | 'cuts across without a gap';
+export type Rule = 'jumps' | 'slip' | 'turns in place' | 'too tight' | 'too fast on a curve' | 'reverse on the road' | 'reverse too fast' | 'bodies overlap' | 'cuts across without a gap'
+  /** Moving cars only (the vehicle invariants, test/vehicle/frameRules.ts). */
+  | 'steers too fast' | 'pulls away too hard' | 'brakes too hard' | 'jerks';
 export interface Finding {
   readonly rule: Rule; readonly who: 'moving' | 'manoeuvre'; readonly uid: number; readonly clock: number; readonly detail: string;
   /** The render frame (count from the start) and the drawn pose at it (the motion lab's timeline and frames). */
@@ -117,13 +120,13 @@ class TestPlaces implements Places {
   dirty = false;
 }
 
-interface Glider extends Glide { uid: number }
 
 export class MotionWatch {
   readonly found: Finding[] = [];
   private readonly places = new TestPlaces();
   private readonly core: ManoeuvreCore<null>;
-  private readonly glides: (Glider | null)[] = [];
+  private readonly seen: number[] = [];
+  private readonly phys = new PhysWatch();
   private readonly tracks = new Map<string, Track>();
   private readonly touching = new Set<string>();
   private readonly cutting = new Set<string>();
@@ -133,7 +136,7 @@ export class MotionWatch {
   frames = 0;
   /** The city's events of the last step (the motion lab logs them). */
   lastEvents: readonly CityEvent[] = [];
-  private readonly at: GlidePose = { x: 0, y: 0, z: 0, a: 0 };
+  private readonly at: DrawnPose = { x: 0, y: 0, z: 0, a: 0 };
 
   constructor(private readonly v: CityView, private readonly hooks: WatchHooks = {}) {
     this.core = new ManoeuvreCore<null>(this.places, () => null);
@@ -172,23 +175,18 @@ export class MotionWatch {
     }
   }
 
-  /** A new sim step: as carLayer.take. */
+  /** A new sim step: as carLayer.take (a new uid, or a first frame far from the last drawn one, is a new car). */
   private take(): void {
     const c = this.v.cars;
-    for (let i = 0; i < Math.max(c.count, this.glides.length); i++) {
+    for (let i = 0; i < Math.max(c.count, this.seen.length); i++) {
       const alive = i < c.count && c.alive[i] === 1;
-      let g = this.glides[i] ?? null;
-      if (!alive || c.state[i] === HOLDING) { if (g) g.uid = 0; continue; }
-      const x = c.x[i]!, y = c.y[i]!, z = c.z[i]!, a = c.heading[i]!;
-      if (!g) { g = { uid: 0, x0: 0, y0: 0, z0: 0, a0: 0, x1: 0, y1: 0, z1: 0, a1: 0 }; this.glides[i] = g; }
-      if (g.uid !== c.uid[i] || Math.hypot(x - g.x1, y - g.y1) > TELEPORT) {
-        g.uid = c.uid[i]!; g.x0 = x; g.y0 = y; g.z0 = z; g.a0 = a;
-        this.tracks.delete(`m${g.uid}`);
-      } else {
-        glideAt(g, 1, this.at);
-        g.x0 = this.at.x; g.y0 = this.at.y; g.z0 = this.at.z; g.a0 = this.at.a;
+      if (!alive || c.state[i] === HOLDING) { this.seen[i] = 0; continue; }
+      const p = drawnAt(c, i, 0, this.at);
+      const last = this.tracks.get(`m${c.uid[i]}`);
+      if (this.seen[i] !== c.uid[i] || (last && Math.hypot(p.x - last.x, p.y - last.y) > TELEPORT)) {
+        this.seen[i] = c.uid[i]!;
+        this.tracks.delete(`m${c.uid[i]}`);
       }
-      g.x1 = x; g.y1 = y; g.z1 = z; g.a1 = a;
     }
   }
 
@@ -199,15 +197,15 @@ export class MotionWatch {
     if (this.places.dirty) { this.places.redo(this.v); this.places.dirty = false; }
     const drawn: Drawn[] = [];
     const c = this.v.cars;
-    for (let i = 0; i < this.glides.length; i++) {
-      const g = this.glides[i];
-      if (!g || g.uid === 0) continue;
-      const p = glideAt(g, t, this.at);
+    for (let i = 0; i < this.seen.length; i++) {
+      const uid = this.seen[i];
+      if (!uid) continue;
+      const p = drawnAt(c, i, t, this.at);
       if (p.z <= UNDER) continue;
       const kind = VEHICLES[c.kind[i]!] as VehicleKind;
       this.note = this.why(i);
       const rev = (c as unknown as { track: ({ turnRound: string | null } | null)[] }).track[i]?.turnRound === 'three';
-      drawn.push(this.motion({ x: p.x, y: p.y, a: p.a, ...sizeOf(kind), uid: g.uid, z: p.z, v: 0, man: false, id: `m${g.uid}`, info: this.note, ...(rev ? { rev } : {}) }));
+      drawn.push(this.motion({ x: p.x, y: p.y, a: p.a, ...sizeOf(kind), uid, z: p.z, v: 0, man: false, id: `m${uid}`, info: this.note, ...(rev ? { rev } : {}) }, undefined, kind));
     }
     for (let i = 0; i < this.core.active; i++) {
       const m = this.core.at(i);
@@ -231,20 +229,28 @@ export class MotionWatch {
   /** What a moving car is doing (for the log): its track kind, a slide under way, its state. */
   private why(i: number): string {
     if (!env('MOTION_LOG') && !this.hooks.onFrame) return '';
-    const c = this.v.cars as unknown as { track: ({ kind: number; key: string } | null)[]; offLeft: Float32Array; state: Uint8Array; s: Float32Array };
+    const c = this.v.cars as unknown as { track: ({ kind: number; key: string } | null)[]; offEnd: Float64Array; state: Uint8Array; s: Float64Array };
     const t = c.track[i];
-    return `[track ${t?.kind ?? '-'} ${t?.key ?? ''} s ${c.s[i]?.toFixed(1)} slide ${c.offLeft[i]!.toFixed(0)} state ${c.state[i]}]`;
+    return `[track ${t?.kind ?? '-'} ${t?.key ?? ''} s ${c.s[i]?.toFixed(1)} slide ${Math.max(0, c.offEnd[i]! - c.s[i]!).toFixed(0)} state ${c.state[i]}]`;
   }
 
   /** Slip, curvature and reversing against the car's last drawn frame. Returns the body with its speed. */
-  private motion(b: Drawn, m?: Move<null>): Drawn {
+  private motion(b: Drawn, m?: Move<null>, kind?: VehicleKind): Drawn {
     const last = this.tracks.get(b.id);
+    if (kind && !b.rev) for (const h of this.phys.feed(b.id, kind, this.frame, b.x, b.y, b.a, DT)) this.flag(h.rule, 'moving', b.uid, `${h.value.toFixed(3)} over ${h.limit.toFixed(3)} ${this.note}`, b, h.value, h.limit);
     this.tracks.set(b.id, { x: b.x, y: b.y, a: b.a, frame: this.frame });
     if (!last || last.frame !== this.frame - 1) return b;
     const dx = b.x - last.x, dy = b.y - last.y, ds = Math.hypot(dx, dy);
     const da = Math.abs(turn(last.a, b.a));
     const who = b.man ? 'manoeuvre' : 'moving';
     const v = ds / DT;
+    const model = !!kind && !b.rev;
+    if (model) {
+      if (v > JUMP_V) { this.flag('jumps', who, b.uid, `${ds.toFixed(1)} px in a frame ${this.note}`, b, v, JUMP_V); return { ...b, v: 0 }; }
+      const along = ds > 0 ? (dx * Math.cos(b.a) + dy * Math.sin(b.a)) / ds : 1;
+      if (along < -0.5 && ds > STILL) this.flag('reverse on the road', who, b.uid, `${v.toFixed(1)} px/s ${this.note}`, b, v, 0);
+      return { ...b, v: along < 0 ? -v : v };
+    }
     if (ds < STILL) {
       if (da > TURN_EPS) this.flag('turns in place', who, b.uid, `${da.toFixed(3)} rad ${m ? `${m.mode}/${m.dir}/${m.phase}` : this.note}`, b, da, TURN_EPS);
       return { ...b, v };

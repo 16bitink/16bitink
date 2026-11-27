@@ -2,8 +2,9 @@
 import { angleDiff, lineLength, offsetLine, resample, reverseLine, sliceLine } from './geom';
 import { closedForWorks, deckZ, isForward, laneOffset } from './roadGeom';
 import { LANE_T, Track } from './track';
-import { MIN_LANE, SAMPLE } from './tune';
-import { buildNode } from './nodeBuild';
+import { IDM, MIN_LANE, SAMPLE, YIELD } from './tune';
+import { buildNode, turnTrims } from './nodeBuild';
+import { capsOf } from './trackCaps';
 import type { Id, Junction, Link, Pt, Road } from './types';
 import type { Network } from './trafficTypes';
 import type { RingRt } from './ringBuild';
@@ -83,7 +84,7 @@ export interface World {
   readonly optByKey: Map<string, OutOpt>;
 }
 
-const RING_TRIM = 8;
+const RING_TRIM = 14;
 const LINE_TRIM = 2;
 const RAMP_TRIM = 14;
 const BEND_TRIM = 26;
@@ -125,16 +126,18 @@ function laneTracks(l: Link, road: Road, t0: number, t1: number): Track[] {
     const pts: Pt[] = off === 0 ? cut : offsetLine(cut, off);
     const t = new Track(`L${l.id}:${i}`, LANE_T, pts, l.freeSpeed, z ? { z } : {});
     t.lane = i;
+    t.caps = capsOf(t, t.vmax);
     return t;
   });
 }
 
-function buildLinks(net: Network, w: World): void {
+/** `extra`: px more to trim at a link's start (`id:0`) and end (`id:1`) so its junctions' turns get the road radius. */
+function buildLinks(net: Network, w: World, extra: ReadonlyMap<string, number>): void {
   for (const link of net.links) {
     const road = w.roadById.get(link.road)!;
     const node = w.nodeById.get(link.to)!, fromNode = w.nodeById.get(link.from)!;
     const len = lineLength(road.line);
-    let t0 = trimAt(fromNode.j, fromNode.kind, net), t1 = trimAt(node.j, node.kind, net);
+    let t0 = trimAt(fromNode.j, fromNode.kind, net) + (extra.get(`${link.id}:0`) ?? 0), t1 = trimAt(node.j, node.kind, net) + (extra.get(`${link.id}:1`) ?? 0);
     const room = Math.max(len * 0.3, len - MIN_LANE);
     if (t0 + t1 > room) { const k = room / (t0 + t1); t0 *= k; t1 *= k; }
     const lanes = laneTracks(link, road, t0, t1);
@@ -161,6 +164,16 @@ export function addTrack(w: World, t: Track): Track {
 
 const CONTROL_DELAY: Readonly<Record<NodeKind, number>> = { free: 0, gate: 0, yield: 1, ring: 1.2, signal: 3 };
 
+/**
+ * Seconds lost slowing down for a junction's control and pulling away again at the sim's own rates (IDM, the
+ * vehicle model's limits): to YIELD.stop at a yield, to a standstill at half of the signals, nothing elsewhere.
+ */
+function stopLoss(l: LinkRt): number {
+  const v = l.link.freeSpeed;
+  const loss = (to: number): number => ((v - to) ** 2 / (2 * v)) * (1 / (IDM.brake * 0.6) + 1 / IDM.accel);
+  return l.node.kind === 'yield' ? loss(YIELD.stop) : l.node.kind === 'signal' ? loss(0) / 2 : 0;
+}
+
 /** Follow ramp nodes to the junction a queue is really for. */
 function findStatNode(l: LinkRt): Id {
   let at = l;
@@ -174,7 +187,17 @@ function findStatNode(l: LinkRt): Id {
   return l.node.j.id;
 }
 
+/**
+ * The tracks of a network. Built twice: first to measure how much each lane must give up so every junction turn gets
+ * the road radius (turnTrims), then with those trims.
+ */
 export function buildWorld(net: Network): World {
+  const first = emptyWorld(net);
+  buildLinks(net, first, new Map());
+  return finish(emptyWorld(net), turnTrims(first));
+}
+
+function emptyWorld(net: Network): World {
   const w: World = {
     net, tracks: [], links: [], nodes: [], linkById: new Map(), nodeById: new Map(), roadById: new Map(net.roads.map((r) => [r.id, r])),
     byKey: new Map(), optByKey: new Map(),
@@ -187,11 +210,15 @@ export function buildWorld(net: Network): World {
     w.nodes.push(n);
     w.nodeById.set(j.id, n);
   }
-  buildLinks(net, w);
+  return w;
+}
+
+function finish(w: World, extra: ReadonlyMap<string, number>): World {
+  buildLinks(w.net, w, extra);
   for (const n of w.nodes) buildNode(w, n);
   for (const l of w.links) {
     l.statNode = findStatNode(l);
-    l.freeTime = l.lanes[0]!.len / l.link.freeSpeed + CONTROL_DELAY[l.node.kind];
+    l.freeTime = l.lanes[0]!.len / l.link.freeSpeed + CONTROL_DELAY[l.node.kind] + stopLoss(l);
     l.time = l.freeTime;
     for (const o of l.opts) w.optByKey.set(o.key, o);
     // No turn into a road under works: only cars already on it drive on, and off it.

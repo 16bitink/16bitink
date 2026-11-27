@@ -138,6 +138,12 @@ export interface CarsView {
   readonly state: Uint8Array;
   /** Stable while the car lives, so the renderer can follow one. */
   readonly uid: Uint32Array;
+  /**
+   * Where each car is drawn through the last step, by the vehicle model (src/sim/drawn.ts): `sub` + 1 frames per car
+   * (frame 0 = the end of the step before), 4 numbers each: x, y, heading, z. x, y, heading, z above are its last frame.
+   */
+  readonly frames: Float64Array;
+  readonly sub: number;
 }
 
 // ---------------------------------------------------------------- the city

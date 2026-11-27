@@ -4,6 +4,9 @@ import { createCity } from '../src/city/city';
 import { SAFFRON } from '../src/city/defs/saffron';
 import { cityAtYear, inner, newCity, ok, runDay, runYear, SEED } from './city-helpers';
 
+/** A whole year of traffic, twice: longer than the suite's 30 s under load. */
+const YEAR_RUN = 60_000;
+
 describe('the year', () => {
   it('runs card, four days with reviews, year end, next year', () => {
     const v = newCity();
@@ -63,7 +66,7 @@ describe('the year', () => {
   it('is deterministic', () => {
     const play = () => { const v = newCity(); runYear(v); return JSON.stringify(v.save()); };
     expect(play()).toBe(play());
-  });
+  }, YEAR_RUN);
 });
 
 describe('saves', () => {
@@ -78,7 +81,7 @@ describe('saves', () => {
     runYear(a);
     runYear(b);
     expect(JSON.stringify(b.save())).toBe(JSON.stringify(a.save()));
-  });
+  }, YEAR_RUN);
 
   it('a save in a day starts the day again with what was built, and gives back what drivers paid (its paydays stay paid)', () => {
     const v = cityAtYear(2);

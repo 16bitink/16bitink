@@ -2,6 +2,7 @@
 import type { CarStore } from './store';
 import { ARC_T, EXIT_T, LANE_T, type Track } from './track';
 import { IDM } from './tune';
+import { capAhead } from './trackCaps';
 import type { Sim } from './sim';
 
 /** The piece after this one for car i, or null when it ends or isn't known. */
@@ -24,10 +25,20 @@ export function nextTrack(sim: Sim, i: number, t: Track): Track | null {
 /** Result of `look`: gap to the leader's bumper and its speed; `hard` = must never be driven into. */
 export const LEAD = { gap: Infinity, v: 0, hard: Infinity };
 
-const gapTo = (c: CarStore, i: number, base: number, q: number): number => base + c.s[q]! - c.half[i]! - c.half[q]!;
+/**
+ * Px the drawn bodies leave less than the sim's (docs/inkroad-vehicle-model.md "Phase A"): a drawn body is longer
+ * than the sim's and a drawn leader may lag its point, so the gap a driver keeps is to what is drawn. The follower's
+ * own overshoot (its drawn car past its point) counts only toward the gap it plans with, never toward the hard room:
+ * stopping its sim point dead would only let the drawn car run further past it.
+ */
+const bodySlack = (c: CarStore, i: number, q: number): number => c.body[i]! - c.half[i]! + c.body[q]! - c.half[q]! + Math.max(0, c.lag[q]!);
+const ownSlack = (c: CarStore, i: number): number => Math.max(0, -c.lag[i]!);
 
-function take(gap: number, v: number, hard: boolean): void {
-  if (gap < LEAD.gap) { LEAD.gap = gap; LEAD.v = v; }
+const gapTo = (c: CarStore, i: number, base: number, q: number): number => base + c.s[q]! - c.half[i]! - c.half[q]! - bodySlack(c, i, q);
+
+/** A leader at `gap` px (`own`: px of the follower's own drawn overshoot, for the planned gap only). */
+function take(gap: number, v: number, hard: boolean, own = 0): void {
+  if (gap - own < LEAD.gap) { LEAD.gap = gap - own; LEAD.v = v; }
   if (hard && gap < LEAD.hard) LEAD.hard = gap;
 }
 
@@ -38,7 +49,7 @@ export function look(sim: Sim, i: number, open: boolean): void {
   LEAD.gap = LEAD.hard = Infinity;
   LEAD.v = 0;
   const a = c.ahead[i]!;
-  if (a >= 0) take(c.s[a]! - c.s[i]! - c.half[a]! - c.half[i]!, c.v[a]!, true);
+  if (a >= 0) take(c.s[a]! - c.s[i]! - c.half[a]! - c.half[i]! - bodySlack(c, i, a), c.v[a]!, true, ownSlack(c, i));
   let base = t.len - c.s[i]!;
   const reach = Math.max(IDM.lookMin, c.v[i]! * IDM.lookTime);
   if (t.merge.length > 0 && a < 0) zipWith(sim, i, t, base);
@@ -50,7 +61,7 @@ export function look(sim: Sim, i: number, open: boolean): void {
     if (at.lastOut >= 0) splitLeader(c, i, at, next, base);
     if (next.tail >= 0) {
       const q = next.tail;
-      take(gapTo(c, i, base, q), c.v[q]!, true);
+      take(gapTo(c, i, base, q), c.v[q]!, true, ownSlack(c, i));
       if (next.merge.length > 0) zipWith(sim, i, next, base + next.len);
       return;
     }
@@ -95,19 +106,30 @@ function zipWith(sim: Sim, i: number, t: Track, d: number): void {
   }
 }
 
-/** Speed the way ahead allows, so a car slows before a tight turn. */
+/** Px short of a lane's end a car plans to be able to stop. */
+const LINE_ROOM = 6;
+
+/** Speed the way ahead allows, so a car slows before a tight turn, or a line just beyond a short link. */
 export function speedAhead(sim: Sim, i: number, v0: number): number {
   const c = sim.cars;
   const t = c.track[i]!;
   let d = t.len - c.s[i]!;
   let lim = v0;
   let at: Track = t;
-  for (let hop = 0; hop < 2; hop++) {
+  // As far ahead as the car needs to brake from its speed to a crawl.
+  const reach = Math.max(110, (c.v[i]! * c.v[i]!) / (2 * IDM.brake * 0.6) + 20);
+  for (let hop = 0; hop < 4; hop++) {
     const next = nextTrack(sim, i, at);
-    if (!next || d > 110) break;
-    const vn = next.vmax * (next.kind === LANE_T ? c.vf[i]! : 1);
-    if (vn < lim) lim = Math.min(lim, Math.sqrt(vn * vn + 2 * IDM.brake * 0.8 * d));
+    if (!next || d > reach) break;
+    const vn = Math.min(next.vmax * (next.kind === LANE_T ? c.vf[i]! : 1), capAhead(next, 0, IDM.brake * 0.6));
+    if (vn < lim) lim = Math.min(lim, Math.sqrt(vn * vn + 2 * IDM.brake * 0.6 * d));
     d += next.len;
+    // The next lane may end at a line it has to stop at (its way there isn't asked for yet): it can always stop there.
+    if (next.kind === LANE_T) {
+      const node = sim.world.links[next.link]!.node;
+      if (node.kind !== 'free' && node.kind !== 'gate') lim = Math.min(lim, Math.sqrt(2 * IDM.brake * 0.6 * Math.max(0, d - LINE_ROOM)));
+      break;
+    }
     at = next;
   }
   return lim;

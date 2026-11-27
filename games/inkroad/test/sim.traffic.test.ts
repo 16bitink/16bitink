@@ -49,7 +49,7 @@ function watcher(t: Traffic) {
       if (p) {
         const d = Math.hypot(c.x[i]! - p.x, c.y[i]! - p.y);
         const jump = d - Math.max(p.v, c.speed[i]!) * STEP;
-        if (jump > worst.jump) { worst.jump = jump; worst.note = `${c.track[i]!.key} s${c.s[i]!.toFixed(1)} off${c.offLeft[i]!.toFixed(1)} v${c.v[i]!.toFixed(1)}`; }
+        if (jump > worst.jump) { worst.jump = jump; worst.note = `${c.track[i]!.key} s${c.s[i]!.toFixed(1)} off${c.sliding(i).toFixed(1)} v${c.v[i]!.toFixed(1)}`; }
         worst.turn = Math.max(worst.turn, Math.abs(angleDiff(p.h, c.heading[i]!)));
         worst.z = Math.max(worst.z, Math.abs(c.z[i]! - p.z));
       }

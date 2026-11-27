@@ -4,9 +4,9 @@ import { toDest } from './drive';
 import { hasRoom } from './grant';
 import { nextTrack } from './path';
 import { receipt, type Sim } from './sim';
-import { POSE } from './store';
-import { LANE_T, TURN_T, poseAt, type Track } from './track';
-import { ANGER_FULL, DRIVEWAY, HONK_AT, REROUTE_AFTER } from './tune';
+import { refAt } from './drawn';
+import { LANE_T, TURN_T, type Track } from './track';
+import { ANGER_FULL, HONK_AT, REROUTE_AFTER } from './tune';
 import { laneS, type LinkRt } from './world';
 import { runsWith } from './routes';
 
@@ -64,17 +64,25 @@ function enterLane(sim: Sim, i: number, t: Track): void {
   plan(sim, i, l);
 }
 
+/** Kept at the very end of its track: the px it didn't drive come off its travel (the drawn car follows travel). */
+function holdAtEnd(c: Sim['cars'], i: number, t: Track, v: number): void {
+  c.travel[i] = Math.max(0, c.travel[i]! - (c.s[i]! - (t.len - TINY)));
+  c.s[i] = t.len - TINY;
+  c.v[i] = v;
+  c.acc[i] = Math.min(c.acc[i]!, 0);
+}
+
 /** Cross into the next track. False = no room there: wait at the very end of this one. */
 function cross(sim: Sim, i: number, t: Track, next: Track): boolean {
   const c = sim.cars;
   const over = c.s[i]! - t.len;
   const q = next.tail;
   if (q >= 0 && c.s[q]! - c.half[q]! - c.half[i]! < over) {
-    c.s[i] = t.len - TINY;
-    c.v[i] = Math.min(c.v[i]!, c.v[q]!);
+    holdAtEnd(c, i, t, Math.min(c.v[i]!, c.v[q]!));
     return false;
   }
   c.unlink(i);
+  c.hop(i, t);
   t.lastOut = i;
   t.lastOutUid = c.uid[i]!;
   c.push(i, next, Math.max(0, over));
@@ -90,7 +98,7 @@ function advance(sim: Sim, i: number): void {
     if (c.s[i]! < t.len) return;
     const next = nextTrack(sim, i, t);
     const barred = t.kind === LANE_T && !c.granted[i] && next !== null && (sim.world.nodes[next.node]!.kind !== 'free' || next.turnRound !== null);
-    if (!next || barred) { c.s[i] = t.len - TINY; c.v[i] = 0; return; }
+    if (!next || barred) { holdAtEnd(c, i, t, 0); return; }
     if (!cross(sim, i, t, next)) return;
   }
 }
@@ -109,13 +117,13 @@ export function move(sim: Sim, i: number): void {
   let ds = ((v + nv) / 2) * STEP;
   if (nv === 0 && v > 0) ds = Math.min(ds, (v * STEP) / 2);
   let after = nv;
-  if (ds > c.room[i]!) { ds = c.room[i]!; after = Math.min(nv, ds / STEP); }
+  if (ds > c.room[i]!) { ds = c.room[i]!; after = Math.min(nv, ds / STEP); c.acc[i] = Math.min(c.acc[i]!, (after - v) / STEP); }
   // A three-point turn stops at each change of gear (the drawn car never glides through one in a step).
   const cusp = c.track[i]!.cusps.find((k) => c.s[i]! < k - TINY && c.s[i]! + ds > k);
   if (cusp !== undefined) { ds = cusp - c.s[i]!; after = 0; }
   c.s[i]! += ds;
   c.v[i] = after;
-  if (c.offLeft[i]! > 0) c.offLeft[i] = Math.max(0, c.offLeft[i]! - ds);
+  c.travel[i] = ds;
   if (c.arrived[i]) return;
   const d = toDest(sim, i);
   if (d <= (c.service[i]! >= 0 ? 2.5 : 0) && c.until[i]! <= sim.time) { arrive(sim, i); return; }
@@ -181,36 +189,17 @@ export function feel(sim: Sim, i: number): boolean {
 
 // ---------------------------------------------------------------- drawing
 
-/** Write x, y, heading, z, speed for the renderer. */
+/** The reference pose of the body's middle (its track, the lane-change slide, the kerb swing): rx, ry, rh, z. */
 export function pose(sim: Sim, i: number): void {
   const c = sim.cars;
-  const t = c.track[i]!;
-  poseAt(t, c.s[i]!, POSE);
-  let x = POSE.x, y = POSE.y, hx = 0, hy = 0, turn = 0;
-  const left = c.offLeft[i]!;
-  if (left > 0) {
-    const u = left / c.offLen[i]!, k = u * u * (3 - 2 * u), slope = (-6 * u * (1 - u)) / c.offLen[i]!;
-    x += c.offX[i]! * k;
-    y += c.offY[i]! * k;
-    turn = c.offH[i]! * k;
-    hx = c.offX[i]! * slope;
-    hy = c.offY[i]! * slope;
-  }
-  const d = toDest(sim, i);
-  if (d < DRIVEWAY.length && c.destNode[i]! < 0 && c.service[i]! < 0 && t.lane === sim.world.links[t.link]!.lanes.length - 1) {
-    const u = 1 - Math.max(0, d) / DRIVEWAY.length, k = u * u * (3 - 2 * u) * DRIVEWAY.slide, slope = (6 * u * (1 - u) * DRIVEWAY.slide) / DRIVEWAY.length;
-    const nx = -Math.sin(POSE.h), ny = Math.cos(POSE.h);
-    x += nx * k;
-    y += ny * k;
-    hx += nx * slope;
-    hy += ny * slope;
-  }
-  c.x[i] = x;
-  c.y[i] = y;
-  c.z[i] = POSE.z;
-  c.heading[i] = (hx === 0 && hy === 0 ? POSE.h : Math.atan2(Math.sin(POSE.h) + hy, Math.cos(POSE.h) + hx)) + turn;
-  c.speed[i] = c.v[i]!;
-  blink(sim, i, t);
+  const r = refAt(sim, i, c.s[i]!);
+  c.rx[i] = r.x;
+  c.ry[i] = r.y;
+  c.rh[i] = r.th;
+  c.z[i] = r.z;
+  // Not drawn yet (it just appeared): it is drawn on its reference until its first step.
+  if (c.fOn[i] === 0) { c.x[i] = r.x; c.y[i] = r.y; c.heading[i] = r.th; c.speed[i] = c.v[i]!; }
+  blink(sim, i, c.track[i]!);
 }
 
 function blink(sim: Sim, i: number, t: Track): void {

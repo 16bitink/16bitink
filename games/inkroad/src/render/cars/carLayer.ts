@@ -6,13 +6,14 @@ import { clamp, type Box } from '../geom';
 import type { AtlasFrame } from '../atlas';
 import type { Pictures } from '../pictures';
 import { projectAngle, projectY, TILT } from '../projection';
-import { glideAt, type Glide, type GlidePose } from './glide';
+import { drawnAt, type DrawnPose } from './drawnPose';
 import { buildCarAtlas, carOrigin, headingFrame, HEADINGS, paintOf, type CarFrames } from './carAtlas';
 
 /**
- * Draws every car: one pooled image per slot of CarsView, eased between the
- * sim's 10 Hz steps so it glides at 60 fps whatever the speed. Cars on a deck
- * sort among the buildings; the rest lie on the road under everything.
+ * Draws every car: one pooled image per slot of CarsView, played through the
+ * vehicle model's frames of the sim's last step (src/sim/drawn.ts) at 60 fps
+ * whatever the speed. Cars on a deck sort among the buildings; the rest lie on
+ * the road under everything.
  */
 export interface CarDepths { readonly ground: number; /** Uprights: base + plan y. */ readonly upright: number }
 
@@ -25,8 +26,11 @@ const EASE_RATE = 0.2;
 /** CarsView.state of a car parking or leaving a space. */
 const HOLDING = 4;
 
-interface Slot extends Glide {
+interface Slot {
   img: Phaser.GameObjects.Image;
+  /** Car slot in CarsView and where it was last drawn. */
+  i: number;
+  x1: number; y1: number; z1: number;
   uid: number;
   kind: number; tint: number; frame: number; deck: boolean; born: number;
   slowing: boolean; speed: number;
@@ -34,8 +38,8 @@ interface Slot extends Glide {
   held: boolean;
 }
 
-/** Scratch pose of the glide (one frame at a time). */
-const AT: GlidePose = { x: 0, y: 0, z: 0, a: 0 };
+/** Scratch pose (one frame at a time). */
+const AT: DrawnPose = { x: 0, y: 0, z: 0, a: 0 };
 
 export interface CarPose { readonly x: number; readonly y: number; readonly z: number; readonly a: number; readonly len: number; readonly wid: number; readonly slowing: boolean }
 
@@ -49,6 +53,7 @@ export class CarLayer {
   private interval = 0.1;
   private now = 0;
   drawn = 0;
+  private cars: CarsView | null = null;
   /** Traffic uids handed over by a pull-out: drawn at once, without fading in. */
   private readonly expected = new Set<number>();
   /** Cars here are inside a tunnel: not drawn. */
@@ -71,6 +76,7 @@ export class CarLayer {
 
   /** `stamp` changes whenever the sim has stepped (the city's clock). */
   update(cars: CarsView, stamp: number, dt: number, view: Box, alpha: number): void {
+    this.cars = cars;
     this.now += dt;
     this.sinceStep += dt;
     if (stamp !== this.lastClock) this.take(cars, stamp);
@@ -83,10 +89,9 @@ export class CarLayer {
     }
   }
 
-  /** A new sim step: where each car is drawn now becomes the start of its next glide. */
+  /** A new sim step: its frames are played from now on. */
   private take(cars: CarsView, stamp: number): void {
     if (this.lastClock >= 0) this.interval += (clamp(this.sinceStep, 1 / 120, MAX_STEP_S) - this.interval) * EASE_RATE;
-    const t = clamp(this.sinceStep / this.interval, 0, 1);
     this.lastClock = stamp;
     this.sinceStep = 0;
     for (let i = 0; i < Math.max(cars.count, this.slots.length); i++) {
@@ -100,27 +105,26 @@ export class CarLayer {
         h.img.setVisible(false);
         continue;
       }
-      this.takeSlot(cars, i, s ?? this.make(i), t);
+      this.takeSlot(cars, i, s ?? this.make(i));
     }
   }
 
   private make(i: number): Slot {
     const img = new Phaser.GameObjects.Image(this.scene, 0, 0, 'cars-0').setVisible(false);
     this.layer.add(img);
-    const s: Slot = { img, uid: 0, x0: 0, y0: 0, z0: 0, a0: 0, x1: 0, y1: 0, z1: 0, a1: 0, kind: -1, tint: -1, frame: -1, deck: false, born: 0, slowing: false, speed: 0, held: false };
+    const s: Slot = { img, i, uid: 0, x1: 0, y1: 0, z1: 0, kind: -1, tint: -1, frame: -1, deck: false, born: 0, slowing: false, speed: 0, held: false };
     while (this.slots.length <= i) this.slots.push(null);
     this.slots[i] = s;
     return s;
   }
 
-  private takeSlot(c: CarsView, i: number, s: Slot, t: number): void {
-    const x = c.x[i]!, y = c.y[i]!, z = c.z[i]!, a = c.heading[i]!;
+  private takeSlot(c: CarsView, i: number, s: Slot): void {
+    const start = drawnAt(c, i, 0, AT);
     const resumed = s.held && s.uid === c.uid[i];
     s.held = false;
-    const fresh = resumed || s.uid !== c.uid[i] || Math.hypot(x - s.x1, y - s.y1) > TELEPORT;
+    const fresh = resumed || s.uid !== c.uid[i] || Math.hypot(start.x - s.x1, start.y - s.y1) > TELEPORT;
     if (fresh) {
       s.uid = c.uid[i]!;
-      s.x0 = x; s.y0 = y; s.z0 = z; s.a0 = a;
       // A car that stood in its space (drawn by the manoeuvre layer) picks up from the lane without fading in.
       s.born = resumed || this.expected.delete(c.uid[i]!) ? this.now - 1 : this.now;
       s.kind = c.kind[i]!;
@@ -128,19 +132,16 @@ export class CarLayer {
       s.frame = -1;
       const o = this.origins[s.kind]!;
       s.img.setOrigin(o.x, o.y);
-    } else {
-      glideAt(s, t, AT);
-      s.x0 = AT.x; s.y0 = AT.y; s.z0 = AT.z; s.a0 = AT.a;
     }
-    s.x1 = x; s.y1 = y; s.z1 = z; s.a1 = a;
+    s.x1 = c.x[i]!; s.y1 = c.y[i]!; s.z1 = c.z[i]!;
     const v = c.speed[i]!;
     s.slowing = v < s.speed - 1.2 || (v < 3 && s.speed < 3);
     s.speed = v;
   }
 
   private draw(s: Slot, t: number, view: Box, alpha: number): void {
-    if (s.uid === 0 || s.held) return;
-    const { x, y, z, a } = glideAt(s, t, AT);
+    if (s.uid === 0 || s.held || !this.cars) return;
+    const { x, y, z, a } = drawnAt(this.cars, s.i, t, AT);
     const seen = z > UNDER && x > view.x0 && x < view.x1 && y > view.y0 && y < view.y1 && !(z < 0.5 && this.hidden(x, y));
     if (s.img.visible !== seen) s.img.setVisible(seen);
     if (!seen) return;
@@ -179,7 +180,7 @@ export class CarLayer {
     if (!s || s.uid === 0 || !s.img.visible) return false;
     const t = clamp(this.sinceStep / this.interval, 0, 1);
     const f = this.frames[s.kind]?.[0];
-    glideAt(s, t, AT);
+    if (this.cars) drawnAt(this.cars, s.i, t, AT);
     out.x = AT.x; out.y = AT.y; out.z = AT.z; out.a = AT.a;
     out.len = f?.len ?? 14;
     out.wid = f?.wid ?? 7;

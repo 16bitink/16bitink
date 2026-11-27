@@ -9,6 +9,7 @@ export function stressCity(city: CityView, n: number): CityView {
   const cars: CarsView = {
     count: n, alive: new Uint8Array(n).fill(1), x: new Float32Array(n), y: new Float32Array(n), heading: new Float32Array(n), z: new Float32Array(n), speed: new Float32Array(n).fill(40),
     kind: new Uint8Array(n), tint: new Uint8Array(n), anger: new Float32Array(n), blinker: new Int8Array(n), state: new Uint8Array(n), uid: new Uint32Array(n),
+    frames: new Float64Array(n * 7 * 4), sub: 6,
   };
   const on: { link: Link; s: number; len: number; v: number }[] = [];
   let seed = 1;
@@ -30,6 +31,8 @@ export function stressCity(city: CityView, n: number): CityView {
     if (c.s > c.len) { c.s = 0; cars.uid[i] = cars.uid[i]! + n; }
     const p = pointAt(c.link.line, c.s);
     cars.x[i] = p.x; cars.y[i] = p.y; cars.heading[i] = p.a;
+    // Every frame of the step at the step's end pose (enough to cost what drawing costs).
+    for (let k = 0; k <= 6; k++) cars.frames.set([p.x, p.y, p.a, 0], (i * 7 + k) * 4);
   });
   const advance = (s: number): void => { left += s; while (left >= STEP) { left -= STEP; clock += STEP; step(); } };
   step();

@@ -1,7 +1,10 @@
 /** A roundabout as a real ring: one lane round, entries that give way, exits, and right-turn slips on wide roads. */
 import { angleDiff, curve, dist } from './geom';
 import { armHeading, ringRadius } from './netCore';
-import { ARC_T, ENTRY_T, EXIT_T, SPAN_T, TURN_T, Track, limitSpin } from './track';
+import { ARC_T, ENTRY_T, EXIT_T, SPAN_T, TURN_T, Track } from './track';
+import { capsOf, lowestCap } from './trackCaps';
+import { cornerTurn } from './vehicle/turns';
+import { ROAD_R } from './vehicle/shift';
 import { RING } from './tune';
 import { addTrack, type LinkRt, type NodeRt, type World } from './world';
 import type { Pt } from './types';
@@ -27,8 +30,8 @@ export interface RingRt {
   readonly max: number;
 }
 
-const SPREAD = 0.5; // radians from the arm to its entry and exit points
-const SPREAD_SHARE = 0.4;
+const SPREAD = 0.65; // radians from the arm to its entry and exit points (room for an entry at the road radius)
+const SPREAD_SHARE = 0.42;
 const STEPS = 10;
 
 function arcLine(c: Pt, r: number, from: number, to: number): Pt[] {
@@ -37,6 +40,28 @@ function arcLine(c: Pt, r: number, from: number, to: number): Pt[] {
     const a = from + ((to - from) * i) / n;
     return { x: c.x + Math.cos(a) * r, y: c.y + Math.sin(a) * r };
   });
+}
+
+/** Share of a ring join's turn made in its clothoids: longer than a road turn's, so the wheels swing into the ring's S at a car's rate. */
+const JOIN_SHARE = 0.65;
+
+/** Px between the points of an entry, exit or slip: its curvature is what the drawn car steers by. */
+const JOIN_STEP = 1;
+
+/**
+ * Onto or off the ring: clothoid, arc, clothoid as wide as the corner allows (src/sim/vehicle/turns.ts cornerTurn),
+ * else the old curve. Its end meets the ring's curvature with a step the drawn car's wheels take at their own rate
+ * (a curvature-continuous quintic join was tried: on these small rings it only moves the S to the join's end).
+ */
+function joinLine(p0: Pt, h0: number, p1: Pt, h1: number): Pt[] {
+  const c = cornerTurn({ x: p0.x, y: p0.y, th: h0 }, { x: p1.x, y: p1.y, th: h1 }, ROAD_R, 0, JOIN_SHARE);
+  return c ? c.pts.map((q) => ({ x: q.x, y: q.y })) : curve(p0, h0, p1, h1, STEPS, dist(p0, p1) * 0.4);
+}
+
+/** Its speed under its own curve and steering caps (src/sim/trackCaps.ts). */
+function capTrack(t: Track): void {
+  t.caps = capsOf(t, t.vmax);
+  t.vmax = lowestCap(t.caps, t.vmax);
 }
 
 /** Cars go round with the angle falling (anticlockwise on screen); this is the heading at an angle. */
@@ -74,6 +99,7 @@ export function buildRing(w: World, n: NodeRt): void {
     const t = new Track(`R${n.j.id}:${key}`, kind, arcLine(c, r, from, end), vmax, { h0: ringHeading(from), h1: ringHeading(end) });
     t.node = n.i;
     t.arm = arm;
+    capTrack(t);
     return addTrack(w, t);
   };
   const arms: RingArm[] = sorted.map(({ road }, i) => {
@@ -98,16 +124,16 @@ function entriesAndExits(w: World, n: NodeRt, arm: RingArm, a: ArmAngles, c: Pt,
   const join = onRing(c, r, a.entry), leave = onRing(c, r, a.exit);
   for (const lane of arm.inL?.lanes ?? []) {
     const p = lane.end();
-    const t = new Track(`E${arm.inL!.link.id}:${lane.lane}`, ENTRY_T, curve(p, lane.h1, join, ringHeading(a.entry), STEPS, dist(p, join) * 0.4), RING.speed, { h0: lane.h1, h1: ringHeading(a.entry) });
+    const t = new Track(`E${arm.inL!.link.id}:${lane.lane}`, ENTRY_T, joinLine(p, lane.h1, join, ringHeading(a.entry)), RING.speed, { h0: lane.h1, h1: ringHeading(a.entry), step: JOIN_STEP });
     Object.assign(t, { node: n.i, arm: i, from: lane, to: arm.arc });
-    limitSpin(t);
+    capTrack(t);
     arm.entries.push(addTrack(w, t));
   }
   for (const lane of arm.outL?.lanes ?? []) {
     const p = lane.start();
-    const t = new Track(`X${arm.outL!.link.id}:${lane.lane}`, EXIT_T, curve(leave, ringHeading(a.exit), p, lane.h0, STEPS, dist(p, leave) * 0.4), RING.speed, { h0: ringHeading(a.exit), h1: lane.h0 });
+    const t = new Track(`X${arm.outL!.link.id}:${lane.lane}`, EXIT_T, joinLine(leave, ringHeading(a.exit), p, lane.h0), RING.speed, { h0: ringHeading(a.exit), h1: lane.h0, step: JOIN_STEP });
     Object.assign(t, { node: n.i, arm: i, to: lane });
-    limitSpin(t);
+    capTrack(t);
     arm.exits.push(addTrack(w, t));
   }
   arm.span.merge = arm.entries;
@@ -120,9 +146,9 @@ function slip(w: World, n: NodeRt, from: LinkRt, to: LinkRt): Track | null {
   const a = from.lanes[from.carLanes - 1]!, b = to.lanes[to.carLanes - 1]!;
   const turn = angleDiff(a.h1, b.h0);
   if (turn < 0.5 || turn > 2.2) return null;
-  const t = new Track(`C${from.link.id}>${to.link.id}:slip`, TURN_T, curve(a.end(), a.h1, b.start(), b.h0, STEPS), RING.speed * 1.1, { h0: a.h1, h1: b.h0 });
+  const t = new Track(`C${from.link.id}>${to.link.id}:slip`, TURN_T, joinLine(a.end(), a.h1, b.start(), b.h0), RING.speed * 1.1, { h0: a.h1, h1: b.h0, step: JOIN_STEP });
   Object.assign(t, { node: n.i, from: a, to: b, free: true });
-  limitSpin(t);
+  capTrack(t);
   n.turns.push(t);
   return addTrack(w, t);
 }

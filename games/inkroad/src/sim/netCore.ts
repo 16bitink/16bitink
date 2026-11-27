@@ -23,8 +23,12 @@ export interface Draft { nodes: Map<Id, NodeCore>; roads: Map<Id, Road>; nextId:
 
 export const KERB_SLOW = 0.82;
 export const WORKS_SLOW = 0.6;
-/** Outer ring gap and lanes for roundabouts. */
-export const RING_EXTRA = 10;
+
+/**
+ * Px from the widest arm's edge to the ring's lane: a street ring of 31 px (8.7 m) is driven at about 21 px/s (17 km/h
+ * at game pace) and leaves its entries room for a planned-radius curve (docs/inkroad-vehicle-model.md "Phase A").
+ */
+export const RING_EXTRA = 22;
 export const RING_EDGE = 3;
 const JUNCTION_PAD = 5;
 /** Junctions big enough for a R_MIN right turn (with FILLET 15 in src/render/ground/roadShape.ts). */

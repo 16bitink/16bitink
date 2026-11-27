@@ -2,8 +2,14 @@
 import { CAR_LENGTH, VEHICLES } from './constants';
 import type { VehicleKind } from './types';
 
+/**
+ * The Intelligent Driver Model, with the vehicle model's limits (src/sim/vehicle/params.ts, played px/s²): pulling
+ * away at 2.5 m/s², braking planned at a comfortable 1.4 m/s² (well under the model's 2.2, so a driver starts early and
+ * his foot, moving at 3 m/s³, never falls behind) and 3.5 m/s² at most (test/vehicle/limits.test.ts checks they
+ * agree), so the drawn car never has to lag behind the sim or overshoot it.
+ */
 export const IDM = {
-  accel: 54, brake: 60, hardBrake: 220, headway: 1.1, standGap: 4, lineGap: 1.5,
+  accel: 13.9, brake: 8, hardBrake: 19.4, jerk: 20.8, headway: 1.1, standGap: 4, lineGap: 1.5,
   lookTime: 2.4, lookMin: 34,
 } as const;
 
@@ -21,9 +27,11 @@ export const isBus = (kind: number): boolean => BUSLIKE.has(kind);
 export const SAMPLE = 4;
 export const MIN_LANE = 24;
 export const CONFLICT_DIST = 7;
-export const TURN = { lateral: 100, min: 20, straight: 0.35 } as const;
-/** The swing to the kerb before a driveway or a kerbside stop (40 px would keep its bend under R_MIN; see the build doc). */
-export const DRIVEWAY = { speed: 18, slide: 13, length: 26 } as const;
+/**
+ * The swing to the kerb before a driveway or a kerbside stop: a quintic of `slide` px over `length` px, driven at no
+ * more than `speed` (its wheels swing at a car's steering rate: src/sim/vehicle/shift.ts shiftLength(13, 15) = 60).
+ */
+export const DRIVEWAY = { speed: 15, slide: 13, length: 60 } as const;
 export const CHANGE = { length: 40, short: 22, time: 0.8, every: 5, minSpeed: 8, gain: 26, urgent: 90 } as const;
 export const YIELD = { gap: 1.7, courtesy: 11, near: 34, stop: 9, oneByOne: 1.5 } as const;
 export const RING = { speed: 48, askTime: 0.4, behind: 0.6, ahead: 0.8, assume: 32, gap: 1.25, starving: 8, fresh: 4, back: 70, ask: 6, perCar: 34 } as const;

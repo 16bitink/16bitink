@@ -17,23 +17,23 @@ import { CATALOGUE } from './catalogue';
 import type { MotionSwitches } from '../../src/sim/switches';
 
 
-/** November 27, phase 1: where each scenario stands (counts per rule, expectations that fail). */
+/** November 27, step 2 phase A (moving cars on the vehicle model): where each scenario stands (counts per rule, expectations that fail). */
 const KNOWN_CORE: KnownSets = {
   defaults: {
-    'park.kerb.parallel-traffic': { counts: {'too fast on a curve (moving)': 26, 'too tight (moving)': 7, 'reverse too fast (manoeuvre)': 78, 'too fast on a curve (manoeuvre)': 19, 'jumps (manoeuvre)': 8}, failing: ['A breaks no motion rule'] },
-    'park.forecourt.far-lane': { counts: {'too fast on a curve (moving)': 25, 'too tight (moving)': 11, 'jumps (manoeuvre)': 28, 'turns in place (manoeuvre)': 1, 'too fast on a curve (manoeuvre)': 2, 'reverse too fast (manoeuvre)': 6, 'cuts across without a gap (manoeuvre)': 2, 'crosses a kerb (manoeuvre)': 2}, failing: ['A waits for B before crossing', 'A breaks no motion rule'] },
-    'park.carpark.gate-aisle': { counts: {'too fast on a curve (moving)': 24, 'too tight (moving)': 10, 'too fast on a curve (manoeuvre)': 75, 'jumps (manoeuvre)': 31, 'crosses a kerb (manoeuvre)': 2, 'reverse too fast (manoeuvre)': 73, 'cuts across without a gap (manoeuvre)': 1}, failing: ['A breaks no motion rule'] },
-    'drive.cross.right': { counts: {'too fast on a curve (moving)': 7, 'too tight (moving)': 29}, failing: ['A breaks no motion rule'] },
-    'drive.roundabout.exits': { counts: {'too fast on a curve (moving)': 494, 'too tight (moving)': 170, 'bodies overlap (moving)': 1}, failing: ['A breaks no motion rule', 'B breaks no motion rule', 'C breaks no motion rule'] },
-    'park.double.park-leave': { counts: {'too fast on a curve (moving)': 42, 'too tight (moving)': 14, 'bodies overlap (moving)': 4, 'bodies overlap (manoeuvre)': 11, 'jumps (manoeuvre)': 76, 'cuts across without a gap (manoeuvre)': 4, 'too fast on a curve (manoeuvre)': 22, 'reverse too fast (manoeuvre)': 13, 'crosses a kerb (manoeuvre)': 5, 'too tight (manoeuvre)': 1}, failing: ['A breaks no motion rule'] },
+    'park.kerb.parallel-traffic': { counts: {'too fast on a curve (moving)': 10, 'reverse too fast (manoeuvre)': 79, 'too fast on a curve (manoeuvre)': 21, 'jumps (manoeuvre)': 8, 'bodies overlap (manoeuvre)': 1}, failing: ['B is through by 20 s', 'A breaks no motion rule'] },
+    'park.forecourt.far-lane': { counts: {'jumps (manoeuvre)': 29, 'too fast on a curve (manoeuvre)': 2, 'reverse too fast (manoeuvre)': 6, 'crosses a kerb (manoeuvre)': 2}, failing: ['A breaks no motion rule'] },
+    'park.carpark.gate-aisle': { counts: {'too fast on a curve (manoeuvre)': 75, 'jumps (manoeuvre)': 31, 'bodies overlap (manoeuvre)': 1, 'cuts across without a gap (manoeuvre)': 1, 'reverse too fast (manoeuvre)': 73, 'crosses a kerb (manoeuvre)': 1}, failing: ['A breaks no motion rule'] },
+    'drive.cross.right': { counts: {}, failing: [] },
+    'drive.roundabout.exits': { counts: {'bodies overlap (moving)': 1}, failing: ['C is through by 26 s', 'C breaks no motion rule'] },
+    'park.double.park-leave': { counts: {'bodies overlap (moving)': 5, 'jumps (manoeuvre)': 81, 'bodies overlap (manoeuvre)': 11, 'too fast on a curve (manoeuvre)': 16, 'reverse too fast (manoeuvre)': 16, 'crosses a kerb (manoeuvre)': 4, 'too tight (manoeuvre)': 2, 'cuts across without a gap (manoeuvre)': 1}, failing: ['A breaks no motion rule'] },
   },
   on: {
-    'park.kerb.parallel-traffic': { counts: {'too fast on a curve (moving)': 25, 'too tight (moving)': 8}, failing: ['A breaks no motion rule'] },
-    'park.forecourt.far-lane': { counts: {'too fast on a curve (moving)': 24, 'too tight (moving)': 10, 'cuts across without a gap (manoeuvre)': 2, 'bodies overlap (manoeuvre)': 1, 'crosses a kerb (manoeuvre)': 2}, failing: ['A waits for B before crossing', 'A parks off the road', 'A leaves and is gone by 36 s', 'A breaks no motion rule'] },
-    'park.carpark.gate-aisle': { counts: {'too tight (moving)': 15, 'too fast on a curve (moving)': 21, 'crosses a kerb (manoeuvre)': 1, 'jumps (manoeuvre)': 1}, failing: ['A leaves and is gone by 36 s', 'A breaks no motion rule'] },
-    'drive.cross.right': { counts: {'too fast on a curve (moving)': 48}, failing: ['A breaks no motion rule'] },
-    'drive.roundabout.exits': { counts: {'too fast on a curve (moving)': 494, 'too tight (moving)': 170, 'bodies overlap (moving)': 1}, failing: ['A breaks no motion rule', 'B breaks no motion rule', 'C breaks no motion rule'] },
-    'park.double.park-leave': { counts: {'too fast on a curve (moving)': 27, 'too tight (moving)': 12, 'bodies overlap (moving)': 1, 'bodies overlap (manoeuvre)': 2}, failing: ['A breaks no motion rule'] },
+    'park.kerb.parallel-traffic': { counts: {'cuts across without a gap (manoeuvre)': 2}, failing: ['B is through by 20 s', 'A breaks no motion rule'] },
+    'park.forecourt.far-lane': { counts: {'crosses a kerb (manoeuvre)': 1}, failing: ['A leaves and is gone by 36 s', 'A breaks no motion rule'] },
+    'park.carpark.gate-aisle': { counts: {'crosses a kerb (manoeuvre)': 1, 'jumps (manoeuvre)': 1}, failing: ['A leaves and is gone by 36 s', 'A breaks no motion rule'] },
+    'drive.cross.right': { counts: {}, failing: [] },
+    'drive.roundabout.exits': { counts: {'bodies overlap (moving)': 1}, failing: ['C is through by 26 s', 'C breaks no motion rule'] },
+    'park.double.park-leave': { counts: {'bodies overlap (moving)': 1, 'bodies overlap (manoeuvre)': 2}, failing: ['A breaks no motion rule'] },
   },
 };
 

@@ -1,9 +1,14 @@
 /** Ways through a junction: turns, lane rules, conflict tables, signal phases. */
 import { angleDiff, curve, dist } from './geom';
+import { capsOf, lowestCap } from './trackCaps';
+import { cornerTurn, laneShift } from './vehicle/turns';
+import { ROAD_R, ROAD_SHARE } from './vehicle/shift';
+import type { Pt } from './types';
 import { phaseArms } from './netCore';
 import { ROADS } from './constants';
-import { TURN_T, Track, limitSpin, type Conflict } from './track';
-import { CONFLICT_DIST, TURN } from './tune';
+import { TURN_T, Track, type Conflict } from './track';
+import { CONFLICT_DIST, IDM } from './tune';
+import { CURVE_PLAN } from './drive';
 import { buildRing } from './ringBuild';
 import { pathOf, poseAlong } from './drivePath';
 import { A_LAT_PLAYED, R_MIN, REVERSE_PLAYED } from './kinematics';
@@ -13,8 +18,6 @@ import { addTrack, type LinkRt, type NodeRt, type OutOpt, type World } from './w
 const SHARP = 2.1;
 const SIDE = 0.5;
 const WORKS_SLOW = 0.5;
-/** Left turns cut the corner, so two opposite ones pass each other. */
-const LEFT_PULL = 0.21;
 
 export const exitHeading = (l: LinkRt): number => l.lanes[0]!.h0;
 
@@ -65,11 +68,33 @@ function outLane(o: OutOpt, i: number): number {
   return Math.min(i, m - 1);
 }
 
-function turnSpeed(o: OutOpt, len: number, works: boolean): number {
-  const through = Math.min(o.from.link.freeSpeed, o.to.link.freeSpeed);
-  const turn = Math.abs(o.turn);
-  const v = turn < TURN.straight ? through : Math.max(TURN.min, Math.min(through, Math.sqrt(TURN.lateral * (len / turn))));
-  return works ? v * WORKS_SLOW : v;
+/** Heading change (rad) under which a way through is driven straight on (a quintic jog where the lanes don't line up). */
+const STRAIGHT_ON = 0.08;
+/** Px between a road turn's points: its curvature is what the drawn car steers by. */
+const TURN_STEP = 1;
+
+/**
+ * The line of a road turn from the end of lane a to the start of lane b (docs/inkroad-vehicle-model.md "Reference
+ * paths"): clothoid, arc, clothoid at the road radius where the corner allows, else the widest that fits; straight on,
+ * a quintic jog. With the px each lane would have to give up for the full radius (buildWorld trims them).
+ */
+export function turnLine(a: Track, b: Track): { readonly pts: readonly Pt[]; readonly trimIn: number; readonly trimOut: number } | null {
+  const p0 = { x: a.xs[a.n]!, y: a.ys[a.n]!, th: a.h1 }, p1 = { x: b.xs[0]!, y: b.ys[0]!, th: b.h0 };
+  const dx = p1.x - p0.x, dy = p1.y - p0.y;
+  if (Math.abs(angleDiff(p0.th, p1.th)) < STRAIGHT_ON) {
+    const along = dx * Math.cos(p0.th) + dy * Math.sin(p0.th), side = -dx * Math.sin(p0.th) + dy * Math.cos(p0.th);
+    if (along < 1) return null;
+    return { pts: laneShift(p0, along, side, 0), trimIn: 0, trimOut: 0 };
+  }
+  const c = cornerTurn(p0, p1, ROAD_R, 0, ROAD_SHARE);
+  return c ? { pts: c.pts, trimIn: c.trimIn, trimOut: c.trimOut } : null;
+}
+
+/** A turn's speed: the roads' own, under its curve and steering caps (slower through works). */
+function capTurn(t: Track, o: OutOpt, works: boolean): void {
+  const through = Math.min(o.from.link.freeSpeed, o.to.link.freeSpeed) * (works ? WORKS_SLOW : 1);
+  t.caps = capsOf(t, through);
+  t.vmax = lowestCap(t.caps, through);
 }
 
 /** Px between a turn-round track's points: far under a sim step's walk at walking pace, so the drawn glide (heading vs chord) follows the arcs. */
@@ -122,12 +147,10 @@ function connect(w: World, n: NodeRt, o: OutOpt, lane: number): Track {
     return addTrack(w, t);
   }
   const p0 = a.end(), p1 = b.start();
-  const pull = o.turn < -SIDE && n.kind !== 'free' ? dist(p0, p1) * LEFT_PULL : 0;
-  const pts = curve(p0, a.h1, p1, b.h0, Math.max(4, Math.ceil(dist(p0, p1) / 3)), pull);
-  const t = new Track(`C${o.key}:${lane}`, TURN_T, pts, 0, { h0: a.h1, h1: b.h0, z: (u) => a.zs[a.n]! * (1 - u) + b.zs[0]! * u });
-  t.vmax = n.kind === 'free' && Math.abs(o.turn) < SHARP
-    ? Math.min(o.from.link.freeSpeed, o.to.link.freeSpeed) : turnSpeed(o, t.len, n.j.works > 0);
-  limitSpin(t);
+  // (no line: the lanes don't meet ahead of both, so an old-style curve between them)
+  const pts = turnLine(a, b)?.pts ?? curve(p0, a.h1, p1, b.h0, Math.max(4, Math.ceil(dist(p0, p1) / 3)));
+  const t = new Track(`C${o.key}:${lane}`, TURN_T, pts, 0, { h0: a.h1, h1: b.h0, z: (u) => a.zs[a.n]! * (1 - u) + b.zs[0]! * u, step: TURN_STEP });
+  capTurn(t, o, n.j.works > 0 && !(n.kind === 'free' && Math.abs(o.turn) < SHARP));
   t.node = n.i;
   t.from = a;
   t.to = b;
@@ -138,17 +161,39 @@ function connect(w: World, n: NodeRt, o: OutOpt, lane: number): Track {
   return addTrack(w, t);
 }
 
-/** Free nodes connect only the lanes meant for a turn; others connect all, so nobody is ever stuck. */
+/** The lanes of l a turn o is made from: free nodes connect only the lanes meant for it; others all, so nobody is ever stuck. */
+function lanesFor(n: NodeRt, l: LinkRt, o: OutOpt): number[] {
+  return l.lanes.map((_, i) => i).filter((i) => !(n.kind === 'free' && (i < o.lo || (i > o.hi && i < l.carLanes))));
+}
+
 function connectAll(w: World, n: NodeRt): void {
-  for (const l of n.ins) {
-    for (const o of l.opts) {
-      for (let i = 0; i < l.lanes.length; i++) {
-        const bus = i >= l.carLanes;
-        if (n.kind === 'free' && (i < o.lo || (i > o.hi && !bus))) continue;
-        connect(w, n, o, i);
+  for (const l of n.ins) for (const o of l.opts) for (const i of lanesFor(n, l, o)) connect(w, n, o, i);
+}
+
+/**
+ * Px each lane end must give up so every turn through its junction gets the road radius (buildWorld rebuilds the
+ * lanes with them): keyed `${link id}:0` for a link's start and `${link id}:1` for its end. Rings and gates have none.
+ */
+export function turnTrims(w: World): Map<string, number> {
+  const out = new Map<string, number>();
+  const put = (key: string, px: number): void => { if (px > (out.get(key) ?? 0)) out.set(key, px); };
+  for (const n of w.nodes) {
+    if (n.kind === 'gate' || n.kind === 'ring') continue;
+    for (const l of n.ins) {
+      const opts = makeOpts(n, l);
+      laneRules(l, opts, n);
+      for (const o of opts) {
+        if (o.uTurn) continue;
+        for (const i of lanesFor(n, l, o)) {
+          const line = turnLine(l.lanes[i]!, o.to.lanes[outLane(o, i)]!);
+          if (!line) continue;
+          put(`${l.link.id}:1`, line.trimIn);
+          put(`${o.to.link.id}:0`, line.trimOut);
+        }
       }
     }
   }
+  return out;
 }
 
 function priorities(n: NodeRt): void {
@@ -224,6 +269,18 @@ export function zip(turns: readonly Track[]): void {
 
 const TURN_DELAY = { left: 1.2, right: 0.5, straight: 0.2, uTurn: 4 } as const;
 
+/**
+ * Seconds a turn costs over driving on at the roads' speed: slowing to its cap, crossing at it, pulling away again
+ * (the sim's own IDM rates), so routes and estimates know a tight turn is slow.
+ */
+function slowdown(o: OutOpt): number {
+  const t = o.conn.find((q) => q !== null);
+  if (!t) return 0;
+  const v = Math.min(o.from.link.freeSpeed, o.to.link.freeSpeed), vt = Math.max(1, Math.min(v, t.vmax));
+  const brake = IDM.brake * CURVE_PLAN;
+  return t.len / vt - t.len / v + ((v - vt) ** 2 / (2 * v)) * (1 / brake + 1 / IDM.accel);
+}
+
 export function buildNode(w: World, n: NodeRt): void {
   for (const l of n.ins) {
     l.opts = makeOpts(n, l);
@@ -235,6 +292,7 @@ export function buildNode(w: World, n: NodeRt): void {
   if (n.kind === 'gate') { for (const l of n.ins) l.opts = []; return; }
   if (n.kind === 'ring') { buildRing(w, n); return; }
   connectAll(w, n);
+  for (const l of n.ins) for (const o of l.opts) o.delay += slowdown(o);
   if (n.kind === 'free') { zip(n.turns); return; }
   priorities(n);
   conflicts(n);

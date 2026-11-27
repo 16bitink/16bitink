@@ -24,6 +24,8 @@ export class Track {
   readonly hs: Float32Array;
   readonly zs: Float32Array;
   vmax: number;
+  /** Speed cap at each sample from the track's own curves (src/sim/trackCaps.ts), or null if it has none under vmax. */
+  caps: Float32Array | null = null;
   /** Index of the link (lanes only) and lane number. */
   link = -1;
   lane = 0;
@@ -86,17 +88,6 @@ export class Track {
   start(): Pt { return { x: this.xs[0]!, y: this.ys[0]! }; }
   end(): Pt { return { x: this.xs[this.n]!, y: this.ys[this.n]! }; }
   points(): Pt[] { return Array.from(this.xs, (x, i) => ({ x, y: this.ys[i]! })); }
-}
-
-const MAX_SPIN = 4.6; // radians a second
-const SPIN_OVER = 2; // samples
-
-/** Never drive a bend faster than a car could plausibly steer. */
-export function limitSpin(t: Track): void {
-  for (let i = SPIN_OVER; i <= t.n; i++) {
-    const k = (Math.abs(t.hs[i]! - t.hs[i - SPIN_OVER]!) * t.inv) / SPIN_OVER;
-    if (k > 0) t.vmax = Math.min(t.vmax, MAX_SPIN / k);
-  }
 }
 
 export interface Pose { x: number; y: number; h: number; z: number }

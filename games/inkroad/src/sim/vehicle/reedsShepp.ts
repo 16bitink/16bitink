@@ -245,9 +245,10 @@ export function rsSample(q0: Pose, p: RsPath, kappa: number, vcap: { fwd: number
 
 /** The rear axle after a signed distance d on curvature k (exact arc). */
 export function advance(x: number, y: number, th: number, k: number, d: number): { x: number; y: number; th: number } {
-  if (Math.abs(k) < 1e-12) return { x: x + d * Math.cos(th), y: y + d * Math.sin(th), th };
-  const th1 = th + k * d;
-  return { x: x + (Math.sin(th1) - Math.sin(th)) / k, y: y - (Math.cos(th1) - Math.cos(th)) / k, th: th1 };
+  // The chord of the arc, along its middle heading: no cancellation when k is tiny (a nearly straight wheel).
+  const half = (k * d) / 2;
+  const chord = Math.abs(half) < 1e-8 ? d : (d * Math.sin(half)) / half;
+  return { x: x + chord * Math.cos(th + half), y: y + chord * Math.sin(th + half), th: th + k * d };
 }
 
 /** Where a candidate ends (for checks). */

@@ -57,6 +57,35 @@ export interface TurnPlan {
   readonly radius: number;
 }
 
+/** A corner turn that may not fit: the curve, and whether it had to be tighter than asked (the corner is too small). */
+export interface CornerTurn { readonly pts: readonly Pt5[]; readonly radius: number; readonly tight: boolean; readonly trimIn: number; readonly trimOut: number }
+
+/**
+ * A road turn from the end of one lane (p0) to the start of the next (p1), both kept: as wide as the corner allows up
+ * to WIDEST_TURN·r, at radius r where it fits; where the corner is too small for r, the widest that fits (tight)
+ * and the px each lane would have to give up for r (trimIn, trimOut). Null if the lane lines don't meet ahead.
+ */
+export function cornerTurn(p0: Pose, p1: Pose, r: number, vcap: number, share: number): CornerTurn | null {
+  const turn = wrap(p1.th - p0.th);
+  const c0 = Math.cos(p0.th), s0 = Math.sin(p0.th), c1 = Math.cos(p1.th), s1 = Math.sin(p1.th);
+  const den = c0 * s1 - s0 * c1;
+  if (Math.abs(den) < 1e-6) return null;
+  const dx = p1.x - p0.x, dy = p1.y - p0.y;
+  const d0 = (dx * s1 - dy * c1) / den, d1 = (c0 * dy - s0 * dx) / den;
+  if (d0 < 0.5 || d1 < 0.5) return null;
+  const tu = unitTangent(turn, share);
+  const fit = Math.min(d0, d1) / tu;
+  const radius = Math.min(fit, WIDEST_TURN * r);
+  const t = radius * tu;
+  const start = { x: p0.x + (d0 - t) * c0, y: p0.y + (d0 - t) * s0, th: p0.th };
+  const lead: Pt5[] = d0 > t + 1e-6 ? straight(p0, d0 - t, vcap) : [];
+  const curve = smoothTurn(start, turn, radius, vcap, share);
+  const end = curve[curve.length - 1]!;
+  const tail: Pt5[] = d1 > t + 1e-6 ? straight(end, d1 - t, vcap).slice(1) : [];
+  const need = r * tu;
+  return { pts: [...lead, ...curve.slice(lead.length > 0 ? 1 : 0), ...tail], radius, tight: fit < r, trimIn: Math.max(0, need - d0), trimOut: Math.max(0, need - d1) };
+}
+
 /**
  * A junction turn from the end of one lane (p0) to the start of the next (p1), for a heading change between ~5° and
  * ~150°: as wide as the corner allows (up to WIDEST_TURN planned radii), never under rPlan. Null if the lane lines
@@ -113,3 +142,4 @@ export function laneShift(from: Pose, len: number, side: number, vcap: number): 
     };
   });
 }
+
