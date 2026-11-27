@@ -49,8 +49,15 @@ export const REAL_LIMITS = {
   planBrake: 2.2,
   /** Jerk, m/s³ (comfort studies put normal driving at 2–3, harsh above 5). */
   jerk: 3,
-  /** Forward speed while manoeuvring, m/s (~9 km/h). */
+  /**
+   * Forward speed while manoeuvring, m/s (~9 km/h): under the ~10 km/h of car-park aisles and lot accesses (car parks
+   * are signed 5–10 mph) and the ~15 km/h of a turn into a gate or driveway (the owner, phase B "parking speeds").
+   */
   manoeuvre: 2.5,
+  /** The last straight into a space, m/s (5 km/h, walking pace: the owner's "final forward creep"). */
+  creep: 5 / 3.6,
+  /** Turning in at a gate, driveway, forecourt or kerb space, at most (15 km/h). */
+  turnIn: 15 / 3.6,
   /** Seconds standing at a cusp to change gear. */
   gearChange: 0.5,
 } as const;
@@ -78,6 +85,9 @@ export interface VehicleParams {
   readonly jerk: number;
   readonly reverse: number;
   readonly manoeuvre: number;
+  /** The final creep into a space and the most at a turn-in, played px/s (the lab's 'too fast while parking'). */
+  readonly creep: number;
+  readonly turnIn: number;
   /** Sideways pull allowed on a curve, played px/s²: v ≤ √(aLat / |κ|). */
   readonly aLat: number;
   readonly gearChange: number;
@@ -139,6 +149,8 @@ function build(kind: VehicleKind): VehicleParams {
     jerk: L.jerk * PX_PER_M * P * P * P,
     reverse: REVERSE_MAX * P,
     manoeuvre: L.manoeuvre * PX_PER_M * P,
+    creep: L.creep * PX_PER_M * P,
+    turnIn: L.turnIn * PX_PER_M * P,
     aLat: A_LAT * P * P,
     gearChange: L.gearChange / P,
   };

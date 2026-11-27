@@ -80,10 +80,13 @@ export interface SpawnRequest {
    * held), then stands there holding the lane (state 4) for this many seconds before it drives off.
    */
   readonly hold?: number;
+  /** Where the car is drawn when it appears (the end of its played move out, the body's middle): it goes on from there. */
+  readonly pose?: LanePose;
 }
 
 /** Where a car stands in its lane: plan px and heading (radians, 0 = east, clockwise). */
-export interface LanePose { readonly x: number; readonly y: number; readonly a: number }
+/** `v`: the drawn car's speed there (px/s), when it is moving (a manoeuvre starts from it, never from a standstill it never reached). */
+export interface LanePose { readonly x: number; readonly y: number; readonly a: number; readonly v?: number; /** Its acceleration (px/s²) then. */ readonly acc?: number }
 
 export interface Arrival { readonly uid: number; readonly slot: number; readonly tag: number; readonly seconds: number; readonly waited: number; readonly tolls: number; readonly at: Pt; /** Heading where it was last drawn. */ readonly a?: number }
 
@@ -104,16 +107,18 @@ export interface Traffic {
   remove(uid: number): void;
   /** An arrived car turns into its space: it holds its lane where it stopped (state 4) for `seconds`, then is gone. False: no such car. */
   park(uid: number, seconds: number): boolean;
+  /** The drawn frames of a car through the last step (x, y, heading each, SUB + 1 of them), or null. */
+  framesOf(uid: number): Float64Array | null;
   /** Where a car on the road stands now, or null. */
   poseOf(uid: number): LanePose | null;
   /** Where `spawn(r)` would put a car leaving a space (its kerb lane at r.from), without making it; null from a gate or with no way. */
   entryPose(r: SpawnRequest): LanePose | null;
   /** Double-parked or broken down: the lane is blocked there for `seconds`. Gone when the time is up. */
-  block(at: Access, seconds: number, state: 2 | 3 | 4): number;
-  /** A car pulling out (held, state 4) holds its lane at least `seconds` from now. */
-  holdLonger(uid: number, seconds: number): void;
+  block(at: Access, seconds: number, state: 2 | 3 | 4, kind?: VehicleKind): number;
   /** Turning across the far side of a road at `at` (the car heading `heading`): seconds until its other-way lanes have a `gap`-second gap. */
   gapAcross(at: Access, heading: number, gap: number): number;
+  /** Its own lanes at `at`: clear of bodies from `back` px behind to `ahead` px past, nobody arriving within `seconds` (a pull-out's lane time). */
+  laneClear(at: Access, heading: number, back: number, ahead: number, seconds: number): boolean;
   /** Holds those other-way lanes at `at` for `seconds` (the body is in them). Returns how many lanes. */
   holdAcross(at: Access, heading: number, seconds: number): number;
   /** Buses, trams and school buses: drive the stops in a loop, pausing `dwell` at each. Returns a handle. */

@@ -2,6 +2,9 @@
 import { hash01 } from './rng';
 import { plan } from './motion';
 import { DRIVEWAY, IDM } from './tune';
+import { gapAcross } from './crossing';
+import { project } from './geom';
+import { standIn, startTurn, TURN_GAP } from './turning';
 
 /** A pull-out from the kerb is a forward S this many driveway lengths long: its bend stays near R_MIN, never a sideways hop. */
 const PULL_OUT_STRETCH = 2;
@@ -137,7 +140,11 @@ function drivers(sim: Sim, i: number): void {
   c.hw[i] = 1 + DRIVER_GAP * (hash01(uid, 2) - 0.5) * 2;
 }
 
-/** Swing round to the other side of the same road. False = no other side, or no space there. */
+/**
+ * Turn round onto the other side of the same road: a played turn (src/sim/turning.ts) from where the car is drawn to
+ * the lane back, after the road is clear both ways; the lane it leaves is held by a stand-in while the body sweeps it.
+ * False = no other side, no space there, or no turn fits.
+ */
 export function turnBack(sim: Sim, i: number): boolean {
   const c = sim.cars;
   const t = c.track[i]!;
@@ -147,12 +154,17 @@ export function turnBack(sim: Sim, i: number): boolean {
   const to = other.lanes[c.bus[i] ? other.lanes.length - 1 : other.carLanes - 1]!;
   const s = to.len * (1 - c.s[i]! / t.len);
   if (!spaceAt(sim, to, s, c.half[i]!, 0)) return false;
-  const x = c.rx[i]!, y = c.ry[i]!;
+  const at = { road: l.road.id, s: project(l.road.line, { x: c.x[i]!, y: c.y[i]! }).s };
+  const wait = Math.max(gapAcross(sim, at, c.heading[i]!, TURN_GAP), gapAcross(sim, at, c.heading[i]! + Math.PI, TURN_GAP));
+  const sOld = c.s[i]!;
+  const r = startTurn(sim, i, to, Math.max(c.half[i]!, s - 8), wait);
+  if (!r || !spaceAt(sim, to, r.s, c.half[i]!, 0)) { c.play[i] = null; return false; }
   c.unlink(i);
-  c.insert(i, to, s);
+  c.insert(i, to, r.s);
   c.forget(i);
   c.v[i] = 0;
-  c.slideFrom(i, x, y, DRIVEWAY.length * 1.2);
+  c.playGoal[i] = -1;
+  standIn(sim, t, sOld, wait + r.played.seconds, c.kind[i]!);
   plan(sim, i, other);
   return true;
 }

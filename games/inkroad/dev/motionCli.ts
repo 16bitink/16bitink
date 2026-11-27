@@ -1,5 +1,5 @@
 /**
- * `npm run motion -- <scenario|all|list|table> [--switch PLANNED_TIMES=on ROOMY_CORNERS=on] [--on] [--both] [--json] [--frame n] [--log n] [--rule text] [--who A]`
+ * `npm run motion -- <scenario|all|list|table> [--switch ROOMY_CORNERS=on GAP_ACCEPT=on] [--on] [--both] [--json] [--frame n] [--log n] [--rule text] [--who A]`
  * (dev/motion.mjs). One verdict line per scenario; a named scenario also prints its expectations, a compact violation
  * timeline and an ASCII frame at the first violation (or at --frame n). Switches also from the environment:
  * MOTION_SWITCHES=PLANNED_TIMES,ROOMY_CORNERS. docs/inkroad-motion-lab.md.
@@ -11,7 +11,7 @@ import { CATALOGUE } from '../test/motion/catalogue';
 import type { MotionSwitches } from '../src/sim/switches';
 
 type Env = Readonly<Record<string, string | undefined>>;
-const NAMES: readonly (keyof MotionSwitches)[] = ['PLANNED_TIMES', 'ROOMY_CORNERS', 'GAP_ACCEPT', 'ROAD_STOPS', 'HONEST_SWINGS'];
+const NAMES: readonly (keyof MotionSwitches)[] = ['ROOMY_CORNERS', 'GAP_ACCEPT'];
 const TIMELINE = 40;
 
 export function parseSwitches(args: readonly string[], env: Env): Partial<MotionSwitches> {
@@ -67,8 +67,8 @@ function detail(r: RunResult, args: readonly string[]): string {
   return out.join('\n');
 }
 
-const OFF: MotionSwitches = { PLANNED_TIMES: false, ROOMY_CORNERS: false, GAP_ACCEPT: false, ROAD_STOPS: false, HONEST_SWINGS: false };
-const ON: MotionSwitches = { PLANNED_TIMES: true, ROOMY_CORNERS: true, GAP_ACCEPT: true, ROAD_STOPS: true, HONEST_SWINGS: true };
+const OFF: MotionSwitches = { ROOMY_CORNERS: false, GAP_ACCEPT: false };
+const ON: MotionSwitches = { ROOMY_CORNERS: true, GAP_ACCEPT: true };
 /** Rules shown in the main-failure column when no other expectation fails. */
 const TOP_RULES = 2;
 
@@ -101,7 +101,7 @@ export function table(): string {
 export function main(args: readonly string[], env: Env): string {
   const name = args.find((a) => !a.startsWith('--') && !a.includes('=')) ?? 'all';
   const switches = parseSwitches(args, env);
-  const runs: Partial<MotionSwitches>[] = args.includes('--both') ? [{ PLANNED_TIMES: false, ROOMY_CORNERS: false, GAP_ACCEPT: false, ROAD_STOPS: false, HONEST_SWINGS: false }, { PLANNED_TIMES: true, ROOMY_CORNERS: true, GAP_ACCEPT: true, ROAD_STOPS: true, HONEST_SWINGS: true }] : [switches];
+  const runs: Partial<MotionSwitches>[] = args.includes('--both') ? [{ ROOMY_CORNERS: false, GAP_ACCEPT: false }, { ROOMY_CORNERS: true, GAP_ACCEPT: true }] : [switches];
   if (name === 'table') return table();
   if (name === 'list') return CATALOGUE.map((k) => `${k.id.padEnd(34)} ${k.built ? 'built' : 'todo '} ${k.expect}`).join('\n');
   const picked = name === 'all' ? SCENARIOS : SCENARIOS.filter((s) => s.id === name || s.id.startsWith(name));

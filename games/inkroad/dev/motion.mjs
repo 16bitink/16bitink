@@ -1,4 +1,4 @@
-// The InkRoad motion lab: `npm run motion -- <scenario|all> [--switch PLANNED_TIMES=on ROOMY_CORNERS=on GAP_ACCEPT=on] [--frame n] [--log n]`.
+// The InkRoad motion lab: `npm run motion -- <scenario|all> [--switch ROOMY_CORNERS=on GAP_ACCEPT=on] [--frame n] [--log n]`.
 // One line per scenario; a named one also prints its violation timeline and an ASCII top-down frame at the first
 // violation (or at --frame n). Loads dev/motionCli.ts through Vite's module runner, no build step.
 // docs/inkroad-motion-lab.md.

@@ -34,6 +34,16 @@ export const LEAD = { gap: Infinity, v: 0, hard: Infinity };
 const bodySlack = (c: CarStore, i: number, q: number): number => c.body[i]! - c.half[i]! + c.body[q]! - c.half[q]! + Math.max(0, c.lag[q]!);
 const ownSlack = (c: CarStore, i: number): number => Math.max(0, -c.lag[i]!);
 
+/**
+ * Px a follower leaves behind a car that is parking or pulling out (the owner, phase B: queues behind a manoeuvring
+ * car look real): it stands back far enough for the car to back into a kerb space or swing out of one behind its point.
+ */
+export const PARK_ROOM = 24;
+/** A leader this close to its stop on this lane (px) is about to park: its blinker is on. */
+const PARK_NEAR = 80;
+const parkRoom = (c: CarStore, a: number, t: Track): number =>
+  c.state[a] === 4 || (c.destLink[a] === t.link && c.destNode[a]! < 0 && c.service[a]! < 0 && c.destAt[a]! - c.s[a]! < PARK_NEAR) ? PARK_ROOM : 0;
+
 const gapTo = (c: CarStore, i: number, base: number, q: number): number => base + c.s[q]! - c.half[i]! - c.half[q]! - bodySlack(c, i, q);
 
 /** A leader at `gap` px (`own`: px of the follower's own drawn overshoot, for the planned gap only). */
@@ -49,7 +59,7 @@ export function look(sim: Sim, i: number, open: boolean): void {
   LEAD.gap = LEAD.hard = Infinity;
   LEAD.v = 0;
   const a = c.ahead[i]!;
-  if (a >= 0) take(c.s[a]! - c.s[i]! - c.half[a]! - c.half[i]! - bodySlack(c, i, a), c.v[a]!, true, ownSlack(c, i));
+  if (a >= 0) take(c.s[a]! - c.s[i]! - c.half[a]! - c.half[i]! - bodySlack(c, i, a) - parkRoom(c, a, t), c.v[a]!, true, ownSlack(c, i));
   let base = t.len - c.s[i]!;
   const reach = Math.max(IDM.lookMin, c.v[i]! * IDM.lookTime);
   if (t.merge.length > 0 && a < 0) zipWith(sim, i, t, base);
@@ -61,7 +71,7 @@ export function look(sim: Sim, i: number, open: boolean): void {
     if (at.lastOut >= 0) splitLeader(c, i, at, next, base);
     if (next.tail >= 0) {
       const q = next.tail;
-      take(gapTo(c, i, base, q), c.v[q]!, true, ownSlack(c, i));
+      take(gapTo(c, i, base, q) - parkRoom(c, q, next), c.v[q]!, true, ownSlack(c, i));
       if (next.merge.length > 0) zipWith(sim, i, next, base + next.len);
       return;
     }

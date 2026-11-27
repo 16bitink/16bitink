@@ -7,13 +7,13 @@ export interface Situation { readonly id: string; readonly expect: string; reado
 export const CATALOGUE: readonly Situation[] = [
   // ---- parking in and out
   { id: 'park.kerb.parallel-traffic', built: true, expect: 'A backs into a kerb bay with an S from ahead while B follows; pulls out forward into a gap and leaves' },
-  { id: 'park.kerb.far-side', built: true, expect: 'A parks in a bay on the far (left) kerb only by going round, never across the oncoming lane head-on; leaves on its own side' },
+  { id: 'park.kerb.far-side', built: true, expect: 'A parks in a bay on the far (left) kerb only by going round (with no way round in the map: a turn round on the road, the road clear both ways), then backs in from its own lane; never across the oncoming lane head-on; leaves on its own side' },
   { id: 'park.kerb.one-way', built: true, expect: 'On a one-way street A parks on either kerb, front first in the direction of travel, and pulls out forward' },
   { id: 'park.kerb.leave-busy', built: true, expect: 'A in a kerb bay waits at its slot until the lane has a 3 s gap, then pulls out; no car behind brakes over 400 px/s²' },
   { id: 'park.kerb.neighbour-swap', built: true, expect: 'B leaves a bay while A arrives for the one beside it: no overlap, A waits for B to clear, both in R_MIN arcs' },
   { id: 'park.street.unmarked', built: true, expect: 'A pulls over to a bare kerb (no bays) with a forward S, stops parallel, later pulls out forward' },
   { id: 'park.forecourt.near-lane', built: true, expect: 'From the near lane A backs into a forecourt space with an S, square to the kerb; leaves forward' },
-  { id: 'park.forecourt.far-lane', built: true, expect: 'From the far lane A waits for oncoming B to pass, turns across with a 3 s gap, ends in a forecourt space; nothing overlaps' },
+  { id: 'park.forecourt.far-lane', built: true, expect: 'From the far lane A waits for oncoming B to pass, turns in nose first, forward across the road with a 3 s gap (never backing across a lane), ends in a forecourt space; nothing overlaps' },
   { id: 'park.carpark.gate-aisle', built: true, expect: 'A enters a surface car park through its gate, drives the aisle, lines up on its bay column and goes straight in; leaves the same way' },
   { id: 'park.carpark.multi-entrance', built: true, expect: 'A drives into a multi-storey entrance and disappears inside the box (no slots drawn), comes out of the same mouth later' },
   { id: 'park.carpark.underground', built: true, expect: 'As the multi-storey: an underground ramp mouth, no car drawn over the box' },

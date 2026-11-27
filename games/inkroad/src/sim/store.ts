@@ -1,3 +1,4 @@
+import type { Played } from './vehicle/played';
 /** Every car, as struct of arrays, and the queue operations that keep lanes ordered. */
 import { MAX_CARS, VEHICLES } from './constants';
 import { shiftLength } from './vehicle/shift';
@@ -76,6 +77,11 @@ export class CarStore implements CarsView {
   readonly fdelta = f64();
   readonly fa = f64();
   readonly fOn = new Uint8Array(MAX_CARS);
+  /** A turn round on the road played by the vehicle model (src/sim/turning.ts), and the sim time it starts playing: the car stands until it is done. */
+  readonly play: (Played | null)[] = new Array<Played | null>(MAX_CARS).fill(null);
+  readonly playAt = f64();
+  /** Px along the lane back where a dead-end turn ends (-1: the car already stands there, a turn on the road). */
+  readonly playGoal = f64();
   /** Tracks it came by (the rear axle may still be on them), newest first. */
   readonly hist0: (Track | null)[] = new Array<Track | null>(MAX_CARS).fill(null);
   readonly hist1: (Track | null)[] = new Array<Track | null>(MAX_CARS).fill(null);
@@ -130,6 +136,7 @@ export class CarStore implements CarsView {
     for (const a of [this.s, this.v, this.nv, this.waited, this.stuck, this.linkWait, this.tolls, this.until, this.ticket, this.destS, this.destAt, this.rerouted]) a[i] = 0;
     for (const a of [this.offX, this.offY, this.offEnd, this.offLen, this.anger, this.z, this.speed, this.v0, this.travel, this.acc]) a[i] = 0;
     this.fOn[i] = 0;
+    this.play[i] = null;
     this.hist0[i] = this.hist1[i] = null;
     this.ahead[i] = this.behind[i] = this.service[i] = this.destLink[i] = this.destRoad[i] = this.destNode[i] = this.link[i] = -1;
     this.courtesy[i] = this.granted[i] = this.arrived[i] = this.state[i] = this.tint[i] = this.destDir[i] = 0;

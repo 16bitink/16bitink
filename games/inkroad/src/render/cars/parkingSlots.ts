@@ -48,14 +48,13 @@ const none = (n: number): Slots => new Array<null>(n).fill(null);
 /** A car's own space: the city's, or (an old save, a fake city) its place in the list. */
 export const slotOf = (c: ParkedCar, i: number): number => c.slot ?? i;
 
-/** How a car moves into and out of a place: swinging in along the kerb or a forecourt's edge (their slots lie along it), turning into a bay, or into a car park's mouth. */
-export type { Mode } from '../../sim/parkMove';
-import type { Mode } from '../../sim/parkMove';
-import { MOTION_SWITCHES } from '../../sim/switches';
-export const modeOf = (kind: ParkingView['kind']): Mode => (kind === 'double' ? 'double' : kind === 'street' && MOTION_SWITCHES.ROAD_STOPS ? 'pullover' : kind === 'kerb' || kind === 'street' || kind === 'private' ? 'parallel' : 'bay');
-
-/** The slots for every car of one place. */
+/** The slots for every car of one place; a car whose move in ended a hair off its slot stands just where it ended (src/city/movePlan.ts). */
 export function layoutPlace(v: ParkingView, geo: ParkingGeo): Slots {
+  const slots = slotsOfPlace(v, geo);
+  return v.cars.some((c) => c.pose) ? slots.map((s, i) => { const p = v.cars[i]?.pose; return p && s ? { ...s, x: p.x, y: p.y, a: p.a } : s; }) : slots;
+}
+
+function slotsOfPlace(v: ParkingView, geo: ParkingGeo): Slots {
   switch (v.kind) {
     case 'home':
     case 'private':
@@ -136,7 +135,7 @@ function standing(road: Road, along: number, side: number, slot: number, street:
   const loose = street ? streetLoose(road.id, slot) : { turn: 0, shove: 0 };
   const q = at(p, side * (kerbOffset(road) + loose.shove));
   // A one-way street's cars on both kerbs face the way it runs.
-  return { x: q.x, y: q.y, a: p.a + (side < 0 && !(road.oneWay && MOTION_SWITCHES.ROAD_STOPS) ? Math.PI : 0) + loose.turn };
+  return { x: q.x, y: q.y, a: p.a + (side < 0 && !road.oneWay ? Math.PI : 0) + loose.turn };
 }
 
 function doubleSlots(v: ParkingView, geo: ParkingGeo): Slots {

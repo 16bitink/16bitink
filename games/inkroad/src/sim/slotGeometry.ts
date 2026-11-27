@@ -2,6 +2,7 @@ import { CELL } from './constants';
 import { gardenPlan, GATE_W, isGarden, type GardenLot } from './gardenLayout';
 import { pointAt, project } from './geom';
 import { hash01 } from './rng';
+import { halfWidth } from './roadGeom';
 import type { CarParkKind, Pt, Road, VehicleKind } from './types';
 import { BIGGEST, PITCH_BODY, reach, sizeOf, spansTwo } from './vehicleSize';
 
@@ -37,7 +38,8 @@ export type PlaceShape =
   | { readonly kind: 'park'; readonly park: { readonly gx: number; readonly gy: number; readonly w: number; readonly h: number; readonly kind: CarParkKind }; readonly from: Pt | null }
   | { readonly kind: 'sand'; readonly rect: { readonly gx: number; readonly gy: number; readonly w: number; readonly h: number }; readonly road: RoadPoint | null };
 
-export interface RoadPoint { readonly at: Pt; readonly a: number }
+/** The nearest point of a road, its heading there, and the road's half paved width (px). */
+export interface RoadPoint { readonly at: Pt; readonly a: number; readonly half?: number }
 
 /** Clear paint between two parked bodies, side by side and nose to tail. */
 export const GAP_ACROSS = 2.6;
@@ -67,6 +69,8 @@ export const SAND_LOOSE = 0.3;
 const SAND_JIT_U = 1;
 const SAND_JIT_D = 1;
 const SAND_ANCHOR = SAND_INSET + SAND_JIT_D + 0.5;
+/** Px from a road's paved edge to the middle of a car on the sand (half the biggest body across, and a gap). */
+const SAND_ROAD_CLEAR = 8;
 const SAND_REACH = reach(PITCH_BODY, SAND_LOOSE);
 const SAND_BIG = reach(BIGGEST, SAND_LOOSE);
 export const SAND_PITCH = SAND_REACH.x * 2 + SAND_JIT_U * 2 + GAP_ALONG;
@@ -194,13 +198,13 @@ export function aisleRoute(l: SlotLayout, to: SlotPose): readonly Pt[] | null {
 
 /** The ground road that comes closest to a point, and the point on it. */
 export function nearestGround(roads: readonly Road[], c: Pt): RoadPoint | null {
-  let best: { at: Pt; a: number; d: number } | null = null;
+  let best: { at: Pt; a: number; d: number; half: number } | null = null;
   for (const road of roads) {
     if (road.level !== 0 || road.flyover || road.line.length < 2) continue;
     const n = project(road.line, c);
-    if (!best || n.d < best.d) best = { at: { x: n.x, y: n.y }, a: pointAt(road.line, n.s).heading, d: n.d };
+    if (!best || n.d < best.d) best = { at: { x: n.x, y: n.y }, a: pointAt(road.line, n.s).heading, d: n.d, half: halfWidth(road) };
   }
-  return best ? { at: best.at, a: best.a } : null;
+  return best ? { at: best.at, a: best.a, half: best.half } : null;
 }
 
 function sandFrame(r: Box, road: RoadPoint | null): { readonly anchor: Pt; readonly away: number } {
@@ -216,8 +220,11 @@ function sandLayout(cells: { readonly gx: number; readonly gy: number; readonly 
   const r = boxOf(cells);
   const { anchor, away } = sandFrame(r, road);
   const along = away - Math.PI / 2;
-  const inside = (x: number, y: number): boolean => x >= r.x + SAND_INSET && x <= r.x + r.w - SAND_INSET && y >= r.y + SAND_INSET && y <= r.y + r.h - SAND_INSET;
+  // On the sand and clear of the road's paved width (a body there would stand in the lane).
+  const clear = (x: number, y: number): boolean => !road || (x - road.at.x) * Math.cos(away) + (y - road.at.y) * Math.sin(away) >= (road.half ?? 0) + SAND_ROAD_CLEAR;
+  const inside = (x: number, y: number): boolean => x >= r.x + SAND_INSET && x <= r.x + r.w - SAND_INSET && y >= r.y + SAND_INSET && y <= r.y + r.h - SAND_INSET && clear(x, y);
   const rows: RowSlot[][] = [];
+  let nearRoad = false;
   for (let row = 0; row < SAND_ROWS_MAX; row++) {
     const out: RowSlot[] = [];
     for (let j = 0; j < SAND_COLS; j++) {
@@ -228,11 +235,14 @@ function sandLayout(cells: { readonly gx: number; readonly gy: number; readonly 
       const u = col * SAND_PITCH + (hash01(k * SALT.along + cells.gy, cells.gx) - 0.5) * 2 * SAND_JIT_U;
       const x = anchor.x + Math.cos(away) * d + Math.cos(along) * u;
       const y = anchor.y + Math.sin(away) * d + Math.sin(along) * u;
-      if (!inside(x, y)) continue;
+      if (!inside(x, y)) { if (!clear(x, y)) nearRoad = true; continue; }
       const flip = hash01(k * SALT.turn + cells.gx, cells.gy) < 0.5 ? 0 : Math.PI;
       out.push({ pose: { x, y, a: along + jig * 2 * SAND_LOOSE + flip }, u: col * SAND_PITCH, rank: k, dir: flip === 0 ? 1 : -1 });
     }
-    if (out.length === 0) break;
+    // A row too near the road is skipped; past the sand, the rows end.
+    if (out.length === 0 && !nearRoad) break;
+    nearRoad = false;
+    if (out.length === 0) continue;
     rows.push(out);
   }
   return fromRows(rows, false, SAND_PITCH);

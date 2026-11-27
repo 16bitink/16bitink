@@ -1,8 +1,8 @@
 /**
  * Where each moving car is drawn (docs/inkroad-vehicle-model.md "Step 2"): after every sim step the drawn car is driven
  * through the step in sub-steps of 1/60 played second by the vehicle model (src/sim/vehicle/follow.ts), following
- * the car's reference: the line of its tracks (lane, turn, ring) for the rear axle, with the sim's lane-change and
- * kerb-swing offsets laid on it. The sim stays the authority on progress and speed; the drawn car only follows.
+ * the car's reference: the line of its tracks (lane, turn, ring) for the rear axle, with the sim's lane-change slide
+ * laid on it (a car stopping at a place stops in its lane: the move off it is planned, src/city/movePlan.ts). The sim stays the authority on progress and speed; the drawn car only follows.
  * Each sub-step's pose goes into CarStore.frames, which the renderer and the motion tests read (`frameAt`).
  */
 import { STEP } from './constants';
@@ -10,8 +10,8 @@ import { nextTrack } from './path';
 import type { Sim } from './sim';
 import { FRAME_STRIDE, SUB, type CarStore } from './store';
 import type { Track } from './track';
-import { DRIVEWAY } from './tune';
 import { followInto, startOn } from './vehicle/follow';
+import { playedAt, type MutablePose } from './vehicle/played';
 import { paramsOf, type VehicleParams } from './vehicle/params';
 import type { CarState, MutableCar } from './vehicle/bicycle';
 import { VEHICLES } from './constants';
@@ -27,6 +27,8 @@ const PREVIEW_PX = 2, PREVIEW_S = 0.15;
 const LOST = 80, LOST_STANDING = 60;
 /** fOn of a car held in its lane: drawn where it stood, put back on its reference when it is released. */
 const HELD = 2;
+/** A held car drawn within this of its reference (px, and cos of the heading error) goes on from where it is drawn. */
+const HELD_NEAR = 4, HELD_TURN = 0.9;
 
 const PARAMS: readonly VehicleParams[] = VEHICLES.map((k) => paramsOf(k as VehicleKind));
 export const paramsOfKind = (kind: number): VehicleParams => PARAMS[kind] ?? PARAMS[0]!;
@@ -84,7 +86,7 @@ export function refAt(sim: Sim, i: number, p: number): RefOut {
   const c = sim.cars;
   chainAt(sim, i, p);
   lineAt(chainT!, chainS);
-  let lat = 0, slope = 0, bend = 0, hx = 0, hy = 0, ox = 0, oy = 0;
+  let bend = 0, hx = 0, hy = 0, ox = 0, oy = 0;
   const len = c.offLen[i]!;
   const u = len > 0 ? (c.offEnd[i]! - p) / len : 0;
   if (u > 0) {
@@ -95,29 +97,12 @@ export function refAt(sim: Sim, i: number, p: number): RefOut {
       bend = ((-c.offX[i]! * Math.sin(REF.th) + c.offY[i]! * Math.cos(REF.th)) * e2) / (len * len);
     }
   }
-  const d = p >= 0 ? swingLeft(sim, i, p) : Infinity;
-  if (d < DRIVEWAY.length) {
-    const [e, e1, e2] = q5(1 - Math.max(0, d) / DRIVEWAY.length);
-    lat = DRIVEWAY.slide * e;
-    slope = d > 0 ? (DRIVEWAY.slide * e1) / DRIVEWAY.length : 0;
-    bend += d > 0 ? (DRIVEWAY.slide * e2) / (DRIVEWAY.length * DRIVEWAY.length) : 0;
-  }
-  const nx = -Math.sin(REF.th), ny = Math.cos(REF.th);
-  REF.x += ox + nx * lat;
-  REF.y += oy + ny * lat;
-  const tx = Math.cos(REF.th) + hx + nx * slope, ty = Math.sin(REF.th) + hy + ny * slope;
-  if (hx !== 0 || hy !== 0 || slope !== 0) REF.th += Math.atan2(-Math.sin(REF.th) * tx + Math.cos(REF.th) * ty, Math.cos(REF.th) * tx + Math.sin(REF.th) * ty);
+  REF.x += ox;
+  REF.y += oy;
+  const tx = Math.cos(REF.th) + hx, ty = Math.sin(REF.th) + hy;
+  if (hx !== 0 || hy !== 0) REF.th += Math.atan2(-Math.sin(REF.th) * tx + Math.cos(REF.th) * ty, Math.cos(REF.th) * tx + Math.sin(REF.th) * ty);
   REF.k += bend;
   return REF;
-}
-
-/** Px left to a kerbside stop on this lane at progress p (Infinity if the car doesn't stop on it, or swings no kerb). */
-function swingLeft(sim: Sim, i: number, p: number): number {
-  const c = sim.cars;
-  const t = c.track[i]!;
-  if (c.destNode[i]! >= 0 || c.service[i]! >= 0 || c.destLink[i]! < 0 || t.link !== c.destLink[i]) return Infinity;
-  if (t.lane !== sim.world.links[t.link]!.lanes.length - 1) return Infinity;
-  return c.destAt[i]! - p;
 }
 
 /** Scratch drawn car of the hot loop (loaded from the store, stepped, written back). */
@@ -159,14 +144,19 @@ export function drawStep(sim: Sim, i: number): void {
   const p = paramsOfKind(c.kind[i]!);
   const s = c.s[i]!;
   copyLast(c, i);
+  if (c.play[i]) { playStep(sim, i, p); return; }
   const held = c.state[i] === 4;
   const off = Math.hypot(c.fx[i]! + p.toMiddle * Math.cos(c.fth[i]!) - c.rx[i]!, c.fy[i]! + p.toMiddle * Math.sin(c.fth[i]!) - c.ry[i]!);
-  const lost = c.fOn[i] === 1 && (off > LOST || (off > LOST_STANDING && c.travel[i] === 0 && c.v[i] === 0));
-  // Turned round on the road by the sim (src/sim/place.ts turnBack, a manoeuvre until phase B): drawn as the sim has it.
-  const reversed = c.fOn[i] === 1 && Math.cos(c.fth[i]! - c.rh[i]!) < 0;
-  if (held || reversed || c.track[i]!.turnRound === 'three') { c.lag[i] = 0; still(sim, i, p, s, held); return; }
+  const lost = c.fOn[i] !== 0 && (off > LOST || (off > LOST_STANDING && c.travel[i] === 0 && c.v[i] === 0));
+  // A dead end's three-point turn with no played turn (none fitted): drawn as the sim has it.
+  if (held || c.track[i]!.turnRound === 'three') { c.lag[i] = 0; still(sim, i, p, s, held); return; }
   // A car that just appeared (or was put elsewhere by the sim) starts on its reference where it was at the step's start.
-  if (c.fOn[i] !== 1 || lost) begin(sim, i, p, s - c.travel[i]!);
+  // Released from a hold where it was drawn (a pull-out's played move ends on its lane): it goes on from there; held
+  // anywhere else (a bus turned round beyond the map's edge) it starts on its reference.
+  const offLine = c.fOn[i] === HELD && (off > HELD_NEAR || Math.cos(c.fth[i]! - c.rh[i]!) < HELD_TURN);
+  if (c.fOn[i] === 0 || lost || offLine) begin(sim, i, p, s - c.travel[i]!);
+  // Released from a hold: it goes on from where it stood drawn (a pull-out's played move ends there), steering back onto its lane.
+  c.fOn[i] = 1;
   const car = load(c, i);
   let z = 0, lastLead = 0;
   for (let k = 1; k <= SUB; k++) {
@@ -190,6 +180,38 @@ export function drawStep(sim: Sim, i: number): void {
   c.heading[i] = car.th;
   c.z[i] = z;
   c.speed[i] = car.u;
+}
+
+/** A car turning round on the road (src/sim/turning.ts): its drawn car plays the turn's frames at the sim's clock. */
+const PLAY_AT: MutablePose = { x: 0, y: 0, a: 0 };
+function playStep(sim: Sim, i: number, p: VehicleParams): void {
+  const c = sim.cars;
+  const m = c.play[i]!;
+  const o = i * (SUB + 1) * FRAME_STRIDE;
+  const t0 = sim.time - STEP - c.playAt[i]!;
+  for (let k = 1; k <= SUB; k++) {
+    playedAt(m, t0 + k * DT, PLAY_AT);
+    c.frames[o + k * FRAME_STRIDE] = PLAY_AT.x;
+    c.frames[o + k * FRAME_STRIDE + 1] = PLAY_AT.y;
+    c.frames[o + k * FRAME_STRIDE + 2] = PLAY_AT.a;
+    c.frames[o + k * FRAME_STRIDE + 3] = 0;
+  }
+  // The drawn car goes on from the turn's last frame shown, standing (the turn ends standing).
+  store(c, i, { x: PLAY_AT.x - p.toMiddle * Math.cos(PLAY_AT.a), y: PLAY_AT.y - p.toMiddle * Math.sin(PLAY_AT.a), th: PLAY_AT.a, u: 0, dir: 1, delta: t0 + STEP >= m.seconds ? m.end.delta : 0, a: 0 });
+  c.fOn[i] = 1;
+  c.lag[i] = 0;
+  c.x[i] = PLAY_AT.x; c.y[i] = PLAY_AT.y; c.heading[i] = PLAY_AT.a; c.speed[i] = 0; c.z[i] = 0;
+}
+
+/** A car that appears where a played move left it (src/city/movePlan.ts): drawn standing at that pose of its middle, wheels straight. */
+export function placeDrawn(sim: Sim, i: number, x: number, y: number, a: number): void {
+  const c = sim.cars;
+  const p = paramsOfKind(c.kind[i]!);
+  store(c, i, { x: x - p.toMiddle * Math.cos(a), y: y - p.toMiddle * Math.sin(a), th: a, u: 0, dir: 1, delta: 0, a: 0 });
+  const o = i * (SUB + 1) * FRAME_STRIDE;
+  for (let k = 0; k <= SUB; k++) { c.frames[o + k * FRAME_STRIDE] = x; c.frames[o + k * FRAME_STRIDE + 1] = y; c.frames[o + k * FRAME_STRIDE + 2] = a; c.frames[o + k * FRAME_STRIDE + 3] = 0; }
+  c.fOn[i] = HELD;
+  c.x[i] = x; c.y[i] = y; c.heading[i] = a; c.speed[i] = 0;
 }
 
 /** The drawn car set on its reference at progress m (the body's middle), at the step's start speed, as frame 0. */

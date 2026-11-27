@@ -20,7 +20,7 @@ import { bestRide } from './transit';
 import { placeKey } from './day';
 import { catchChance, daring, doubleSpot, streetFine } from './fines';
 export { catchChance, daring } from './fines';
-import { aimAt, aimOf, arrivalSlot, backIn, crossClear, crossHold, holdFrom, holdOut, pulledOut, pullingOut, readyAtEdge, standingAccess, stoppedAt, turnIn } from './manoeuvre';
+import { aimAt, aimOf, arrivalSlot, backIn, crossClear, crossHold, pulledOut, pullingOut, readyAtEdge, standingAccess, stoppedAt, turnIn } from './manoeuvre';
 import { doorBack, doorGone, doorIn, doorReady, nearestDoor, needsDoor, type Look } from './door';
 import { kindOf, legKind } from './vehicleKinds';
 import { hasRoom } from './slots';
@@ -58,14 +58,17 @@ function enter(c: City, leg: Leg, from: Access, to: Access): boolean {
   const door = !out && needsDoor({ from } as SpawnRequest);
   const base: SpawnRequest = { from: out ? standingAccess(c, out) : from, to, ...look, value: leg.tour.value, tag };
   if (out && !readyAtEdge(c, out, base)) return false;
-  const hold = out ? out.edge?.hold ?? holdOut(out.spot) : 0;
-  const req: SpawnRequest = hold > 0 ? { ...base, hold } : base;
+  const hold = out ? out.edge?.hold ?? STEP : 0;
+  // The played move out joins the lane where it chose (edge.from): the spawn stands just there.
+  const at = out?.edge?.from ?? base.from;
+  const pose = out?.edge?.lane;
+  const req: SpawnRequest = { ...base, from: at, ...(hold > 0 ? { hold } : {}), ...(out?.edge && pose ? { pose } : {}) };
   if (out && !crossClear(c, out)) return false;
   if (door && !doorReady(c, leg, req, look)) return false;
-  const uid = c.traffic.spawn(req);
+  const uid = c.traffic.spawn(door && leg.door ? { ...req, hold: leg.door.hold } : req);
   if (uid < 0) return false;
   leg.uid = uid;
-  if (out) { crossHold(c, out); pulledOut(c, uid, out, holdFrom(c, uid, out, hold)); }
+  if (out) { crossHold(c, out); pulledOut(c, uid, out, hold); }
   if (door) doorGone(c, leg, uid);
   c.day.drawn[dayKindAt(c.clock)] += 1;
   releaseSpot(c, leg);
@@ -253,7 +256,10 @@ export function arrive(c: City, a: Arrival): void {
   const drivesIn = 'gate' in leg.target || leg.mode === 'taxi';
   if (drivesIn) { completeTrip(c, leg, a); finish(c, leg, a.uid); if (leg.out) stayThere(c, leg, null, accessOf(c, leg.target)); return; }
   if (leg.spot && hasRoom(c, leg.spot, leg, legKind(c, leg))) {
-    if (dodges(c, leg, leg.spot)) doublePark(c, leg, a, a.at); else park(c, leg, a, leg.spot);
+    if (dodges(c, leg, leg.spot)) { doublePark(c, leg, a, a.at); return; }
+    // Free spaces only on the far kerb: a driver goes round (turns round where it may) and parks from that side.
+    if (farSideOnly(c, leg, leg.spot, a) && !leg.wentRound) { leg.wentRound = true; if (c.traffic.redirect(a.uid, aimAt(c, leg, leg.spot))) return; }
+    park(c, leg, a, leg.spot);
     return;
   }
   if (leg.spot) leg.tried.push(leg.spot.key);
@@ -271,6 +277,13 @@ export function completeTrip(c: City, leg: Leg, a: Arrival): number {
   const coins = a.tolls;
   if (leg.mode === 'taxi' || 'gate' in leg.target) scorePay(c, leg, coins);
   return coins;
+}
+
+/** A kerb or street place on a two-way road whose free spaces are all across the road from the arriving car. */
+function farSideOnly(c: City, leg: Leg, spot: Spot, a: Arrival): boolean {
+  if (spot.kind !== 'kerb' && spot.kind !== 'street') return false;
+  const road = c.net.roads.find((r) => r.id === spot.id);
+  return !!road && !road.oneWay && arrivalSlot(c, leg, spot, c.traffic.poseOf(a.uid)) < 0;
 }
 
 function park(c: City, leg: Leg, a: Arrival, spot: Spot): void {

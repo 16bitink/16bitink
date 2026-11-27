@@ -56,7 +56,7 @@ export class Track {
   merge: Track[] = [];
   /** Right of way can be taken without asking (bends, ramps, slips). */
   free = false;
-  /** Turning round at a dead end (src/sim/parkPaths.ts turnRound): one car at a time; a three-point turn reverses on it (`hs` is the body's heading). */
+  /** Turning round at a dead end (src/sim/turnRound.ts): one car at a time; a three-point turn reverses on it (`hs` is the body's heading). */
   turnRound: 'u' | 'three' | null = null;
   /** Px along a three-point turn where its gear changes: a car stops there before it backs up or sets off again. */
   cusps: readonly number[] = [];

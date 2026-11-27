@@ -9,6 +9,7 @@ import { LANE_T, TURN_T, type Track } from './track';
 import { ANGER_FULL, HONK_AT, REROUTE_AFTER } from './tune';
 import { laneS, type LinkRt } from './world';
 import { runsWith } from './routes';
+import { startTurn, turning } from './turning';
 
 const TINY = 1e-3;
 const CRAWL = 4;
@@ -88,6 +89,7 @@ function cross(sim: Sim, i: number, t: Track, next: Track): boolean {
   c.push(i, next, Math.max(0, over));
   if (next.kind !== LANE_T && !next.occ.includes(i)) next.occ.push(i);
   if (next.kind === LANE_T) enterLane(sim, i, next);
+  if (next.turnRound === 'three') turnOnto(sim, i, next);
   return true;
 }
 
@@ -113,6 +115,7 @@ function arrive(sim: Sim, i: number): void {
 /** Move car i by one step. */
 export function move(sim: Sim, i: number): void {
   const c = sim.cars;
+  if (c.play[i] && holdTurning(sim, i)) return;
   const v = c.v[i]!, nv = c.nv[i]!;
   let ds = ((v + nv) / 2) * STEP;
   if (nv === 0 && v > 0) ds = Math.min(ds, (v * STEP) / 2);
@@ -128,6 +131,36 @@ export function move(sim: Sim, i: number): void {
   const d = toDest(sim, i);
   if (d <= (c.service[i]! >= 0 ? 2.5 : 0) && c.until[i]! <= sim.time) { arrive(sim, i); return; }
   advance(sim, i);
+}
+
+/**
+ * A car in a played turn round stands (its drawn car plays the turn) until the turn is done; then it is on the lane
+ * back where the turn ended (a dead end's turn track is left at its goal). True: it is still turning.
+ */
+function holdTurning(sim: Sim, i: number): boolean {
+  const c = sim.cars;
+  c.travel[i] = 0;
+  if (turning(sim, i)) { c.v[i] = 0; c.acc[i] = 0; return true; }
+  c.play[i] = null;
+  const t = c.track[i]!;
+  const back = t.turnRound !== null && c.playGoal[i]! >= 0 ? nextTrack(sim, i, t) : null;
+  if (back) {
+    // Off the turn and onto the lane back just where the turn ended (the drawn car stands there).
+    c.unlink(i);
+    c.hop(i, t);
+    c.insert(i, back, Math.min(back.len - 1, c.playGoal[i]!));
+    c.v[i] = 0;
+    if (back.kind === LANE_T) enterLane(sim, i, back);
+  }
+  return true;
+}
+
+/** Entering a dead end's three-point turn: plan it on the road and play it (src/sim/turning.ts). */
+function turnOnto(sim: Sim, i: number, t: Track): void {
+  const back = nextTrack(sim, i, t);
+  if (!back) return;
+  const r = startTurn(sim, i, back, 0, 0);
+  if (r) sim.cars.playGoal[i] = r.s;
 }
 
 // ---------------------------------------------------------------- waiting

@@ -15,8 +15,10 @@ import { broken, measure, type Drawn } from './invariants';
  * still runs its own step-1 plan among it, so where it turns in traffic its timing differs and it meets the others.
  */
 const KNOWN: Readonly<Record<string, readonly string[]>> = { 'uturn-avenue': ['overlaps'], 'uturn-deadend': ['overlaps'], 'turn-left': ['overlaps'], 'turn-right': ['overlaps'], 'uturn-roundabout': ['overlaps'] };
-/** Situations where today's drawn car is the vehicle model already (step 2 phase A): nothing for the checks to catch. */
-const MODEL_TODAY = new Set(['turn-left', 'turn-right', 'uturn-roundabout']);
+/** Since phase B every drawn car is the vehicle model (moving cars and manoeuvres alike): the checks find nothing in today's motion but touches. */
+const TODAY_ALLOWED = ['overlaps'];
+/** Left in today's motion (phase B): the car-park car's jerk where its last drawn step meets its played move as it brakes to wait for its gap. */
+const TODAY_KNOWN: Readonly<Record<string, readonly string[]>> = { 'carpark-bay': ['jerk'] };
 
 describe('invariants catch magic', () => {
   const car = paramsOf('car');
@@ -40,8 +42,7 @@ describe('the new model in every situation', () => {
       const row = rowFor(buildScene(sit));
       const allowed = KNOWN[sit.id] ?? [];
       expect(row.nowBroken.filter((b) => !allowed.some((k) => b.startsWith(k)))).toEqual([]);
-      if (!MODEL_TODAY.has(sit.id)) expect(row.oldBroken.length).toBeGreaterThan(0);
-      else expect(row.oldBroken).toEqual([]);
+      expect(row.oldBroken.filter((b) => ![...TODAY_ALLOWED, ...(TODAY_KNOWN[sit.id] ?? [])].some((k) => b.startsWith(k)))).toEqual([]);
     });
   }
 });

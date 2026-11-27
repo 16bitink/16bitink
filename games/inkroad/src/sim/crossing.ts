@@ -4,22 +4,23 @@
  * November 27: cars move like real cars). Pure over the Sim; the city schedules the hold.
  */
 import { poseAt, type Track } from './track';
-import { kindIndex } from './tune';
+import { IDM, kindIndex } from './tune';
 import type { Sim } from './sim';
 import { startLinks } from './routes';
 import { laneS, type LinkRt } from './world';
-import { spaceAt } from './place';
 import { POSE } from './store';
 import { pose } from './motion';
 import type { Access } from './trafficTypes';
-import { MOTION_SWITCHES } from './switches';
 
 /** Longest a driver waits for a gap before taking a smaller one (the far lanes are then held where they are). */
 export const GAP_WAIT_MAX = 8;
 const SLOWEST = 1;
+/** A driver behind a car pulling out sees it and brakes after REACT s, comfortably (px/s², the sim's planned braking). */
+const REACT = 1, COMFY = 8;
+/** A car `d` px short of the stretch at v px/s reaches it within `seconds`, or could not stop short of it comfortably. */
+const tooClose = (d: number, v: number, seconds: number): boolean => d / Math.max(SLOWEST, v) < seconds || d < v * REACT + (v * v) / (2 * COMFY);
 /** How far up the lanes behind the junction a driver looks (px, about 5 s of street traffic). */
 const UPSTREAM_PX = 320;
-const GAP_ACCEPT_UPSTREAM = (): boolean => MOTION_SWITCHES.GAP_ACCEPT;
 
 /** The lanes at `at` whose traffic runs against `heading` (every car lane of the other direction). */
 function farLanes(sim: Sim, at: Access, heading: number): { t: Track; s: number }[] {
@@ -48,7 +49,7 @@ function arrivals(sim: Sim, lanes: readonly { t: Track; s: number }[]): { at: nu
       add(q, s - c.s[q]!);
     }
     // A driver sees past the junction behind: cars on the links that lead into this lane (and may turn onto it).
-    if (GAP_ACCEPT_UPSTREAM()) for (const o of sim.world.links[t.link]?.preds ?? []) {
+    for (const o of sim.world.links[t.link]?.preds ?? []) {
       if (o.from.fromNode === o.to.node) continue;
       for (let k = 0; k < o.from.carLanes; k++) {
         const up = o.from.lanes[k]!;
@@ -76,6 +77,18 @@ export function gapAcross(sim: Sim, at: Access, heading: number, gap: number): n
   return t;
 }
 
+/** No body within the stand-in's length of s on lane t (a car merely approaching does not count). */
+function roomAt(sim: Sim, t: Track, s: number, h: number): boolean {
+  const c = sim.cars;
+  for (let q = t.head; q >= 0; q = c.behind[q]!) {
+    const gap = Math.abs(c.s[q]! - s) - c.half[q]! - h;
+    if (gap < 1) return false;
+    // A car coming that could not stop for it any more (at the sim's hardest braking) is let through.
+    if (c.s[q]! < s && gap < (c.v[q]! * c.v[q]!) / (2 * IDM.brake) + 1) return false;
+  }
+  return true;
+}
+
 /** Holds the far lanes at `at` for `seconds` with hidden stand-ins (as a double-parked car's). Returns how many. */
 export function holdAcross(sim: Sim, at: Access, heading: number, seconds: number): number {
   const c = sim.cars;
@@ -83,7 +96,8 @@ export function holdAcross(sim: Sim, at: Access, heading: number, seconds: numbe
   for (const { t, s } of farLanes(sim, at, heading)) {
     const i = c.take(kindIndex('car'));
     if (i < 0) break;
-    if (s < c.half[i]! || s > t.len - c.half[i]! || !spaceAt(sim, t, s, c.half[i]!, 0)) { c.drop(i); continue; }
+    // Physically free is enough: the drivers coming were checked for their gap, and brake for it now.
+    if (s < c.half[i]! || s > t.len - c.half[i]! || !roomAt(sim, t, s, c.half[i]!)) { c.drop(i); continue; }
     c.state[i] = 4;
     c.until[i] = sim.time + seconds;
     c.born[i] = sim.time;
@@ -96,3 +110,35 @@ export function holdAcross(sim: Sim, at: Access, heading: number, seconds: numbe
 }
 
 export type { LinkRt };
+
+/**
+ * A car about to pull into its own lanes at `at` (heading `heading`): are they clear of every body from `back` px
+ * behind the point to `ahead` px past it, with no car arriving there within `seconds` (the time its move holds them)?
+ */
+export function laneClear(sim: Sim, at: Access, heading: number, back: number, ahead: number, seconds: number): boolean {
+  if ('gate' in at) return true;
+  const c = sim.cars;
+  for (const { l } of startLinks(sim.world, at)) {
+    const s = laneS(l, at.s);
+    poseAt(l.lanes[0]!, s, POSE);
+    if (Math.cos(POSE.h - heading) < 0) continue;
+    for (let k = 0; k < l.carLanes; k++) {
+      const t = l.lanes[k]!;
+      for (let q = t.head; q >= 0; q = c.behind[q]!) {
+        if (c.state[q] === 4 && Math.abs(c.s[q]! - s) < 1) continue;
+        const front = c.s[q]! + c.half[q]!, rear = c.s[q]! - c.half[q]!;
+        if (front > s - back && rear < s + ahead) return false;
+        if (front <= s - back && tooClose(s - back - front, c.v[q]!, seconds)) return false;
+      }
+      // And the cars coming up to it round the junction behind.
+      for (const o of sim.world.links[t.link]?.preds ?? []) {
+        if (o.from.fromNode === o.to.node) continue;
+        for (let m = 0; m < o.from.carLanes; m++) {
+          const up = o.from.lanes[m]!;
+          for (let q = up.head; q >= 0; q = c.behind[q]!) if (tooClose(up.len - c.s[q]! - c.half[q]! + s - back, c.v[q]!, seconds)) return false;
+        }
+      }
+    }
+  }
+  return true;
+}

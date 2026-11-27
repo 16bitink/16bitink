@@ -3,7 +3,7 @@ import type { CityView, ParkingView, Pt } from '../../sim/types';
 import { lotRect } from '../../city/geometry';
 import { dressCar } from './carDress';
 import type { CarLayer } from './carLayer';
-import { layoutPlace, makeGeo, modeOf, type Mode, type ParkingGeo } from './parkingSlots';
+import { layoutPlace, makeGeo, type ParkingGeo } from './parkingSlots';
 
 export { baysOf } from './parkingSlots';
 
@@ -11,7 +11,7 @@ interface Shown { view: ParkingView; imgs: Phaser.GameObjects.Image[]; uids: num
 
 /** Where a parked car stands (or, for a car park with no bays, its mouth), kept after it leaves so its pull-out can start there. */
 export interface Placed {
-  readonly x: number; readonly y: number; readonly a: number; readonly mode: Mode;
+  readonly x: number; readonly y: number; readonly a: number;
   readonly rect?: { readonly x: number; readonly y: number; readonly w: number; readonly h: number };
   /** A car park bay reached by the aisle: gate, aisle, the bay's column. */
   readonly via?: readonly Pt[];
@@ -76,7 +76,7 @@ export class ParkedCars {
     const where = !geo || id === undefined ? undefined : kind === 'lot' ? geo.lots.get(Number(id)) : kind === 'park' ? geo.parks.get(Number(id)) : undefined;
     if (!where) return undefined;
     const r = lotRect(where);
-    return { x: r.x + r.w / 2, y: r.y + r.h / 2, a: 0, mode: 'enter', rect: r };
+    return { x: r.x + r.w / 2, y: r.y + r.h / 2, a: 0, rect: r };
   }
 
   /** Its picture waits while the manoeuvre draws it. */
@@ -101,13 +101,12 @@ export class ParkedCars {
     const imgs = had?.imgs ?? [];
     const old = had?.uids ?? [];
     const uids: number[] = [];
-    const mode = modeOf(v.kind);
     let used = 0;
     v.cars.forEach((c, i) => {
       const s = slots[i];
       if (!s) { this.mouth(v, c.uid, geo); uids.push(c.uid); return; }
       uids.push(c.uid);
-      this.poses.set(c.uid, s.via ? { x: s.x, y: s.y, a: s.a, mode: 'aisle', via: s.via } : { x: s.x, y: s.y, a: s.a, mode });
+      this.poses.set(c.uid, s.via ? { x: s.x, y: s.y, a: s.a, via: s.via } : { x: s.x, y: s.y, a: s.a });
       this.retired.delete(c.uid);
       if (this.held.has(c.uid)) return;
       const img = imgs[used] ?? this.take();
@@ -125,7 +124,7 @@ export class ParkedCars {
     const park = v.kind === 'park' && v.park !== undefined ? geo.parks.get(v.park) : undefined;
     if (!park) return;
     const r = lotRect(park);
-    this.poses.set(uid, { x: r.x + r.w / 2, y: r.y + r.h / 2, a: 0, mode: 'enter', rect: r });
+    this.poses.set(uid, { x: r.x + r.w / 2, y: r.y + r.h / 2, a: 0, rect: r });
     this.retired.delete(uid);
   }
 

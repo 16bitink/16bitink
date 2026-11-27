@@ -1,9 +1,12 @@
+import type { VehicleKind } from './types';
+
 /** The Traffic contract: cars on a network, one step at a time. */
-import { gapAcross, holdAcross } from './crossing';
+import { gapAcross, holdAcross, laneClear } from './crossing';
 import { STEP } from './constants';
 import { considerLane, think } from './drive';
 import { feel, move, plan, pose } from './motion';
-import { drawStep } from './drawn';
+import { drawStep, placeDrawn } from './drawn';
+import { FRAME_STRIDE, SUB } from './store';
 import { Measure } from './measure';
 import { entryPose, exists, firstLink, place, reachableFrom, reachableTo, setDest, standAt, turnBack } from './place';
 import { relocate } from './relocate';
@@ -85,10 +88,19 @@ function parkIn(sim: Sim, uid: number, seconds: number): boolean {
   return true;
 }
 
+function framesOf(sim: Sim, uid: number): Float64Array | null {
+  const c = sim.cars;
+  const i = c.slotOf.get(uid);
+  if (i === undefined) return null;
+  const out = new Float64Array((SUB + 1) * 3);
+  for (let k = 0; k <= SUB; k++) for (let j = 0; j < 3; j++) out[k * 3 + j] = c.frames[(i * (SUB + 1) + k) * FRAME_STRIDE + j]!;
+  return out;
+}
+
 function poseOf(sim: Sim, uid: number): LanePose | null {
   const c = sim.cars;
   const i = c.slotOf.get(uid);
-  return i === undefined ? null : { x: c.x[i]!, y: c.y[i]!, a: c.heading[i]! };
+  return i === undefined ? null : { x: c.x[i]!, y: c.y[i]!, a: c.heading[i]!, v: c.speed[i]!, acc: c.fa[i]! };
 }
 
 /** Where a pull-out spawn of `r` would stand, without making it. */
@@ -129,6 +141,7 @@ function spawn(sim: Sim, req: SpawnRequest): number {
   const hold = r.hold ?? 0;
   if (!place(sim, i, l, r.from, hold > 0)) { c.drop(i); return -1; }
   if (hold > 0) { c.state[i] = 4; c.until[i] = sim.time + hold; }
+  if (r.pose) placeDrawn(sim, i, r.pose.x, r.pose.y, r.pose.a);
   if (l.road.toll) c.tolls[i]! += sim.tollNow;
   return c.uid[i]!;
 }
@@ -176,10 +189,11 @@ function redirect(sim: Sim, uid: number, want: Access): boolean {
   return false;
 }
 
-function block(sim: Sim, at: Access, seconds: number, state: 2 | 3 | 4): number {
+function block(sim: Sim, at: Access, seconds: number, state: 2 | 3 | 4, kind: VehicleKind = 'car'): number {
   if (!exists(sim, at)) return -1;
   const c = sim.cars;
-  const i = c.take(kindIndex('car'));
+  // The stand-in is as long as what stands there (a double-parked lorry blocks a lorry's length).
+  const i = c.take(kindIndex(kind));
   if (i < 0) return -1;
   c.state[i] = state;
   c.until[i] = sim.time + seconds;
@@ -220,11 +234,12 @@ export function createTraffic(net: Network, seed: number): Traffic {
     remove: (uid) => { const i = sim.cars.slotOf.get(uid); if (i !== undefined) sim.cars.drop(i); },
     park: (uid, seconds) => parkIn(sim, uid, seconds),
     poseOf: (uid) => poseOf(sim, uid),
+    framesOf: (uid) => framesOf(sim, uid),
     entryPose: (r) => poseFor(sim, r),
-    block: (at, seconds, state) => block(sim, at, seconds, state),
-    holdLonger: (uid, seconds) => { const i = sim.cars.slotOf.get(uid); if (i !== undefined && sim.cars.state[i] === 4) sim.cars.until[i] = Math.max(sim.cars.until[i]!, sim.time + seconds); },
+    block: (at, seconds, state, kind) => block(sim, at, seconds, state, kind),
     gapAcross: (at, heading, gap) => gapAcross(sim, at, heading, gap),
     holdAcross: (at, heading, seconds) => holdAcross(sim, at, heading, seconds),
+    laneClear: (at, heading, back, ahead, seconds) => laneClear(sim, at, heading, back, ahead, seconds),
     addService: (r) => sim.services.add(r),
     removeService: (id) => sim.services.remove(id),
     serviceLap: (id) => sim.services.lap(id),

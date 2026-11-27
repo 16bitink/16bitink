@@ -8,7 +8,6 @@
 import type { City } from '../../src/city/state';
 import { CROSS_GAP } from '../../src/city/manoeuvre';
 import type { RunResult, Scenario } from './lab';
-import type { KnownSets } from './known';
 import { anticlockwise, clean, closest, expect, firstManoeuvre, leavesBy, lotDoor, parksIn, passesBy, quickestRound, roundsAtPace, samplesOf, standsOffRoad } from './checks';
 
 const cityOf = (r: RunResult): City => (r.city as unknown as { c: City }).c;
@@ -46,10 +45,10 @@ const DRIVE_NEAR: Scenario = {
   expect: 'From the near lane A turns into its driveway at a manoeuvre\'s pace (no swing faster than an R_MIN arc), stands off the road, later leaves forward the way it came',
   ...STREET,
   lots: [{ name: 'Home', kind: 'home', cell: [6, 5], w: 2, h: 2 }],
-  actors: [{ kind: 'arrive', id: 'A', at: 0.5, from: 'W', home: 'E', lot: 'Home', spot: { lot: 'Home' }, stay: 10 }],
+  actors: [{ kind: 'arrive', id: 'A', at: 0.5, from: 'W', home: 'E', lot: 'Home', spot: { lot: 'Home' }, stay: 25 }],
   flows: [{ from: 'E', to: 'W', every: 7, start: 3 }],
-  seconds: 50,
-  expectations: (r) => [parksIn(r, 'A', 'lot:'), standsOffRoad(r, 'A'), roundsAtPace(r, 'A'), leavesBy(r, 'A', 50), clean(r, 'A')],
+  seconds: 90,
+  expectations: (r) => [parksIn(r, 'A', 'lot:'), standsOffRoad(r, 'A'), roundsAtPace(r, 'A'), leavesBy(r, 'A', 90), clean(r, 'A')],
 };
 
 const DRIVE_FAR: Scenario = {
@@ -59,10 +58,10 @@ const DRIVE_FAR: Scenario = {
   ...STREET,
   lots: [{ name: 'Home', kind: 'home', cell: [6, 2], w: 2, h: 2 }],
   actors: [
-    { kind: 'arrive', id: 'A', at: 0.5, from: 'W', home: 'E', lot: 'Home', spot: { lot: 'Home' }, stay: 10 },
+    { kind: 'arrive', id: 'A', at: 0.5, from: 'W', home: 'E', lot: 'Home', spot: { lot: 'Home' }, stay: 25 },
     { kind: 'through', id: 'B', at: 2.5, from: 'E', to: 'W' },
   ],
-  seconds: 50,
+  seconds: 90,
   expectations: (r) => {
     const door = lotDoor(r, 'Home');
     const turn = firstManoeuvre(r, 'A');
@@ -71,7 +70,7 @@ const DRIVE_FAR: Scenario = {
     return [
       parksIn(r, 'A', 'lot:'),
       expect('A waits for B before crossing', waited, `A turns at ${turn?.toFixed(1) ?? '-'} s, B at the driveway at ${b.t.toFixed(1)} s`),
-      standsOffRoad(r, 'A'), roundsAtPace(r, 'A'), leavesBy(r, 'A', 50), clean(r, 'A'),
+      standsOffRoad(r, 'A'), roundsAtPace(r, 'A'), leavesBy(r, 'A', 90), clean(r, 'A'),
     ];
   },
 };
@@ -84,8 +83,8 @@ const DRIVE_LEAVE_FAR: Scenario = {
   lots: [{ name: 'Home', kind: 'home', cell: [6, 5], w: 2, h: 2 }],
   actors: [{ kind: 'parked', id: 'A', spot: { lot: 'Home' }, lot: 'Home', leaveAt: 2, to: 'W' }],
   flows: [{ from: 'W', to: 'E', every: 4, start: 0, until: 14 }],
-  seconds: 50,
-  expectations: (r) => [leavesBy(r, 'A', 50), roundsAtPace(r, 'A'), clean(r, 'A')],
+  seconds: 90,
+  expectations: (r) => [leavesBy(r, 'A', 90), roundsAtPace(r, 'A'), clean(r, 'A')],
 };
 
 const WAY_BEHIND: Scenario = {
@@ -96,8 +95,8 @@ const WAY_BEHIND: Scenario = {
   lots: [{ name: 'Shop', kind: 'shops', cell: [5, 5], w: 3, h: 2 }],
   kerbs: [[6, 4]],
   actors: [{ kind: 'parked', id: 'A', spot: { kerb: [6, 4] }, slot: 4, lot: 'Shop', leaveAt: 2, to: 'W' }],
-  seconds: 60,
-  expectations: (r) => [leavesBy(r, 'A', 60), roundsAtPace(r, 'A'), roundsAwayFromJunctions(r, 'A'), clean(r, 'A')],
+  seconds: 100,
+  expectations: (r) => [leavesBy(r, 'A', 100), roundsAtPace(r, 'A'), roundsAwayFromJunctions(r, 'A'), clean(r, 'A')],
 };
 
 /** A block to drive round: row 4 from gate W to gate E, crossed at columns 4 and 8 by a loop through rows 1 and 7. */
@@ -201,26 +200,4 @@ const UTURN_RING: Scenario = {
 
 export const TURNS: readonly Scenario[] = [DRIVE_NEAR, DRIVE_FAR, DRIVE_LEAVE_FAR, WAY_BEHIND, UTURN_CROSS, UTURN_DEADEND, UTURN_AVENUE, UTURN_RING];
 
-/** November 27: where each stands (counts per rule, expectations still failing); a fix lowers it. */
-export const KNOWN_TURNS: KnownSets = {
-  defaults: {
-    'park.driveway.near-lane': { counts: {'jumps (manoeuvre)': 20, 'crosses a kerb (manoeuvre)': 2, 'too fast on a curve (manoeuvre)': 4, 'reverse too fast (manoeuvre)': 13, 'cuts across without a gap (manoeuvre)': 1}, failing: ['A swings round no faster than a real car (120 deg in 1.8 s or more)', 'A breaks no motion rule'] },
-    'park.driveway.far-lane': { counts: {'jumps (manoeuvre)': 32, 'crosses a kerb (manoeuvre)': 4, 'too tight (manoeuvre)': 1, 'too fast on a curve (manoeuvre)': 2, 'reverse too fast (manoeuvre)': 2}, failing: ['A parks off the road', 'A swings round no faster than a real car (120 deg in 1.8 s or more)', 'A breaks no motion rule'] },
-    'park.driveway.leave-far': { counts: {'too fast on a curve (manoeuvre)': 2, 'jumps (manoeuvre)': 5, 'reverse too fast (manoeuvre)': 11}, failing: ['A breaks no motion rule'] },
-    'park.kerb.way-behind': { counts: {'too fast on a curve (manoeuvre)': 14, 'jumps (manoeuvre)': 14, 'reverse too fast (manoeuvre)': 29, 'too tight (manoeuvre)': 1}, failing: ['A swings round no faster than a real car (120 deg in 1.8 s or more)', 'A breaks no motion rule'] },
-    'drive.uturn.crossroads': { counts: {'too fast on a curve (manoeuvre)': 14, 'jumps (manoeuvre)': 14, 'reverse too fast (manoeuvre)': 29, 'too tight (manoeuvre)': 1}, failing: ['A swings round no faster than a real car (120 deg in 1.8 s or more)', 'A breaks no motion rule'] },
-    'drive.uturn.deadend': { counts: {'bodies overlap (manoeuvre)': 3, 'too fast on a curve (manoeuvre)': 18, 'jumps (manoeuvre)': 63, 'reverse too fast (manoeuvre)': 65, 'bodies overlap (moving)': 2, 'crosses a kerb (manoeuvre)': 2, 'too tight (manoeuvre)': 1}, failing: ['D turned round in the dead-end street', 'D, sent past its place on the far side, backed up in a three-point turn at the end', 'D is through by 70 s', 'B or C turned round at the end with a three-point turn', 'A swings round no faster than a real car (120 deg in 1.8 s or more)', 'C swings round no faster than a real car (120 deg in 1.8 s or more)', 'A breaks no motion rule', 'B breaks no motion rule', 'C breaks no motion rule'] },
-    'drive.uturn.avenue': { counts: {'too fast on a curve (manoeuvre)': 7, 'jumps (manoeuvre)': 22, 'bodies overlap (manoeuvre)': 2, 'reverse too fast (manoeuvre)': 12, 'bodies overlap (moving)': 1, 'crosses a kerb (manoeuvre)': 1}, failing: ['A or B turned round at the end with a three-point turn', 'B swings round no faster than a real car (120 deg in 1.8 s or more)', 'A breaks no motion rule', 'B breaks no motion rule'] },
-    'drive.uturn.roundabout': { counts: {}, failing: [] },
-  },
-  on: {
-    'park.driveway.near-lane': { counts: {'crosses a kerb (manoeuvre)': 2}, failing: ['A parks off the road', 'A breaks no motion rule'] },
-    'park.driveway.far-lane': { counts: {'crosses a kerb (manoeuvre)': 1}, failing: ['A parks off the road', 'A leaves and is gone by 50 s', 'A breaks no motion rule'] },
-    'park.driveway.leave-far': { counts: {}, failing: [] },
-    'park.kerb.way-behind': { counts: {}, failing: [] },
-    'drive.uturn.crossroads': { counts: {}, failing: [] },
-    'drive.uturn.deadend': { counts: {'bodies overlap (manoeuvre)': 4, 'bodies overlap (moving)': 1, 'crosses a kerb (manoeuvre)': 2, 'cuts across without a gap (manoeuvre)': 3, 'jumps (manoeuvre)': 4}, failing: ['D turned round in the dead-end street', 'D, sent past its place on the far side, backed up in a three-point turn at the end', 'D is through by 70 s', 'B or C turned round at the end with a three-point turn', 'A breaks no motion rule', 'B breaks no motion rule', 'C breaks no motion rule'] },
-    'drive.uturn.avenue': { counts: {'bodies overlap (manoeuvre)': 2, 'bodies overlap (moving)': 1}, failing: ['A or B turned round at the end with a three-point turn', 'A breaks no motion rule'] },
-    'drive.uturn.roundabout': { counts: {}, failing: [] },
-  },
-};
+

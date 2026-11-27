@@ -12,7 +12,7 @@ import { accessOf, accessPoint, pointOf } from './places';
 import { scoreLost } from './score';
 import { freeSlots, sAlong, sideHeading } from './slots';
 import { pointAt } from '../sim/geom';
-import { laneOffset, lanesPerLink } from '../sim/roadGeom';
+import { halfWidth, laneOffset, lanesPerLink } from '../sim/roadGeom';
 import { R_MIN } from '../sim/kinematics';
 import { DRIVEWAY } from '../sim/tune';
 import { polyLength } from './geometry';
@@ -92,7 +92,7 @@ export function taxiArrive(c: City, leg: Leg, a: Arrival): void {
   if (rider) {
     // Their ride starts at the kerb: the taxi's way there is the taxi's, as when taxis came out of the door.
     const ride: Leg = { ...rider, start: c.clock, leaving: e };
-    drive(c, ride, e && MOTION_SWITCHES.ROAD_STOPS ? standingAccess(c, e) : road ?? accessOf(c, leg.target), accessOf(c, rider.tour.from));
+    drive(c, ride, e ? standingAccess(c, e) : road ?? accessOf(c, leg.target), accessOf(c, rider.tour.from));
     return;
   }
   if (leg.out) stayThere(c, leg, null, accessOf(c, leg.target));
@@ -173,12 +173,15 @@ function stopInLane(c: City, leg: Leg, a: Arrival): boolean {
  */
 export function stopOnRoad(c: City, e: Standing | null, pose: { readonly x: number; readonly y: number; readonly a: number } | null, shoulder: boolean): void {
   const road = e && e.s !== undefined ? c.net.roads.find((r) => r.id === e.spot.id) : undefined;
-  if (!e || !road || !pose || e.s === undefined || !MOTION_SWITCHES.ROAD_STOPS) return;
+  if (!e || !road || !pose || e.s === undefined) return;
   const side = sideHeading(road, e.s, pose.a);
   const p = pointAt(road.line, e.s);
   const here = (pose.x - p.x) * -Math.sin(p.heading) + (pose.y - p.y) * Math.cos(p.heading);
   const lane = road.oneWay ? laneOffset(road, side > 0 ? lanesPerLink(road) - 1 : 0) : side * laneOffset(road, lanesPerLink(road) - 1);
-  const lat = shoulder ? lane + side * DRIVEWAY.slide : lane;
+  // The shoulder is the paved edge at most (the owner, phase B: a car stops in its lane, a little toward the kerb at
+  // most; parked cars stand in the kerb's band beyond it).
+  const edge = Math.max(0, halfWidth(road) - Math.abs(lane) - sizeOf(e.kind).wid / 2 - EDGE_GAP);
+  const lat = shoulder ? lane + side * Math.min(DRIVEWAY.slide, edge) : lane;
   const d = Math.abs(lat - here);
   const run = d < SAME_LINE ? 0 : 2 * R_MIN * Math.sin(d >= 2 * R_MIN ? Math.PI / 2 : Math.acos(1 - d / (2 * R_MIN))) + S_ROOM;
   // From where it really is (not the stand-in's spacing), and never onto a car already standing on that line ahead.
@@ -198,6 +201,8 @@ export function stopOnRoad(c: City, e: Standing | null, pose: { readonly x: numb
   e.spot.ver += 1;
 }
 
+/** Px a car on the shoulder keeps from the paved edge. */
+const EDGE_GAP = 0.3;
 /** Px sideways under which a car already stands on its line; px of room past a forward S. */
 const SAME_LINE = 0.5;
 const S_ROOM = 2;

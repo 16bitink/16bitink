@@ -17,15 +17,15 @@ function harbourAt(year: number): CityView {
 }
 
 /**
- * Where each case stands (November 27, step 2 phase A: every moving car is the vehicle model, docs/inkroad-vehicle-model.md):
- * a ratchet until every count is zero. Moving cars are held to the vehicle invariants (test/vehicle/frameRules.ts:
- * slip and curvature at the rear axle, wheel rate, acceleration, braking, jerk, curve speed); manoeuvring cars (and a
- * moving car in a three-point turn) still to the older rules until phase B plans them. MOTION_STRICT=1 asks for zero.
+ * Where each case stands (November 28, step 2 phase B: every drawn car, moving or manoeuvring, is the vehicle model,
+ * docs/inkroad-vehicle-model.md): a ratchet until every count is zero. Every car is held to the vehicle invariants
+ * (test/vehicle/frameRules.ts) and the owner's phase B rules: reverse at walking pace, never across a lane of
+ * traffic, parking speeds, no loops (test/motion-helpers.ts). MOTION_STRICT=1 asks for zero.
  */
 const CEILING: Readonly<Record<string, Readonly<Record<string, number>>>> = {
-  'Saffron Bay year 3': { 'bodies overlap (moving)': 111, 'brakes too hard (moving)': 3, 'jerks (moving)': 15, 'jumps (moving)': 1, 'pulls away too hard (moving)': 3, 'reverse on the road (moving)': 2, 'reverse too fast (moving)': 12, 'slip (moving)': 71, 'steers too fast (moving)': 3, 'too fast on a curve (moving)': 106, 'too tight (moving)': 5, 'bodies overlap (manoeuvre)': 86, 'cuts across without a gap (manoeuvre)': 46, 'jumps (manoeuvre)': 4005, 'reverse too fast (manoeuvre)': 1291, 'slip (manoeuvre)': 7, 'too fast on a curve (manoeuvre)': 769, 'too tight (manoeuvre)': 37, 'turns in place (manoeuvre)': 1 },
-  'Saffron Bay year 6': { 'bodies overlap (moving)': 428, 'reverse too fast (moving)': 5, 'too fast on a curve (moving)': 265, 'bodies overlap (manoeuvre)': 208, 'cuts across without a gap (manoeuvre)': 134, 'jumps (manoeuvre)': 3971, 'reverse too fast (manoeuvre)': 1761, 'slip (manoeuvre)': 14, 'too fast on a curve (manoeuvre)': 1718, 'too tight (manoeuvre)': 50, 'turns in place (manoeuvre)': 5 },
-  'Old Harbour year 4': { 'bodies overlap (moving)': 110, 'reverse too fast (moving)': 10, 'too fast on a curve (moving)': 653, 'bodies overlap (manoeuvre)': 187, 'cuts across without a gap (manoeuvre)': 115, 'jumps (manoeuvre)': 2568, 'reverse too fast (manoeuvre)': 1691, 'slip (manoeuvre)': 5, 'too fast on a curve (manoeuvre)': 1050, 'too tight (manoeuvre)': 48, 'turns in place (manoeuvre)': 5 },
+  'Saffron Bay year 3': { 'bodies overlap (manoeuvre)': 37, 'bodies overlap (moving)': 84, 'cuts across without a gap (manoeuvre)': 26, 'jerks (manoeuvre)': 35, 'loops (manoeuvre)': 6, 'pulls away too hard (manoeuvre)': 2, 'reverses across a lane (manoeuvre)': 13, 'steers too fast (manoeuvre)': 1, 'too fast while parking (manoeuvre)': 79 },
+  'Saffron Bay year 6': { 'bodies overlap (manoeuvre)': 72, 'bodies overlap (moving)': 151, 'cuts across without a gap (manoeuvre)': 57, 'jerks (manoeuvre)': 73, 'loops (manoeuvre)': 7, 'pulls away too hard (manoeuvre)': 9, 'reverses across a lane (manoeuvre)': 18, 'steers too fast (manoeuvre)': 3, 'too fast on a curve (moving)': 13 },
+  'Old Harbour year 4': { 'bodies overlap (manoeuvre)': 35, 'bodies overlap (moving)': 88, 'cuts across without a gap (manoeuvre)': 28, 'jerks (manoeuvre)': 41, 'loops (manoeuvre)': 4, 'pulls away too hard (manoeuvre)': 1, 'reverses across a lane (manoeuvre)': 11, 'steers too fast (manoeuvre)': 2, 'too fast on a curve (moving)': 340, 'too fast while parking (manoeuvre)': 62 },
 };
 
 const CASES: readonly { readonly name: string; readonly make: () => CityView }[] = [

@@ -223,15 +223,3 @@ export { BAY_PX, ROAD_END_CLEAR, STREET_BAYS, STREET_END_CLEAR, STREET_JITTER } 
 export const SLOT_ANY = 0.3;
 /** Seconds a slot stays promised to a car driving to it. */
 export const CLAIM_SECONDS = 30;
-/** Seconds the lane is held: parallel parking in and out at the kerb or on a street, turning in and out of a driveway or car park. */
-export const PARK_IN = 1.2;
-export const PARK_OUT = 0.8;
-export const TURN_IN = 0.3;
-export const TURN_OUT = 0.3;
-/** Seconds of the whole visible move, the lane part included: parallel parking in and out, turning into and out of a bay. */
-export const PARK_IN_MOVE = 2.4;
-export const PARK_OUT_MOVE = 1.6;
-export const TURN_IN_MOVE = 1;
-export const TURN_OUT_MOVE = 1;
-/** Px a second a car drives along a car park's aisle (gate to bay, bay to gate). */
-export const AISLE_SPEED = 45;

@@ -3,12 +3,12 @@ import type { LanePose, SpawnRequest } from '../sim/trafficTypes';
 import type { VehicleKind } from '../sim/types';
 import type { Leg, Place } from './day';
 import { lotRect } from './geometry';
-import { doorTimes, swingsRound } from './moveTimes';
-import { plannedTimes } from './manoeuvre';
+import { planDoor } from './movePlan';
 import { viewKind } from './stand';
 import { emit, type City } from './state';
-import { DRIVEWAY } from '../sim/tune';
-import { TURN_IN_MOVE, TURN_OUT, TURN_OUT_MOVE } from './tune';
+import type { MovePlay } from '../sim/types';
+import { lastPose } from '../sim/vehicle/played';
+import type { Rect } from './geometry';
 
 /**
  * Cars with no space of their own drawn (a lorry at its depot, a taxi at the door, a visitor who puts the car in the
@@ -30,21 +30,26 @@ export function doorKey(leg: Leg, arriving: boolean): string | null {
   return 'lot' in p ? `lot:${p.lot}` : null;
 }
 
-function tell(c: City, dir: 'in' | 'out', car: number, key: string, lane: LanePose, seconds: number, move: number, look: Look, split?: number): void {
-  emit(c, { t: 'park', dir, car, key, slot: -1, lane, seconds, move, ...(split !== undefined ? { split } : {}), tint: look.tint, kind: viewKind(look.kind) });
+function tell(c: City, dir: 'in' | 'out', car: number, key: string, lane: LanePose, seconds: number, move: number, look: Look, play: MovePlay): void {
+  emit(c, { t: 'park', dir, car, key, slot: -1, lane, seconds, move, tint: look.tint, kind: viewKind(look.kind), play });
 }
 
-/** The car turns in at the building's entrance, holding its lane for the turn, then is gone inside. False: no door here. */
+/** The rect of the building (or car park) a door key names. */
+function rectOf(c: City, key: string): Rect | null {
+  const [k, id] = key.split(':');
+  const where = k === 'lot' ? c.lots.find((l) => l.id === Number(id)) : k === 'park' ? c.parks.find((p) => p.id === Number(id)) : undefined;
+  return where ? lotRect(where) : null;
+}
+
+/** The car turns in at the building's entrance along its played move, holding its lane while its body is in it. False: no door here. */
 export function doorIn(c: City, uid: number, leg: Leg, look: Look, at: string | null = doorKey(leg, true), pose: LanePose | null = null): boolean {
   const key = at;
   const lane = key ? pose ?? c.traffic.poseOf(uid) : null;
-  if (!key || !lane) return false;
-  // It holds its lane while its body is in it (the planned path's lane part), then the view plays the rest.
-  // A mouth behind the car (a swing round) always takes its drawn path's own time.
-  const plan = doorTimes(c, key, lane, 'in', look.kind);
-  const timed = plan && (plannedTimes() || swingsRound(plan)) ? plan : null;
-  if (!timed || !c.traffic.park(uid, timed.lane)) c.traffic.remove(uid);
-  tell(c, 'in', uid, key, lane, timed?.lane ?? 0, timed?.move ?? TURN_IN_MOVE, look, timed?.split);
+  const rect = key ? rectOf(c, key) : null;
+  if (!key || !lane || !rect) return false;
+  const m = planDoor(c, rect, lane, 'in', look.kind, uid);
+  if (!c.traffic.park(uid, Math.max(STEP, m.lane))) c.traffic.remove(uid);
+  tell(c, 'in', uid, key, lane, m.lane, m.played.seconds, look, { a: m.played, fade: true });
   return true;
 }
 
@@ -76,21 +81,21 @@ export function doorReady(c: City, leg: Leg, req: SpawnRequest, look: Look): boo
   if (leg.door) return c.clock >= leg.door.goAt - STEP / 2;
   const key = doorKey(leg, false);
   const lane = key ? c.traffic.entryPose(req) : null;
-  if (!key || !lane) return true;
-  // It joins the lane moving, as such cars always did: the move ends where the car's kerb slide begins.
-  const edge = kerbStart(lane);
-  const plan = doorTimes(c, key, edge, 'out', look.kind);
-  const move = (plan && (plannedTimes() || swingsRound(plan)) ? plan.move : undefined) ?? TURN_OUT_MOVE - TURN_OUT;
-  leg.door = { uid: DOOR_UID + leg.tag, goAt: c.clock + move, lane: edge, key };
-  tell(c, 'out', leg.door.uid, key, leg.door.lane, 0, move, look);
-  return move <= STEP / 2;
+  const rect = key ? rectOf(c, key) : null;
+  if (!key || !lane || !rect) return true;
+  // Out of the mouth to the lane edge (it waits there for its gap), then into the lane, where its spawn stands that long.
+  const m = planDoor(c, rect, lane, 'out', look.kind, DOOR_UID + leg.tag);
+  const end = lastPose(m.played);
+  leg.door = { uid: DOOR_UID + leg.tag, goAt: c.clock + m.toEdge.seconds, lane: { x: end.x, y: end.y, a: end.th }, key, hold: Math.max(STEP, m.lane) };
+  tell(c, 'out', leg.door.uid, key, leg.door.lane, leg.door.hold, m.toEdge.seconds + leg.door.hold, look, { a: m.toEdge, b: m.played, fade: true });
+  return m.toEdge.seconds <= STEP / 2;
 }
 
 /** It found its gap: the view hands it to the lane. */
 export function doorGone(c: City, leg: Leg, uid: number): void {
   const d = leg.door;
   if (!d) return;
-  emit(c, { t: 'parkGo', car: d.uid, key: d.key, lane: c.traffic.poseOf(uid) ?? d.lane, seconds: 0, uid });
+  emit(c, { t: 'parkGo', car: d.uid, key: d.key, lane: c.traffic.poseOf(uid) ?? d.lane, seconds: d.hold, uid });
   leg.door = undefined;
 }
 
@@ -98,11 +103,9 @@ export function doorGone(c: City, leg: Leg, uid: number): void {
 export function doorBack(c: City, leg: Leg, look: Look): void {
   const d = leg.door;
   if (!d) return;
-  tell(c, 'in', d.uid, d.key, d.lane, 0, TURN_IN_MOVE, look);
+  const rect = rectOf(c, d.key);
   leg.door = undefined;
-}
-
-/** Where a car joining the lane moving is first drawn: beside its lane pose, toward the kerb (the sim's driveway slide). */
-export function kerbStart(lane: LanePose): LanePose {
-  return { x: lane.x - Math.sin(lane.a) * DRIVEWAY.slide, y: lane.y + Math.cos(lane.a) * DRIVEWAY.slide, a: lane.a };
+  if (!rect) return;
+  const m = planDoor(c, rect, d.lane, 'in', look.kind, d.uid);
+  tell(c, 'in', d.uid, d.key, d.lane, 0, m.played.seconds, look, { a: m.played, fade: true });
 }

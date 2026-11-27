@@ -27,15 +27,15 @@ export const KERB_PARALLEL: Scenario = {
   ...STREET_EW,
   kerbs: [[6, 4]],
   actors: [
-    { kind: 'arrive', id: 'A', at: 0.5, from: 'W', home: 'E', lot: 'Shop', spot: { kerb: [6, 4] }, stay: 14 },
+    { kind: 'arrive', id: 'A', at: 0.5, from: 'W', home: 'E', lot: 'Shop', spot: { kerb: [6, 4] }, stay: 29 },
     { kind: 'through', id: 'B', at: 1.6, from: 'W', to: 'E' },
   ],
   flows: [{ from: 'W', to: 'E', every: 4, start: 18, until: 34 }, { from: 'E', to: 'W', every: 5, start: 2 }],
-  seconds: 42,
+  seconds: 82,
   expectations: (r) => [
     parksIn(r, 'A', 'kerb:'),
-    leavesBy(r, 'A', 42),
-    passesBy(r, 'B', 20),
+    leavesBy(r, 'A', 82),
+    passesBy(r, 'B', 45),
     brakesUnder(r, 'B', 400),
     clean(r, 'A'),
   ],
@@ -45,14 +45,14 @@ export const KERB_PARALLEL: Scenario = {
 export const FORECOURT_FAR: Scenario = {
   id: 'park.forecourt.far-lane',
   title: 'Forecourt from the far lane, oncoming traffic',
-  expect: 'From the far lane A waits for oncoming B to pass, turns across with a 3 s gap, ends in a forecourt space; nothing overlaps',
+  expect: 'From the far lane A waits for oncoming B to pass, turns in nose first, forward across the road with a 3 s gap (never backing across a lane), ends in a forecourt space; nothing overlaps',
   ...STREET_EW,
   actors: [
-    { kind: 'arrive', id: 'A', at: 0.5, from: 'W', home: 'E', lot: 'Shop', spot: { lot: 'Shop' }, stay: 12 },
+    { kind: 'arrive', id: 'A', at: 0.5, from: 'W', home: 'E', lot: 'Shop', spot: { lot: 'Shop' }, stay: 27 },
     { kind: 'through', id: 'B', at: 2.5, from: 'E', to: 'W' },
   ],
   flows: [{ from: 'E', to: 'W', every: 6, start: 9 }],
-  seconds: 36,
+  seconds: 76,
   expectations: (r) => {
     const door = lotDoor(r, 'Shop');
     const turn = firstManoeuvre(r, 'A');
@@ -63,7 +63,7 @@ export const FORECOURT_FAR: Scenario = {
       parksIn(r, 'A', 'lot:'),
       expect('A waits for B before crossing', waited, `A turns at ${turn?.toFixed(1) ?? '-'} s, B at the driveway at ${b.t.toFixed(1)} s`),
       standsOffRoad(r, 'A'),
-      leavesBy(r, 'A', 36),
+      leavesBy(r, 'A', 76),
       clean(r, 'A'),
     ];
   },
@@ -77,12 +77,12 @@ export const CARPARK_GATE: Scenario = {
   ...STREET_EW,
   lots: [{ name: 'Shop', kind: 'shops', cell: [9, 1], w: 2, h: 2 }],
   carParks: [{ kind: 'lot', at: [5, 1] }],
-  actors: [{ kind: 'arrive', id: 'A', at: 0.5, from: 'W', home: 'E', lot: 'Shop', spot: { park: 0 }, stay: 10 }],
+  actors: [{ kind: 'arrive', id: 'A', at: 0.5, from: 'W', home: 'E', lot: 'Shop', spot: { park: 0 }, stay: 25 }],
   flows: [{ from: 'E', to: 'W', every: 7, start: 3 }],
-  seconds: 36,
+  seconds: 76,
   expectations: (r) => {
     const c = (r.city as unknown as { c: import('../../src/city/state').City }).c;
-    return [parksIn(r, 'A', 'park:'), wasInside(r, 'A', lotRect(c.parks[0]!)), leavesBy(r, 'A', 36), clean(r, 'A')];
+    return [parksIn(r, 'A', 'park:'), wasInside(r, 'A', lotRect(c.parks[0]!)), leavesBy(r, 'A', 76), clean(r, 'A')];
   },
 };
 
@@ -136,11 +136,11 @@ export const DOUBLE_PARK: Scenario = {
   kerbs: [[6, 4]],
   fill: [{ kerb: [6, 4] }],
   actors: [
-    { kind: 'arrive', id: 'A', at: 0.5, from: 'W', home: 'E', lot: 'Square', spot: { kerb: [6, 4] }, stay: 10, vehicle: 'truck', onlyThere: true },
+    { kind: 'arrive', id: 'A', at: 0.5, from: 'W', home: 'E', lot: 'Square', spot: { kerb: [6, 4] }, stay: 25, vehicle: 'truck', onlyThere: true },
     { kind: 'through', id: 'B', at: 2, from: 'W', to: 'E' },
   ],
-  seconds: 40,
-  expectations: (r) => [parksIn(r, 'A', 'double:'), leavesBy(r, 'A', 40), passesBy(r, 'B', 40), brakesUnder(r, 'B', 400), clean(r, 'A')],
+  seconds: 80,
+  expectations: (r) => [parksIn(r, 'A', 'double:'), leavesBy(r, 'A', 80), passesBy(r, 'B', 65), brakesUnder(r, 'B', 400), clean(r, 'A')],
 };
 
 export const SCENARIOS: readonly Scenario[] = [KERB_PARALLEL, FORECOURT_FAR, CARPARK_GATE, CROSS_RIGHT, ROUNDABOUT, DOUBLE_PARK];

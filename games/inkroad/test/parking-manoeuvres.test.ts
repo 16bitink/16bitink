@@ -8,7 +8,8 @@ import { pointAlong, polyLength } from '../src/city/geometry';
 import { kerbSpaces, streetSpaces } from '../src/city/parking';
 import { roadSlots } from '../src/city/slots';
 import { stand, unstand } from '../src/city/stand';
-import { PARK_IN, PARK_OUT } from '../src/city/tune';
+/** Lane holds of a parking move (any length: the city times them from the played move since phase B). */
+const PARK_IN = 1.2, PARK_OUT = 0.8;
 import { armTo, cross, gateNode } from './sim.helpers';
 import { cityAtYear, inner } from './city-helpers';
 

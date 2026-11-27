@@ -20,6 +20,11 @@ export interface World {
   /** Is this point on ground a car may drive on? */
   readonly drivable: (x: number, y: number) => boolean;
   readonly bodies: readonly Body[];
+  /**
+   * Where a car may be while it backs up (the owner, phase B: nobody reverses across a lane of traffic): off the
+   * road and its own lane, never the oncoming lanes. Absent: anywhere drivable (a three-point turn on a clear road).
+   */
+  readonly reverse?: (x: number, y: number) => boolean;
 }
 
 export interface Manoeuvre {
@@ -37,8 +42,50 @@ export interface Manoeuvre {
   readonly why: string | null;
 }
 
-/** Reverse costs this many times forward; a gear change costs this many body lengths. */
-const REVERSE_PRICE = 1.6, CUSP_PRICE = 1.5;
+/** Reverse costs this many times forward; a gear change costs this many body lengths; each radian turned this many px (longer and gentle beats short and twisty). */
+const REVERSE_PRICE = 1.6, CUSP_PRICE = 1.5, TURN_PRICE = 6;
+/**
+ * No loops (the owner, phase B): a path turning more than LOOP_SHARE x its net heading change + LOOP_SLACK is a loop,
+ * never taken unless the move is meant to turn the car round. LOOP_SLACK leaves room for a parallel park's S (two
+ * arcs of up to ~50 degrees with no net change).
+ */
+export const LOOP_SHARE = 1.5, LOOP_SLACK = (110 * Math.PI) / 180;
+/** Goals within this of the start's heading, ahead of it, are reached with a forward S only (no cusp, no reversing). */
+const S_ONLY = Math.PI / 4;
+
+export interface PlanOptions {
+  /** The move is meant to turn the car round (a three-point turn, a turn on the road): loops and cusps allowed. */
+  readonly turnaround?: boolean;
+}
+
+/**
+ * Changes of steering along a candidate in full swings at this radius (L to R is 2, L or R to S is 1): the wheels swing
+ * at a finite rate, so the car crawls through each; a wider radius swings less. Priced SWING_PRICE px per full swing
+ * at a car's own radius (scaled by wheelbase / r).
+ */
+const SWING_PRICE = 8;
+function swingsOf(p: RsPath): number {
+  const k = (c: string): number => (c === 'L' ? 1 : c === 'R' ? -1 : 0);
+  let n = 0;
+  for (let i = 1; i < p.ctypes.length; i++) if (Math.abs(p.lengths[i]!) > 1e-9) n += Math.abs(k(p.ctypes[i]!) - k(p.ctypes[i - 1]!));
+  return n;
+}
+
+/** Total turning of a candidate, radians (every arc's angle). */
+export const turningOf = (p: RsPath): number => p.lengths.reduce((n, l, i) => n + (p.ctypes[i] === 'S' ? 0 : Math.abs(l)), 0);
+
+const wrapA = (a: number): number => Math.atan2(Math.sin(a), Math.cos(a));
+
+/** May this candidate run between these poses? No loops; a goal nearly ahead is a forward S. */
+function allowed(p: RsPath, a: Pose, b: Pose, o: PlanOptions): boolean {
+  if (o.turnaround) return true;
+  const net = Math.abs(wrapA(b.th - a.th));
+  if (turningOf(p) > LOOP_SHARE * net + LOOP_SLACK) return false;
+  const ahead = (b.x - a.x) * Math.cos(a.th) + (b.y - a.y) * Math.sin(a.th) > 0;
+  return !(net < S_ONLY && ahead) || p.lengths.every((l) => l >= -1e-9);
+}
+/** Wider radii tried first, as shares of rPlan. */
+const WIDE = [2, 1.4] as const;
 /** Px between body checks along a candidate. */
 const CHECK_STEP = 1.5;
 
@@ -50,11 +97,11 @@ const cuspsOf = (p: RsPath): number => p.lengths.filter((l, i) => i > 0 && Math.
 function costOf(p: RsPath, r: number, body: number): number {
   const fwd = p.lengths.filter((l) => l > 0).reduce((s, l) => s + l, 0) * r;
   const rev = -p.lengths.filter((l) => l < 0).reduce((s, l) => s + l, 0) * r;
-  return fwd + REVERSE_PRICE * rev + CUSP_PRICE * body * cuspsOf(p);
+  return fwd + REVERSE_PRICE * rev + CUSP_PRICE * body * cuspsOf(p) + TURN_PRICE * turningOf(p) + SWING_PRICE * swingsOf(p) * (body * 0.6) / r;
 }
 
-/** Body poses along a candidate, every CHECK_STEP px. */
-function* bodiesAlong(q0: Pose, p: RsPath, kappa: number, v: VehicleParams): Generator<Body> {
+/** Body poses along a candidate, every CHECK_STEP px, with the gear each is driven in. */
+function* bodiesAlong(q0: Pose, p: RsPath, kappa: number, v: VehicleParams): Generator<Body & { readonly dir: 1 | -1 }> {
   let q = q0;
   for (let i = 0; i < p.lengths.length; i++) {
     const len = p.lengths[i]! / kappa;
@@ -63,7 +110,7 @@ function* bodiesAlong(q0: Pose, p: RsPath, kappa: number, v: VehicleParams): Gen
     for (let j = 1; j <= n; j++) {
       const at = advance(q.x, q.y, q.th, k, (len * j) / n);
       const m = middleOf(v, at.x, at.y, at.th);
-      yield { x: m.x, y: m.y, a: at.th, len: v.len, wid: v.wid };
+      yield { x: m.x, y: m.y, a: at.th, len: v.len, wid: v.wid, dir: len < 0 ? -1 : 1 };
     }
     q = advance(q.x, q.y, q.th, k, len);
   }
@@ -82,8 +129,11 @@ export function fits(q0: Pose, p: RsPath, kappa: number, v: VehicleParams, w: Wo
 /** Where and why a candidate fails (null if it fits): for the lab's notes. */
 export function whyNot(q0: Pose, p: RsPath, kappa: number, v: VehicleParams, w: World): string | null {
   for (const b of bodiesAlong(q0, p, kappa, v)) {
-    const off = corners(b).find(([x, y]) => !w.drivable(x, y));
+    const cs = corners(b);
+    const off = cs.find(([x, y]) => !w.drivable(x, y));
     if (off) return `off the ground at ${off[0].toFixed(0)},${off[1].toFixed(0)}`;
+    const back = b.dir < 0 && w.reverse ? cs.find(([x, y]) => !w.reverse!(x, y)) : undefined;
+    if (back) return `reverses across a lane at ${back[0].toFixed(0)},${back[1].toFixed(0)}`;
     const hit = w.bodies.find((o) => bodiesOverlap(b, o, 0.3));
     if (hit) return `hits the body at ${hit.x.toFixed(0)},${hit.y.toFixed(0)} from ${b.x.toFixed(0)},${b.y.toFixed(0)}`;
   }
@@ -91,23 +141,28 @@ export function whyNot(q0: Pose, p: RsPath, kappa: number, v: VehicleParams, w: 
 }
 
 /** Speed caps per gear while manoeuvring (played px/s). */
-const caps = (v: VehicleParams) => ({ fwd: v.manoeuvre, rev: v.reverse });
+const caps = (v: VehicleParams) => ({ fwd: v.manoeuvre, rev: v.reverse * REVERSE_SHARE });
+/** Reverse is planned this far under walking pace: the body's middle swings a little faster than the rear axle on a bend. */
+const REVERSE_SHARE = 0.94;
 
 /** The cheapest fitting manoeuvre over every start and goal offered; if none fits, the cheapest anyway (fits: false). */
-export function planManoeuvre(starts: readonly Offer[], goals: readonly Offer[], v: VehicleParams, w: World): Manoeuvre | null {
-  for (const r of [v.rPlan, v.rMin * 1.02]) {
-    const best = cheapest(starts, goals, v, w, r, true);
-    if (best) return best;
+export function planManoeuvre(starts: readonly Offer[], goals: readonly Offer[], v: VehicleParams, w: World, o: PlanOptions = {}): Manoeuvre | null {
+  // Gentle first (the owner: longer and gentle beats short and twisty; wide arcs swing the wheels less, so they are driven faster).
+  let best: Manoeuvre | null = null;
+  for (const r of [v.rPlan * WIDE[0], v.rPlan * WIDE[1], v.rPlan, v.rMin * 1.02]) {
+    const m = cheapest(starts, goals, v, w, r, true, o);
+    if (m && (!best || m.cost < best.cost)) best = m;
   }
-  return cheapest(starts, goals, v, w, v.rPlan, false);
+  if (best) return best;
+  return cheapest(starts, goals, v, w, v.rPlan, false, o) ?? cheapest(starts, goals, v, w, v.rPlan, false, { turnaround: true });
 }
 
-function cheapest(starts: readonly Offer[], goals: readonly Offer[], v: VehicleParams, w: World, r: number, mustFit: boolean): Manoeuvre | null {
+function cheapest(starts: readonly Offer[], goals: readonly Offer[], v: VehicleParams, w: World, r: number, mustFit: boolean, o: PlanOptions): Manoeuvre | null {
   const kappa = 1 / r;
   const touching = (q: Pose): Body[] => { const m = middleOf(v, q.x, q.y, q.th); return w.bodies.filter((o) => bodiesOverlap({ x: m.x, y: m.y, a: q.th, len: v.len, wid: v.wid }, o, 0.3)); };
   const all: { p: RsPath; i: number; j: number; cost: number }[] = [];
   starts.forEach((a, i) => goals.forEach((b, j) => {
-    for (const p of rsCandidates(a.pose, b.pose, kappa)) if (!b.endDir || lastGear(p) === b.endDir) all.push({ p, i, j, cost: costOf(p, r, v.len) + a.cost + b.cost });
+    for (const p of rsCandidates(a.pose, b.pose, kappa)) if ((!b.endDir || lastGear(p) === b.endDir) && allowed(p, a.pose, b.pose, o)) all.push({ p, i, j, cost: costOf(p, r, v.len) + a.cost + b.cost });
   }));
   all.sort((x, y) => x.cost - y.cost);
   for (const c of all) {

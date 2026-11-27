@@ -34,6 +34,10 @@ Every scenario gets the generic checks:
 | bodies overlap | MotionWatch | oriented boxes, 0.4 px touch allowed |
 | cuts across without a gap | MotionWatch | a moving car within 1 s of a manoeuvring body |
 | drives on the left | `test/motion/checks.ts` | a moving car on a two-way road, lined up with it, away from junctions, over 1.5 px left of the middle |
+| reverse too fast | MotionWatch | reversing over REVERSE_MAX (1.5 m/s at the game's pace), 2% slack |
+| reverses across a lane | MotionWatch | a reversing body past the inner edge of the outermost lane on its side (2 px of paint); a move turning the car over 130 degrees (a turn round) excepted |
+| too fast while parking | MotionWatch | once a manoeuvring car has left its lane line: forward over 15 km/h, over 5 km/h within 6 px of its space |
+| loops | MotionWatch | a move turning more than 1.5 x its net heading change + 110 degrees |
 | crosses a kerb | `test/motion/checks.ts` | joining or leaving the paved band (half width + 2 px, + 11 px on streets and bay roads) more than 24 px from every way in (block and car park accesses, gates) |
 
 Expectation helpers (`test/motion/checks.ts`): `roundsAtPace(r, 'A')` (no 120 degree swing faster than an R_MIN arc at the manoeuvre pace, 1.8 s; `quickestRound` gives the time and place), `parksIn(r, 'A', 'kerb:')`, `leavesBy(r, 'A', s)`, `passesBy(r, 'B', s)`, `brakesUnder(r, 'B', px/s²)`, `clean(r, 'A')` (no violation by A), `standsOffRoad`, `wasInside(r, 'A', rect)`, `anticlockwise(r, 'A', junction)`, and the raw pieces: `parkIns`, `parkOuts`, `firstManoeuvre`, `closest`, `lotDoor`, `samplesOf`, `hardestBrake`.
@@ -157,3 +161,7 @@ What the first six showed (phase 1):
 - `dev/motion.mjs` + `dev/motionCli.ts`: `npm run motion`. `dev/motion.html` + `dev/motionPage.ts`: the replay page.
 - `src/sim/switches.ts`: the switches as one config object (the only engine change of this phase; `PLANNED_TIMES` is now read through `plannedTimes()` in `src/city/manoeuvre.ts` and `src/city/door.ts`, `ROOMY_CORNERS` through `roomyCorners()` in `src/sim/netCore.ts` and the kerb fillet in `src/render/ground/roadShape.ts`; defaults unchanged, both off).
 - `test/motion-helpers.ts` (MotionWatch) gained hooks for the lab (`before` each step, `onFrame`), the pose, frame, value and limit on each finding, and `lastEvents`; the season test uses it as before.
+
+## Phase B (November 28)
+
+Every manoeuvring car is now judged by the vehicle invariants (slip and curvature at the rear axle, wheel rate, acceleration, braking, jerk, curve speed) and the four rules above; the old manoeuvre rules (jumps, reverse too fast at 7.2 px/s, too tight at the middle) are replaced. The ratchet is one table, `test/motion/knownNow.ts`, regenerated with `npm run motion -- all --both --json`. Parking scenarios run 40 s longer and their cars stay 15 s longer (real moves take 8 to 25 s). Trail pictures: `node dev/trails.mjs <scenario|prefix|all> --out DIR` (needs Chrome): roads, lots, the cars parked at the start, each actor's drawn path (green manoeuvring, orange reversing, a body outline every second), violations as red rings.

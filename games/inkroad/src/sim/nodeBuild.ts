@@ -12,7 +12,7 @@ import { CURVE_PLAN } from './drive';
 import { buildRing } from './ringBuild';
 import { pathOf, poseAlong } from './drivePath';
 import { A_LAT_PLAYED, R_MIN, REVERSE_PLAYED } from './kinematics';
-import { turnRound } from './parkPaths';
+import { turnRound } from './turnRound';
 import { addTrack, type LinkRt, type NodeRt, type OutOpt, type World } from './world';
 
 const SHARP = 2.1;

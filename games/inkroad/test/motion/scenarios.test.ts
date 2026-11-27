@@ -8,44 +8,14 @@
 import { describe, expect, it } from 'vitest';
 import { runScenario } from './lab';
 import { ALL_SCENARIOS as SCENARIOS } from './all';
-import { KNOWN_CITY } from './scenarios.city';
-import { KNOWN_DRIVING } from './scenarios.driving';
-import { KNOWN_PARKING } from './scenarios.parking';
-import { KNOWN_TURNS } from './scenarios.turns';
-import type { KnownSets } from './known';
+import { KNOWN_NOW as KNOWN } from './knownNow';
 import { CATALOGUE } from './catalogue';
 import type { MotionSwitches } from '../../src/sim/switches';
 
 
-/** November 27, step 2 phase A (moving cars on the vehicle model): where each scenario stands (counts per rule, expectations that fail). */
-const KNOWN_CORE: KnownSets = {
-  defaults: {
-    'park.kerb.parallel-traffic': { counts: {'too fast on a curve (moving)': 10, 'reverse too fast (manoeuvre)': 79, 'too fast on a curve (manoeuvre)': 21, 'jumps (manoeuvre)': 8, 'bodies overlap (manoeuvre)': 1}, failing: ['B is through by 20 s', 'A breaks no motion rule'] },
-    'park.forecourt.far-lane': { counts: {'jumps (manoeuvre)': 29, 'too fast on a curve (manoeuvre)': 2, 'reverse too fast (manoeuvre)': 6, 'crosses a kerb (manoeuvre)': 2}, failing: ['A breaks no motion rule'] },
-    'park.carpark.gate-aisle': { counts: {'too fast on a curve (manoeuvre)': 75, 'jumps (manoeuvre)': 31, 'bodies overlap (manoeuvre)': 1, 'cuts across without a gap (manoeuvre)': 1, 'reverse too fast (manoeuvre)': 73, 'crosses a kerb (manoeuvre)': 1}, failing: ['A breaks no motion rule'] },
-    'drive.cross.right': { counts: {}, failing: [] },
-    'drive.roundabout.exits': { counts: {'bodies overlap (moving)': 1}, failing: ['C is through by 26 s', 'C breaks no motion rule'] },
-    'park.double.park-leave': { counts: {'bodies overlap (moving)': 5, 'jumps (manoeuvre)': 81, 'bodies overlap (manoeuvre)': 11, 'too fast on a curve (manoeuvre)': 16, 'reverse too fast (manoeuvre)': 16, 'crosses a kerb (manoeuvre)': 4, 'too tight (manoeuvre)': 2, 'cuts across without a gap (manoeuvre)': 1}, failing: ['A breaks no motion rule'] },
-  },
-  on: {
-    'park.kerb.parallel-traffic': { counts: {'cuts across without a gap (manoeuvre)': 2}, failing: ['B is through by 20 s', 'A breaks no motion rule'] },
-    'park.forecourt.far-lane': { counts: {'crosses a kerb (manoeuvre)': 1}, failing: ['A leaves and is gone by 36 s', 'A breaks no motion rule'] },
-    'park.carpark.gate-aisle': { counts: {'crosses a kerb (manoeuvre)': 1, 'jumps (manoeuvre)': 1}, failing: ['A leaves and is gone by 36 s', 'A breaks no motion rule'] },
-    'drive.cross.right': { counts: {}, failing: [] },
-    'drive.roundabout.exits': { counts: {'bodies overlap (moving)': 1}, failing: ['C is through by 26 s', 'C breaks no motion rule'] },
-    'park.double.park-leave': { counts: {'bodies overlap (moving)': 1, 'bodies overlap (manoeuvre)': 2}, failing: ['A breaks no motion rule'] },
-  },
-};
-
-const GROUP_KNOWN: readonly KnownSets[] = [KNOWN_CORE, KNOWN_PARKING, KNOWN_DRIVING, KNOWN_CITY, KNOWN_TURNS];
-const KNOWN: KnownSets = {
-  defaults: Object.assign({}, ...GROUP_KNOWN.map((k) => k.defaults)),
-  on: Object.assign({}, ...GROUP_KNOWN.map((k) => k.on)),
-};
-
 const SETS: readonly { readonly name: 'defaults' | 'on'; readonly switches: MotionSwitches }[] = [
-  { name: 'defaults', switches: { PLANNED_TIMES: false, ROOMY_CORNERS: false, GAP_ACCEPT: false, ROAD_STOPS: false, HONEST_SWINGS: false } },
-  { name: 'on', switches: { PLANNED_TIMES: true, ROOMY_CORNERS: true, GAP_ACCEPT: true, ROAD_STOPS: true, HONEST_SWINGS: true } },
+  { name: 'defaults', switches: { ROOMY_CORNERS: false, GAP_ACCEPT: false } },
+  { name: 'on', switches: { ROOMY_CORNERS: true, GAP_ACCEPT: true } },
 ];
 
 const strict = (globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env.MOTION_STRICT;

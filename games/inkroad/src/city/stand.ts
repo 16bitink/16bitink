@@ -102,7 +102,7 @@ export const viewKind = (k: VehicleKind): ParkedCar['kind'] => k;
 
 function parkedOf(e: Standing): ParkedCar {
   const span = spanOf(e.spot, e.slot, e.kind);
-  return { uid: e.uid, tint: e.tint, kind: viewKind(e.kind), slot: e.slot, ...(span.length > 1 ? { span } : {}), ...(e.household !== undefined ? { household: e.household } : {}), ...(e.s !== undefined ? { s: e.s, side: e.side ?? 1 } : {}), ...(e.lat !== undefined ? { lat: e.lat } : {}) };
+  return { uid: e.uid, tint: e.tint, kind: viewKind(e.kind), slot: e.slot, ...(span.length > 1 ? { span } : {}), ...(e.household !== undefined ? { household: e.household } : {}), ...(e.s !== undefined ? { s: e.s, side: e.side ?? 1 } : {}), ...(e.lat !== undefined ? { lat: e.lat } : {}), ...(e.stood ? { pose: e.stood } : {}) };
 }
 
 function viewOf(s: Spot): ParkingView {

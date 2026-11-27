@@ -7,7 +7,7 @@
 import { STEP, VEHICLES } from '../src/sim/constants';
 import type { CityEvent, CityView, ParkingView, VehicleKind } from '../src/sim/types';
 import { lotRect } from '../src/city/geometry';
-import { layoutPlace, makeGeo, modeOf, type ParkingGeo } from '../src/render/cars/parkingSlots';
+import { layoutPlace, makeGeo, type ParkingGeo } from '../src/render/cars/parkingSlots';
 import type { Placed } from '../src/render/cars/parkedCars';
 import { ManoeuvreCore, type Move, type Places } from '../src/render/cars/manoeuvreCore';
 import { drawnAt, turn, type DrawnPose } from '../src/render/cars/drawnPose';
@@ -15,7 +15,10 @@ import { PhysWatch } from './vehicle/frameRules';
 import { bodiesOverlap, sizeOf, type Body } from '../src/sim/vehicleSize';
 import { A_LAT_PLAYED as A_LAT, R_MIN, REVERSE_PLAYED as REVERSE_MAX } from '../src/sim/kinematics';
 import { UNDER } from '../src/render/deckHeight';
-import { moveSeconds, planMove } from '../src/sim/parkMove';
+import { halfWidth } from '../src/sim/roadGeom';
+import { LANE } from '../src/sim/constants';
+import { paramsOf } from '../src/sim/vehicle/params';
+import type { Road } from '../src/sim/types';
 
 /** Render frames per sim step (60 fps at 1x, 10 steps a second). */
 export const FRAMES = 6;
@@ -40,9 +43,45 @@ const JUMP_V = 150;
 /** A jump further than this is a new car (as carLayer.ts). */
 const TELEPORT = 60;
 const HOLDING = 4;
+/** Reversing at most walking pace (the owner: 1.5 m/s at the game's pace), a hair of sampling slack. */
+const REVERSE_LIMIT = REVERSE_MAX * 1.02;
+/** Parking speeds (the owner, phase B): turning in 15 km/h (manoeuvres are driven at 9, under the 10 km/h of aisles), the last px into a space 5 km/h. */
+const KMH = 3.55 * 1.25 / 3.6;
+const TURN_IN_CAP = 15 * KMH, CREEP_CAP = 5 * KMH, CREEP_PX = 6, PARK_SLACK = 1.05;
+/** A manoeuvring car within this of its start line (px, rad) is still braking in its lane. */
+const ON_LINE = 2, ON_HEADING = 0.1;
+/** A reversing body may reach this far past the inner edge of its lane (paint). */
+const REVERSE_SLACK = 2;
+/** Loops: total turning over LOOP_SHARE x the net change + LOOP_SLACK (as the planner, src/sim/vehicle/planner.ts). */
+const LOOP_SHARE = 1.5, LOOP_SLACK = (110 * Math.PI) / 180;
+
+/** A move that turns the car round (its net heading change over 130 degrees): reversing across the road is its design. */
+const turnsRound = (m: Move<null>): boolean => {
+  const last = m.b && m.b.n > 0 ? m.b : m.a;
+  return Math.abs(turn(m.a.frames[2]!, last.frames[(last.n - 1) * 3 + 2]!)) > (130 * Math.PI) / 180;
+};
+
+/** Where a body's middle lies against a road's line, if beside its middle part (not past its ends). */
+function projectOn(r: Road, b: { readonly x: number; readonly y: number }): { lat: number; h: number } | null {
+  let best: { lat: number; h: number; d: number } | null = null;
+  const line = r.line;
+  for (let i = 1; i < line.length; i++) {
+    const a = line[i - 1]!, e = line[i]!;
+    const dx = e.x - a.x, dy = e.y - a.y, l2 = dx * dx + dy * dy;
+    if (l2 < 1e-9) continue;
+    const t = ((b.x - a.x) * dx + (b.y - a.y) * dy) / l2;
+    if (t < 0 || t > 1) continue;
+    const l = Math.sqrt(l2);
+    const lat = (-(b.x - a.x) * dy + (b.y - a.y) * dx) / l;
+    if (!best || Math.abs(lat) < best.d) best = { lat, h: Math.atan2(dy, dx), d: Math.abs(lat) };
+  }
+  return best;
+}
 const GRID = 32;
 
 export type Rule = 'jumps' | 'slip' | 'turns in place' | 'too tight' | 'too fast on a curve' | 'reverse on the road' | 'reverse too fast' | 'bodies overlap' | 'cuts across without a gap'
+  /** The owner's phase B rules: no backing across a lane of traffic, parking speeds, no loops. */
+  | 'reverses across a lane' | 'too fast while parking' | 'loops'
   /** Moving cars only (the vehicle invariants, test/vehicle/frameRules.ts). */
   | 'steers too fast' | 'pulls away too hard' | 'brakes too hard' | 'jerks';
 export interface Finding {
@@ -93,7 +132,7 @@ class TestPlaces implements Places {
       p.cars.forEach((c, i) => {
         const s = slots[i];
         if (!s) { this.mouth(p, c.uid); return; }
-        this.poses.set(c.uid, s.via ? { x: s.x, y: s.y, a: s.a, mode: 'aisle', via: s.via } : { x: s.x, y: s.y, a: s.a, mode: modeOf(p.kind) });
+        this.poses.set(c.uid, { x: s.x, y: s.y, a: s.a });
         if (!this.held.has(c.uid)) bodies.push({ x: s.x, y: s.y, a: s.a, ...sizeOf(c.kind as VehicleKind), uid: c.uid, z: 0, v: 0, man: false, id: `p${c.uid}` });
       });
     }
@@ -104,7 +143,7 @@ class TestPlaces implements Places {
     const park = v.kind === 'park' && v.park !== undefined ? this.geo!.parks.get(v.park) : undefined;
     if (!park) return;
     const r = lotRect(park);
-    this.poses.set(uid, { x: r.x + r.w / 2, y: r.y + r.h / 2, a: 0, mode: 'enter', rect: r });
+    this.poses.set(uid, { x: r.x + r.w / 2, y: r.y + r.h / 2, a: 0, rect: r });
   }
 
   poseOf(uid: number): Placed | undefined { return this.poses.get(uid); }
@@ -113,7 +152,7 @@ class TestPlaces implements Places {
     const where = !this.geo || id === undefined ? undefined : kind === 'lot' ? this.geo.lots.get(Number(id)) : kind === 'park' ? this.geo.parks.get(Number(id)) : undefined;
     if (!where) return undefined;
     const r = lotRect(where);
-    return { x: r.x + r.w / 2, y: r.y + r.h / 2, a: 0, mode: 'enter', rect: r };
+    return { x: r.x + r.w / 2, y: r.y + r.h / 2, a: 0, rect: r };
   }
   hold(uid: number): void { this.held.add(uid); this.dirty = true; }
   unhold(uid: number): void { if (this.held.delete(uid)) this.dirty = true; }
@@ -131,6 +170,8 @@ export class MotionWatch {
   private readonly touching = new Set<string>();
   private readonly cutting = new Set<string>();
   private readonly handed = new Map<number, number>();
+  private readonly turning = new Map<number, { first: number; last: number; sum: number }>();
+  private readonly across = new Set<string>();
   private frame = 0;
   steps = 0;
   frames = 0;
@@ -139,7 +180,7 @@ export class MotionWatch {
   private readonly at: DrawnPose = { x: 0, y: 0, z: 0, a: 0 };
 
   constructor(private readonly v: CityView, private readonly hooks: WatchHooks = {}) {
-    this.core = new ManoeuvreCore<null>(this.places, () => null);
+    this.core = new ManoeuvreCore<null>(this.places, () => null, (m) => this.ended(m));
     this.places.sync(v);
   }
 
@@ -171,7 +212,7 @@ export class MotionWatch {
       if (env('MOTION_UID') && (e.t === 'park' || e.t === 'parkGo') && e.car === Number(env('MOTION_UID'))) console.log(`EV @${this.v.clock.toFixed(1)} ${JSON.stringify(e)}`);
       if (e.t === 'phase') this.core.dropWaiting();
       else if (e.t === 'parkGo') { this.core.go(e); if (e.uid !== undefined) this.handed.set(e.uid, e.car); }
-      else if (e.t === 'park') { this.core.start(e); this.compare(e); }
+      else if (e.t === 'park') this.core.start(e);
     }
   }
 
@@ -204,25 +245,17 @@ export class MotionWatch {
       if (p.z <= UNDER) continue;
       const kind = VEHICLES[c.kind[i]!] as VehicleKind;
       this.note = this.why(i);
-      const rev = (c as unknown as { track: ({ turnRound: string | null } | null)[] }).track[i]?.turnRound === 'three';
+      const sim = c as unknown as { track: ({ turnRound: string | null } | null)[]; play: (unknown | null)[] };
+      const rev = sim.track[i]?.turnRound === 'three' || !!sim.play[i];
       drawn.push(this.motion({ x: p.x, y: p.y, a: p.a, ...sizeOf(kind), uid, z: p.z, v: 0, man: false, id: `m${uid}`, info: this.note, ...(rev ? { rev } : {}) }, undefined, kind));
     }
     for (let i = 0; i < this.core.active; i++) {
       const m = this.core.at(i);
-      drawn.push(this.motion({ x: m.px, y: m.py, a: m.pa, ...sizeOf(m.kind as VehicleKind), uid: m.uid, z: 0, v: 0, man: true, id: `c${m.uid}`, info: `${m.mode}/${m.dir}/${m.phase}` }, m));
+      drawn.push(this.motion({ x: m.px, y: m.py, a: m.pa, ...sizeOf(m.kind as VehicleKind), uid: m.uid, z: 0, v: 0, man: true, id: `c${m.uid}`, info: `${m.dir}/${m.phase}/${m.a.word}` }, m, m.kind as VehicleKind));
+      this.turned(m);
     }
     this.overlaps(drawn);
     this.hooks.onFrame?.(this.frame, this.v.clock - STEP * (1 - t), drawn, this.places.bodies);
-  }
-
-  /** MOTION_PLAN=1: the city's seconds against the drawn plan's (a mismatch rushes the drawn car). */
-  private compare(e: Extract<CityEvent, { t: 'park' }>): void {
-    if (!env('MOTION_PLAN') || e.slot < 0) return;
-    const p = this.places.poseOf(e.car);
-    if (!p) return;
-    const t = moveSeconds(planMove(p.via ? "aisle" : p.mode, e.lane, p, e.dir, p.via), e.dir, e.split);
-    const move = e.move ?? e.seconds;
-    if (t.lane > e.seconds * 1.05 || t.lane + t.off > move * 1.05) console.log(`plan ${e.dir} ${p.mode} ${e.key}: lane ${t.lane.toFixed(1)}/${e.seconds.toFixed(1)} all ${(t.lane + t.off).toFixed(1)}/${move.toFixed(1)} from ${e.lane.x.toFixed(0)},${e.lane.y.toFixed(0)},${e.lane.a.toFixed(2)} to ${p.x.toFixed(0)},${p.y.toFixed(0)},${p.a.toFixed(2)}`);
   }
 
   private note = '';
@@ -234,38 +267,82 @@ export class MotionWatch {
     return `[track ${t?.kind ?? '-'} ${t?.key ?? ''} s ${c.s[i]?.toFixed(1)} slide ${Math.max(0, c.offEnd[i]! - c.s[i]!).toFixed(0)} state ${c.state[i]}]`;
   }
 
-  /** Slip, curvature and reversing against the car's last drawn frame. Returns the body with its speed. */
+  /**
+   * Every drawn car against the vehicle invariants (slip and curvature at the rear axle, wheel rate, acceleration,
+   * braking, jerk, curve speed: test/vehicle/frameRules.ts), plus jumps, reversing (only in a manoeuvre or a turn
+   * round, at walking pace, never across a lane of traffic) and the parking speeds. Returns the body with its speed.
+   */
   private motion(b: Drawn, m?: Move<null>, kind?: VehicleKind): Drawn {
     const last = this.tracks.get(b.id);
-    if (kind && !b.rev) for (const h of this.phys.feed(b.id, kind, this.frame, b.x, b.y, b.a, DT)) this.flag(h.rule, 'moving', b.uid, `${h.value.toFixed(3)} over ${h.limit.toFixed(3)} ${this.note}`, b, h.value, h.limit);
+    const who = b.man ? 'manoeuvre' : 'moving';
+    const what = m ? `${m.dir}/${m.phase}/${m.a.word}` : this.note;
+    if (kind) for (const h of this.phys.feed(b.id, kind, this.frame, b.x, b.y, b.a, DT)) this.flag(h.rule, who, b.uid, `${h.value.toFixed(3)} over ${h.limit.toFixed(3)} ${what}`, b, h.value, h.limit);
     this.tracks.set(b.id, { x: b.x, y: b.y, a: b.a, frame: this.frame });
     if (!last || last.frame !== this.frame - 1) return b;
     const dx = b.x - last.x, dy = b.y - last.y, ds = Math.hypot(dx, dy);
-    const da = Math.abs(turn(last.a, b.a));
-    const who = b.man ? 'manoeuvre' : 'moving';
     const v = ds / DT;
-    const model = !!kind && !b.rev;
-    if (model) {
-      if (v > JUMP_V) { this.flag('jumps', who, b.uid, `${ds.toFixed(1)} px in a frame ${this.note}`, b, v, JUMP_V); return { ...b, v: 0 }; }
-      const along = ds > 0 ? (dx * Math.cos(b.a) + dy * Math.sin(b.a)) / ds : 1;
-      if (along < -0.5 && ds > STILL) this.flag('reverse on the road', who, b.uid, `${v.toFixed(1)} px/s ${this.note}`, b, v, 0);
-      return { ...b, v: along < 0 ? -v : v };
-    }
-    if (ds < STILL) {
-      if (da > TURN_EPS) this.flag('turns in place', who, b.uid, `${da.toFixed(3)} rad ${m ? `${m.mode}/${m.dir}/${m.phase}` : this.note}`, b, da, TURN_EPS);
-      return { ...b, v };
-    }
-    if (v > JUMP_V) { this.flag('jumps', who, b.uid, `${ds.toFixed(1)} px in a frame ${m ? `${m.mode}/${m.dir}/${m.phase}` : this.note}`, b, v, JUMP_V); return { ...b, v: 0 }; }
+    if (v > JUMP_V) { this.flag('jumps', who, b.uid, `${ds.toFixed(1)} px in a frame ${what}`, b, v, JUMP_V); return { ...b, v: 0 }; }
+    if (ds < STILL) return { ...b, v: 0 };
     const along = (dx * Math.cos(b.a) + dy * Math.sin(b.a)) / ds;
-    const slip = Math.acos(Math.min(1, Math.abs(along)));
-    if (slip > SLIP_TOL) this.flag('slip', who, b.uid, `${slip.toFixed(2)} rad at ${b.x.toFixed(0)},${b.y.toFixed(0)} ${m ? `${m.mode}/${m.dir}/${m.phase}` : this.note}`, b, slip, SLIP_TOL);
-    if (da > ds / R_TEST + TURN_EPS) this.flag('too tight', who, b.uid, `r ${(ds / da).toFixed(1)} px ${m ? `${m.mode}/${m.dir}/${m.phase}` : this.note}`, b, ds / da, R_TEST);
-    else if (da > TURN_EPS && v > Math.sqrt(A_LAT * (ds / da)) * CURVE_SLACK + SPEED_EPS) this.flag('too fast on a curve', who, b.uid, `${v.toFixed(0)} px/s on r ${(ds / da).toFixed(0)}`, b, v, Math.sqrt(A_LAT * (ds / da)) * CURVE_SLACK + SPEED_EPS);
-    if (along < -0.5) {
-      if (!b.man && !b.rev) this.flag('reverse on the road', who, b.uid, `${v.toFixed(1)} px/s ${this.note}`, b, v, 0);
-      else if (v > REVERSE_MAX + SPEED_EPS) this.flag('reverse too fast', who, b.uid, `${v.toFixed(1)} px/s ${m ? `${m.mode}/${m.dir}/${m.phase}` : this.note}`, b, v, REVERSE_MAX + SPEED_EPS);
+    const back = along < -0.5;
+    if (back && !b.man && !b.rev) this.flag('reverse on the road', who, b.uid, `${v.toFixed(1)} px/s ${what}`, b, v, 0);
+    if (back && (b.man || b.rev)) {
+      if (v > REVERSE_LIMIT) this.flag('reverse too fast', who, b.uid, `${v.toFixed(1)} px/s ${what}`, b, v, REVERSE_LIMIT);
+      if (!b.rev && !(m && turnsRound(m))) this.acrossLane(b, what);
     }
-    return { ...b, v: along < 0 ? -v : v };
+    if (!back && m) this.parkingSpeed(b, m, v, what);
+    return { ...b, v: back ? -v : v };
+  }
+
+  /** A reversing body reaching past the inner edge of the outermost lane on its side of a road: it backs across a lane of traffic. */
+  private acrossLane(b: Drawn, what: string): void {
+    const geo = this.places.geo;
+    if (!geo) return;
+    for (const r of geo.ground) {
+      const n = projectOn(r, b);
+      if (!n) continue;
+      const hw = halfWidth(r);
+      const ext = (b.len * Math.abs(Math.sin(b.a - n.h)) + b.wid * Math.abs(Math.cos(b.a - n.h))) / 2;
+      const inner = Math.abs(n.lat) - ext;
+      const edge = hw - LANE - REVERSE_SLACK;
+      if (Math.abs(n.lat) - ext > hw + 1 || inner >= edge) continue;
+      const key = `${b.id}|across`;
+      if (!this.across.has(key)) this.flag('reverses across a lane', 'manoeuvre', b.uid, `${(edge - inner).toFixed(1)} px past its lane on road ${r.id} ${what}`, b, edge - inner, 0);
+      this.across.add(key);
+      return;
+    }
+  }
+
+  /**
+   * Forward in a manoeuvre: still on its lane line it is only braking in its lane (the road's own rules); once it has
+   * left the line, never over the turn-in pace (15 km/h), and the last px into a space at a creep (5 km/h).
+   */
+  private parkingSpeed(b: Drawn, m: Move<null>, v: number, what: string): void {
+    const x0 = m.a.frames[0]!, y0 = m.a.frames[1]!, a0 = m.a.frames[2]!;
+    const lat = Math.abs(-(b.x - x0) * Math.sin(a0) + (b.y - y0) * Math.cos(a0));
+    if (m.dir === 'in' && m.phase === 'move' && lat < ON_LINE && Math.abs(turn(a0, b.a)) < ON_HEADING) return;
+    const end = m.dir === 'in' && Math.hypot(m.endX - b.x, m.endY - b.y) < CREEP_PX;
+    const cap = (end ? CREEP_CAP : TURN_IN_CAP) * PARK_SLACK;
+    if (v > cap) this.flag('too fast while parking', 'manoeuvre', b.uid, `${v.toFixed(1)} px/s ${end ? 'creeping in' : 'manoeuvring'} ${what}`, b, v, cap);
+  }
+
+  /** Heading turned so far by each manoeuvring car (for the loops rule), from its first drawn frame. */
+  private turned(m: Move<null>): void {
+    const t = this.turning.get(m.uid);
+    if (!t) { this.turning.set(m.uid, { first: m.pa, last: m.pa, sum: 0 }); return; }
+    t.sum += Math.abs(turn(t.last, m.pa));
+    t.last = m.pa;
+  }
+
+  /** A move whose total turning is far beyond its net heading change looped (the owner: no loops, ever). */
+  private ended(m: Move<null>): void {
+    const t = this.turning.get(m.uid);
+    this.turning.delete(m.uid);
+    for (const k of [...this.across]) if (k.startsWith(`c${m.uid}|`)) this.across.delete(k);
+    if (!t) return;
+    const net = Math.abs(turn(t.first, t.last));
+    const most = LOOP_SHARE * net + LOOP_SLACK;
+    if (t.sum > most) this.flag('loops', 'manoeuvre', m.uid, `turned ${((t.sum * 180) / Math.PI).toFixed(0)} deg for a net ${((net * 180) / Math.PI).toFixed(0)} deg ${m.dir}/${m.a.word}`, { x: m.px, y: m.py, a: m.pa, ...sizeOf(m.kind as VehicleKind) }, t.sum, most);
   }
 
   /** Every moving or manoeuvring body against every other drawn body; new touches only. Plus cut-offs. */

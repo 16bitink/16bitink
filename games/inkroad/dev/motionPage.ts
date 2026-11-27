@@ -18,7 +18,7 @@ const view = $<HTMLCanvasElement>('view');
 const line = $<HTMLCanvasElement>('timeline');
 const ctx = view.getContext('2d')!;
 const tl = line.getContext('2d')!;
-const SWITCHES: readonly (keyof MotionSwitches)[] = ['PLANNED_TIMES', 'ROOMY_CORNERS', 'GAP_ACCEPT', 'ROAD_STOPS', 'HONEST_SWINGS'];
+const SWITCHES: readonly (keyof MotionSwitches)[] = ['ROOMY_CORNERS', 'GAP_ACCEPT'];
 const ACTOR_COLOURS = ['#2f6fd6', '#d6862f', '#8a3fd1', '#1f9b8a', '#c23f8a', '#6b8f1f'];
 /** A violation shows on its car for this many frames either side. */
 const MARK_FRAMES = 4;
