@@ -1,77 +1,164 @@
 import type Phaser from 'phaser';
+import type { CityView, ParkingView, Pt } from '../../sim/types';
 import { lotRect } from '../../city/geometry';
-import type { CarPark, CityView, Id } from '../../sim/types';
-import { hash2 } from '../noise';
-import { projectY } from '../projection';
-import { CAR_TINTS } from '../style';
-import { carOrigin, HEADINGS } from './carAtlas';
+import { dressCar } from './carDress';
 import type { CarLayer } from './carLayer';
+import { layoutPlace, makeGeo, modeOf, type Mode, type ParkingGeo } from './parkingSlots';
 
-/** Cars standing in open car parks, as many as the sim says are used. */
-const BAY = 13.2;
-const EDGE = 17;
-const ROW_IN = 18;
-const UP = Math.round(HEADINGS * 0.75);
-const DOWN = Math.round(HEADINGS * 0.25);
+export { baysOf } from './parkingSlots';
 
-export interface Bay { readonly x: number; readonly y: number; readonly up: boolean }
+interface Shown { view: ParkingView; imgs: Phaser.GameObjects.Image[]; uids: number[] }
 
-/** Bays along the north and south edges. Pure. */
-export function baysOf(p: Pick<CarPark, 'gx' | 'gy' | 'w' | 'h'>): Bay[] {
-  const r = lotRect(p);
-  const n = Math.floor((r.w - EDGE * 2) / BAY);
-  const out: Bay[] = [];
-  for (let i = 0; i < n; i++) {
-    const x = r.x + EDGE + (i + 0.5) * ((r.w - EDGE * 2) / n);
-    out.push({ x, y: r.y + ROW_IN, up: false }, { x, y: r.y + r.h - ROW_IN, up: true });
-  }
-  return out;
+/** Where a parked car stands (or, for a car park with no bays, its mouth), kept after it leaves so its pull-out can start there. */
+export interface Placed {
+  readonly x: number; readonly y: number; readonly a: number; readonly mode: Mode;
+  readonly rect?: { readonly x: number; readonly y: number; readonly w: number; readonly h: number };
+  /** A car park bay reached by the aisle: gate, aisle, the bay's column. */
+  readonly via?: readonly Pt[];
 }
 
+/** A car that left stays known this many list changes, so an event that comes late still finds it. */
+const KEEP_CHANGES = 2000;
+
+/**
+ * Every car the city says is standing somewhere (`city.parking`), drawn at its own slot.
+ * Images are pooled; only places whose view object changed are laid out again.
+ * A car in `held` is mid-manoeuvre: its image waits until `reveal`.
+ */
 export class ParkedCars {
-  private readonly shown = new Map<Id, Phaser.GameObjects.Image[]>();
-  private last: readonly CarPark[] | null = null;
+  private readonly shown = new Map<string, Shown>();
+  private readonly pool: Phaser.GameObjects.Image[] = [];
+  private readonly poses = new Map<number, Placed>();
+  private readonly retired = new Map<number, number>();
+  private readonly held = new Set<number>();
+  private changes = 0;
+  private last: CityView['parking'] = undefined;
+  private geoKey: readonly unknown[] = [];
+  private geo: ParkingGeo | null = null;
 
   constructor(private readonly scene: Phaser.Scene, private readonly cars: CarLayer, private readonly depth: number) {}
 
   sync(city: CityView): void {
-    if (city.carParks === this.last) return;
-    this.last = city.carParks;
-    const keep = new Set<Id>();
-    for (const p of city.carParks) {
-      if (p.kind !== 'lot' && p.kind !== 'ride') continue;
-      keep.add(p.id);
-      this.fill(p);
+    const list = city.parking;
+    if (!list) { if (this.last) this.clear(); return; }
+    const key = [city.roads, city.lots, city.carParks, city.beaches];
+    const moved = key.some((k, i) => k !== this.geoKey[i]);
+    if (list === this.last && !moved) return;
+    if (moved) { this.geo = makeGeo(city); this.geoKey = key; }
+    const geo = this.geo ?? (this.geo = makeGeo(city));
+    this.changes++;
+    const seen = new Set<string>();
+    for (const v of list) {
+      seen.add(v.key);
+      const had = this.shown.get(v.key);
+      if (had && had.view === v && !moved) continue;
+      this.place(v, had, geo);
     }
-    for (const [id, imgs] of this.shown) {
-      if (keep.has(id)) continue;
-      imgs.forEach((i) => i.destroy());
-      this.shown.delete(id);
+    for (const [k, s] of this.shown) {
+      if (seen.has(k)) continue;
+      this.release(s.imgs, 0);
+      s.uids.forEach((u) => this.retire(u));
+      this.shown.delete(k);
+    }
+    this.last = list;
+    this.purge();
+  }
+
+  /** Where this car stands (or stood a moment ago). */
+  poseOf(uid: number): Placed | undefined {
+    return this.poses.get(uid);
+  }
+
+  /** A building's entrance, for a car that turns into it (or comes out) with no space of its own drawn: `lot:ID` or `park:ID`. */
+  door(key: string): Placed | undefined {
+    const geo = this.geo;
+    const [kind, id] = key.split(':');
+    const where = !geo || id === undefined ? undefined : kind === 'lot' ? geo.lots.get(Number(id)) : kind === 'park' ? geo.parks.get(Number(id)) : undefined;
+    if (!where) return undefined;
+    const r = lotRect(where);
+    return { x: r.x + r.w / 2, y: r.y + r.h / 2, a: 0, mode: 'enter', rect: r };
+  }
+
+  /** Its picture waits while the manoeuvre draws it. */
+  hold(uid: number): void {
+    if (this.held.has(uid)) return;
+    this.held.add(uid);
+    this.redo(uid);
+  }
+
+  /** The manoeuvre is over: the car stands in its slot. */
+  unhold(uid: number): void {
+    if (this.held.delete(uid)) this.redo(uid);
+  }
+
+  private redo(uid: number): void {
+    if (!this.geo) return;
+    for (const s of this.shown.values()) if (s.uids.includes(uid)) { this.place(s.view, s, this.geo); return; }
+  }
+
+  private place(v: ParkingView, had: Shown | undefined, geo: ParkingGeo): void {
+    const slots = layoutPlace(v, geo);
+    const imgs = had?.imgs ?? [];
+    const old = had?.uids ?? [];
+    const uids: number[] = [];
+    const mode = modeOf(v.kind);
+    let used = 0;
+    v.cars.forEach((c, i) => {
+      const s = slots[i];
+      if (!s) { this.mouth(v, c.uid, geo); uids.push(c.uid); return; }
+      uids.push(c.uid);
+      this.poses.set(c.uid, s.via ? { x: s.x, y: s.y, a: s.a, mode: 'aisle', via: s.via } : { x: s.x, y: s.y, a: s.a, mode });
+      this.retired.delete(c.uid);
+      if (this.held.has(c.uid)) return;
+      const img = imgs[used] ?? this.take();
+      imgs[used++] = img;
+      dressCar(img, this.cars, c.kind, c.tint, s.x, s.y, s.a);
+    });
+    this.release(imgs, used);
+    const kept = new Set(uids);
+    for (const u of old) if (!kept.has(u)) this.retire(u);
+    this.shown.set(v.key, { view: v, imgs, uids });
+  }
+
+  /** A multi-storey or underground car park draws no bays: its cars drive into the mouth. */
+  private mouth(v: ParkingView, uid: number, geo: ParkingGeo): void {
+    const park = v.kind === 'park' && v.park !== undefined ? geo.parks.get(v.park) : undefined;
+    if (!park) return;
+    const r = lotRect(park);
+    this.poses.set(uid, { x: r.x + r.w / 2, y: r.y + r.h / 2, a: 0, mode: 'enter', rect: r });
+    this.retired.delete(uid);
+  }
+
+  private retire(uid: number): void {
+    this.retired.set(uid, this.changes);
+  }
+
+  private purge(): void {
+    for (const [u, at] of this.retired) {
+      if (this.changes - at < KEEP_CHANGES) continue;
+      this.retired.delete(u);
+      this.poses.delete(u);
+      this.held.delete(u);
     }
   }
 
-  private fill(p: CarPark): void {
-    const bays = baysOf(p);
-    const want = Math.round(bays.length * Math.min(1, p.spaces > 0 ? p.used / p.spaces : 0));
-    const imgs = this.shown.get(p.id) ?? [];
-    this.shown.set(p.id, imgs);
-    const order = bays.map((b, i) => ({ b, k: hash2(i, p.id, 9) })).sort((a, b) => a.k - b.k);
-    while (imgs.length < want) {
-      const { b, k } = order[imgs.length]!;
-      imgs.push(this.car(b, Math.floor(k * 997) % CAR_TINTS.length));
-    }
-    while (imgs.length > want) imgs.pop()!.destroy();
+  private take(): Phaser.GameObjects.Image {
+    return this.pool.pop() ?? this.scene.add.image(0, 0, '__DEFAULT').setDepth(this.depth);
   }
 
-  private car(b: Bay, tint: number): Phaser.GameObjects.Image {
-    const f = this.cars.frame(0, tint, b.up ? UP : DOWN);
-    const o = carOrigin('car');
-    return this.scene.add.image(b.x, projectY(b.y), f.texture, f.frame).setOrigin(o.x, o.y).setScale(1 / f.scale).setDepth(this.depth);
+  /** Hands back the images beyond `keep` to the pool. */
+  private release(imgs: Phaser.GameObjects.Image[], keep: number): void {
+    while (imgs.length > keep) this.pool.push(imgs.pop()!.setVisible(false));
   }
 
   clear(): void {
-    for (const imgs of this.shown.values()) imgs.forEach((i) => i.destroy());
+    for (const s of this.shown.values()) this.release(s.imgs, 0);
     this.shown.clear();
-    this.last = null;
+    this.poses.clear();
+    this.retired.clear();
+    this.held.clear();
+    this.last = undefined;
+    this.geo = null;
+    this.geoKey = [];
   }
 }

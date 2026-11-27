@@ -1,5 +1,6 @@
 import type Phaser from 'phaser';
 import { lotRect } from '../../city/geometry';
+import { gardenPlan, isGarden } from '../gardenLayout';
 import type { CityView } from '../../sim/types';
 import { TILT } from '../projection';
 
@@ -32,7 +33,8 @@ export class FootprintLayer {
     this.parks = city.carParks;
     this.g.clear();
     for (const b of [...city.lots.filter((l) => l.level > 0), ...city.carParks]) {
-      const r = lotRect(b);
+      // A garden lot's footprint is only its built north rows; the front garden stays ground.
+      const r = 'garden' in b && isGarden(b) ? gardenPlan(b).built : lotRect(b);
       this.g.fillStyle(PAPER, 0.3).fillRect(r.x + 2, r.y + 2, r.w - 4, r.h - 4);
       this.g.lineStyle(4.5, PAPER, 0.8).strokeRect(r.x + 3, r.y + 3, r.w - 6, r.h - 6);
       this.g.lineStyle(1.8, EDGE, 0.85).strokeRect(r.x + 3, r.y + 3, r.w - 6, r.h - 6);

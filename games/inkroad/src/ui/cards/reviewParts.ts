@@ -28,15 +28,25 @@ export function ledgerHtml(l: Ledger): string {
     <span class="t">This season</span><span class="t r ${net >= 0 ? 'up' : 'down'}">${signed(net)}</span></div>`);
 }
 
-export function approvalHtml(env: UiEnv): string {
+const complaintList = (env: UiEnv): string => {
+  const worst = [...env.city.complaints].sort((a, b) => b.weight - a.weight).slice(0, 3);
+  const list = worst.map((c) => `<div class="complaint" style="cursor:default">${pic(`resident-${c.animal}`)}<div><p>${esc(c.text)}</p><small>${esc(c.who)}</small></div></div>`).join('');
+  return worst.length ? `<h3>Top complaints</h3>${list}` : '<p class="hand dim">Nobody is shouting. Suspicious.</p>';
+};
+
+const approvalScore = (env: UiEnv): string => {
   const { city } = env;
   const d = Math.round(city.approval - city.lastBars.approval);
   const cls = d > 0 ? 'up' : d < 0 ? 'down' : '';
-  const worst = [...city.complaints].sort((a, b) => b.weight - a.weight).slice(0, 3);
-  const list = worst.map((c) => `<div class="complaint" style="cursor:default">${pic(`resident-${c.animal}`)}<div><p>${esc(c.text)}</p><small>${esc(c.who)}</small></div></div>`).join('');
-  return section('Approval', `<div class="cmp"><b>${Math.round(city.approval)}</b><span class="${cls}">${d === 0 ? 'no change' : signed(d)}</span></div>
-    ${worst.length ? `<h3>Top complaints</h3>${list}` : '<p class="hand dim">Nobody is shouting. Suspicious.</p>'}`);
-}
+  return `<div class="cmp"><b>${Math.round(city.approval)}</b><span class="${cls}">${d === 0 ? 'no change' : signed(d)}</span></div>`;
+};
+
+/** The score and the worst complaints together (phone tab, or a wide card with no second column). */
+export const approvalHtml = (env: UiEnv): string => section('Approval', approvalScore(env) + complaintList(env));
+/** Just the score, when the complaints sit in their own column. */
+export const scoreHtml = (env: UiEnv): string => section('Approval', approvalScore(env));
+/** Just the complaints, as a column of their own. */
+export const complaintsHtml = (env: UiEnv): string => `<div class="sec bigcomplaints">${complaintList(env)}</div>`;
 
 export function priceRow(key: keyof Prices, env: UiEnv): string {
   const lim = env.city.priceLimits[key];

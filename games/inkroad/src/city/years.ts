@@ -11,6 +11,8 @@ import { yearGoal } from './goals';
 import { driftOwnership } from './growth';
 import { earn } from './money';
 import { buildSpots } from './parking';
+import { buildFleet, parkAllAtHome } from './households';
+import { parkingView } from './stand';
 import { takeBack } from './purse';
 import { refreshAccess } from './places';
 import { clearForRoads, settlePlots, squeezeIn } from './plots';
@@ -94,6 +96,10 @@ export function freshTraffic(c: City): void {
   repairLines(c);
   syncServices(c);
   buildSpots(c);
+  // Every household car is at home: at a year start and in a city loaded from its save.
+  c.fleet = buildFleet(c);
+  parkAllAtHome(c);
+  c.parking = parkingView(c);
 }
 
 function beginDay(c: City): void {

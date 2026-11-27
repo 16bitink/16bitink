@@ -1,5 +1,6 @@
 import type { CityDef } from '../../src/sim/types';
 import { GATES, LOTS, MAP, ROADS_DEF } from './map';
+import { RIVERS_ROUTINE } from './routine';
 import { RIVERS_YEARS } from './years';
 
 /** City 5 (paid, skeleton): an ageing freeway city where the bravest road is the one you take away. */
@@ -17,5 +18,6 @@ export const RIVERS: CityDef = {
   lots: LOTS,
   gates: GATES,
   years: RIVERS_YEARS,
+  routine: RIVERS_ROUTINE,
   rules: { carOwnership: 0.86, landPrice: 3, widen: true, ageing: { match: 3 }, freeway: { from: 6 } },
 };

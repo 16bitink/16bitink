@@ -156,3 +156,35 @@ export class FakeCity {
   lotMood(): { trips: number; parking: number } { return { trips: 0.3, parking: 0.7 }; }
   save(): unknown { return { year: this.year }; }
 }
+
+/**
+ * A believable `CityView.parking` worked out from a real city's lots, roads, car parks and beaches,
+ * for looking at the renderer before the engine reports it: homes and forecourts, kerbs, a small street,
+ * a car park, sand at the first public (or any) beach and one double-parked car.
+ */
+export function fakeParking(city: Pick<CityView, 'roads' | 'lots' | 'carParks' | 'beaches'>): NonNullable<CityView['parking']> {
+  const kinds = ['car', 'car', 'car', 'van', 'taxi', 'truck'] as const;
+  let uid = 1;
+  const cars = (n: number, withS?: { len: number; side: -1 | 1 }): NonNullable<CityView['parking']>[number]['cars'] =>
+    Array.from({ length: n }, (_, i) => {
+      const id = uid++;
+      return { uid: id, tint: (id * 5) % 12, kind: kinds[id % kinds.length]!, ...(withS ? { s: ((i + 0.5) / n) * withS.len, side: withS.side } : {}) };
+    });
+  const out: NonNullable<CityView['parking']>[number][] = [];
+  for (const l of city.lots) {
+    if (l.kind === 'home') out.push({ key: `lot:${l.id}`, kind: 'home', lot: l.id, spaces: 4, cars: cars(2 + (l.id % 3)) });
+    else if (['market', 'shops', 'mall', 'office'].includes(l.kind)) out.push({ key: `lot:${l.id}`, kind: 'private', lot: l.id, spaces: 6, cars: cars(3 + (l.id % 3)) });
+  }
+  city.roads.forEach((r, i) => {
+    if (r.level !== 0 || r.line.length < 2) return;
+    const len = r.line.reduce((m, p, k) => (k ? m + Math.hypot(p.x - r.line[k - 1]!.x, p.y - r.line[k - 1]!.y) : 0), 0);
+    if (len < 100) return;
+    const kind = r.type === 'street' ? 'street' : 'kerb';
+    const n = Math.min(8, Math.floor(len / 40));
+    out.push({ key: `${kind}:${r.id}`, kind, road: r.id, spaces: n * 2, cars: [...cars(n, { len, side: 1 }), ...cars(n >> 1, { len, side: -1 })] });
+    if (i === 3) out.push({ key: `double:${r.id}`, kind: 'double', road: r.id, spaces: 1, cars: [{ uid: uid++, tint: 3, kind: 'van', s: len / 2, side: 1 }] });
+  });
+  for (const p of city.carParks) if (p.kind === 'lot' || p.kind === 'ride') out.push({ key: `park:${p.id}`, kind: 'park', park: p.id, spaces: p.spaces, cars: cars(Math.min(14, p.spaces)) });
+  for (const b of city.beaches ?? []) out.push({ key: `sand:${b.id}`, kind: 'sand', beach: b.id, spaces: 8, cars: cars(7) });
+  return out;
+}

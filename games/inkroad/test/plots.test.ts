@@ -9,8 +9,8 @@ import { cityAtYear, inner, newCity, ok } from './city-helpers';
 
 const cell = (gx: number, gy: number): Cell => ({ gx, gy });
 const lot = (v: CityView, name: string) => v.lots.find((l) => l.name === name)!;
-/** A street across the ground of Blueprint Offices (year 4). */
-const ACROSS = [cell(14, 8), cell(11, 8), cell(11, 12)];
+/** A street from the end of the south road west across the plot of Henna Square (year 4), by the stadium. */
+const ACROSS = [cell(12, 30), cell(10, 30)];
 
 /** Build in year 1, then come to January of a later year. */
 function builtThen(year: number): CityView {
@@ -33,11 +33,11 @@ describe('reserved plots', () => {
   it('a plot due within two years refuses by name and year, and shows itself', () => {
     const v = cityAtYear(2);
     const q = v.quote({ t: 'road', cells: ACROSS, type: 'street' });
-    expect(q.why).toBe('Blueprint Offices opens here in year 4');
-    const b = lot(v, 'Blueprint Offices');
+    expect(q.why).toBe('Henna Square opens here in year 4');
+    const b = lot(v, 'Henna Square');
     expect(q.at).toEqual({ gx: b.gx, gy: b.gy, w: b.w, h: b.h });
-    const p = v.quote({ t: 'carPark', kind: 'lot', at: cell(9, 10) });
-    expect(p.why).toBe('Blueprint Offices opens here in year 4');
+    const p = v.quote({ t: 'carPark', kind: 'lot', at: cell(9, 29) });
+    expect(p.why).toBe('Henna Square opens here in year 4');
     expect(p.at).toEqual(q.at);
   });
 
@@ -54,20 +54,20 @@ describe('reserved plots', () => {
   it('moves out of the way of the road when its year comes near, with a word, and stays moved', () => {
     const v = builtThen(2);
     const c = inner(v);
-    const was = SAFFRON.lots.find((l) => l.name === 'Blueprint Offices')!;
-    const now = lot(v, 'Blueprint Offices');
+    const was = SAFFRON.lots.find((l) => l.name === 'Henna Square')!;
+    const now = lot(v, 'Henna Square');
     expect([now.gx, now.gy]).not.toEqual([was.gx, was.gy]);
     expect(now.w * now.h).toBe(was.w * was.h);
     expect(c.net.roads.some((r) => r.cells.some((x) => vertexInBlock(now, x)))).toBe(false);
     expect(c.lots.some((l) => l.id !== now.id && l.opensYear !== DROPPED && blocksMeet(l, now))).toBe(false);
-    expect(v.drainEvents().some((e) => e.t === 'toast' && e.text.includes('Blueprint Offices'))).toBe(true);
+    expect(v.drainEvents().some((e) => e.t === 'toast' && e.text.includes('Henna Square'))).toBe(true);
     const again = createCity(SAFFRON, 7, JSON.parse(JSON.stringify(v.save())));
-    expect(lot(again, 'Blueprint Offices')).toMatchObject({ gx: now.gx, gy: now.gy, opensYear: 4 });
-    expect(again.quote({ t: 'road', cells: [cell(now.gx + 1, now.gy + 1), cell(now.gx + 1, now.gy + 2)], type: 'street' }).why).toMatch(/Blueprint Offices opens here/);
+    expect(lot(again, 'Henna Square')).toMatchObject({ gx: now.gx, gy: now.gy, opensYear: 4 });
+    expect(again.quote({ t: 'road', cells: [cell(now.gx + 1, now.gy + 1), cell(now.gx + 1, now.gy + 2)], type: 'street' }).why).toMatch(/Henna Square opens here/);
     inner(again).phase = 'yearEnd';
     while (again.year < 4) { inner(again).phase = 'yearEnd'; again.apply({ t: 'next' }); }
-    expect(lot(again, 'Blueprint Offices')).toMatchObject({ gx: now.gx, gy: now.gy, level: 2 });
-    expect(lot(again, 'Blueprint Offices').access).not.toBeNull();
+    expect(lot(again, 'Henna Square')).toMatchObject({ gx: now.gx, gy: now.gy, level: 1 });
+    expect(lot(again, 'Henna Square').access).not.toBeNull();
   });
 
   it('is deterministic, and leaves everything alone where nothing overlaps', () => {
@@ -83,14 +83,14 @@ describe('reserved plots', () => {
     const c = inner(v);
     c.year = 2;
     const free = new Set<string>();
-    for (let x = 23; x <= 25; x++) for (let y = 27; y <= 29; y++) free.add(`${x},${y}`);
+    for (let x = 19; x <= 21; x++) for (let y = 27; y <= 29; y++) free.add(`${x},${y}`);
     const only = (keep: boolean): void => { c.net = { ...c.net, terrain: c.net.terrain.map((row, y) => row.map((t, x): Terrain => (keep && free.has(`${x},${y}`) ? t : '#'))) }; };
     const i = c.lots.findIndex((l) => l.name === 'Blueprint Offices');
     const plot = { ...c.lots[i]!, gx: 21, gy: 26 }; // on the south road
     c.lots = c.lots.map((l) => (l.id === plot.id ? plot : l.opensYear > 1 ? { ...l, opensYear: DROPPED } : l));
     only(true);
     settlePlots(c);
-    expect(c.lots[i]).toMatchObject({ w: 2, h: 2, gx: 23, gy: 27 });
+    expect(c.lots[i]).toMatchObject({ w: 2, h: 2, gx: 19, gy: 27 });
     c.lots = c.lots.map((l) => (l.id === plot.id ? plot : l));
     only(false);
     settlePlots(c);

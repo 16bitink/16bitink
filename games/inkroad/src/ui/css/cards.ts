@@ -74,6 +74,20 @@ export const CARDS_CSS = `
 `;
 
 export const CARDS_CSS_2 = `
+.ikr .card.review{width:min(900px,100%)}
+.ikr .card.review .foot{border-top:2px dashed rgba(42,40,50,.35);padding-top:12px}
+.ikr .card.review .foot .grow{font-size:var(--fs);line-height:1.2}
+.ikr .card.review.twocol .cols{align-items:stretch;gap:28px}
+.ikr .card.review.twocol .col:last-child{border-left:2px dashed rgba(42,40,50,.35);padding-left:28px}
+/* Room between stacked panes, so the guide's highlight ring around one never covers the next one's heading. */
+.ikr .card .col > .pane + .pane{margin-top:18px}
+.ikr .bigcomplaints{flex:1;display:flex;flex-direction:column;gap:12px}
+.ikr .bigcomplaints h3{font-size:15px}
+.ikr .bigcomplaints .complaint{flex:1;min-height:84px;gap:14px;padding:10px 14px}
+.ikr .bigcomplaints .complaint .pic{width:60px;height:60px}
+.ikr .bigcomplaints .complaint p{font-size:25px;line-height:1.1}
+.ikr .bigcomplaints .complaint small{font-size:15px;margin-top:3px}
+@media (max-width:760px){.ikr:not(.phone) .card.review.twocol .col:last-child{border-left:0;padding-left:0}}
 .ikr .tabs{display:flex;gap:6px;flex:none}
 .ikr .tab{flex:1;padding:0 6px;box-shadow:0 2px 0 var(--ink)}
 .ikr .pane{display:flex;flex-direction:column;gap:12px}

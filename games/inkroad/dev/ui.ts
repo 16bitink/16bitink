@@ -56,6 +56,11 @@ async function play(app: import('../src/app/app').App, screen: string, year: num
   if (screen === 'ghost') w.ghost = { cmd: { t: 'next' }, quote: { ok: true, cost: 84, land: 12, works: 1, warn: 'Runs past 3 homes: noise' }, label: 'New avenue', at: { x: 0, y: 0 }, dragging: false };
   if (screen === 'letter') { city.year = 2; city.season = 1; }
   if (screen === 'review' || screen === 'letter') s.city.advance(200);
+  if (q.get('bare') === '1') {
+    city.commissions = [];
+    for (const l of Object.values(city.priceLimits) as { open: boolean }[]) l.open = false;
+    Object.defineProperty(city, 'vote', { get: () => null });
+  }
   if (screen === 'yearEnd') { city.phase = 'yearEnd'; city.plates[0] = 2; }
   if (screen === 'replaced') { city.year = 3; city.season = 1; city.advance(200); }
   if (screen === 'cityDone') { city.year = 10; city.phase = 'cityDone'; city.plates = [3, 2, 3, 1, 2, 3, 2, 0, 1, 3]; }

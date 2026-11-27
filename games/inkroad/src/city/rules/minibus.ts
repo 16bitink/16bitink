@@ -1,7 +1,7 @@
 import { CELL } from '../../sim/constants';
 import type { Cell, Id, Lot, SpecialView, TransitLine } from '../../sim/types';
 import { no, priced, type Handler } from '../commands/shared';
-import { areaOf, cellPt, centreOf, clamp, distPt, distToLine, pointAlong, polyLength } from '../geometry';
+import { builtArea, cellPt, centreOf, clamp, distPt, distToLine, pointAlong, polyLength } from '../geometry';
 import { earn } from '../money';
 import { mixSeed } from '../rng';
 import { sore } from '../score';
@@ -35,7 +35,7 @@ const serves = (c: City, l: TransitLine, a: { x: number; y: number }, b: { x: nu
   near(l, a) && near(l, b) && l.crowding < MINI.crowded && headway(c, l) < MINI.slowest;
 
 interface Corridor { readonly from: Lot; readonly to: Lot; readonly weight: number }
-const pull = (l: Lot): number => ((JOBS[l.kind] ?? 0) + (SHOPPING[l.kind] ?? 0)) * areaOf(l) * (LEVEL_PULL[l.level] ?? 0);
+const pull = (l: Lot): number => ((JOBS[l.kind] ?? 0) + (SHOPPING[l.kind] ?? 0)) * builtArea(l) * (LEVEL_PULL[l.level] ?? 0);
 
 /** The busiest trips nobody's bus makes, best first. */
 function corridors(c: City): readonly Corridor[] {
@@ -49,7 +49,7 @@ function corridors(c: City): readonly Corridor[] {
       const a = centreOf(from), b = centreOf(to);
       const cells = distPt(a, b) / CELL;
       if (cells < MINI.minCells || cells > MINI.maxCells || own.some((l) => serves(c, l, a, b)) || minis(c).some((l) => near(l, a) && near(l, b))) continue;
-      out.push({ from, to, weight: areaOf(from) * (LEVEL_PULL[from.level] ?? 1) * pull(to) * Math.exp(-cells / MINI.gravity) });
+      out.push({ from, to, weight: builtArea(from) * (LEVEL_PULL[from.level] ?? 1) * pull(to) * Math.exp(-cells / MINI.gravity) });
     }
   }
   return out.sort((x, y) => y.weight - x.weight || x.from.id - y.from.id || x.to.id - y.to.id);

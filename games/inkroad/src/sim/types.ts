@@ -132,7 +132,7 @@ export interface CarsView {
   /** 0 calm … 1 furious (waited long); drawn as a puff over the car. */
   readonly anger: Float32Array;
   readonly blinker: Int8Array; // -1 left, 0, 1 right
-  /** 1 = looking for a space, 2 = double-parked, 3 = broken down. */
+  /** 1 = looking for a space, 2 = double-parked, 3 = broken down, 4 = parking or leaving a space (holds its lane; not drawn by the car layer: the parked-car layer draws the manoeuvre). */
   readonly state: Uint8Array;
   /** Stable while the car lives, so the renderer can follow one. */
   readonly uid: Uint32Array;
@@ -163,6 +163,8 @@ export interface Lot {
   readonly district: string;
   /** Which building picture: 0..n-1, stable. */
   readonly variant: number;
+  /** A deep plot: the buildings stand in the north half, the south half is their own front garden down to the gate. Homes count only the built half. */
+  readonly garden?: boolean;
 }
 
 export type CarParkKind = 'lot' | 'multi' | 'under' | 'ride';
@@ -350,6 +352,21 @@ export type CityEvent =
   | { readonly t: 'phase'; readonly phase: Phase }
   /** The season's second drawn day begins (phase stays 'day'): light, music and the title "Weekend". */
   | { readonly t: 'weekend' }
+  /**
+   * A car moves between its slot and `lane` (where it stands in the lane, plan px, heading in radians) over `move`
+   * seconds; the lane is held (car state 4) only for the `seconds` of it spent in the lane.
+   * in: lane first (held for `seconds`), then off the road into the slot; `parking` lists it in the slot from this step.
+   * out: it leaves the slot now and drives off the road to the lane edge for `move - seconds`; `parking` no longer
+   *   lists it from this step (its slot stays its own). It then waits at the edge for its `parkGo`.
+   * A car that gives up waiting at the edge gets an 'in' with seconds 0 (no lane hold) back into its slot.
+   */
+  | { readonly t: 'park'; readonly dir: 'in' | 'out'; readonly car: number; readonly key: string; readonly slot: number; readonly lane: { readonly x: number; readonly y: number; readonly a: number }; readonly seconds: number; /** The whole move, at least `seconds`: the lane is held only for the part of it in the lane (the start of 'in', the end of 'out'); the rest happens off the road. */ readonly move?: number; readonly tint: number; readonly kind: ParkedCar['kind'] }
+  /**
+   * The car waiting at the lane edge after its 'out' found its gap: from the edge into `lane` over `seconds` (the lane
+   * held, car state 4), then it drives off as a moving car. Comes `move - seconds` after the 'out' when the lane is
+   * clear, later when it is not; `car` and `lane` as in that 'out' (`lane` is where it now stands).
+   */
+  | { readonly t: 'parkGo'; readonly car: number; readonly key: string; readonly lane: { readonly x: number; readonly y: number; readonly a: number }; readonly seconds: number; /** Its traffic uid from now on: the car layer picks it up without fading in. */ readonly uid?: number }
   | { readonly t: 'toast'; readonly who: string; readonly text: string };
 
 /** Per-road and per-junction numbers the map views colour by. Over the last ~30 s (live) or the last day. */
@@ -418,6 +435,12 @@ export interface CityView {
   readonly plannedRoads: readonly PlannedRoad[];
   /** Petrol stations that are open, with their queues now. */
   readonly fuel: readonly FuelView[];
+  /**
+   * Every car standing still, by the place it stands: cars never vanish, they park.
+   * The array is replaced when anything in it changes (at most twice a second); a place
+   * whose cars did not change keeps the same object, so the view redraws only what moved.
+   */
+  readonly parking?: readonly ParkingView[];
   /** One line about how this city lives ("Saffron Bay rises early..."), for the city and year cards. */
   readonly routineLine: string;
   /** What opens next, two years ahead. */
@@ -485,6 +508,44 @@ export interface ResidentView {
   readonly tank: number;
   readonly day: readonly DayStop[];
   readonly now: string;
+}
+/**
+ * Where cars stand: home = a block's own driveways (along its edge that faces its road);
+ * private = a shop's, office's or school's forecourt (the same edge); kerb = marked bays along a road;
+ * park = a car park (cars drawn only in surface ones); street = left along a small street that has no bays (not allowed);
+ * sand = on the sand of a public beach; double = stopped in the lane beside parked cars.
+ */
+export type ParkingKind = 'home' | 'private' | 'kerb' | 'park' | 'street' | 'sand' | 'double';
+export interface ParkedCar {
+  /** Stable while the car stands here; a household's car keeps its uid all season. */
+  readonly uid: number;
+  readonly tint: number;
+  readonly kind: 'car' | 'van' | 'taxi' | 'truck';
+  readonly household?: Id;
+  /** Road kinds (kerb, street, double): px along road.line where it stands, and the side (1 = right of the line's direction). */
+  readonly s?: number;
+  readonly side?: -1 | 1;
+  /** Its own space in the place, 0..slots-1, kept until it leaves: neighbours never shift, gaps stay. */
+  readonly slot?: number;
+  /** A vehicle longer than a bay (van, lorry): every slot it covers, its own first (the next one on its side). */
+  readonly span?: readonly number[];
+}
+export interface ParkingView {
+  readonly key: string;
+  readonly kind: ParkingKind;
+  /** home and private: the lot. */
+  readonly lot?: Id;
+  /** kerb, street and double: the road. */
+  readonly road?: Id;
+  /** park: the car park. */
+  readonly park?: Id;
+  /** sand: the BeachView id. */
+  readonly beach?: string;
+  readonly spaces: number;
+  /** Spaces laid out in this place (slot indices run 0..slots-1); unmarked places (street, sand) have fewer, uneven ones. */
+  readonly slots?: number;
+  /** Oldest first. */
+  readonly cars: readonly ParkedCar[];
 }
 /** A petrol station. `spill`: the queue stands on the road. */
 export interface FuelView { readonly lot: Id; readonly pumps: number; readonly busy: number; readonly waiting: number; readonly spill: boolean; readonly served: number }
@@ -569,6 +630,8 @@ export interface LotDef {
   readonly level?: 1 | 2 | 3 | 4; // at opening
   readonly maxLevel?: 1 | 2 | 3 | 4;
   readonly district: string;
+  /** See Lot.garden: h is 4, buildings in the north 2 rows, a front garden in the south 2. */
+  readonly garden?: boolean;
 }
 
 export interface RoadDef {
@@ -706,6 +769,8 @@ export interface CityDef {
   readonly routine?: RoutineProfile;
   /** Stretches of beach whose fate the Council decides. */
   readonly beaches?: readonly BeachDef[];
+  /** Every lot faces the Council street along its south edge, and its driveway is on that street only. */
+  readonly frontStreets?: boolean;
   /** City-wide rules. */
   readonly rules: { readonly carOwnership: number; readonly landPrice: number; readonly widen: boolean; readonly zoneCells?: readonly (readonly [number, number, number, number])[] } & SpecialRules;
 }

@@ -102,10 +102,10 @@ describe('junctions', () => {
 describe('car parks', () => {
   it('needs sand and a road, knows the Master Plan, can be taken away', () => {
     const v = cityAtYear(2);
-    expect(why(v, { t: 'carPark', kind: 'lot', at: cell(18, 10) })).toMatch(/stands here/);
+    expect(why(v, { t: 'carPark', kind: 'lot', at: cell(28, 10) })).toMatch(/stands here/);
     expect(why(v, { t: 'carPark', kind: 'lot', at: cell(37, 20) })).toMatch(/float/);
     expect(why(v, { t: 'carPark', kind: 'multi', at: cell(26, 15) })).toMatch(/toolbox/);
-    expect(why(v, { t: 'carPark', kind: 'lot', at: cell(10, 10) })).toBe('Blueprint Offices opens here in year 4');
+    expect(why(v, { t: 'carPark', kind: 'lot', at: cell(8, 21) })).toBe('Blueprint Offices opens here in year 4');
     const site = [...Array(30).keys()].flatMap((x) => [cell(5 + x, 9), cell(5 + x, 13)]).find((c) => v.quote({ t: 'carPark', kind: 'lot', at: c }).ok)!;
     ok(v, { t: 'carPark', kind: 'lot', at: site });
     expect(v.carParks[0]!.spaces).toBeGreaterThan(5);
@@ -167,7 +167,7 @@ describe('lines', () => {
     const v = cityAtYear(5);
     const c = inner(v);
     expect(why(v, draw(v, 'bus', [cell(22, 12)]))).toMatch(/two stops/);
-    expect(why(v, draw(v, 'bus', [cell(22, 12), cell(2, 33)]))).toMatch(/roads/);
+    expect(why(v, draw(v, 'bus', [cell(22, 12), cell(1, 37)]))).toMatch(/roads/);
     expect(why(v, draw(v, 'bus', [cell(22, 12), cell(22, 13)]))).toMatch(/close/);
     ok(v, draw(v, 'bus', [cell(22, 11), cell(22, 21), cell(18, 24)]));
     const l = v.lines[0]!;

@@ -1,7 +1,7 @@
 import type { Bar, Letter } from '../sim/types';
 import { APPROVAL_LETTER } from '../sim/constants';
 import { mean } from './day';
-import { areaOf, cellsToBlock, clamp, distToLine } from './geometry';
+import { builtArea, cellsToBlock, clamp, distToLine } from './geometry';
 import { CELL, ROADS } from '../sim/constants';
 import type { City, DayReport } from './state';
 import { has } from './state';
@@ -10,11 +10,11 @@ import { APPROVAL_EASE, EXPECT_RANGE, FUMES, HABIT, NOISE_PER_HOME, OUTRAGE, PAR
 /** Cars idling at a jam beside people's windows, and the day's lorries. */
 function fumes(c: City): number {
   const homes = c.lots.filter((l) => l.kind === 'home' && l.level > 0);
-  const cells = Math.max(1, homes.reduce((n, l) => n + areaOf(l), 0));
+  const cells = Math.max(1, homes.reduce((n, l) => n + builtArea(l), 0));
   const jam = c.net.junctions.filter((j) => j.arms.length >= 3).reduce((sum, j) => {
     const s = c.traffic.junctionStats(j.id);
     if (s.wait <= FUMES.from) return sum;
-    const near = homes.filter((l) => cellsToBlock(l, j) <= FUMES.cells).reduce((n, l) => n + areaOf(l), 0);
+    const near = homes.filter((l) => cellsToBlock(l, j) <= FUMES.cells).reduce((n, l) => n + builtArea(l), 0);
     return sum + ((s.wait - FUMES.from) * s.cars * near * FUMES.per) / cells;
   }, 0);
   const lorries = Math.max(0, c.day.plan.filter((t) => t.purpose === 'truck').length - FUMES.lorriesFrom) * FUMES.perLorry;
@@ -38,12 +38,12 @@ function noise(c: City): number {
   let cells = 0;
   for (const l of homes) {
     const at = { x: (l.gx + l.w / 2) * CELL, y: (l.gy + l.h / 2) * CELL };
-    cells += areaOf(l);
+    cells += builtArea(l);
     for (const r of c.net.roads) {
       if (r.level === -1 || distToLine(r.line, at) > CELL * (r.level === 1 ? 3.5 : 2.6)) continue;
       const flow = c.traffic.roadStats(r.id).flow;
       const cut = r.type === 'street' ? Math.max(0, flow - STREETS.cutFrom) * STREETS.cut * 0.1 : 0;
-      sum += areaOf(l) * (ROADS[r.type].noise - 1 + cut + (r.level === 1 ? 1.5 : 0)) * quiet;
+      sum += builtArea(l) * (ROADS[r.type].noise - 1 + cut + (r.level === 1 ? 1.5 : 0)) * quiet;
     }
   }
   return cells === 0 ? 0 : (sum / cells) * NOISE_PER_HOME * 20;

@@ -59,26 +59,36 @@ function entryLanes(sim: Sim, l: LinkRt, gate: boolean, bus: boolean): Track[] {
   return open.map((t) => ({ t, r: room(t) })).sort((p, q) => q.r - p.r || p.t.lane - q.t.lane).map((e) => e.t);
 }
 
-/** Put car i (already taken) on link l. False = no space now. */
-export function place(sim: Sim, i: number, l: LinkRt, from: Access): boolean {
+/**
+ * Put car i (already taken) on link l. False = no space now. `still`: it pulls out of a space and stands
+ * in the lane first, so it needs a gap a standing car can take (no upstream car close at its speed).
+ */
+export function place(sim: Sim, i: number, l: LinkRt, from: Access, still = false): boolean {
   const c = sim.cars;
   const gate = 'gate' in from;
   for (const t of entryLanes(sim, l, gate, c.bus[i] === 1)) {
     const s = gate ? c.half[i]! : laneS(l, from.s);
-    const v = gate ? t.vmax * 0.8 * sim.speed : ENTRY_SPEED;
+    const v = gate ? t.vmax * 0.8 * sim.speed : still ? 0 : ENTRY_SPEED;
     const q = t.tail;
     const startV = gate && q >= 0 ? Math.min(v, c.v[q]! + Math.max(0, c.s[q]! - s) * 0.4) : v;
     if (!gate && t.incoming > 0 && s - c.half[i]! < t.incoming && (q < 0 || c.s[q]! > s)) continue;
     if (gate ? q >= 0 && c.s[q]! - c.half[q]! - c.len[i]! < IDM.standGap + startV * 0.25 : !spaceAt(sim, t, s, c.half[i]!, v)) continue;
     c.insert(i, t, s);
-    c.v[i] = startV;
-    if (!gate) fromKerb(sim, i, t, s);
+    c.v[i] = still ? 0 : startV;
+    if (!gate && !still) fromKerb(sim, i, t, s);
     drivers(sim, i);
     plan(sim, i, l);
     pose(sim, i);
     return true;
   }
   return false;
+}
+
+/** Where a car leaving a space at `from` would stand in its kerb lane on link l (heading along the lane). */
+export function entryPose(l: LinkRt, from: Access, bus: boolean): { x: number; y: number; a: number } {
+  const t = l.lanes[bus ? l.lanes.length - 1 : l.carLanes - 1]!;
+  poseAt(t, 'road' in from ? laneS(l, from.s) : t.len / 2, POSE_ZERO);
+  return { x: POSE_ZERO.x, y: POSE_ZERO.y, a: POSE_ZERO.h };
 }
 
 /** The car comes out of the driveway: drawn beside the lane and sliding in. */

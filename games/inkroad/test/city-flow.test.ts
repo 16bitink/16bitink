@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DAY } from '../src/sim/constants';
+import { DAY, WEEKEND } from '../src/sim/constants';
 import { createCity } from '../src/city/city';
 import { SAFFRON } from '../src/city/defs/saffron';
 import { cityAtYear, inner, newCity, ok, runDay, runYear, SEED } from './city-helpers';
@@ -33,6 +33,9 @@ describe('the year', () => {
     expect(v.clock).toBeCloseTo(1);
     expect(v.apply({ t: 'next' }).ok).toBe(false);
     v.advance(DAY);
+    // A season is a workday and then a weekend: night falls after the weekend.
+    expect([v.phase, v.dayKind]).toEqual(['day', 'weekend']);
+    v.advance(WEEKEND);
     expect(v.phase).toBe('review');
     expect(v.hour).toBeGreaterThan(22);
   });

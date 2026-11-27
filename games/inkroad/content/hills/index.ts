@@ -1,6 +1,7 @@
 import type { CityDef } from '../../src/sim/types';
 import { GATES, MAP, ROADS_DEF } from './map';
 import { LOTS } from './lots';
+import { HILLS_ROUTINE } from './routine';
 import { HILLS_YEARS } from './years';
 
 /** City 4 (paid): two steep shores, two bridges, ferries and minibuses with opinions. */
@@ -18,5 +19,6 @@ export const HILLS: CityDef = {
   lots: LOTS,
   gates: GATES,
   years: HILLS_YEARS,
+  routine: HILLS_ROUTINE,
   rules: { carOwnership: 0.6, landPrice: 5, widen: true, steep: true, ferries: 1.8, minibuses: { from: 3 } },
 };

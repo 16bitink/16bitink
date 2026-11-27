@@ -19,12 +19,19 @@ function saveLot(def: CityDef, l: Lot): LotSave {
   return same ? { level: l.level } : { level: l.level, at: [l.gx, l.gy, l.w, l.h, l.opensYear] };
 }
 
+/** A garden lot keeps its garden only while it is still 4 deep: a shrunk one is a plain lot. */
+const withGarden = (l: Lot): Lot => {
+  if (!l.garden || l.h === 4) return l;
+  const { garden: _g, ...plain } = l;
+  return plain;
+};
+
 function restoreLot(def: CityDef, base: Lot, s: LotSave | undefined): Lot {
   const l = { ...base, level: s?.level ?? base.level };
   if (!Array.isArray(s?.at) || s.at.length !== 5 || !s.at.every((n) => Number.isInteger(n) && n >= 0 && n < MAX_CELL)) return l;
   const [gx, gy, w, h, opensYear] = s.at as [number, number, number, number, number];
   const cols = def.map[0]?.length ?? 0;
-  return w > 0 && h > 0 && gx + w < cols && gy + h < def.map.length ? { ...l, gx, gy, w, h, opensYear } : l;
+  return w > 0 && h > 0 && gx + w < cols && gy + h < def.map.length ? withGarden({ ...l, gx, gy, w, h, opensYear }) : l;
 }
 const MAX_CELL = 128;
 export interface CitySave {

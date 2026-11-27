@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import type { CarsView, CityView } from '../../sim/types';
 import type { CarLayer } from '../cars/carLayer';
+import type { Blinker } from '../cars/manoeuvres';
 import { nightOf, washOf } from '../daylight';
 import { clamp } from '../geom';
 import { projectAngle, projectY } from '../projection';
@@ -10,6 +11,7 @@ import { ctxOf, makeCanvas } from '../tiles';
 const MAX_PUFFS = 14;
 const PUFF_FROM = 0.55;
 const BEAM = { w: 64, h: 40 } as const;
+const NONE: readonly Blinker[] = [];
 
 export class Lights {
   private readonly wash: Phaser.GameObjects.Rectangle;
@@ -30,7 +32,7 @@ export class Lights {
     this.wash.setPosition(x, y).setSize(w * 1.1, h * 1.1);
   }
 
-  update(dt: number, city: CityView, cars: CarLayer, close: number): void {
+  update(dt: number, city: CityView, cars: CarLayer, close: number, moving: readonly Blinker[] = NONE): void {
     this.clock += dt;
     const colour = washOf(city.hour);
     this.wash.setVisible(colour !== 0xffffff).setFillStyle(colour);
@@ -44,6 +46,12 @@ export class Lights {
         if (this.pose.slowing) this.tail(tails++, close);
         if (c.blinker[i] !== 0 && this.clock % 0.8 < 0.4) this.blink(blinks++, c.blinker[i]!, close);
         if (c.anger[i]! > PUFF_FROM && c.uid[i]! % 2 === 0 && puffs < MAX_PUFFS) this.puff(puffs++, i, c, close);
+      }
+    }
+    if (close > 0.05 && this.clock % 0.8 < 0.4) {
+      for (const b of moving) {
+        this.pose.x = b.x; this.pose.y = b.y; this.pose.z = 0; this.pose.a = b.a; this.pose.len = b.len; this.pose.wid = b.wid;
+        this.blink(blinks++, b.side, close);
       }
     }
     rest(this.beams, beams);

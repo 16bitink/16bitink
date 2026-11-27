@@ -26,9 +26,9 @@ function fixJunction(city: CityView, node: number): boolean {
 
 /** Where a beginner would draw a line when the coach asks for one. */
 const LINES: Readonly<Record<string, readonly (readonly string[])[]>> = {
-  saffron: [['Acacia Gardens', 'Pepper Market', 'Blueprint Offices'], ['Tide Row', 'Far Shore Offices', 'Creek Villas', 'Pepper Market'], ['Almond Flats', 'Rosewater Flats', 'Saffron School']],
+  saffron: [['Blueprint Offices', 'Acacia Gardens', 'Pepper Market'], ['Tide Row', 'Far Shore Offices', 'Creek Villas', 'Pepper Market'], ['Almond Flats', 'Rosewater Flats', 'Saffron School']],
   isles: [['Orchid Row', 'Lantern Market', 'Folded Offices', 'Abacus Offices'], ['Biscuit Lane', 'Teapot Street', 'Isle School', 'Silk Market', 'Cloud Row']],
-  harbour: [['Weavers Green', 'Tin Lane', 'Herring Market', 'Anchor Lane', 'Barrel Street'], ['Loom Street', 'Ledger Offices', 'Upper Gables'], ['Tar Street', 'North Hospital', 'Compass House']],
+  harbour: [['Weavers Green', 'Tin Lane', 'Herring Market', 'Anchor Lane', 'Barrel Street'], ['Loom Street', 'Ledger Offices', 'Upper Gables'], ['North Hospital', 'Tar Street', 'Compass House']],
 };
 
 function followCoach(city: CityView, attempt: number): void {

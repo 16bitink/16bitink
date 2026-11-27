@@ -51,7 +51,8 @@ describe('what prices do', () => {
   it('a toll counts by the gates on the way', () => {
     const v = cityAtYear(7);
     const c = inner(v);
-    const busy = v.roads.find((r) => !r.fixed && r.cells[0]!.gx === 7 && r.cells[0]!.gy === 18) ?? v.roads.find((r) => !r.fixed)!;
+    // The main street by the west gate, which every driver from Dune Road takes.
+    const busy = v.roads.find((r) => !r.fixed && r.cells.some((x) => x.gx === 7 && x.gy === 18))!;
     ok(v, { t: 'toll', road: busy.id, on: true });
     answerPrices(c, plan(c));
     expect(c.day.shared.length).toBeGreaterThan(0);

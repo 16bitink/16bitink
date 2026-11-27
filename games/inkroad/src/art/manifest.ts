@@ -106,11 +106,8 @@ export type FlatName = keyof typeof FLATS;
 
 // ---------------------------------------------------------------- vehicles (straight from above, nose right, 8x)
 
-export const VEHICLE_PICTURES = {
-  car: { w: 112, h: 58, n: 5 }, taxi: { w: 112, h: 56, n: 0 }, van: { w: 136, h: 67, n: 0 }, truck: { w: 232, h: 114, n: 0 },
-  bus: { w: 272, h: 102, n: 0 }, tram: { w: 440, h: 155, n: 0 }, tow: { w: 152, h: 65, n: 0 }, school: { w: 240, h: 94, n: 0 },
-  police: { w: 112, h: 57, n: 0 },
-} as const;
+export { VEHICLE_PICTURES } from '../sim/vehicleSize';
+import { VEHICLE_PICTURES } from '../sim/vehicleSize';
 
 // ---------------------------------------------------------------- buildings (anchor: bottom centre of the footprint's south edge, 2x)
 
@@ -120,13 +117,17 @@ export const FOOTPRINTS: Readonly<Record<string, readonly [number, number]>> = {
   market: [4, 3], school: [4, 3], hospital: [4, 3], landmark: [4, 3],
   nursery: [2, 2], fuel: [2, 2], food: [2, 2], fun: [3, 2],
   mall: [6, 4], stadium: [6, 5], port: [6, 3], fair: [6, 5], 'park-multi': [2, 2], 'park-under': [2, 2],
+  /** A garden lot's front garden: one walled piece south of each plot column, its front wall on the lot's south edge. */
+  garden: [2, 2],
 };
 /** Kinds that repeat their picture over the lot. */
 export const PLOT_KINDS: readonly string[] = ['home', 'shops', 'office', 'food'];
 /** Kinds with no building: painted ground. */
 export const GROUND_KINDS: readonly string[] = ['park', 'square'];
 
-export const VARIANTS: Readonly<Record<string, number>> = { home: 4, shops: 2, office: 2, food: 2 };
+export const VARIANTS: Readonly<Record<string, number>> = { home: 4, shops: 2, office: 2, food: 2, garden: 4 };
+/** The picture kind of a garden lot's front garden (`b-<set>-garden1-<v>`, one level). */
+export const GARDEN_KIND = 'garden';
 const FALLBACK_STYLE = 'gulf';
 
 export const buildingKey = (style: string, kind: string, level: number, variant: number): string => `b/${style}/${kind}${level}-${variant}`;

@@ -1,5 +1,5 @@
 import type Phaser from 'phaser';
-import { buildingFallbacks, FOOTPRINTS, GROUND_KINDS, spriteFallbacks, spriteKeys, spritesOf, SPRITE_SCALE, VARIANTS, type SpriteName } from '../../art/manifest';
+import { buildingFallbacks, FOOTPRINTS, GARDEN_KIND, GROUND_KINDS, spriteFallbacks, spriteKeys, spritesOf, SPRITE_SCALE, VARIANTS, type SpriteName } from '../../art/manifest';
 import { CELL } from '../../sim/constants';
 import type { CityDef } from '../../sim/types';
 import { buildAtlas, type AtlasFrame, type Piece } from '../atlas';
@@ -76,7 +76,7 @@ export class UprightAtlas {
 
   /** Every kind the city has, at every level and variant; the same picture is packed once. */
   private buildings(def: CityDef, add: (name: string, pic: Picture, depth: number, shadow: boolean) => void): void {
-    const kinds = new Set<string>([...def.lots.map((l) => l.kind), 'park-multi', 'park-under']);
+    const kinds = new Set<string>([...def.lots.map((l) => l.kind), 'park-multi', 'park-under', ...(def.lots.some((l) => l.garden) ? [GARDEN_KIND] : [])]);
     const done = new Set<string>();
     for (const kind of kinds) {
       if (GROUND_KINDS.includes(kind)) continue;

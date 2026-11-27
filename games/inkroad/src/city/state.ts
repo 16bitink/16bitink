@@ -1,9 +1,10 @@
 import type { Network, Traffic } from '../sim/trafficTypes';
 import type {
   Bar, CarPark, CityDef, CityEvent, Commission, Complaint, Control, Id, JunctionStats, Ledger, Letter, Lot, Movement, Phase, Policies, Prices,
-  Project, Pt, RoadStats, TransitLine,
+  ParkingView, Project, Pt, RoadStats, TransitLine,
 } from '../sim/types';
 import type { Day } from './day';
+import type { Fleet } from './households';
 import type { Dice } from './rng';
 import type { RuleDay, RuleState } from './rules/state';
 
@@ -85,6 +86,10 @@ export interface City {
   rule?: RuleState;
   ruleDay?: RuleDay;
   replacedWhy: { readonly text: string; readonly spots: readonly { readonly at: Pt; readonly text: string }[] } | undefined;
+  /** Who lives here and their cars: derived from the lots and the seed at dawn, never saved. */
+  fleet?: Fleet;
+  /** What the view draws of the standing cars: replaced when it changes. */
+  parking?: readonly ParkingView[];
 }
 
 export const emptyLedger = (): Ledger => ({

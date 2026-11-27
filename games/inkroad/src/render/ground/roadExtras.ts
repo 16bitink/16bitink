@@ -5,8 +5,8 @@ import type { Brush } from './roadPaint';
 import type { RoadShape } from './roadShape';
 
 /** Kerb bays and road works, painted on the road. */
-const BAY = 17;
-const BAY_DEPTH = 5;
+export const BAY = 17;
+export const BAY_DEPTH = 5;
 const HATCH = 9;
 
 /** Paid bays: turquoise and white kerb stones and a comb of bay lines. */

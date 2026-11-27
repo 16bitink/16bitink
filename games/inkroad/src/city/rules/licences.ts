@@ -1,6 +1,6 @@
 import type { SpecialView } from '../../sim/types';
 import { no, priced, type Handler } from '../commands/shared';
-import { areaOf, centreOf, clamp } from '../geometry';
+import { builtArea, centreOf, clamp } from '../geometry';
 import { population } from '../growth';
 import { earn } from '../money';
 import { sore } from '../score';
@@ -21,7 +21,7 @@ export const LICENCE = {
 
 /** Households now, and (with `soon`) in the blocks that open next January. */
 function homes(c: City, soon = false): number {
-  const coming = soon ? c.def.lots.reduce((n, l, id) => n + (l.kind === 'home' && l.opensYear === c.year + 1 && c.lots[id]?.level === 0 ? areaOf(l) * (PEOPLE_PER_CELL[l.level ?? 1] ?? 0) * PEOPLE_SHOWN : 0), 0) : 0;
+  const coming = soon ? c.def.lots.reduce((n, l, id) => n + (l.kind === 'home' && l.opensYear === c.year + 1 && c.lots[id]?.level === 0 ? builtArea(l) * (PEOPLE_PER_CELL[l.level ?? 1] ?? 0) * PEOPLE_SHOWN : 0), 0) : 0;
   return Math.max(1, Math.round((population(c) + coming) / LICENCE.people));
 }
 /** population() counts ten residents for each of these. */

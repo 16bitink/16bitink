@@ -7,6 +7,8 @@ import { COMPLAINTS, DRIVER_LINES, localise, residentFor } from './residents';
 import { mixSeed } from './rng';
 import type { City } from './state';
 import { lotById } from './state';
+import { householdOf } from './households';
+import { dayLine } from './views';
 import { CELL } from '../sim/constants';
 
 const MAX_COMPLAINTS = 3;
@@ -28,11 +30,14 @@ function piles(c: City): readonly Pile[] {
 
 function write(c: City, s: Sore, weight: number, i: number): Complaint {
   const seed = mixSeed(c.seed, c.year, c.season, i, Math.round(s.at.x), Math.round(s.at.y));
-  const who = residentFor(seed, c.def.style);
+  const h = s.household !== undefined ? householdOf(c, s.household) : undefined;
+  const who = h ? { name: h.who, animal: h.animal } : residentFor(seed, c.def.style);
+  const day = h ? dayLine(c, h.id) : undefined;
   const lines = COMPLAINTS[s.kind] ?? COMPLAINTS.late!;
   const line = lines[(seed >>> 8) % lines.length]!;
   const place = s.place ?? (s.lot !== null ? lotById(c, s.lot)?.name : undefined) ?? nearName(c, s.at);
-  return { who: who.name, animal: who.animal, text: localise(line, c.def.style).replaceAll('{place}', place).replaceAll('{n}', String(s.n)), bar: s.bar, at: s.at, weight };
+  const text = localise(line, c.def.style).replaceAll('{place}', place).replaceAll('{n}', String(s.n));
+  return { who: who.name, animal: who.animal, text, bar: s.bar, at: s.at, weight, ...(h ? { household: h.id } : {}), ...(day ? { day } : {}) };
 }
 
 /** Street sores come from the map, not from trips. */

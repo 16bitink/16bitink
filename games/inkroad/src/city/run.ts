@@ -1,14 +1,17 @@
-import { DAY, STEP } from '../sim/constants';
+import { STEP } from '../sim/constants';
 import { setRoad } from '../sim/network';
-import { isPeak, periodAt } from './clock';
+import { isPeak, NIGHT_END, periodAt, SEASON_END, WEEKEND_AT } from './clock';
 import type { Leg, Tour } from './day';
 import { emptyDay } from './day';
-import { planDay } from './demand';
+import { planDay, planWeekend } from './demand';
+import { busyCars, lateLeg, nightSweep, sendStrandedHome, smallHours } from './hops';
+import { buildFleet, parkAllAtHome } from './households';
+import { parkingView } from './stand';
 import { createDice } from './rng';
 import { tickRules } from './rules';
 import { wirePrice } from './rules/speedTolls';
 import { happen, pipeRoad, todayPlan } from './happenings';
-import { arrive, gaveUp, leaveAll, retryWaiting, startTour } from './legs';
+import { arrive, closeWorkday, gaveUp, leaveAll, retryWaiting, startTour } from './legs';
 import { commitNetwork } from './network';
 import { buildSpots, publishParks, sampleSpots } from './parking';
 import { accessOf } from './places';
@@ -25,11 +28,14 @@ const WATCH_EVERY = 1;
 const HONKS_PER_STEP = 2;
 const RED = new Set(['D', 'E', 'F']);
 const CALM = new Set(['A', 'B']);
-const LATE_FACTOR = 1.2;
 const PIPE_WORKS = 1;
+/** Seconds a household waits for its car before trying to set off again. */
+const BUSY_WAIT = 2;
+/** The parking view is rebuilt at most this often (seconds). */
+const PARKING_EVERY = 0.5;
 
 /** Everyone's first day is the same one: a good jam, in the right place. */
-export const FIRST_MORNING = { seed: 38 };
+export const FIRST_MORNING = { seed: 24 };
 function firstMorning<T>(c: City, plan: () => T): T {
   if (c.year > 1 || c.season > 0) return plan();
   const own = c.dice;
@@ -45,6 +51,8 @@ export function startDay(c: City): void {
   c.carry = 0;
   c.day = emptyDay();
   buildSpots(c);
+  c.fleet = buildFleet(c);
+  parkAllAtHome(c);
   c.traffic.startDay();
   const pipe = pipeRoad(c);
   if (pipe !== null) commitNetwork(c, setRoad(c.net, pipe, { works: PIPE_WORKS }));
@@ -53,6 +61,7 @@ export function startDay(c: City): void {
   c.weather = { speed: today.speed, crashes: 0 };
   c.day.agenda = [...today.agenda];
   c.day.plan = firstMorning(c, () => answerPrices(c, planDay(c, today.crowds, today.schoolRate)));
+  c.parking = parkingView(c);
   conditions(c);
   preWarm(c);
 }
@@ -102,10 +111,14 @@ function insert(c: City, t: Tour): void {
 }
 
 function depart(c: City): void {
+  let busy: Set<number> | null = null;
   for (;;) {
     const t = c.day.plan[c.day.next];
     if (!t || t.leave > c.clock) return;
     c.day.next += 1;
+    // A car is never in two places: a day whose car is still out (a late night) waits until it is free.
+    const car = t.chain?.car ?? null;
+    if (car !== null && (busy ??= busyCars(c)).has(car)) { insert(c, { ...t, leave: c.clock + BUSY_WAIT }); continue; }
     if (!retime(c, t)) startTour(c, t);
   }
 }
@@ -122,9 +135,23 @@ function watch(c: City): void {
 
 const every = (c: City, seconds: number): boolean => Math.floor(c.clock / seconds) !== Math.floor((c.clock - STEP) / seconds);
 
-/** One fixed step of the day. Returns true when night falls. */
+const crossed = (c: City, at: number): boolean => c.clock >= at - STEP / 2 && c.clock - STEP < at - STEP / 2;
+
+/** The workday is over: the weekend's title. The small hours are over: everyone is home, and the weekend's plan begins. */
+function nightAndWeekend(c: City): void {
+  if (crossed(c, WEEKEND_AT)) { closeWorkday(c); emit(c, { t: 'weekend' }); }
+  if (!crossed(c, NIGHT_END)) return;
+  smallHours(c);
+  const shared = c.day.shared;
+  const weekend = answerPrices(c, planWeekend(c));
+  c.day.shared = [...shared, ...c.day.shared];
+  c.day.plan = [...c.day.plan.slice(0, c.day.next), ...[...c.day.plan.slice(c.day.next), ...weekend].sort((a, b) => a.leave - b.leave || a.id - b.id)];
+}
+
+/** One fixed step of the season. Returns true when the weekend's night falls. */
 export function stepDay(c: City): boolean {
   c.clock += STEP;
+  nightAndWeekend(c);
   conditions(c);
   while (c.clock > 0 && c.day.agenda[0] && c.day.agenda[0].at <= c.clock) {
     const e = c.day.agenda.shift()!;
@@ -132,25 +159,23 @@ export function stepDay(c: City): boolean {
   }
   depart(c);
   leaveAll(c);
-  if (every(c, RETRY_EVERY)) retryWaiting(c);
+  retryWaiting(c, every(c, RETRY_EVERY));
   c.traffic.step();
   for (const a of c.traffic.drainArrivals()) arrive(c, a);
   for (const a of c.traffic.drainGaveUp()) gaveUp(c, a);
   for (const at of c.traffic.drainHonks().slice(0, HONKS_PER_STEP)) emit(c, { t: 'honk', at });
-  if (every(c, WATCH_EVERY)) { sampleSpots(c); publishParks(c); watch(c); if (tickRules(c)) applyConditions(c); }
-  return c.clock >= DAY - STEP / 2;
+  if (every(c, WATCH_EVERY)) { sendStrandedHome(c); sampleSpots(c); publishParks(c); watch(c); if (tickRules(c)) applyConditions(c); }
+  if (c.day.parkingDirty && (c.day.parkingNow || every(c, PARKING_EVERY))) { c.day.parkingDirty = false; c.day.parkingNow = false; c.parking = parkingView(c); }
+  return c.clock >= SEASON_END - STEP / 2;
 }
 
 /** Night: whoever is still on the road gets home late. */
 export function endDay(c: City): void {
+  nightSweep(c);
+  c.parking = parkingView(c);
   for (const s of c.day.shared) scorePricedOut(c, s, s.coins);
   for (const leg of c.day.waiting) scoreLost(c, leg, pointOf(c, leg.out ? leg.tour.from : leg.tour.to), 'gaveUp');
   c.day.waiting = [];
   for (const leg of c.day.legs) if (!leg.done) lateLeg(c, leg);
 }
 
-function lateLeg(c: City, leg: Leg): void {
-  leg.done = true;
-  const spent = c.clock - leg.start;
-  if (spent > leg.free * c.expect.trip) scoreTrip(c, leg, spent * LATE_FACTOR);
-}

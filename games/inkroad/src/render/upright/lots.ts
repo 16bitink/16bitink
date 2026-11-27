@@ -1,7 +1,8 @@
 import type Phaser from 'phaser';
-import { FOOTPRINTS, GROUND_KINDS, PLOT_KINDS } from '../../art/manifest';
+import { FOOTPRINTS, GARDEN_KIND, GROUND_KINDS, PLOT_KINDS, VARIANTS } from '../../art/manifest';
 import { lotRect } from '../../city/geometry';
 import { CELL } from '../../sim/constants';
+import { gardenPlan, gardenVariant, isGarden } from '../gardenLayout';
 import type { CarPark, CityView, Id, Lot } from '../../sim/types';
 import type { Thing, Things } from './things';
 
@@ -14,17 +15,19 @@ const PLOT = 2; // cells
 export interface PlotSpot { readonly x: number; readonly y: number; readonly size: number; readonly kind: string; readonly variant: number }
 
 /** Where a lot's buildings stand (the middle of each footprint's south edge). */
-export function plotSpots(l: Pick<Lot, 'id' | 'kind' | 'gx' | 'gy' | 'w' | 'h' | 'variant'>): PlotSpot[] {
+export function plotSpots(l: Pick<Lot, 'id' | 'kind' | 'gx' | 'gy' | 'w' | 'h' | 'variant' | 'garden'>): PlotSpot[] {
   if (GROUND_KINDS.includes(l.kind)) return [];
-  const r = lotRect(l);
+  // A garden lot builds only its north two rows; the rest is front garden.
+  const built = isGarden(l) && PLOT_KINDS.includes(l.kind) ? { ...l, h: PLOT } : l;
+  const r = lotRect(built);
   if (!PLOT_KINDS.includes(l.kind)) {
     const [fw, fh] = FOOTPRINTS[l.kind] ?? [2, 2];
     const size = Math.min(1, l.w / fw, l.h / fh);
     return [{ x: r.x + r.w / 2, y: r.y + r.h / 2 + (fh * CELL * size) / 2, size, kind: l.kind, variant: l.variant }];
   }
-  const cols = Math.max(1, Math.floor(l.w / PLOT));
-  const rows = Math.max(1, Math.floor(l.h / PLOT));
-  const size = Math.min(1, l.w / PLOT, l.h / PLOT);
+  const cols = Math.max(1, Math.floor(built.w / PLOT));
+  const rows = Math.max(1, Math.floor(built.h / PLOT));
+  const size = Math.min(1, built.w / PLOT, built.h / PLOT);
   const cw = r.w / cols;
   const ch = r.h / rows;
   const out: PlotSpot[] = [];
@@ -34,6 +37,13 @@ export function plotSpots(l: Pick<Lot, 'id' | 'kind' | 'gx' | 'gy' | 'w' | 'h' |
     }
   }
   return out;
+}
+
+/** A garden lot's front gardens: one painted piece under each plot column, standing on the lot's south edge. */
+export function gardenSpots(l: Pick<Lot, 'id' | 'kind' | 'gx' | 'gy' | 'w' | 'h' | 'variant' | 'garden'>): PlotSpot[] {
+  if (!isGarden(l) || !PLOT_KINDS.includes(l.kind)) return [];
+  const n = VARIANTS[GARDEN_KIND] ?? 1;
+  return gardenPlan(l).pieces.map((p, i) => ({ x: p.x, y: p.y, size: 1, kind: GARDEN_KIND, variant: gardenVariant(l, i, n) }));
 }
 
 interface Stand { level: number; things: Thing[] }
@@ -60,7 +70,7 @@ export class LotsView {
       const s = this.lots.get(l.id);
       if (s?.level === l.level) continue;
       s?.things.forEach((t) => this.things.remove(t));
-      const things = l.level === 0 ? [] : plotSpots(l).map((p) => this.things.add(this.things.atlas.building(p.kind, l.level, p.variant), p.x, p.y, { size: p.size }));
+      const things = l.level === 0 ? [] : [...plotSpots(l), ...gardenSpots(l)].map((p) => this.things.add(this.things.atlas.building(p.kind, p.kind === GARDEN_KIND ? 1 : l.level, p.variant), p.x, p.y, { size: p.size }));
       this.lots.set(l.id, { level: l.level, things });
       if (!quiet) things.forEach((t, i) => this.pop(t, i));
     }

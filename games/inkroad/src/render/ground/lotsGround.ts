@@ -9,6 +9,7 @@ import { halfWidth } from '../../sim/roadGeom';
 import { flatPlaceholder } from '../placeholders';
 import { HAND, INK, INK_SOFT, KERB_BLUE } from '../style';
 import type { Brush } from './roadPaint';
+import { isGarden } from '../gardenLayout';
 
 /** The ground under lots and car parks: worn pads, driveways, parks, squares, the Master Plan's outlines. */
 const INSET = 5;
@@ -16,10 +17,10 @@ const INSET = 5;
 export const PLAN_YEARS = 2;
 const DRIVE_W = 6;
 
-export interface LotScene { readonly lots: readonly Lot[]; readonly parks: readonly CarPark[]; readonly roads: ReadonlyMap<Id, Road>; readonly year: number; readonly firstYear: number; readonly beaches: readonly BeachView[]; readonly plans: readonly PlannedRoad[] }
+export interface LotScene { readonly lots: readonly Lot[]; readonly parks: readonly CarPark[]; readonly roads: ReadonlyMap<Id, Road>; readonly year: number; readonly firstYear: number; readonly beaches: readonly BeachView[]; readonly plans: readonly PlannedRoad[]; readonly style: string }
 
 export function lotScene(city: CityView): LotScene {
-  return { lots: city.lots, parks: city.carParks, roads: new Map(city.roads.map((r) => [r.id, r])), year: city.year, firstYear: (city.def.number - 1) * 10, beaches: city.beaches ?? [], plans: city.plannedRoads ?? [] };
+  return { lots: city.lots, parks: city.carParks, roads: new Map(city.roads.map((r) => [r.id, r])), year: city.year, firstYear: (city.def.number - 1) * 10, beaches: city.beaches ?? [], plans: city.plannedRoads ?? [], style: city.def.style };
 }
 
 const rectBox = (r: Rect, pad = 14): Box => ({ x0: r.x - pad, y0: r.y - pad, x1: r.x + r.w + pad, y1: r.y + r.h + pad });
@@ -27,7 +28,7 @@ const rectBox = (r: Rect, pad = 14): Box => ({ x0: r.x - pad, y0: r.y - pad, x1:
 export const planned = (l: Lot, year: number): boolean => l.level === 0 && l.opensYear > year && l.opensYear - year <= PLAN_YEARS;
 
 export function lotSig(l: Lot, year: number): string {
-  return `L${l.id}:${l.gx},${l.gy},${l.w},${l.h}:${l.level > 0 ? 1 : planned(l, year) ? `p${l.opensYear}` : 0}:${l.access?.road ?? -1}:${Math.round(l.access?.s ?? 0)}`;
+  return `L${l.id}:${l.gx},${l.gy},${l.w},${l.h}${l.garden ? 'g' : ''}:${l.level > 0 ? 1 : planned(l, year) ? `p${l.opensYear}` : 0}:${l.access?.road ?? -1}:${Math.round(l.access?.s ?? 0)}`;
 }
 export const parkSig = (p: CarPark): string => `P${p.id}:${p.kind}:${p.access?.road ?? -1}:${Math.round(p.access?.s ?? 0)}`;
 export const lotBox = (l: { gx: number; gy: number; w: number; h: number }): Box => rectBox(lotRect(l), 60);
@@ -80,6 +81,8 @@ function planRoad(g: CanvasRenderingContext2D, pr: PlannedRoad, firstYear: numbe
 function openLot(b: Brush, s: LotScene, l: Lot): void {
   const { g } = b;
   const r = lotRect(l);
+  // A garden lot's front garden is its painted garden pictures (upright/lots.ts); the ground stays bare under them.
+  if (isGarden(l)) return;
   if (l.access) driveway(b, s, r, l.access);
   if (GROUND_KINDS.includes(l.kind)) garden(b, l, r);
 }

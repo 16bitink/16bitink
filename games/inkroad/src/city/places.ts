@@ -48,9 +48,15 @@ export function nearName(c: City, at: Pt): string {
   return best?.name ?? c.def.name;
 }
 
+/** A lot's driveway. In a city of front streets a lot is served only by the road along its south edge (beach plots by any). */
+export function lotAccess(c: City, l: Lot): Lot['access'] {
+  const reach = reachOf(l);
+  return blockAccess(c.net, l, reach, c.def.frontStreets === true && reach === undefined);
+}
+
 /** Give every open block and car park its driveway again (after a network change). */
 export function refreshAccess(c: City): void {
-  c.lots = c.lots.map((l) => (l.level === 0 ? l : { ...l, access: blockAccess(c.net, l, reachOf(l)) }));
+  c.lots = c.lots.map((l) => (l.level === 0 ? l : { ...l, access: lotAccess(c, l) }));
   c.parks = c.parks.map((p) => ({ ...p, access: blockAccess(c.net, p) }));
 }
 

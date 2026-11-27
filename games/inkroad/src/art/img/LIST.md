@@ -8,6 +8,7 @@ Textures `tex-*`: 512x512 seamless. Oldtown textures are `tex-oldtown-*`; the gu
 Oldtown sprites are `tree-oldtown-1..8` (1 birch, 2 oak, 3 fir, 4 gold beech, 5 poplar, 6 linden, 7 willow, 8 rowan), `tree-oldtown-shrub-1..3`, `tree-oldtown-rock-1`; the oldtown island reuses `flat-island` (sandy, weak) and the common props/vehicles are shared.
 Extra sets, same key scheme: `b-islands-*`, `b-hills-*`, `b-rivers-*` (also `park-multi1-0`, `park-under1-0`, `mall1-0`, `stadium1-0`, `port1-0`; no fair). Their landmark is `landmark1-0` (islands glass garden dome, hills aqueduct garden, rivers brick power-station museum). Trees `tree-<set>-1..8`, `tree-<set>-shrub-1..2`, `tree-<set>-rock-1..2`; textures `tex-<set>-sand` (base ground), `-grass`, `-water`, `-rock`, `-plaza`, `-asphalt`, plus `-deep` (islands, rivers), `-shallow` (hills), `-beach` (islands), `-path` (hills). Oldtown island with lawn and flowers: `flat-oldtown-island`, `flat-oldtown-island-small`. Common vehicles/props/flat car parks are shared by all sets.
 Routine sites per set: `b-<set>-fuel1-0`, `nursery1-0`, `food1-0`, `food1-1`, `food2-0` (2x2, 160 px) and `fun1-0` (3x2, 240 px: gulf water park, oldtown harbour sauna, islands night-market garden, hills tea garden, rivers ball park). Beach props: `prop-umbrella-1..3`, `prop-towel-1..2` (flat), `prop-lounger`, `prop-lifeguard`, `prop-beach-fence`, `prop-beach-kiosk`, `prop-surf-rack`, `prop-buoy`, `prop-fuel-sign` (blank bars, no text).
+Front gardens `b-<set>-garden1-0..3` (gulf, oldtown, rivers, hills; 2x2, 160 px): the south half of a garden lot, one under each plot column. Open north edge (the villa's own front wall and gate stand there), side walls, a front wall with a centred gate on the south edge, a straight path between the two gates. Cut by `build_gardens.py <set>` from `raw/<set>-gardens.png`, scaled so the ground is exactly 2 cells deep and meets the villa above. Islands has no garden lots (falls back to gulf).
 Missing on purpose: night `-lit` pictures; `tex-deck` (use `tex-concrete`); hospital has a leaf, not a cross.
 
 | file | px | footprint (cells) | south edge |
@@ -18,6 +19,10 @@ Missing on purpose: night `-lit` pictures; `tex-deck` (use `tex-concrete`); hosp
 | b-gulf-food2-0 | 160x128 | 2x2 | bottom row |
 | b-gulf-fuel1-0 | 160x144 | 2x2 | bottom row |
 | b-gulf-fun1-0 | 240x152 | 3x2 | bottom row |
+| b-gulf-garden1-0 | 160x142 | 2x2 | bottom row |
+| b-gulf-garden1-1 | 160x154 | 2x2 | bottom row |
+| b-gulf-garden1-2 | 160x142 | 2x2 | bottom row |
+| b-gulf-garden1-3 | 160x142 | 2x2 | bottom row |
 | b-gulf-home1-0 | 160x175 | 2x2 | bottom row |
 | b-gulf-home1-1 | 160x177 | 2x2 | bottom row |
 | b-gulf-home1-2 | 160x169 | 2x2 | bottom row |
@@ -65,6 +70,10 @@ Missing on purpose: night `-lit` pictures; `tex-deck` (use `tex-concrete`); hosp
 | b-hills-food2-0 | 160x144 | 2x2 | bottom row |
 | b-hills-fuel1-0 | 160x154 | 2x2 | bottom row |
 | b-hills-fun1-0 | 240x139 | 3x2 | bottom row |
+| b-hills-garden1-0 | 160x166 | 2x2 | bottom row |
+| b-hills-garden1-1 | 160x155 | 2x2 | bottom row |
+| b-hills-garden1-2 | 160x147 | 2x2 | bottom row |
+| b-hills-garden1-3 | 160x167 | 2x2 | bottom row |
 | b-hills-home1-0 | 160x174 | 2x2 | bottom row |
 | b-hills-home1-1 | 160x173 | 2x2 | bottom row |
 | b-hills-home1-2 | 160x161 | 2x2 | bottom row |
@@ -159,6 +168,10 @@ Missing on purpose: night `-lit` pictures; `tex-deck` (use `tex-concrete`); hosp
 | b-oldtown-food2-0 | 160x127 | 2x2 | bottom row |
 | b-oldtown-fuel1-0 | 160x164 | 2x2 | bottom row |
 | b-oldtown-fun1-0 | 240x146 | 3x2 | bottom row |
+| b-oldtown-garden1-0 | 160x145 | 2x2 | bottom row |
+| b-oldtown-garden1-1 | 160x145 | 2x2 | bottom row |
+| b-oldtown-garden1-2 | 160x146 | 2x2 | bottom row |
+| b-oldtown-garden1-3 | 160x146 | 2x2 | bottom row |
 | b-oldtown-home1-0 | 160x162 | 2x2 | bottom row |
 | b-oldtown-home1-1 | 160x159 | 2x2 | bottom row |
 | b-oldtown-home1-2 | 160x155 | 2x2 | bottom row |
@@ -205,6 +218,10 @@ Missing on purpose: night `-lit` pictures; `tex-deck` (use `tex-concrete`); hosp
 | b-rivers-food2-0 | 160x131 | 2x2 | bottom row |
 | b-rivers-fuel1-0 | 160x141 | 2x2 | bottom row |
 | b-rivers-fun1-0 | 240x139 | 3x2 | bottom row |
+| b-rivers-garden1-0 | 160x144 | 2x2 | bottom row |
+| b-rivers-garden1-1 | 160x144 | 2x2 | bottom row |
+| b-rivers-garden1-2 | 160x144 | 2x2 | bottom row |
+| b-rivers-garden1-3 | 160x144 | 2x2 | bottom row |
 | b-rivers-home1-0 | 160x165 | 2x2 | bottom row |
 | b-rivers-home1-1 | 160x156 | 2x2 | bottom row |
 | b-rivers-home1-2 | 160x159 | 2x2 | bottom row |

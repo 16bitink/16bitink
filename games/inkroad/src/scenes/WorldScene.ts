@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { CELL } from '../sim/constants';
 import type { CityEvent, CityView, Pt, ToolId } from '../sim/types';
 import { CarLayer } from '../render/cars/carLayer';
+import { Manoeuvres } from '../render/cars/manoeuvres';
 import { ParkedCars } from '../render/cars/parkedCars';
 import { DEPTH } from '../render/depths';
 import { smooth } from '../render/geom';
@@ -42,6 +43,9 @@ import { sinks } from './tools/make';
  */
 const MAX_FRAME_S = 0.1;
 const MAX_DAY_STEP_S = 0.5;
+/** Sim seconds the glided clock may trail the sim's, and how fast its pace follows the sim's. */
+const CLOCK_LAG = 0.25;
+const PACE_EASE = 0.15;
 const FAR = { from: 0.56, to: 0.42 } as const; // CSS px per plan px: cars fade into flow lines
 const SINK = 0.13; // how faint standing things get with a tool in hand
 const SINK_RATE = 7;
@@ -96,6 +100,7 @@ export class WorldScene extends Phaser.Scene {
   private stops!: Stops;
   private boats!: Boats;
   private parked!: ParkedCars;
+  private moves!: Manoeuvres;
   private flow!: FlowLayer;
   private nightfall!: Lights;
   private glows!: Glows;
@@ -111,6 +116,9 @@ export class WorldScene extends Phaser.Scene {
   private arrowsIn = 0;
   private sink = 1;
   private lastClock = 0;
+  /** The glided clock manoeuvres follow, and the sim seconds a frame it moves on average. */
+  private shownClock = 0;
+  private pace = 0;
   private talks = 0;
   private readonly pose = { x: 0, y: 0, z: 0, a: 0, len: 14, wid: 7, slowing: false };
   private dpr = 1;
@@ -158,6 +166,7 @@ export class WorldScene extends Phaser.Scene {
     this.tolls = new Tolls(this, DEPTH.upright);
     this.ferries = new Ferries(this, this.pics, DEPTH.shadow + 2);
     this.parked = new ParkedCars(this, this.cars, DEPTH.cars - 1);
+    this.moves = new Manoeuvres(this, this.cars, this.parked, DEPTH.cars - 1);
     this.flow = new FlowLayer(this, DEPTH.flat);
     this.version = -1;
     this.groundLots = null;
@@ -180,6 +189,7 @@ export class WorldScene extends Phaser.Scene {
     this.tolls.clear();
     this.ferries.clear();
     this.lots.clear();
+    this.moves.clear();
     this.parked.clear();
     this.things.clear();
     this.flow.destroy();
@@ -224,6 +234,20 @@ export class WorldScene extends Phaser.Scene {
     if (!this.up) return;
     if (list.some((e) => e.t === 'built')) this.follow(); // the effects need the new shapes
     this.fx.play(list, this.city, this.ground.roads);
+    this.startMoves(list);
+  }
+
+  /** Cars turning into and out of their spaces. */
+  private startMoves(list: readonly CityEvent[]): void {
+    let synced = false;
+    for (const e of list) {
+      if (e.t === 'phase') this.moves.dropWaiting(); // the season's end; the night keeps everyone, they drive home
+      else if (e.t === 'parkGo') { this.moves.go(e); if (e.uid !== undefined) this.cars.expect(e.uid); }
+      else if (e.t === 'park') {
+        if (!synced) { this.parked.sync(this.city); synced = true; } // an `in` car is in its slot already
+        this.moves.start(e);
+      }
+    }
   }
 
   override update(_t: number, deltaMs: number): void {
@@ -239,9 +263,11 @@ export class WorldScene extends Phaser.Scene {
     this.things.cull(view);
     const far = smooth((FAR.from - this.rig.zoom) / (FAR.from - FAR.to));
     this.cars.update(this.city.cars, this.city.clock, dt, view, 1 - far);
-    this.jams.update(this.dayStep(), dt, this.city, view);
+    const day = this.dayStep();
+    this.jams.update(day, dt, this.city, view);
     this.flow.update(dt, this.city, this.ground.roads, this.overlay, far, view);
-    this.nightfall.update(dt, this.city, this.cars, 1 - far);
+    this.moves.update(day);
+    this.nightfall.update(dt, this.city, this.cars, 1 - far, this.moves.blinkers);
     this.glows.update(nightOf(this.city.hour));
     this.marks.update(dt, this.city, this.selection, this.tool === 'bus' || this.tool === 'tram' || this.tool === 'metro' || this.tool === 'boat');
     this.words.update(dt, this.city, this.overlay, this.rig.zoom);
@@ -255,10 +281,19 @@ export class WorldScene extends Phaser.Scene {
     this.ghosts.update(dt, this.rig.zoom);
   }
 
-  /** How much of the day has passed since the last frame. */
+  /**
+   * How much of the day has passed since the last frame, glided: the sim clock moves in whole steps (a tenth of a
+   * second), so manoeuvres follow a smoothed clock that trails it by at most CLOCK_LAG and never jumps a step at once.
+   */
   private dayStep(): number {
-    const step = Math.min(MAX_DAY_STEP_S, Math.max(0, this.city.clock - this.lastClock));
-    this.lastClock = this.city.clock;
+    const clock = this.city.clock;
+    const adv = clock - this.lastClock;
+    this.lastClock = clock;
+    if (adv < 0 || adv > MAX_DAY_STEP_S) { this.shownClock = clock; this.pace = 0; return adv > 0 ? MAX_DAY_STEP_S : 0; }
+    this.pace += (adv - this.pace) * PACE_EASE;
+    const next = Math.min(clock, Math.max(clock - CLOCK_LAG, this.shownClock + this.pace));
+    const step = Math.max(0, next - this.shownClock);
+    this.shownClock = Math.max(this.shownClock, next);
     return step;
   }
 

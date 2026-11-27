@@ -21,6 +21,8 @@ const TELEPORT = 60;
 const RAMP_FOOT = 0.03;
 const MAX_STEP_S = 0.14;
 const EASE_RATE = 0.2;
+/** CarsView.state of a car parking or leaving a space. */
+const HOLDING = 4;
 
 interface Slot {
   img: Phaser.GameObjects.Image;
@@ -29,6 +31,8 @@ interface Slot {
   x1: number; y1: number; z1: number; a1: number;
   kind: number; tint: number; frame: number; deck: boolean; born: number;
   slowing: boolean; speed: number;
+  /** In state 4 (parking or leaving): the manoeuvre layer draws it, this one waits where it is. */
+  held: boolean;
 }
 
 const turn = (a: number, b: number): number => {
@@ -50,6 +54,8 @@ export class CarLayer {
   private interval = 0.1;
   private now = 0;
   drawn = 0;
+  /** Traffic uids handed over by a pull-out: drawn at once, without fading in. */
+  private readonly expected = new Set<number>();
   /** Cars here are inside a tunnel: not drawn. */
   private hidden: (x: number, y: number) => boolean = () => false;
 
@@ -57,6 +63,11 @@ export class CarLayer {
     this.frames = buildCarAtlas(scene.textures, pics);
     this.origins = VEHICLES.map((k) => carOrigin(k as VehicleKind));
     this.layer = scene.add.layer().setDepth(depths.ground);
+  }
+
+  /** A car pulling out of a space (drawn by the manoeuvre layer until now) joins the road as this traffic uid. */
+  expect(uid: number): void {
+    this.expected.add(uid);
   }
 
   setHidden(fn: (x: number, y: number) => boolean): void {
@@ -86,7 +97,14 @@ export class CarLayer {
     for (let i = 0; i < Math.max(cars.count, this.slots.length); i++) {
       const alive = i < cars.count && cars.alive[i] === 1;
       const s = this.slots[i] ?? null;
-      if (!alive) { if (s && s.uid !== 0) { s.uid = 0; s.img.setVisible(false); } continue; }
+      if (!alive) { if (s && s.uid !== 0) { s.uid = 0; s.held = false; s.img.setVisible(false); } continue; }
+      if (cars.state[i] === HOLDING) {
+        const h = s ?? this.make(i);
+        h.uid = cars.uid[i]!;
+        h.held = true;
+        h.img.setVisible(false);
+        continue;
+      }
       this.takeSlot(cars, i, s ?? this.make(i), t);
     }
   }
@@ -94,7 +112,7 @@ export class CarLayer {
   private make(i: number): Slot {
     const img = new Phaser.GameObjects.Image(this.scene, 0, 0, 'cars-0').setVisible(false);
     this.layer.add(img);
-    const s: Slot = { img, uid: 0, x0: 0, y0: 0, z0: 0, a0: 0, x1: 0, y1: 0, z1: 0, a1: 0, kind: -1, tint: -1, frame: -1, deck: false, born: 0, slowing: false, speed: 0 };
+    const s: Slot = { img, uid: 0, x0: 0, y0: 0, z0: 0, a0: 0, x1: 0, y1: 0, z1: 0, a1: 0, kind: -1, tint: -1, frame: -1, deck: false, born: 0, slowing: false, speed: 0, held: false };
     while (this.slots.length <= i) this.slots.push(null);
     this.slots[i] = s;
     return s;
@@ -102,11 +120,14 @@ export class CarLayer {
 
   private takeSlot(c: CarsView, i: number, s: Slot, t: number): void {
     const x = c.x[i]!, y = c.y[i]!, z = c.z[i]!, a = c.heading[i]!;
-    const fresh = s.uid !== c.uid[i] || Math.hypot(x - s.x1, y - s.y1) > TELEPORT;
+    const resumed = s.held && s.uid === c.uid[i];
+    s.held = false;
+    const fresh = resumed || s.uid !== c.uid[i] || Math.hypot(x - s.x1, y - s.y1) > TELEPORT;
     if (fresh) {
       s.uid = c.uid[i]!;
       s.x0 = x; s.y0 = y; s.z0 = z; s.a0 = a;
-      s.born = this.now;
+      // A car that stood in its space (drawn by the manoeuvre layer) picks up from the lane without fading in.
+      s.born = resumed || this.expected.delete(c.uid[i]!) ? this.now - 1 : this.now;
       s.kind = c.kind[i]!;
       s.tint = c.tint[i]!;
       s.frame = -1;
@@ -123,7 +144,7 @@ export class CarLayer {
   }
 
   private draw(s: Slot, t: number, view: Box, alpha: number): void {
-    if (s.uid === 0) return;
+    if (s.uid === 0 || s.held) return;
     const x = s.x0 + (s.x1 - s.x0) * t;
     const y = s.y0 + (s.y1 - s.y0) * t;
     const z = s.z0 + (s.z1 - s.z0) * t;

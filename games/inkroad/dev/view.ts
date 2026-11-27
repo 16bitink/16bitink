@@ -1,4 +1,8 @@
 import { SAFFRON } from '../src/city/defs/saffron';
+import { HARBOUR } from '../content/harbour';
+import { RIVERS } from '../content/rivers';
+import { HILLS } from '../content/hills';
+import { ISLES } from '../content/isles';
 import { createCity } from '../src/city/city';
 import { nobody } from '../src/city/bots/beginner';
 import { planner } from '../src/city/bots/planner';
@@ -8,11 +12,13 @@ import type { CityView, ToolId } from '../src/sim/types';
 import { createWorld } from '../src/scenes/world';
 import type { Overlay, WorldPort } from '../src/scenes/port';
 import { loadFonts } from './fonts';
+import { fakeParking } from './fakeCity';
 import { galleryCity } from './gallery';
 import { stressCity } from './stress';
 
 /**
  * The world view alone, on the real city.
+ *   ?city=harbour|rivers|hills|isles  another city   ?garden=1 Saffron's Palm Row as a garden lot
  *   ?year=N       a bot plays up to year N first (seconds each)
  *   ?warm=S       run S seconds of the day before showing (default 0)
  *   ?gallery=1 every kind of road    ?stress=700 that many dummy cars
@@ -25,7 +31,7 @@ const TOOLS: readonly (ToolId | null)[] = [null, 'street', 'avenue', 'boulevard'
 const OVERLAYS: readonly Overlay[] = ['none', 'flow', 'parking', 'anger', 'money'];
 
 function makeCity(): CityView {
-  const city = createCity(SAFFRON, 7);
+  const city = createCity(({ harbour: HARBOUR, rivers: RIVERS, hills: HILLS, isles: ISLES } as Record<string, typeof SAFFRON>)[q.get('city') ?? ''] ?? SAFFRON, 7);
   for (let y = 1; y < num('year', 1) && city.phase !== 'replaced'; y++) {
     playYear(city, q.get('bot') === 'nobody' ? nobody : planner, 0);
     if (city.phase === 'yearEnd') city.apply({ t: 'next' });
@@ -35,9 +41,18 @@ function makeCity(): CityView {
   return city;
 }
 
+/** ?garden=1 marks Saffron's Palm Row as a 4-deep garden lot, for a look before the city data has one. */
+function withGarden(c: CityView): CityView {
+  if (q.get('garden') !== '1') return c;
+  const lots = c.lots.map((l) => (l.name === 'Palm Row' && !l.garden ? { ...l, gy: 19, h: 4, garden: true } : l));
+  Object.defineProperty(c, 'lots', { value: lots, configurable: true });
+  return c;
+}
+
 await loadFonts().catch((e: unknown) => console.warn('[view] fonts', e));
-const real = makeCity();
+const real = withGarden(makeCity());
 const city = q.get('gallery') === '1' ? galleryCity(real) : q.has('stress') ? stressCity(real, num('stress', 700)) : real;
+if (q.get('fakepark') === '1' && !city.parking) Object.defineProperty(city, 'parking', { value: fakeParking(city), configurable: true });
 let speed = num('speed', 1);
 const say = document.getElementById('say')!;
 let hint = '';
@@ -69,7 +84,7 @@ button('whole map', () => world.overview());
 if (q.get('bare') === '1') document.body.classList.add('bare');
 
 await world.ready;
-Object.assign((window as unknown as { __ir: object }).__ir, { city, world, setSpeed: (s: number) => { speed = s; }, PERIODS });
+Object.assign((window as unknown as { __ir: object }).__ir, { city, world, setSpeed: (s: number) => { speed = s; }, getSpeed: () => speed, PERIODS });
 (window as unknown as { __ready: boolean }).__ready = true;
 setInterval(() => {
   const p = (window as unknown as { __ir: { fps(): { avg: number; p95ms: number }; cars(): number } }).__ir;

@@ -37,7 +37,7 @@ const LATER: readonly Spec[] = [
   // Year 5: the market on the hill with no room for a car park, and the north street.
   ['market', 37, 24, 4, 3, 5, 1, 4], ['home', 4, 5, 4, 2, 5], ['home', 8, 5, 4, 2, 5], ['shops', 12, 5, 2, 2, 5, 1, 3], ['office', 55, 25, 2, 2, 5, 1, 4],
   // Year 6: the school hill and its streets.
-  ['school', 7, 27, 4, 3, 6, 1, 2], ['home', 11, 27, 4, 2, 6], ['home', 1, 23, 4, 2, 6], ['office', 55, 27, 2, 4, 6, 1, 4],
+  ['school', 7, 27, 4, 3, 6, 1, 2], ['home', 11, 26, 4, 4, 6], ['home', 1, 23, 4, 2, 6], ['office', 55, 27, 2, 4, 6, 1, 4],
   // Year 7: the port, and flats where the toll will bite.
   ['port', 37, 32, 6, 3, 7, 1, 3], ['home', 18, 23, 4, 2, 7, 2], ['home', 18, 25, 4, 2, 7, 2],
   // Year 8: the stadium on the plain.
@@ -67,9 +67,11 @@ const HILL_DIST = (gx: number, gy: number, w: number, h: number): string => {
 };
 
 const used: Record<string, number> = {};
+/** Spec rows (by kind, gx, gy) that fill the depth between two roads: plots in the north two rows, front garden in the south two. */
+const GARDEN_AT: ReadonlySet<string> = new Set(['home,11,26']);
 export const LOTS: readonly LotDef[] = [...WEST_CORE, ...EAST_CORE, ...LATER].map(([kind, gx, gy, w, h, opensYear, level = 1, maxLevel = 4]) => {
   const pool = POOLS[kind] ?? [];
   const i = used[kind] ?? 0;
   used[kind] = i + 1;
-  return { name: pool[i] ?? `${kind} ${i}`, kind, gx, gy, w, h, opensYear, level, maxLevel, district: HILL_DIST(gx, gy, w, h) };
+  return { name: pool[i] ?? `${kind} ${i}`, kind, gx, gy, w, h, opensYear, level, maxLevel, district: HILL_DIST(gx, gy, w, h), ...(GARDEN_AT.has(`${kind},${gx},${gy}`) ? { garden: true } : {}) };
 });

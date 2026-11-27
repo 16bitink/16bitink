@@ -1,4 +1,5 @@
 import type { Bar, CarParkKind, LotKind, Prices, TransitMode } from '../sim/types';
+import type { Purpose } from './day';
 
 /** Every number the city layer is tuned with. One sim second reads as one minute of a resident's trip. */
 
@@ -34,7 +35,6 @@ export const SPREAD = { perCoin: 0.16, max: 0.6, early: 0.25, by: [8, 22], home:
 /** The roads run quietly for this long before a day begins, so nobody looks at an empty town. */
 export const PREWARM = 18;
 export const STAY = { shop: [14, 26], visit: [16, 30], event: [16, 24] } as const;
-export const LAST_DEPARTURE = 102;
 
 // ---------------------------------------------------------------- the one formula (minutes)
 export const COST = {
@@ -47,7 +47,7 @@ export const COST = {
 export const VALUE_PER_SECOND = 1 / COST.minPerCoin;
 
 // ---------------------------------------------------------------- parking
-export const PRIVATE_PER_CELL: Readonly<Partial<Record<LotKind, number>>> = { market: 0.2, shops: 0.3, office: 0.2, school: 0.6, hospital: 0.5, mall: 0.16, port: 0.6, stadium: 0.3, fair: 0.3, park: 0.7, square: 0, landmark: 0.4 };
+export const PRIVATE_PER_CELL: Readonly<Partial<Record<LotKind, number>>> = { market: 0.2, shops: 0.3, office: 0.2, school: 0.6, hospital: 0.5, mall: 0.16, port: 0.6, stadium: 0.3, fair: 0.3, park: 0.7, square: 0, landmark: 0.4, nursery: 0.5, food: 0.4, fun: 0.4 };
 /** Free spaces per home cell by level (level 1 villas always have room). */
 /** In year 1 there is free sand to park on beside everything. */
 export const SAND_YEARS: readonly number[] = [6, 1.6, 1.2];
@@ -129,8 +129,12 @@ export const APPROVAL_EASE = 0.55;
 export const START_APPROVAL = 60;
 /** Drivers forgive some of what the weather does. */
 export const WEATHER_PATIENCE = 0.8;
-export const START_EXPECT = 1.35;
-export const EXPECT_RANGE = { min: 1.12, max: 1.4 } as const;
+/**
+ * A normal trip, against the free-flow drive. Residents count a trip from their own space to the next, so the normal one includes pulling out
+ * (waiting for a gap, the manoeuvre): measured at 0.07 of the free-flow drive on a workday (Saffron Bay, years 1 to 6), on top of the old 1.35.
+ */
+export const START_EXPECT = 1.42;
+export const EXPECT_RANGE = { min: 1.19, max: 1.47 } as const;
 export const HABIT = 1 / 3;
 /** Points of trip score by how far past the expected ratio a trip went. */
 export const TRIP_CURVE: readonly (readonly [number, number])[] = [[0.75, 100], [0.9, 93], [1, 85], [1.12, 68], [1.25, 40], [1.4, 16], [1.6, 4], [1.8, 0]];
@@ -146,12 +150,22 @@ export const OUTRAGE = { park: [3, 3], parkPeak: [4, 3], fine: [8, 0.8], toll: [
 export const RIBBON = { flyover: 3, line: 3 } as const;
 /** Homes beside a jam breathe it; lorries in the day are heard by everyone. */
 export const FUMES = { from: 7, per: 0.012, max: 8, cells: 4, lorriesFrom: 6, perLorry: 0.35, lorriesMax: 8 } as const;
+/**
+ * How much a trip of each purpose weighs in the Trips bar ("a late school run hurts Trips most, a missed dinner least", the design).
+ * Shopping, visits, dinners and days out weigh about half a commute: people value time on them at under half of commuting time (UK WebTAG values of time).
+ */
+export const TRIP_FELT: Readonly<Record<Purpose, number>> = { work: 1, school: 1.2, shop: 0.5, visit: 0.5, event: 0.5, through: 1, truck: 1 };
 export const LOST_WEIGHT = 1.6;
 export const STAYED_SCORE = 6;
 export const STAYED_WEIGHT = 1;
 /** Someone who would have paid but didn't go by car still feels the price. */
 export const PRICED_OUT = 0.6;
-export const PARK_SCORE = { first: 95, perCell: 6, freeCells: 1.5, perTry: 24, illegal: 22, none: 0, sweet: 60 } as const;
+/**
+ * Points for a parked car. `illegal`: double parking (it blocks the lane) and a paid space dodged.
+ * `street`: along a small street, not allowed but out of the lane; its fine is felt in Cost when it comes, so here it is a nuisance, not a blocked lane.
+ * `sand`: the sand by a public beach when its bays are full, free and allowed, "a worse Parking score" than a bay (the design); a desert town takes it as normal.
+ */
+export const PARK_SCORE = { first: 95, perCell: 6, freeCells: 1.5, perTry: 24, illegal: 22, street: 40, sand: 60, none: 0, sweet: 60 } as const;
 /** Coming home to one's own space is no news. */
 export const OWN_SPACE_WEIGHT = 0.25;
 export const PAY_SCORE = { free: 76, perCoin: 13, fineHit: 45, homeCharge: 20, normal: 0.7 } as const;
@@ -164,3 +178,50 @@ export const OWNERSHIP = { drift: 0.012, transitAt: 0.15, min: 0.55, max: 0.96 }
 export const PEOPLE_PER_CELL: readonly number[] = [0, 14, 30, 52, 84];
 /** Shops near dear, empty car parks lose customers. */
 export const DEAD_PARK = 0.35;
+
+// ---------------------------------------------------------------- households and their days
+/** Drawn households a home block holds, per tour the block used to make (one drawn household stands for about a dozen). */
+export const HOUSEHOLDS_PER_TOUR = 0.46;
+/** Grown-ups and children: shares of households. */
+export const FAMILY = { two: 0.62, child: 0.42, nursery: 0.3 } as const;
+/** Seconds a car stops to drop a child, to buy petrol; stays at shops, meals, visits and outings (as long as the old tours'). */
+export const STOPS = { drop: 3, fuel: 2.5, shop: [14, 24], food: [12, 20], visit: [16, 28], errand: [10, 16], out: [18, 30], lunch: [6, 9] } as const;
+/** The weekend's drawn day is short: this share of the households that would go out are drawn going out. */
+export const WEEKEND_OUT = 0.7;
+/** Weekend stays are this much of a workday's: its drawn day is shorter. */
+export const WEEKEND_STAY = 0.5;
+/** A day's last stay ends this long before the day does, so that everyone can get home. */
+export const HOME_BY = 6;
+/** Leave this much earlier than the free-flow trip, to be on time. */
+export const LEAVE_PAD = 1.25;
+/** Grown-ups at home all day who go to the shops at midday (the market's busy hours). */
+export const MIDDAY_SHOP = 0.55;
+/** Under this much of a tank, the next hop calls at a petrol station. */
+export const FUEL_LOW = 0.2;
+export const PUMPS = 4;
+/** Cells of sand a public beach offers to park on, per cell of beach. */
+export const SAND_PER_CELL = 1.2;
+/** Hours on the clock (0..24) when inspectors fine cars left on a small street. */
+export const FINE_HOURS = [7, 20] as const;
+/** Weekend traffic by gate per second, against a workday's: commuters, through cars, lorries. */
+export const WEEKEND_GATES = { commuters: 0.35, through: 0.9, lorries: 0.25 } as const;
+
+// ---------------------------------------------------------------- spaces and manoeuvres
+
+export { BAY_PX, ROAD_END_CLEAR, STREET_BAYS, STREET_END_CLEAR, STREET_JITTER } from '../sim/roadSlots';
+/** Chance a driver takes any free space instead of the one nearest where they came in: gaps appear. */
+export const SLOT_ANY = 0.3;
+/** Seconds a slot stays promised to a car driving to it. */
+export const CLAIM_SECONDS = 30;
+/** Seconds the lane is held: parallel parking in and out at the kerb or on a street, turning in and out of a driveway or car park. */
+export const PARK_IN = 1.2;
+export const PARK_OUT = 0.8;
+export const TURN_IN = 0.3;
+export const TURN_OUT = 0.3;
+/** Seconds of the whole visible move, the lane part included: parallel parking in and out, turning into and out of a bay. */
+export const PARK_IN_MOVE = 2.4;
+export const PARK_OUT_MOVE = 1.6;
+export const TURN_IN_MOVE = 1;
+export const TURN_OUT_MOVE = 1;
+/** Px a second a car drives along a car park's aisle (gate to bay, bay to gate). */
+export const AISLE_SPEED = 45;

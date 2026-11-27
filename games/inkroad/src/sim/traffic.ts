@@ -1,9 +1,10 @@
 /** The Traffic contract: cars on a network, one step at a time. */
 import { STEP } from './constants';
+import { angleDiff } from './geom';
 import { considerLane, think } from './drive';
 import { feel, move, plan, pose } from './motion';
 import { Measure } from './measure';
-import { exists, firstLink, place, setDest, standAt, turnBack } from './place';
+import { entryPose, exists, firstLink, place, setDest, standAt, turnBack } from './place';
 import { relocate } from './relocate';
 import { createRng } from './rng';
 import { Routes } from './routes';
@@ -12,9 +13,9 @@ import { stepSignals } from './signals';
 import type { Sim } from './sim';
 import { CarStore } from './store';
 import { LANE_T } from './track';
-import { CHANGE, TRUCK, kindIndex } from './tune';
+import { CHANGE, TRUCK, isBus, kindIndex } from './tune';
 import { buildWorld } from './world';
-import type { Access, Arrival, Network, SpawnRequest, Traffic } from './trafficTypes';
+import type { Access, Arrival, LanePose, Network, SpawnRequest, Traffic } from './trafficTypes';
 
 const HONK_KEEP = 8;
 
@@ -41,7 +42,7 @@ function stepCars(sim: Sim): void {
   const c = sim.cars;
   for (let i = 0; i < c.count; i++) {
     if (!c.alive[i]) continue;
-    if (c.state[i]! >= 2 && c.until[i]! <= sim.time) { c.drop(i); continue; }
+    if (c.state[i]! >= 2 && c.until[i]! <= sim.time && !release(sim, i)) { c.drop(i); continue; }
     if (!feel(sim, i)) continue;
     if ((i + sim.tick) % CHANGE.every === 0) considerLane(sim, i);
   }
@@ -55,6 +56,46 @@ function stepCars(sim: Sim): void {
     }
   }
   for (let i = 0; i < c.count; i++) if (c.alive[i]) pose(sim, i);
+}
+
+/** A car that pulled out of a space has held its lane long enough: it drives off. False: it was only standing there. */
+function release(sim: Sim, i: number): boolean {
+  const c = sim.cars;
+  if (c.state[i] !== 4 || (c.destRoad[i]! < 0 && c.destNode[i]! < 0)) return false;
+  c.state[i] = 0;
+  plan(sim, i, sim.world.links[c.track[i]!.link]!);
+  return true;
+}
+
+/** An arrived car turns into its space: it stands where it stopped (as last drawn), holding the lane, then is gone. */
+function parkIn(sim: Sim, uid: number, seconds: number): boolean {
+  const c = sim.cars;
+  const i = c.slotOf.get(uid);
+  if (i === undefined || c.track[i]?.kind !== LANE_T) return false; // only from a lane: never inside a junction
+  c.revoke(i); // a right of way it held ahead is given back before its route is forgotten
+  c.arrived[i] = 0;
+  c.state[i] = 4;
+  c.until[i] = sim.time + seconds;
+  c.v[i] = 0;
+  // No trip left, so it is gone when the hold ends; destLink stays, so it is drawn just where it stopped.
+  c.destRoad[i] = c.destNode[i] = -1;
+  c.opt[i] = null;
+  c.blinker[i] = 0;
+  return true;
+}
+
+function poseOf(sim: Sim, uid: number): LanePose | null {
+  const c = sim.cars;
+  const i = c.slotOf.get(uid);
+  return i === undefined ? null : { x: c.x[i]!, y: c.y[i]!, a: c.heading[i]! };
+}
+
+/** Where a pull-out spawn of `r` would stand, without making it. */
+function poseFor(sim: Sim, r: SpawnRequest): LanePose | null {
+  const kind = kindIndex(r.kind);
+  if (!exists(sim, r.from) || !exists(sim, r.to) || 'gate' in r.from) return null;
+  const l = firstLink(sim, r.from, r.to, r.value, kind);
+  return l ? entryPose(l, r.from, isBus(kind)) : null;
 }
 
 function step(sim: Sim): void {
@@ -82,9 +123,27 @@ function spawn(sim: Sim, r: SpawnRequest): number {
   c.born[i] = sim.time;
   c.moved[i] = sim.tick % 2;
   setDest(sim, i, r.to);
-  if (!place(sim, i, l, r.from)) { c.drop(i); return -1; }
+  const hold = r.hold ?? 0;
+  if (!place(sim, i, l, r.from, hold > 0)) { c.drop(i); return -1; }
+  if (hold > 0) { c.state[i] = 4; c.until[i] = sim.time + hold; }
   if (l.road.toll) c.tolls[i]! += sim.tollNow;
   return c.uid[i]!;
+}
+
+/**
+ * Slide from the pose drawn before a redirect to the pose drawn after it. The new pose is measured whole (with the
+ * kerb swing toward the new place), so a swing that stays is not added twice: the car never jumps.
+ */
+function slideFromDrawn(sim: Sim, i: number, x: number, y: number, h: number): void {
+  const c = sim.cars;
+  c.offLeft[i] = 0;
+  pose(sim, i);
+  c.offX[i] = x - c.x[i]!;
+  c.offY[i] = y - c.y[i]!;
+  c.offH[i] = angleDiff(c.heading[i]!, h);
+  c.offLeft[i] = CHANGE.length;
+  c.offLen[i] = CHANGE.length;
+  c.x[i] = x; c.y[i] = y; c.heading[i] = h;
 }
 
 function redirect(sim: Sim, uid: number, to: Access): boolean {
@@ -95,19 +154,24 @@ function redirect(sim: Sim, uid: number, to: Access): boolean {
   const x = c.x[i]!, y = c.y[i]!, h = c.heading[i]!;
   setDest(sim, i, to);
   c.state[i] = 1;
-  if (!c.arrived[i]) { if (t.kind === LANE_T && !c.granted[i]) plan(sim, i, sim.world.links[t.link]!); return true; }
+  if (!c.arrived[i]) {
+    // Its kerb swing toward the old place is undone smoothly, never in one step.
+    if (t.kind === LANE_T && !c.granted[i]) plan(sim, i, sim.world.links[t.link]!);
+    if (t.kind === LANE_T) slideFromDrawn(sim, i, x, y, h);
+    return true;
+  }
   const l = sim.world.links[t.link]!;
   if (l.node.kind === 'gate' && c.s[i]! > t.len - 3) return false;
   c.arrived[i] = 0;
   c.stuck[i] = 0;
   plan(sim, i, l);
-  c.slideFrom(i, x, y, h, CHANGE.length);
+  slideFromDrawn(sim, i, x, y, h);
   if (c.opt[i] || c.destLink[i]! >= 0 || turnBack(sim, i)) return true;
   c.arrived[i] = 1;
   return false;
 }
 
-function block(sim: Sim, at: Access, seconds: number, state: 2 | 3): number {
+function block(sim: Sim, at: Access, seconds: number, state: 2 | 3 | 4): number {
   if (!exists(sim, at)) return -1;
   const c = sim.cars;
   const i = c.take(kindIndex('car'));
@@ -149,6 +213,9 @@ export function createTraffic(net: Network, seed: number): Traffic {
     spawn: (r) => spawn(sim, r),
     redirect: (uid, to) => redirect(sim, uid, to),
     remove: (uid) => { const i = sim.cars.slotOf.get(uid); if (i !== undefined) sim.cars.drop(i); },
+    park: (uid, seconds) => parkIn(sim, uid, seconds),
+    poseOf: (uid) => poseOf(sim, uid),
+    entryPose: (r) => poseFor(sim, r),
     block: (at, seconds, state) => block(sim, at, seconds, state),
     addService: (r) => sim.services.add(r),
     removeService: (id) => sim.services.remove(id),

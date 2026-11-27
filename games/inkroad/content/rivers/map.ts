@@ -107,7 +107,7 @@ const ROWS_DEF: readonly Row[] = [
   ['Dime Shops', 'shops', 15, 25, 2, 2, 1, 'Southside', 1, 2],
   ['Bean Market', 'market', 19, 24, 4, 3, 1, 'Southside', 1, 4],
   // Year 1, the edges.
-  ['Barn Street', 'home', 7, 3, 4, 2, 1, 'North Bank'],
+  ['Barn Street', 'home', 7, 1, 4, 4, 1, 'North Bank'],
   ['Silo Street', 'home', 7, 7, 4, 2, 1, 'North Bank'],
   ['Spoke Offices', 'office', 19, 7, 4, 2, 1, 'North Bank', 2, 4],
   ['Cider Row', 'home', 44, 17, 4, 2, 1, 'East Fork'],
@@ -122,7 +122,7 @@ const ROWS_DEF: readonly Row[] = [
   ['Rivers School', 'school', 13, 29, 4, 3, 2, 'Southside', 1, 2],
   ['Plank Row', 'home', 7, 31, 4, 2, 1, 'Southside'],
   // Year 3: the Council pays for bridges, and the north bank fills in.
-  ['Hatch Row', 'home', 13, 3, 4, 2, 1, 'North Bank'],
+  ['Hatch Row', 'home', 13, 1, 4, 4, 1, 'North Bank'],
   ['Loom Row', 'home', 13, 7, 4, 2, 1, 'North Bank'],
   ['Spindle Row', 'home', 19, 29, 4, 2, 1, 'Southside'],
   // Year 4
@@ -138,11 +138,11 @@ const ROWS_DEF: readonly Row[] = [
   ['Weir Shops', 'shops', 40, 17, 2, 2, 6, 'East Fork', 1, 2],
   ['Sluice Row', 'home', 40, 19, 2, 2, 6, 'East Fork'],
   // Year 7
-  ['Dock Row', 'home', 44, 3, 4, 2, 5, 'Lake Side'],
+  ['Dock Row', 'home', 44, 1, 4, 4, 5, 'Lake Side'],
   ['Loft Row', 'home', 44, 7, 4, 2, 5, 'Lake Side'],
   // Year 8: the third bridge.
   ['Bobbin Row', 'home', 50, 7, 4, 2, 7, 'Lake Side'],
-  ['Cleat Row', 'home', 50, 3, 4, 2, 7, 'Lake Side'],
+  ['Cleat Row', 'home', 50, 1, 4, 4, 7, 'Lake Side'],
   ['Ferry Shops', 'shops', 40, 29, 2, 2, 8, 'Southside', 1, 2],
   ['Tug Row', 'home', 40, 31, 2, 2, 8, 'Southside'],
   // Year 9: the old mill becomes offices.
@@ -158,5 +158,7 @@ const DEFAULT_MAX = 3;
 const OLD_HOME_MAX = 2;
 const NEW_HOME_MAX = 3;
 const ageLimit = (kind: LotDef['kind'], year: number): LotDef['maxLevel'] => (kind !== 'home' ? DEFAULT_MAX : year <= 1 ? OLD_HOME_MAX : NEW_HOME_MAX);
+/** Home lots that fill the depth between two roads: the plots stand in the north two rows, the south two are their front garden. */
+const GARDENS: ReadonlySet<string> = new Set(['Barn Street', 'Hatch Row', 'Dock Row', 'Cleat Row']);
 export const LOTS: readonly LotDef[] = ROWS_DEF.map(([name, kind, gx, gy, w, h, opensYear, district, level = 1, maxLevel = ageLimit(kind, opensYear)]) =>
-  ({ name, kind, gx, gy, w, h, opensYear, level, maxLevel, district }));
+  ({ name, kind, gx, gy, w, h, opensYear, level, maxLevel, district, ...(GARDENS.has(name) ? { garden: true } : {}) }));

@@ -23,7 +23,11 @@ function rectDistance(r: CellRect, p: Pt): number {
   return Math.hypot(dx, dy);
 }
 
-export function nearestAccess(net: Network, rect: CellRect, reach = REACH): { road: Id; s: number } | null {
+/** In front of a block: south of its south edge, within its frontage (every gate is in the south wall). */
+const inFront = (r: CellRect, p: Pt): boolean => p.y > (r.gy + r.h) * CELL && p.x >= r.gx * CELL && p.x <= (r.gx + r.w) * CELL;
+
+/** A block's driveway: the best road point within `reach`; with `front`, only on the road along its south edge. */
+export function nearestAccess(net: Network, rect: CellRect, reach = REACH, front = false): { road: Id; s: number } | null {
   const centre = { x: (rect.gx + rect.w / 2) * CELL, y: (rect.gy + rect.h / 2) * CELL };
   let best: { road: Id; s: number } | null = null;
   let bestScore = Infinity;
@@ -35,7 +39,7 @@ export function nearestAccess(net: Network, rect: CellRect, reach = REACH): { ro
     pts.forEach((p, i) => {
       const s = (len * i) / (pts.length - 1);
       const d = rectDistance(rect, p);
-      if (d > reach * CELL || s < clear || s > len - clear) return;
+      if (d > reach * CELL || s < clear || s > len - clear || (front && !inFront(rect, p))) return;
       const score = d + TYPE_COST[r.type] + dist(p, centre) * CENTRE_PULL;
       if (score < bestScore) { bestScore = score; best = { road: r.id, s }; }
     });

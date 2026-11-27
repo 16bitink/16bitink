@@ -10,6 +10,8 @@ export const centreOf = (b: Block): Pt => ({ x: (b.gx + b.w / 2) * CELL, y: (b.g
 export const cellPt = (c: Cell): Pt => ({ x: c.gx * CELL, y: c.gy * CELL });
 export const distPt = (a: Pt, b: Pt): number => Math.hypot(a.x - b.x, a.y - b.y);
 export const areaOf = (b: Block): number => b.w * b.h;
+/** Cells that count as homes, jobs and people: a garden lot counts only its built half (the north two rows). */
+export const builtArea = (b: Block & { readonly garden?: boolean }): number => (b.garden ? b.w * b.h / 2 : b.w * b.h);
 export const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v));
 
 /** True when a grid vertex stands on a block or its edge: no road there. */

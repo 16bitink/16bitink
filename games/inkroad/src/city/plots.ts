@@ -1,6 +1,6 @@
 import type { CellRect, Lot, Terrain } from '../sim/types';
 import type { Block } from './geometry';
-import { areaOf, blocksMeet, centreOf, distPt, vertexInBlock } from './geometry';
+import { builtArea, blocksMeet, centreOf, distPt, vertexInBlock } from './geometry';
 import { earn } from './money';
 import { blockAccess } from './net';
 import { CELL } from '../sim/constants';
@@ -46,11 +46,20 @@ function groundFor(c: City, l: Lot): Ground {
   return { roads, blocks: [...plots, ...c.parks, ...(c.def.beaches ?? [])], letters: letters.add('.') };
 }
 
-function fits(c: City, g: Ground, b: Block): boolean {
+function fits(c: City, g: Ground, b: Block, year: number): boolean {
   if (b.gx < 1 || b.gy < 1 || b.gx + b.w > c.net.width - 2 || b.gy + b.h > c.net.height - 2) return false;
   if (g.blocks.some((o) => blocksMeet(o, b))) return false;
   if (vertices(b).some((x) => !g.letters.has(c.net.terrain[x.gy]?.[x.gx] ?? '~') || g.roads.has(key(x)))) return false;
-  return blockAccess(c.net, b) !== null;
+  if (!c.def.frontStreets) return blockAccess(c.net, b) !== null;
+  return blockAccess(c.net, b, undefined, true) !== null || councilFront(c, b, year);
+}
+
+/** A Council street of the lot's year or before will run along the site's south edge, past every gate. */
+function councilFront(c: City, b: Block, year: number): boolean {
+  const front = b.gy + b.h + 1;
+  const cells = new Set(c.def.roads.filter((r) => (r.opensYear ?? 1) <= year && r.type !== 'highway').flatMap((r) => [...defCells(r)]).filter((x) => x.gy === front).map((x) => x.gx));
+  for (let x = b.gx + 1; x < b.gx + b.w; x++) if (!cells.has(x)) return false;
+  return true;
 }
 
 /** The nearest free place of this size with a road beside it. */
@@ -66,14 +75,16 @@ function nearestSite(c: City, l: Lot, w: number, h: number): CellRect | null {
     }
   }
   all.sort((p, q) => p.d - q.d || p.b.gy - q.b.gy || p.b.gx - q.b.gx);
-  return all.find((x) => fits(c, g, x.b))?.b ?? null;
+  return all.find((x) => fits(c, g, x.b, l.opensYear))?.b ?? null;
 }
 
 function place(c: City, l: Lot): Lot {
   const same = nearestSite(c, l, l.w, l.h);
   if (same) return { ...l, ...same };
   const small = l.w > SMALL || l.h > SMALL ? nearestSite(c, l, Math.min(l.w, SMALL), Math.min(l.h, SMALL)) : null;
-  return small ? { ...l, ...small } : { ...l, opensYear: DROPPED };
+  if (!small) return { ...l, opensYear: DROPPED };
+  const { garden: _g, ...plain } = l; // a shrunk garden lot is a plain 2-deep lot
+  return { ...plain, ...small };
 }
 
 /** January: plots that come within two years find their ground. */
@@ -95,7 +106,7 @@ export function squeezeIn(c: City): void {
     const at = centreOf(lost);
     const near = c.lots.filter((l) => l.level > 0 && l.level < 4 && l.kind === lost.kind)
       .sort((a, b) => distPt(at, centreOf(a)) - distPt(at, centreOf(b)) || a.id - b.id)
-      .slice(0, Math.max(1, Math.round(areaOf(lost) / CELLS_PER_STEP)));
+      .slice(0, Math.max(1, Math.round(builtArea(lost) / CELLS_PER_STEP)));
     const ids = new Set(near.map((l) => l.id));
     c.lots = c.lots.map((l) => (ids.has(l.id) ? { ...l, level: (l.level + 1) as Lot['level'] } : l));
   }

@@ -1,6 +1,6 @@
 import { mean } from '../day';
 import type { Place } from '../day';
-import { areaOf, centreOf, clamp, distPt } from '../geometry';
+import { builtArea, centreOf, clamp, distPt } from '../geometry';
 import { CELL } from '../../sim/constants';
 import { gateNodes } from '../places';
 import { createDice, mixSeed, type Dice } from '../rng';
@@ -32,7 +32,7 @@ interface SeaDraw { readonly from: Place; readonly to: Place; readonly purpose: 
 
 /** Cars that would like to go to this beach today. */
 export function bathers(c: City, b: BeachDef): number {
-  const cells = c.lots.reduce((n, l) => n + (l.kind === 'home' && l.level > 0 ? areaOf(l) : 0), 0);
+  const cells = c.lots.reduce((n, l) => n + (l.kind === 'home' && l.level > 0 ? builtArea(l) : 0), 0);
   return Math.round(Math.min(SEA.max, (SEA.base + cells * SEA.perHomeCell) * (SEA.season[c.season] ?? 1) * (b.pull ?? 1)));
 }
 
@@ -42,7 +42,7 @@ const contestTours = (c: City): number => (c.season === SEA.contest.season ? Mat
 function pickHome(c: City, dice: Dice, b: BeachDef): Place | null {
   const homes = c.lots.filter((l) => l.kind === 'home' && l.level > 0 && l.access);
   const at = centreOf(b);
-  const weights = homes.map((l) => areaOf(l) * (HOME_TOURS[l.level] ?? 0) * Math.exp(-distPt(at, centreOf(l)) / (SEA.near * CELL)));
+  const weights = homes.map((l) => builtArea(l) * (HOME_TOURS[l.level] ?? 0) * Math.exp(-distPt(at, centreOf(l)) / (SEA.near * CELL)));
   let left = dice.next() * weights.reduce((n, w) => n + w, 0);
   for (let i = 0; i < homes.length; i++) { left -= weights[i]!; if (left <= 0) return { lot: homes[i]!.id }; }
   return homes.length > 0 ? { lot: homes[homes.length - 1]!.id } : null;

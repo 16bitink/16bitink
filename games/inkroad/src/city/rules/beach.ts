@@ -1,7 +1,7 @@
 import { APPROVAL_GOOD } from '../../sim/constants';
 import type { BeachCase, BeachDef, BeachView, CityView, Lot } from '../../sim/types';
 import { no, priced, type Handler } from '../commands/shared';
-import { areaOf, cellsToBlock, centreOf, clamp, type Block } from '../geometry';
+import { builtArea, cellsToBlock, centreOf, clamp, type Block } from '../geometry';
 import { earn, total } from '../money';
 import { blockAccess } from '../net';
 import { refreshAccess } from '../places';
@@ -63,8 +63,8 @@ export function jobsPerWorker(c: City): number {
   let jobs = 0;
   for (const l of c.lots) {
     if (l.level === 0) continue;
-    if (l.kind === 'home') workers += areaOf(l) * (HOME_TOURS[l.level] ?? 0) * PURPOSE.work;
-    jobs += areaOf(l) * (JOBS[l.kind] ?? 0) * (LEVEL_PULL[l.level] ?? 0);
+    if (l.kind === 'home') workers += builtArea(l) * (HOME_TOURS[l.level] ?? 0) * PURPOSE.work;
+    jobs += builtArea(l) * (JOBS[l.kind] ?? 0) * (LEVEL_PULL[l.level] ?? 0);
   }
   return jobs / Math.max(1, workers);
 }

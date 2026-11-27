@@ -74,9 +74,17 @@ export interface SpawnRequest {
   readonly value: number;
   /** Opaque to Traffic; comes back on the arrival. */
   readonly tag: number;
+  /**
+   * Pulling out of a space: the car enters only where its lane has a gap (no car close upstream, the point not
+   * held), then stands there holding the lane (state 4) for this many seconds before it drives off.
+   */
+  readonly hold?: number;
 }
 
-export interface Arrival { readonly uid: number; readonly slot: number; readonly tag: number; readonly seconds: number; readonly waited: number; readonly tolls: number; readonly at: Pt }
+/** Where a car stands in its lane: plan px and heading (radians, 0 = east, clockwise). */
+export interface LanePose { readonly x: number; readonly y: number; readonly a: number }
+
+export interface Arrival { readonly uid: number; readonly slot: number; readonly tag: number; readonly seconds: number; readonly waited: number; readonly tolls: number; readonly at: Pt; /** Heading where it was last drawn. */ readonly a?: number }
 
 export interface Trip { readonly seconds: number; readonly toll: number; readonly reachable: boolean; readonly viaRoads?: readonly Id[] }
 
@@ -93,8 +101,14 @@ export interface Traffic {
   redirect(uid: number, to: Access): boolean;
   /** Take an arrived car off the road (it parked, or left by a gate). */
   remove(uid: number): void;
-  /** Double-parked or broken down: the lane is blocked there for `seconds`. */
-  block(at: Access, seconds: number, state: 2 | 3): number;
+  /** An arrived car turns into its space: it holds its lane where it stopped (state 4) for `seconds`, then is gone. False: no such car. */
+  park(uid: number, seconds: number): boolean;
+  /** Where a car on the road stands now, or null. */
+  poseOf(uid: number): LanePose | null;
+  /** Where `spawn(r)` would put a car leaving a space (its kerb lane at r.from), without making it; null from a gate or with no way. */
+  entryPose(r: SpawnRequest): LanePose | null;
+  /** Double-parked or broken down: the lane is blocked there for `seconds`. Gone when the time is up. */
+  block(at: Access, seconds: number, state: 2 | 3 | 4): number;
   /** Buses, trams and school buses: drive the stops in a loop, pausing `dwell` at each. Returns a handle. */
   addService(r: { readonly stops: readonly Access[]; readonly kind: VehicleKind; readonly dwell: number; readonly vehicles: number; readonly tag: number }): number;
   removeService(id: number): void;

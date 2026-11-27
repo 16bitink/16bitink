@@ -1,5 +1,5 @@
 import { VEHICLE_PICTURES, VEHICLE_SCALE } from '../../art/manifest';
-import { LENGTHS } from '../../sim/tune';
+import { sizeOf } from './carSize';
 import type { VehicleKind } from '../../sim/types';
 import type { Picture } from '../pictures';
 import { CAR_TINTS, INK } from '../style';
@@ -8,10 +8,6 @@ import { ctxOf, makeCanvas } from '../tiles';
 /** Stand-in vehicles, seen straight from above, nose to the right, at 8x. */
 export interface Body { readonly len: number; readonly wid: number; readonly high: number }
 
-/** A lane is 9 px. Drawn a little bigger than the sim's cars (which keep 4 px apart), so they read on a phone. */
-const WIDEST = 9.4;
-const BIGGER = { small: 1.14, long: 1.07, from: 20 } as const;
-
 /** Plan px. The length is the sim's, the width the picture's, kept inside a lane; `high` is the little that shows of its side. */
 export const BODIES: Readonly<Record<VehicleKind, Body>> = {
   car: body('car', 1.4), taxi: body('taxi', 1.4), van: body('van', 2.2), truck: body('truck', 2.6), bus: body('bus', 2.6),
@@ -19,9 +15,7 @@ export const BODIES: Readonly<Record<VehicleKind, Body>> = {
 };
 
 function body(kind: VehicleKind, high: number): Body {
-  const p = VEHICLE_PICTURES[kind];
-  const len = LENGTHS[kind] * (LENGTHS[kind] < BIGGER.from ? BIGGER.small : BIGGER.long);
-  return { len, wid: Math.min(WIDEST, (len * p.h) / p.w), high };
+  return { ...sizeOf(kind), high };
 }
 
 const PAINTS: Readonly<Record<VehicleKind, string>> = {

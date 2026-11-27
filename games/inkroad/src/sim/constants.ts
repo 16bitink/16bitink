@@ -7,9 +7,13 @@ export const STEP = 0.1; // seconds per sim step
 /** A season is a drawn workday, then a short weekend day. */
 export const DAY = 120;
 export const PERIODS = { dawn: 0, am: 10, mid: 42, pm: 70, night: 108 } as const;
-export const WEEKEND = 50;
-/** The weekend has no morning peak: it wakes late. */
-export const WEEKEND_PERIODS = { dawn: 0, am: 4, mid: 4, pm: 28, night: 41 } as const;
+/**
+ * The weekend has no morning peak: it wakes late. Its first 16 s are the night before it (00:00 to 06:00): a busy junction passes
+ * about one car a second, so a planned city's evening queue (Saffron Bay, years 1 to 8: up to about 20 cars) drains at the day's
+ * pace before dawn, by road, instead of greeting the weekend.
+ */
+export const WEEKEND = 62;
+export const WEEKEND_PERIODS = { dawn: 0, am: 16, mid: 16, pm: 40, night: 53 } as const;
 export const SEASONS = ['Spring', 'Summer', 'Autumn', 'Winter'] as const;
 export const YEARS_PER_CITY = 10;
 

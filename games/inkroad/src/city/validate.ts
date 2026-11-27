@@ -4,10 +4,11 @@ import { isCommission } from './commissions';
 import { blocksMeet, vertexInBlock } from './geometry';
 import { isMetric } from './goals';
 import { beachProblems } from './validateBeach';
+import { layoutProblems } from './validateLayout';
 
 /** Checks a city's data before it is played (the paid cities come from the server). Returns every problem found. */
-const KINDS: readonly LotKind[] = ['home', 'market', 'shops', 'office', 'school', 'hospital', 'mall', 'stadium', 'port', 'fair', 'park', 'square', 'landmark'];
-const FIXED: Readonly<Partial<Record<LotKind, readonly [number, number]>>> = { market: [4, 3], school: [4, 3], hospital: [4, 3], mall: [6, 4], stadium: [6, 5], port: [6, 3], fair: [6, 5], landmark: [4, 3] };
+const KINDS: readonly LotKind[] = ['home', 'market', 'shops', 'office', 'school', 'hospital', 'mall', 'stadium', 'port', 'fair', 'park', 'square', 'landmark', 'nursery', 'fuel', 'food', 'fun'];
+const FIXED: Readonly<Partial<Record<LotKind, readonly [number, number]>>> = { market: [4, 3], school: [4, 3], hospital: [4, 3], mall: [6, 4], stadium: [6, 5], port: [6, 3], fair: [6, 5], landmark: [4, 3], nursery: [2, 2], fuel: [2, 2], food: [2, 2], fun: [3, 2] };
 const PLOTS: ReadonlySet<LotKind> = new Set<LotKind>(['home', 'shops', 'office']);
 const TOOLS: readonly ToolId[] = ['street', 'avenue', 'boulevard', 'highway', 'remove', 'junction', 'flyover', 'underpass', 'kerb', 'parking', 'toll', 'bus', 'buslane', 'tram', 'metro', 'boat', 'oneway', 'square', 'zone'];
 const ROAD_TYPES = ['street', 'avenue', 'boulevard', 'highway'];
@@ -65,6 +66,7 @@ function lotProblems(def: CityDef, l: LotDef): string[] {
   const size = FIXED[l.kind];
   if (size && (l.w !== size[0] || l.h !== size[1])) out.push(`${l.name} must be ${size[0]} x ${size[1]}`);
   if (PLOTS.has(l.kind) && (l.w % 2 !== 0 || l.h % 2 !== 0)) out.push(`${l.name} must be whole plots of 2 x 2`);
+  if (l.garden && (l.kind !== 'home' || l.h !== 4 || l.w % 2 !== 0)) out.push(`${l.name} is a garden lot: it must be a home 4 deep and a whole number of plots wide`);
   for (let y = l.gy; y <= l.gy + l.h; y++) for (let x = l.gx; x <= l.gx + l.w; x++) if ('~#pb'.includes(def.map[y]?.[x] ?? '~')) out.push(`${l.name} stands on '${def.map[y]?.[x]}' at ${x},${y}`);
   for (const r of def.roads) for (const c of expandCells(r.cells.map(([gx, gy]) => ({ gx, gy })))) if (vertexInBlock(l, c)) out.push(`a road runs through ${l.name} at ${c.gx},${c.gy}`);
   return out;
@@ -75,6 +77,7 @@ function layout(def: CityDef): string[] {
   def.lots.forEach((a, i) => def.lots.slice(i + 1).forEach((b) => { if (blocksMeet(a, b)) out.push(`${a.name} overlaps ${b.name}`); }));
   const names = def.lots.map((l) => l.name);
   out.push(...beachProblems(def));
+  out.push(...layoutProblems(def));
   const gates = def.gates.map((g) => g.name);
   out.push(...names.filter((n, i) => names.indexOf(n) !== i).map((n) => `two lots are called ${n}`));
   for (const y of def.years) for (const e of y.events) if (e.at && e.at !== 'bridge' && !names.includes(e.at) && !gates.includes(e.at)) out.push(`year ${y.year}: no place called ${e.at}`);

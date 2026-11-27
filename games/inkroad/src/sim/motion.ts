@@ -39,6 +39,7 @@ export function plan(sim: Sim, i: number, l: LinkRt): void {
   c.opt[i] = sim.routes.choose(c.field[i]!, c.value[i]!, l, c.uid[i]!);
 }
 
+/** A car stuck too long leaves the road (its receipt keeps where it was drawn, so the city can turn it in at a building). */
 export function giveUp(sim: Sim, i: number): void {
   if (sim.cars.service[i]! >= 0) { sim.services.lost(i); return; }
   if (sim.cars.state[i]! < 2) {

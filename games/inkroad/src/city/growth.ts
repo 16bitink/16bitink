@@ -1,6 +1,6 @@
 import type { Lot } from '../sim/types';
 import { mean } from './day';
-import { areaOf, cellsToBlock, clamp } from './geometry';
+import { builtArea, cellsToBlock, clamp } from './geometry';
 import { buildSpots, meanOccupancy } from './parking';
 import type { City, Mood } from './state';
 import { emit } from './state';
@@ -70,4 +70,4 @@ export function driftOwnership(c: City): void {
 }
 
 export const population = (c: City): number =>
-  c.lots.reduce((n, l) => n + (l.kind === 'home' ? areaOf(l) * (PEOPLE_PER_CELL[l.level] ?? 0) * 10 : 0), 0);
+  c.lots.reduce((n, l) => n + (l.kind === 'home' ? builtArea(l) * (PEOPLE_PER_CELL[l.level] ?? 0) * 10 : 0), 0);

@@ -1,5 +1,6 @@
 import type { CityDef } from '../../sim/types';
 import { BEACHES, GATES, LOTS, MAP, ROADS_DEF } from './saffronMap';
+import { SAFFRON_ROUTINE } from './saffronRoutine';
 import { SAFFRON_YEARS } from './saffronYears';
 
 /** City 1 (free): a young desert port where everyone drives. */
@@ -17,6 +18,8 @@ export const SAFFRON: CityDef = {
   lots: LOTS,
   gates: GATES,
   beaches: BEACHES,
+  frontStreets: true,
   years: SAFFRON_YEARS,
+  routine: SAFFRON_ROUTINE,
   rules: { carOwnership: 0.82, landPrice: 2, widen: true },
 };

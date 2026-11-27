@@ -1,7 +1,7 @@
 import { greensOf, spriteKeys, type Greens, type SpriteName } from '../../art/manifest';
 import { lotRect } from '../../city/geometry';
 import { CELL } from '../../sim/constants';
-import type { CityView, Pt } from '../../sim/types';
+import type { CityView, Lot, Pt } from '../../sim/types';
 import { boxesMeet, boxOf, dist, lineLength, nearestOnLine, pointAt, type Box } from '../geom';
 import { coneSpots } from '../ground/roadExtras';
 import { islandSpots } from '../ground/island';

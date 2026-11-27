@@ -29,6 +29,6 @@ export interface Sim {
 export function receipt(sim: Sim, i: number): Arrival {
   const c = sim.cars;
   return {
-    uid: c.uid[i]!, slot: i, tag: c.tag[i]!, seconds: sim.time - c.born[i]!, waited: c.waited[i]!, tolls: c.tolls[i]!, at: { x: c.x[i]!, y: c.y[i]! },
+    uid: c.uid[i]!, slot: i, tag: c.tag[i]!, seconds: sim.time - c.born[i]!, waited: c.waited[i]!, tolls: c.tolls[i]!, at: { x: c.x[i]!, y: c.y[i]! }, a: c.heading[i]!,
   };
 }

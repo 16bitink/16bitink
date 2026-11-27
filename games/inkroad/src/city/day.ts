@@ -1,10 +1,41 @@
 import type { Access } from '../sim/trafficTypes';
-import type { Bar, Id, Pt } from '../sim/types';
+import type { SlotLayout } from '../sim/slotGeometry';
+import type { Bar, DayKind, Id, Pt, VehicleKind } from '../sim/types';
 
 /** One drawn day: who travels, where they park, how it went. Working memory, thrown away at night. */
 export type Place = { readonly lot: Id } | { readonly gate: Id };
 export type Purpose = 'work' | 'school' | 'shop' | 'visit' | 'through' | 'truck' | 'event';
 export type Mode = 'car' | 'taxi' | 'transit' | 'ride' | 'walk' | 'stay';
+
+/** One stop of a household's day: where, why, and when they mean to be there (season clock). */
+export type StopKind = 'work' | 'school' | 'nursery' | 'shop' | 'food' | 'fun' | 'visit' | 'errand' | 'fuel' | 'out' | 'home';
+export interface Stop {
+  readonly kind: StopKind;
+  readonly label: string;
+  readonly place: Place;
+  readonly at: number;
+  /** Clock at which they leave again, or null for a stay of `stay` seconds. */
+  readonly until: number | null;
+  readonly stay: number;
+  readonly purpose: Purpose;
+}
+/** A grown-up's day: stops one after another, then home. Lives in Day.chains. */
+export interface Chain {
+  readonly id: number;
+  readonly household: Id;
+  readonly person: number;
+  readonly home: Place;
+  readonly kind: DayKind;
+  readonly seed: number;
+  readonly value: number;
+  /** The household car this grown-up has with them (fleet uid), or null. */
+  car: number | null;
+  stops: readonly Stop[];
+  /** Minutes late at each stop reached so far. */
+  late: number[];
+  /** The stop they are heading to or at: -1 before leaving home, stops.length on the way home, past it once home. */
+  now: number;
+}
 
 export interface Tour {
   readonly id: number;
@@ -19,20 +50,51 @@ export interface Tour {
   readonly value: number; // coins per second
   /** Extra fine-grained choice noise, fixed per tour. */
   readonly seed: number;
+  /** A household's hop: its day, and the index of the stop it goes to (stops.length: home). */
+  readonly chain?: Chain;
+  readonly stop?: number;
+  /** Where the traveller lives, when it is not `from` (a hop between two stops). */
+  readonly home?: Place;
+  /** A taxi going to fetch somebody or back to its base: nobody's trip, never judged. */
+  readonly deadhead?: boolean;
+}
+
+/** A car standing in a place. `spot` moves with it when its place goes away. */
+export interface Standing {
+  readonly uid: number;
+  readonly tint: number;
+  readonly kind: VehicleKind;
+  readonly household?: Id;
+  slot: number;
+  s?: number;
+  side?: -1 | 1;
+  /** Counted in the place's `used` (a household's own car at home is not: it has its own space). */
+  readonly counted: boolean;
+  spot: Spot;
+  /** Clock until which it is still turning in: it may not leave before. */
+  readyAt?: number;
+  /** Leaving: off the road at the lane edge (not drawn in `parking`, its slot still its own), ready for the lane at `goAt`, where it will stand. */
+  edge?: { readonly goAt: number; readonly lane: { readonly x: number; readonly y: number; readonly a: number } };
 }
 
 /** A parking place: private spaces of a block, kerb bays, a car park. */
 export interface Spot {
   readonly key: string;
-  readonly kind: 'private' | 'home' | 'kerb' | 'park';
+  /** street, sand and double are where cars stand when there is nowhere they may. */
+  readonly kind: 'private' | 'home' | 'kerb' | 'park' | 'street' | 'sand' | 'double';
   readonly id: Id; // lot, road or car park
   readonly spaces: number;
   used: number;
   readonly access: Access;
+  /** Off-road places: the drawn slots (src/sim/slotGeometry.ts), which `spaces` never exceeds. */
+  readonly layout?: SlotLayout;
   readonly at: Pt;
   /** Sum of used/spaces, sampled, and samples taken. */
   sum: number;
   samples: number;
+  /** The cars standing here, oldest first, and a counter bumped when they change. */
+  cars: Standing[];
+  ver: number;
 }
 
 export interface Leg {
@@ -54,17 +116,27 @@ export interface Leg {
   heldAt: number; // clock when it first could not enter the road, or -1
   from: Access | null;
   to: Access | null;
-  /** The space it frees once it is on the road. */
-  leaving: Spot | null;
+  /** The place it frees once it is on the road. */
+  leaving: Standing | null;
   tolls: number;
+  /** The household car it drives (fleet uid), its traffic uid on the road, and where it stood once there. */
+  car: number | null;
+  uid: number;
+  parked: Standing | null;
+  /** The slot it was promised in `spot` (road places), or -1. */
+  slot: number;
+  /** A car with no space to pull out of comes out of a building's entrance (`door.ts`): its move, once told. */
+  door?: { readonly uid: number; readonly goAt: number; readonly lane: { readonly x: number; readonly y: number; readonly a: number }; readonly key: string };
+  /** A taxi on its way to fetch somebody: their ride home, set off from the kerb once it is there. */
+  then?: Leg;
 }
 
-export interface Stay { readonly leg: Leg; readonly until: number; readonly spot: Spot | null; readonly from: Access | null }
+export interface Stay { readonly leg: Leg; readonly until: number; readonly spot: Spot | null; readonly from: Access | null; readonly parked: Standing | null }
 
 export interface Tally { sum: number; w: number }
 export interface LotTally { readonly trips: Tally; readonly parking: Tally }
 /** Something that went badly at a place, for complaints and the review. */
-export interface Sore { readonly bar: Bar; readonly kind: string; readonly at: Pt; readonly weight: number; readonly lot: Id | null; readonly n: number; readonly place?: string }
+export interface Sore { readonly bar: Bar; readonly kind: string; readonly at: Pt; readonly weight: number; readonly lot: Id | null; readonly n: number; readonly place?: string; readonly household?: Id }
 
 export interface DayStats {
   trips: Tally; parking: Tally; cost: Tally; ratio: Tally; pay: Tally; seconds: Tally;
@@ -95,6 +167,16 @@ export interface Day {
   sampled: number;
   retimed: Set<number>;
   period: string;
+  /** Households' days: the drawn day's (replaced at the weekend) and the workday's, for the night's letters. */
+  chains: Map<Id, Chain[]>;
+  workChains: Map<Id, Chain[]>;
+  /** Cars that entered the road, by day. */
+  drawn: Record<DayKind, number>;
+  /** Petrol stations: cars served and in the queue now. */
+  pumps: Map<Id, { served: number; queue: Leg[] }>;
+  parkingDirty: boolean;
+  /** A car turned into or out of a space this step: the view is rebuilt before the step ends. */
+  parkingNow: boolean;
 }
 
 const tally = (): Tally => ({ sum: 0, w: 0 });
@@ -107,6 +189,7 @@ export const emptyStats = (): DayStats => ({
 export const emptyDay = (): Day => ({
   plan: [], next: 0, legs: [], waiting: [], stays: [], spots: new Map(), stats: emptyStats(),
   agenda: [], red: new Set(), shared: [], moneyMade: 0, sampled: 0, retimed: new Set(), period: '',
+  chains: new Map(), workChains: new Map(), drawn: { work: 0, weekend: 0 }, pumps: new Map(), parkingDirty: true, parkingNow: false,
 });
 
 export function add(t: Tally, v: number, w = 1): void { t.sum += v * w; t.w += w; }

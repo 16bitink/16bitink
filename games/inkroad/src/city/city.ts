@@ -2,10 +2,12 @@ import { DAY, STEP } from '../sim/constants';
 import { createNetwork } from '../sim/network';
 import { createTraffic } from '../sim/traffic';
 import type {
-  Bar, CityDef, CityEvent, CityView, Command, Id, JunctionStats, Lot, Movement, Quote, RoadStats, YearGoal,
+  Bar, CityDef, CityEvent, CityView, Command, FuelView, Id, JunctionStats, Lot, Movement, Quote, RoadStats, YearGoal,
 } from '../sim/types';
 import { reportDay } from './approval';
-import { hourAt, periodAt } from './clock';
+import { dayKindAt, hourAt, lengthOf, localClock, periodAt } from './clock';
+import { fuelView } from './hops';
+import { carSlotOf, driverView, householdView, residentsOf } from './views';
 import { apply, quote } from './commands';
 import { priceLimits } from './commands/desk';
 import { emptyDay } from './day';
@@ -24,7 +26,7 @@ import type { City, DayReport } from './state';
 import { emptyLedger, emptyMeasures, openControls, openParks, openPolicies, openTools, yearDef } from './state';
 import { TECHS } from './techs';
 import { START_APPROVAL, START_EXPECT, START_PRICES } from './tune';
-import { driverOf, traceRoad } from './voices';
+import { traceRoad } from './voices';
 import { beginYear, freshTraffic } from './years';
 
 const START_BARS: Readonly<Record<Bar, number>> = { trips: 58, parking: 70, cost: 80, streets: 78 };
@@ -37,6 +39,7 @@ const FRESH_CARS = 3;
 const baseLots = (def: CityDef, seed: number): readonly Lot[] => def.lots.map((l, id) => ({
   id, name: l.name, kind: l.kind, gx: l.gx, gy: l.gy, w: l.w, h: l.h, level: l.opensYear === 1 ? l.level ?? 1 : 0,
   opensYear: l.opensYear, maxLevel: l.maxLevel ?? 4, access: null, district: l.district, variant: mixSeed(seed, id) % VARIANTS,
+  ...(l.garden ? { garden: true } : {}),
 }));
 
 function newCity(def: CityDef, seed: number): City {
@@ -66,6 +69,16 @@ function loadCity(def: CityDef, save: unknown): City | null {
   return c;
 }
 
+/** Petrol stations change every step: the same array while nothing in it does. */
+const fuels = new WeakMap<City, readonly FuelView[]>();
+function fuelOf(c: City): readonly FuelView[] {
+  const now = fuelView(c);
+  const was = fuels.get(c);
+  if (was && was.length === now.length && was.every((f, i) => JSON.stringify(f) === JSON.stringify(now[i]))) return was;
+  fuels.set(c, now);
+  return now;
+}
+
 const shown = new WeakMap<readonly Lot[], readonly Lot[]>();
 /** A public beach is a place people go, not a block: the view reads it from `beaches`. The same array while nothing changes. */
 function builtLots(lots: readonly Lot[]): readonly Lot[] {
@@ -82,12 +95,13 @@ class CityGame implements CityView {
   get year() { return this.c.year; }
   get season() { return this.c.season; }
   get phase() { return this.c.phase; }
-  get clock() { return this.c.clock; }
+  get clock() { return localClock(this.c.clock); }
   get hour() { return hourAt(this.c.clock, this.c.phase); }
   get period() { return this.c.phase === 'review' || this.c.phase === 'yearEnd' ? 'night' as const : periodAt(this.c.clock); }
-  get dayKind() { return 'work' as const; }
-  get dayLength() { return DAY; }
-  get fuel() { return []; }
+  get dayKind() { return dayKindAt(this.c.clock); }
+  get dayLength() { return lengthOf(dayKindAt(this.c.clock)); }
+  get fuel() { return fuelOf(this.c); }
+  get parking() { return this.c.parking ?? []; }
   get routineLine() { return this.c.def.routine?.line ?? ''; }
   get version() { return this.c.net.version; }
   get roads() { return this.c.net.roads; }
@@ -165,10 +179,10 @@ class CityGame implements CityView {
   }
 
   trace(road: Id) { return traceRoad(this.c, road); }
-  driver(i: number) { const d = driverOf(this.c, i); return d ? { ...d, household: null, day: [], now: '', late: 0 } : null; }
-  residents(_lot: Id) { return []; }
-  household(_id: Id) { return null; }
-  carOf(_household: Id) { return -1; }
+  driver(i: number) { return driverView(this.c, i); }
+  residents(lot: Id) { return residentsOf(this.c, lot); }
+  household(id: Id) { return householdView(this.c, id); }
+  carOf(household: Id) { return carSlotOf(this.c, household); }
   lotMood(lot: Id) {
     const m = moodOf(this.c, lot);
     const l = this.c.lots[lot];
