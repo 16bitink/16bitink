@@ -4,14 +4,13 @@ import { toDest } from './drive';
 import { hasRoom } from './grant';
 import { nextTrack } from './path';
 import { receipt, type Sim } from './sim';
-import { refAt } from './drawn';
+import { driveCar, refAt } from './drawn';
 import { LANE_T, TURN_T, type Track } from './track';
 import { ANGER_FULL, HONK_AT, REROUTE_AFTER } from './tune';
 import { laneS, type LinkRt } from './world';
 import { runsWith } from './routes';
 import { reserveTurn, reverseOut, startTurn, turning } from './turning';
 
-const TINY = 1e-3;
 const CRAWL = 4;
 
 // ---------------------------------------------------------------- choosing the way
@@ -65,23 +64,15 @@ function enterLane(sim: Sim, i: number, t: Track): void {
   plan(sim, i, l);
 }
 
-/** Kept at the very end of its track: the px it didn't drive come off its travel (the drawn car follows travel). */
-function holdAtEnd(c: Sim['cars'], i: number, t: Track, v: number): void {
-  c.travel[i] = Math.max(0, c.travel[i]! - (c.s[i]! - (t.len - TINY)));
-  c.s[i] = t.len - TINY;
-  c.v[i] = v;
-  c.acc[i] = Math.min(c.acc[i]!, 0);
-}
-
-/** Cross into the next track. False = no room there: wait at the very end of this one. */
+/**
+ * Cross into the next track. False = no room there yet: the car stays on this one, past its end where its braking
+ * took it (it is never pulled back; the room it was given makes it stop there).
+ */
 function cross(sim: Sim, i: number, t: Track, next: Track): boolean {
   const c = sim.cars;
   const over = c.s[i]! - t.len;
   const q = next.tail;
-  if (q >= 0 && c.s[q]! - c.half[q]! - c.half[i]! < over) {
-    holdAtEnd(c, i, t, Math.min(c.v[i]!, c.v[q]!));
-    return false;
-  }
+  if (q >= 0 && c.s[q]! - c.half[q]! - c.half[i]! < over) return false;
   c.unlink(i);
   c.hop(i, t);
   t.lastOut = i;
@@ -100,7 +91,8 @@ function advance(sim: Sim, i: number): void {
     if (c.s[i]! < t.len) return;
     const next = nextTrack(sim, i, t);
     const barred = t.kind === LANE_T && !c.granted[i] && next !== null && (sim.world.nodes[next.node]!.kind !== 'free' || next.turnRound !== null);
-    if (!next || barred) { holdAtEnd(c, i, t, 0); return; }
+    // Not let on (no way granted, no lane after it): it stays on this track, braking for its end (src/sim/drive.ts).
+    if (!next || barred) return;
     if (!cross(sim, i, t, next)) return;
   }
 }
@@ -112,22 +104,18 @@ function arrive(sim: Sim, i: number): void {
   sim.arrivals.push(receipt(sim, i));
 }
 
-/** Move car i by one step. */
+/**
+ * Move car i by one step: the car drives itself (src/sim/drawn.ts) and its progress is read off where it is; then it
+ * arrives or goes on to the next track. A car held in its lane (a manoeuvre draws it, a stand-in) doesn't move.
+ */
 export function move(sim: Sim, i: number): void {
   const c = sim.cars;
-  if (c.play[i] && holdTurning(sim, i)) return;
-  if (c.playGoal[i] === WAIT_TURN && waitToTurn(sim, i)) return;
-  const v = c.v[i]!, nv = c.nv[i]!;
-  let ds = ((v + nv) / 2) * STEP;
-  if (nv === 0 && v > 0) ds = Math.min(ds, (v * STEP) / 2);
-  let after = nv;
-  if (ds > c.room[i]!) { ds = c.room[i]!; after = Math.min(nv, ds / STEP); c.acc[i] = Math.min(c.acc[i]!, (after - v) / STEP); }
-  // A three-point turn stops at each change of gear (the drawn car never glides through one in a step).
-  const cusp = c.track[i]!.cusps.find((k) => c.s[i]! < k - TINY && c.s[i]! + ds > k);
-  if (cusp !== undefined) { ds = cusp - c.s[i]!; after = 0; }
-  c.s[i]! += ds;
-  c.v[i] = after;
-  c.travel[i] = ds;
+  const rolled = c.travel[i]! > 0;
+  c.travel[i] = 0;
+  if (c.play[i] && holdTurning(sim, i)) { if (!c.play[i]) driveCar(sim, i, true); return; }
+  if (c.playGoal[i] === WAIT_TURN && waitToTurn(sim, i, rolled)) { if (!c.play[i]) driveCar(sim, i, true); return; }
+  if (c.state[i] === 4) { c.v[i] = 0; return; }
+  driveCar(sim, i);
   if (c.arrived[i]) return;
   const d = toDest(sim, i);
   if (d <= (c.service[i]! >= 0 ? 2.5 : 0) && c.until[i]! <= sim.time) { arrive(sim, i); return; }
@@ -140,7 +128,6 @@ export function move(sim: Sim, i: number): void {
  */
 function holdTurning(sim: Sim, i: number): boolean {
   const c = sim.cars;
-  c.travel[i] = 0;
   if (turning(sim, i)) { c.v[i] = 0; c.acc[i] = 0; return true; }
   c.play[i] = null;
   const t = c.track[i]!;
@@ -162,7 +149,8 @@ function turnOnto(sim: Sim, i: number, t: Track): void {
   const c = sim.cars;
   const back = nextTrack(sim, i, t);
   if (!back) return;
-  const r = startTurn(sim, i, back, 0, 0);
+  // A turn round starts from a stand (the car rolls onto the turn's track and brakes there first).
+  const r = c.fu[i]! > STOOD ? null : startTurn(sim, i, back, 0, 0);
   if (r) { c.playGoal[i] = r.s; c.reserve[i] = null; return; }
   // Waiting: it reserves its turn, and remembers since when it waits (playAt is free while nothing plays).
   if (c.playGoal[i] !== WAIT_TURN) c.playAt[i] = sim.time;
@@ -172,16 +160,19 @@ function turnOnto(sim: Sim, i: number, t: Track): void {
 
 /** playGoal of a car standing at a dead end's turn, waiting for room to turn round (a car in the way). */
 const WAIT_TURN = -2;
+/** Px/s under which a car counts as standing. */
+const STOOD = 0.05;
 /** Seconds between its looks, and seconds of waiting after which it backs out of the dead end instead. */
 const TURN_LOOK = 1, BACK_OUT_AFTER = 12;
 
 /** Standing at the start of its turn until a turn that clears every body fits. True: still waiting. */
-function waitToTurn(sim: Sim, i: number): boolean {
+function waitToTurn(sim: Sim, i: number, rolled: boolean): boolean {
   const c = sim.cars;
   const t = c.track[i]!;
-  c.v[i] = 0; c.travel[i] = 0; c.acc[i] = 0;
+  // It brakes to a stand where it is (src/sim/drawn.ts driveCar with stop), never stopped dead; it looks once it stands.
   if (t.turnRound !== 'three') { c.playGoal[i] = -1; c.reserve[i] = null; return false; }
-  if (Math.round(sim.time / STEP) % Math.round(TURN_LOOK / STEP) !== 0) return true;
+  if (c.fu[i]! > STOOD) return true;
+  if (!rolled && Math.round(sim.time / STEP) % Math.round(TURN_LOOK / STEP) !== 0) return true;
   const waited = sim.time - c.playAt[i]!;
   if (waited > BACK_OUT_AFTER && t.from && reverseOut(sim, i, t.from)) return true;
   turnOnto(sim, i, t);

@@ -9,6 +9,9 @@ import { ALL_SCENARIOS } from '../test/motion/all';
 import { halfWidth } from '../src/sim/roadGeom';
 import { lotRect } from '../src/city/geometry';
 import { CELL } from '../src/sim/constants';
+import { inPlan } from '../src/sim/slotGeometry';
+import type { City } from '../src/city/state';
+import type { Rect } from '../src/city/geometry';
 
 const SCALE = 5;
 /** Px round the manoeuvres the picture keeps. */
@@ -33,6 +36,8 @@ function svgOf(r: RunResult, from: number, to: number): string {
   const out: string[] = [`<svg xmlns="http://www.w3.org/2000/svg" width="${Math.round((x1 - x0) * SCALE)}" height="${Math.round((y1 - y0) * SCALE)}" viewBox="${x0} ${y0} ${x1 - x0} ${y1 - y0}"><rect x="${x0}" y="${y0}" width="${x1 - x0}" height="${y1 - y0}" fill="#eee9dc"/>`];
   for (const l of v.lots) { const q = lotRect(l); out.push(`<rect x="${q.x}" y="${q.y}" width="${q.w}" height="${q.h}" fill="#d9cdb0" stroke="#a89a78" stroke-width="0.4"/>`); }
   for (const p of v.carParks) { const q = lotRect(p); out.push(`<rect x="${q.x}" y="${q.y}" width="${q.w}" height="${q.h}" fill="#c9c9c9" stroke="#888" stroke-width="0.4"/>`); }
+  for (const b of v.beaches ?? []) { const q = lotRect(b.rect); out.push(`<rect x="${q.x}" y="${q.y}" width="${q.w}" height="${q.h}" fill="#ecd9a8" stroke="#c9b07a" stroke-width="0.4"/>`); }
+  out.push(...placeMarks(r));
   for (const road of v.roads) {
     const d = road.line.map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join('');
     out.push(`<path d="${d}" stroke="#77777a" stroke-width="${2 * halfWidth(road)}" fill="none" stroke-linejoin="round"/>`);
@@ -62,6 +67,26 @@ function svgOf(r: RunResult, from: number, to: number): string {
   for (const x of r.violations) if (x.t >= from && x.t <= to) out.push(`<circle cx="${x.x.toFixed(1)}" cy="${x.y.toFixed(1)}" r="2.5" fill="none" stroke="#e01010" stroke-width="0.5"><title>${x.rule}</title></circle>`);
   out.push(`<text x="${x0 + 3}" y="${y1 - 3}" font-size="4" font-family="sans-serif">${r.scenario.id}: ${r.violations.length} violations; blue drive, green manoeuvre, orange reverse</text></svg>`);
   return out.join('\n');
+}
+
+/** Every off-road place's bays (thin outlines) and its aisle and gate lane (pale bands), as the city counts them. */
+function placeMarks(r: RunResult): string[] {
+  const c = (r.city as unknown as { c: City }).c;
+  const out: string[] = [];
+  for (const spot of c.day.spots.values()) {
+    const l = spot.layout;
+    if (!l) continue;
+    const a = l.aisle;
+    if (a) {
+      const band = (x: number, y: number, w: number, h: number): Rect => (a.swap ? { x: y, y: x, w: h, h: w } : { x, y, w, h });
+      const lane = Math.abs(a.gate.y - a.y) < 1 ? null : band(a.gate.x - a.lane, Math.min(a.gate.y, a.y), 2 * a.lane, Math.abs(a.gate.y - a.y));
+      for (const q of [band(a.x0, a.y - a.half, a.x1 - a.x0, 2 * a.half), ...(lane ? [lane] : [])]) out.push(`<rect x="${q.x}" y="${q.y}" width="${q.w}" height="${q.h}" fill="#fff8e0" opacity="0.45"/>`);
+      const g = inPlan(a, a.gate);
+      out.push(`<circle cx="${g.x}" cy="${g.y}" r="1.2" fill="#c0a020"/>`);
+    }
+    for (const p of l.poses) out.push(box({ ...p, len: 16, wid: 7 }, 'fill="none" stroke="#fffdf4" stroke-width="0.35" opacity="0.9"'));
+  }
+  return out;
 }
 
 const flag = (args: readonly string[], name: string): string | undefined => { const i = args.indexOf(`--${name}`); return i >= 0 ? args[i + 1] : undefined; };

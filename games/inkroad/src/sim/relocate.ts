@@ -129,6 +129,8 @@ export function relocate(sim: Sim, next: World): void {
   sim.routes.reset();
   for (const { i } of all) {
     c.track[i] = null;
+    // The tracks it came by are the old network's: its reference behind it is no longer theirs.
+    c.forget(i);
     c.ahead[i] = c.behind[i] = -1;
     c.granted[i] = 0;
     c.opt[i] = c.outTo[i] = c.exitBy[i] = null;

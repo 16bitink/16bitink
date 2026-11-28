@@ -68,11 +68,11 @@ function settleRun(from: Pose, to: Pose, dir: 1 | -1, p: VehicleParams): Run {
 const ROLL = 24, ROLL_PRICE = 0.25, ROLL_BACK = 44, BACK_PRICE = 1.6;
 
 /** Start offers: where the car stands, and straight on along its heading while the body stays on the ground. */
-function rollOffers(p: VehicleParams, from: Pose, w: World, forwardOnly: boolean): Offer[] {
+function rollOffers(p: VehicleParams, from: Pose, w: World, forwardOnly: boolean, reverseOnly = false): Offer[] {
   const out: Offer[] = [{ pose: from, cost: 0 }];
   const c = Math.cos(from.th), s = Math.sin(from.th);
   // Straight on, or straight back a little in its own lane (backing up in its lane is allowed; a gear change is priced).
-  for (const way of forwardOnly ? ([1] as const) : ([1, -1] as const)) {
+  for (const way of forwardOnly ? ([1] as const) : reverseOnly ? ([-1] as const) : ([1, -1] as const)) {
     for (let d = OFFER_STEP; d <= (way > 0 ? ROLL : ROLL_BACK); d += OFFER_STEP) {
       const q = { x: from.x + way * c * d, y: from.y + way * s * d, th: from.th };
       const end = way > 0 ? p.toMiddle + p.len / 2 : p.toMiddle - p.len / 2, side = p.wid / 2;
@@ -93,9 +93,9 @@ function straightRun(from: Pose, to: Pose, p: VehicleParams): Run {
 /** RS runs into a space from a standing car, with the settling straight. Null: no RS path at all. */
 function intoRuns(p: VehicleParams, from: Pose, slot: Pose, w: World, settle: boolean, o: PlanOptions & { readonly backIn?: boolean }): { runs: Run[]; m: Manoeuvre } | null {
   const goal = { ...slot, th: unwrapTo(from.th, slot.th) };
-  const goals = (settle ? settleGoals(goal, o.backIn === true) : [{ pose: goal, cost: 0, excuse: goal }]).filter((g) => !o.forwardOnly || g.endDir !== -1);
+  const goals = (settle ? settleGoals(goal, o.backIn === true) : [{ pose: goal, cost: 0, excuse: goal }]).filter((g) => (!o.forwardOnly || g.endDir !== -1) && (!o.reverseOnly || g.endDir !== 1));
   // Backing up straight in its own lane first is allowed even when the move itself is forward only.
-  const starts = rollOffers(p, from, w, false);
+  const starts = rollOffers(p, from, w, false, o.reverseOnly === true);
   const m = planManoeuvre(starts, goals, p, w, o);
   if (!m) return null;
   const g = goals[m.to]!;

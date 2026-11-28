@@ -101,7 +101,7 @@ export function main(args: readonly string[]): string {
         for (const d of drawn) if (!seen.first.has(d.uid)) seen.first.set(d.uid, v.clock);
         if (watchUid) for (const d of drawn) if (d.uid === watchUid && (uidN++ % uidEvery === 0)) {
           const cs = v.cars as unknown as CarStore; const i = cs.slotOf.get(d.uid);
-          out.push(`  #${d.id} @${clock.toFixed(2)} ${d.x.toFixed(1)},${d.y.toFixed(1)} ${d.a.toFixed(2)} ${d.info ?? ''} ${i === undefined ? '' : `st${cs.state[i]} arr${cs.arrived[i]} v${cs.v[i]!.toFixed(1)} until${cs.until[i]!.toFixed(1)}`} ${w.lastEvents.map((e) => e.t).join(',')}`);
+          out.push(`  #${d.id} @${clock.toFixed(2)} ${d.x.toFixed(1)},${d.y.toFixed(1)} ${d.a.toFixed(2)} ${d.info ?? ''} ${i === undefined ? '' : `st${cs.state[i]} arr${cs.arrived[i]} v${cs.v[i]!.toFixed(1)} until${cs.until[i]!.toFixed(1)} ${TRACK[cs.track[i]!.kind] ?? cs.track[i]!.kind} s${cs.s[i]!.toFixed(1)}/${cs.track[i]!.len.toFixed(1)} g${cs.granted[i]} room${cs.room[i]!.toFixed(1)} acc${cs.acc[i]!.toFixed(1)} a${cs.fa[i]!.toFixed(1)} ahead${cs.ahead[i]}`} ${w.lastEvents.map((e) => e.t).join(',')}`);
         }
         const all = [...drawn, ...parked];
         for (let x = 0; x < drawn.length; x++) {

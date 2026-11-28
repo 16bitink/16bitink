@@ -51,8 +51,8 @@ describe('parked bodies never overlap, whatever the kinds', () => {
   const cases = places.flatMap((p) => kinds.map((k) => [p.name, k, p] as const));
   it.each(cases)('%s with %s', (_n, kind, p) => {
     const s = stand(p, kind);
-    // Lorries never use a car park (no room in the aisle to turn): they stand in front strips and at the kerb.
-    expect(s.length).toBeGreaterThan(p.view.kind === 'park' && kind === 'truck' ? -1 : 1);
+    // Lorries never use a car park or a beach's track (no room in the aisle to turn): they stand in front strips and at the kerb.
+    expect(s.length).toBeGreaterThan((p.view.kind === 'park' || p.view.kind === 'sand') && kind === 'truck' ? -1 : 1);
     for (let i = 0; i < s.length; i++) for (let j = i + 1; j < s.length; j++) expect(bodiesOverlap(s[i]!.body, s[j]!.body), `${i} and ${j}`).toBe(false);
   });
 });

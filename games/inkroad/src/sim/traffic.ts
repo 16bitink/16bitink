@@ -56,7 +56,7 @@ function stepCars(sim: Sim): void {
     if (!feel(sim, i)) continue;
     if ((i + sim.tick) % CHANGE.every === 0) considerLane(sim, i);
   }
-  for (let i = 0; i < c.count; i++) if (c.alive[i]) { think(sim, i); c.v0[i] = c.v[i]!; c.travel[i] = 0; }
+  for (let i = 0; i < c.count; i++) if (c.alive[i]) think(sim, i);
   // Leaders first within a track, so a queue moves off together.
   for (const t of sim.world.tracks) {
     for (let i = t.head; i >= 0;) {

@@ -16,6 +16,7 @@ import type { World } from '../sim/vehicle/planner';
 import type { Pt, Road, VehicleKind } from '../sim/types';
 import { bodyAt, type Body } from '../sim/vehicleSize';
 import { lotRect, type Rect } from './geometry';
+import { inPlan, PARK_PITCH, type Aisle } from '../sim/slotGeometry';
 import type { Spot, Standing } from './day';
 import type { City } from './state';
 
@@ -31,6 +32,8 @@ const YARD_SIDE = 24, YARD_BACK = 6;
 const APRON_WID = 30;
 /** A car park's gate is flared wider (a car swings into it from either lane). */
 const GATE_WID = 56;
+/** A car park's gate by its aisle: a car turns square into it, so it crosses the kerb where the gate is. */
+const AISLE_GATE_WID = 26;
 /** Px a reversing body may reach past the inner edge of its lane (paint, a wheel on the line). */
 const REVERSE_SLACK = 2;
 
@@ -87,6 +90,9 @@ const roadOf = (c: City, id: number): Road | undefined => c.net.roads.find((r) =
 function accessRoad(c: City, spot: Spot): Road | undefined {
   if (spot.kind === 'kerb' || spot.kind === 'street' || spot.kind === 'double') return roadOf(c, spot.id);
   const poses = spot.layout?.poses ?? [];
+  const a = spot.layout?.aisle;
+  // A beach track's gate is on its road.
+  if (spot.kind === 'sand' && a) return nearestRoad(c, inPlan(a, a.gate));
   if (spot.kind === 'sand' && poses.length) return nearestRoad(c, poses[0]!);
   return roadOf(c, 'road' in spot.access ? spot.access.road : -1);
 }
@@ -118,8 +124,53 @@ function yardOf(road: Road, poses: readonly { readonly x: number; readonly y: nu
 /** The nearest point of a road's line to p. */
 const onLine = (road: Road, p: Pt): Pt => { const n = project(road.line, p); return { x: n.x, y: n.y }; };
 
+/** Px of the bay mouths along the aisle a body may cut across (a wheel over a neighbour's line on the turn in). */
+const MOUTH_CUT = 5;
+/** The bay's column is this many pitches wide (the turn in swings a corner over the neighbours' lines). */
+const COLUMN_WID = 1.6;
+
+/**
+ * A car park's ground for one bay (the owner, rule 22: gate, aisle, bay): the aisle between the bay mouths with a
+ * strip of the mouths, the gate lane from the gate's edge to the aisle (on a side edge the gate opens onto the aisle
+ * itself), and the bay's column from the aisle to its back line.
+ */
+function aisleRects(a: Aisle, plan: Rect, at: Pt): Rect[] {
+  // Built in the aisle's frame (x along it), turned back to plan.
+  const swap = (q: Rect): Rect => (a.swap ? { x: q.y, y: q.x, w: q.h, h: q.w } : q);
+  const park = swap(plan), bay = inPlan(a, at);
+  const top = a.y - a.half, bottom = a.y + a.half;
+  const out: Rect[] = [{ x: a.x0, y: top - MOUTH_CUT, w: a.x1 - a.x0, h: bottom - top + 2 * MOUTH_CUT }];
+  if (Math.abs(a.gate.a - Math.PI / 2) < 0.1 || Math.abs(a.gate.a + Math.PI / 2) < 0.1) {
+    const y0 = Math.min(a.gate.y, a.y), y1 = Math.max(a.gate.y, a.y);
+    out.push({ x: a.gate.x - a.lane, y: y0, w: 2 * a.lane, h: y1 - y0 });
+  } else {
+    const end = a.gate.x < a.x0 ? a.x0 : a.x1;
+    out.push({ x: Math.min(a.gate.x, end) - 1, y: top, w: Math.abs(a.gate.x - end) + 2, h: bottom - top });
+  }
+  const above = bay.y < a.y;
+  const wid = COLUMN_WID * PARK_PITCH;
+  const y0 = above ? Math.max(park.y, top - a.depth) : bottom, y1 = above ? top : Math.min(park.y + park.h, bottom + a.depth);
+  out.push({ x: bay.x - wid / 2, y: y0, w: wid, h: y1 - y0 });
+  return out.map(swap);
+}
+
+/** The ground of an aisle's move: the gate's apron from the road, the gate lane, the aisle and the bay's column. */
+function aisleArea(a: Aisle, road: Road, place: Rect, bay: Pt): { boxes: Body[]; rects: Rect[] } {
+  const gate = inPlan(a, a.gate);
+  return { boxes: [apron(gate, onLine(road, gate), AISLE_GATE_WID)], rects: aisleRects(a, place, bay) };
+}
+
+/** The sand a track's bays stand on (their bounds, in plan): a column stops at it. */
+function sandRect(a: Aisle, poses: readonly Pt[]): Rect {
+  const g = inPlan(a, a.gate);
+  const xs = [...poses.map((p) => p.x), g.x], ys = [...poses.map((p) => p.y), g.y];
+  const pad = a.depth / 2 + 1;
+  const x0 = Math.min(...xs) - pad, y0 = Math.min(...ys) - pad;
+  return { x: x0, y: y0, w: Math.max(...xs) + pad - x0, h: Math.max(...ys) + pad - y0 };
+}
+
 /** The place's own ground: boxes (yards, aprons) and rects (a car park's ground, a building's mouth). */
-function placeArea(c: City, spot: Spot | null, mouth: { readonly rect: Rect; readonly at: Pt } | null): { boxes: Body[]; rects: Rect[] } {
+function placeArea(c: City, spot: Spot | null, mouth: { readonly rect: Rect; readonly at: Pt } | null, bay?: Pt): { boxes: Body[]; rects: Rect[] } {
   const boxes: Body[] = [], rects: Rect[] = [];
   if (mouth) {
     rects.push(mouth.rect);
@@ -131,12 +182,17 @@ function placeArea(c: City, spot: Spot | null, mouth: { readonly rect: Rect; rea
   const l = spot.layout;
   if (spot.kind === 'park') {
     const park = c.parks.find((p) => p.id === spot.id);
+    const aisle = l?.aisle;
+    // Moving to or from a bay of a park with an aisle: only the gate, its lane, the aisle and that bay's column.
+    if (park && aisle && road && bay) return aisleArea(aisle, road, lotRect(park), bay);
     if (park) rects.push(lotRect(park));
     const gate = l?.aisle?.gate;
     if (gate && road) boxes.push(apron(gate, onLine(road, gate), GATE_WID));
     else if (park && road) { const r = lotRect(park); const m = { x: r.x + r.w / 2, y: r.y + r.h / 2 }; boxes.push(apron(m, onLine(road, m), APRON_WID)); }
     return { boxes, rects };
   }
+  // The sand's track: as a car park's aisle, inside the sand.
+  if (spot.kind === 'sand' && l?.aisle && road && bay) return aisleArea(l.aisle, road, sandRect(l.aisle, l.poses), bay);
   if (l && road) {
     const lot = spot.kind === 'home' || spot.kind === 'private' ? c.lots.find((q) => q.id === spot.id) : undefined;
     const yard = yardOf(road, l.poses, lot ? lotRect(lot) : null);
@@ -161,6 +217,8 @@ export interface GroundAsk {
   readonly self: number;
   readonly road?: number;
   readonly mouth?: { readonly rect: Rect; readonly at: Pt } | null;
+  /** The car park bay the move goes to or comes from: its ground is the gate, the aisle and that bay's column. */
+  readonly bay?: Pt;
   /**
    * Reversing is allowed only on this road on this side of its line (sign of the segment's lat), up to the inner edge
    * of its outermost lane; absent: anywhere drivable (a turn on a clear road).
@@ -175,7 +233,7 @@ export function groundFor(c: City, q: GroundAsk): Ground {
   const box: Box = { x0: Math.min(q.from.x, q.to.x), y0: Math.min(q.from.y, q.to.y), x1: Math.max(q.from.x, q.to.x), y1: Math.max(q.from.y, q.to.y) };
   const segs = segsNear(c, box);
   const discs = c.net.junctions.filter((j) => near(box, j.x, j.y, REACH + j.radius)).map((j) => ({ x: j.x, y: j.y, r: j.radius + KERB }));
-  const { boxes, rects } = placeArea(c, q.spot, q.mouth ?? null);
+  const { boxes, rects } = placeArea(c, q.spot, q.mouth ?? null, q.bay);
   const onRoad = (x: number, y: number): boolean => segs.some((s) => offSeg(s, x, y).d <= s.hw) || discs.some((d) => Math.hypot(d.x - x, d.y - y) <= d.r);
   const inPlace = (x: number, y: number): boolean => boxes.some((b) => inBox(b, x, y)) || rects.some((r) => inRect(r, x, y));
   const drivable = (x: number, y: number): boolean => inPlace(x, y) || onRoad(x, y);
@@ -183,7 +241,9 @@ export function groundFor(c: City, q: GroundAsk): Ground {
   const own = rev ? segs.filter((s) => s.road.id === rev.road) : [];
   const edge = rev ? halfWidth(own[0]?.road ?? roadOf(c, rev.road)!) - LANE - REVERSE_SLACK : 0;
   // In a car park a car backs only within the park (out of its bay into the aisle), never out through its gate.
-  const backable = q.spot?.kind === 'park' && rects.length ? (x: number, y: number): boolean => rects.some((r) => inRect(r, x, y)) : inPlace;
+  const park = q.spot?.kind === 'park' ? c.parks.find((p) => p.id === q.spot!.id) : undefined;
+  const inside = park ? lotRect(park) : null;
+  const backable = inside && rects.length ? (x: number, y: number): boolean => inRect(inside, x, y) && rects.some((r) => inRect(r, x, y)) : inPlace;
   const reverse = rev ? (x: number, y: number): boolean => backable(x, y) || own.some((s) => { const o = offSeg(s, x, y); return o.t >= -0.05 && o.t <= 1.05 && o.d <= s.hw && o.lat * rev.side >= edge; }) : undefined;
   return { drivable, bodies: bodiesNear(c, q, box), area: boxes, ...(reverse ? { reverse } : {}) };
 }

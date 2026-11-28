@@ -1,18 +1,18 @@
 /** How fast each car wants to go next: the Intelligent Driver Model, stop lines and destinations. */
-import { LANE, STEP } from './constants';
+import { LANE } from './constants';
 import { askWay, toLine } from './grant';
 import { LEAD, look, speedAhead } from './path';
-import { LANE_T } from './track';
+import { LANE_T, nearest, type Track } from './track';
 import { capAhead } from './trackCaps';
 import { shiftLength } from './vehicle/shift';
 import { CHANGE, DRIVEWAY, IDM } from './tune';
 import type { Sim } from './sim';
 
 const FREE_EXP = 4;
+/** Px/s over which a car coming up to its place to park only eases off (slower, it may still pull up to it). */
+const PARK_ROLL = 8;
 /** Px/s over its wanted speed at which a driver brakes in earnest. */
 const OVER = 0.5;
-/** How much faster than the jerk limit a driver brakes when the plan's braking isn't enough. */
-const URGENT = 3;
 /** Px of lane kept after a lane change ends. */
 const CHANGE_ROOM = 4;
 /** Share of the planned braking a car approaches a curve's cap with (the rest absorbs the foot's jerk). */
@@ -44,22 +44,14 @@ function desired(sim: Sim, i: number): number {
 }
 
 /**
- * A driver's foot moves at the jerk limit (as the drawn car's, src/sim/vehicle/bicycle.ts): pulling away and easing
- * off ramp; braking harder than the comfortable plan ramps URGENT times as fast (a driver stamping on the brake).
+ * Set acc (the acceleration the IDM commands) and room (px the front may still go before what it must never drive
+ * into, plus the distance that thing itself needs to stop) for car i. The car's own limits apply in src/sim/drawn.ts.
  */
-function smooth(prev: number, want: number, v: number): number {
-  const base = v <= 0 ? Math.max(0, prev) : prev;
-  const j = IDM.jerk * STEP;
-  if (want > base) return Math.min(want, base + j);
-  return Math.max(want, base - (want < -IDM.brake ? j * URGENT : j));
-}
-
-/** Set nv (speed next) and room (hard limit) for car i. */
 export function think(sim: Sim, i: number): void {
   const c = sim.cars;
   const t = c.track[i]!;
   const v = c.v[i]!;
-  if (c.until[i]! > sim.time || c.arrived[i]) { c.nv[i] = 0; c.room[i] = 0; c.acc[i] = 0; return; }
+  if (c.until[i]! > sim.time || c.arrived[i]) { c.room[i] = 0; c.acc[i] = -IDM.hardBrake; return; }
   let open = true;
   const front = c.ahead[i]! < 0;
   let line = Infinity;
@@ -74,24 +66,23 @@ export function think(sim: Sim, i: number): void {
   const hw = IDM.headway * c.hw[i]! * (t.kind === LANE_T ? sim.world.links[t.link]!.headway : 0.9);
   let brake = 0;
   if (LEAD.gap < Infinity) brake = interaction(v, v - LEAD.v, LEAD.gap, IDM.standGap, hw);
-  let room = LEAD.hard - 0.6;
+  // A moving leader can't stop dead either: the room is the gap plus its own stop at the hardest braking.
+  let room = LEAD.hard - 0.6 + (LEAD.hardV * LEAD.hardV) / (2 * IDM.hardBrake);
   if (line < Infinity) {
     brake = Math.max(brake, interaction(v, v, line, IDM.lineGap, 0.25));
     room = Math.min(room, line);
   }
-  if (c.service[i]! >= 0) {
-    const d = toDest(sim, i);
-    if (d < Infinity) brake = Math.max(brake, interaction(v, v, d + 1, 0.8, 0.25));
-  }
+  const d = toDest(sim, i);
+  if (c.service[i]! >= 0 && d < Infinity) brake = Math.max(brake, interaction(v, v, d + 1, 0.8, 0.25));
+  // Coming up to its place to park at speed it no longer speeds up: the move off the lane takes over a car easing off.
+  const parking = d < DRIVEWAY.length && v > PARK_ROLL && c.service[i]! < 0 && c.destNode[i]! < 0;
   const r = v / v0;
   let acc = IDM.accel * (1 - (r > 1 ? Math.min(r ** FREE_EXP, 1 + (IDM.brake / IDM.accel)) : r ** FREE_EXP) - brake);
   // Over the speed it may have here (a curve ahead): brakes as planned, not by the gentle free-road term.
   if (v > v0 + OVER) acc = Math.min(acc, -IDM.brake);
   // Easing off as it reaches its speed (its foot moves at the jerk limit, so it would overshoot otherwise).
   if (acc > 0) acc = Math.min(acc, Math.sqrt(2 * IDM.jerk * Math.max(0, v0 - v)));
-  acc = smooth(c.acc[i]!, Math.max(-IDM.hardBrake, acc), v);
-  c.acc[i] = acc;
-  c.nv[i] = Math.max(0, v + acc * STEP);
+  c.acc[i] = Math.max(-IDM.hardBrake, parking ? Math.min(0, acc) : acc);
   c.room[i] = Math.max(0, room);
 }
 
@@ -105,11 +96,33 @@ function fits(sim: Sim, i: number, toLane: number, s: number): boolean {
   const v = c.v[i]!;
   let b = t.head, a = -1;
   while (b >= 0 && c.s[b]! >= s) { a = b; b = c.behind[b]!; }
-  // A gap for the drawn bodies (longer than the sim's), not the points.
-  if (a >= 0 && c.s[a]! - s - c.body[a]! - c.body[i]! < IDM.standGap + Math.max(0, v - c.v[a]!) * 0.6) return false;
-  if (b >= 0 && s - c.s[b]! - c.body[b]! - c.body[i]! < IDM.standGap * 0.7 + Math.max(0, c.v[b]! - v) * 0.8 + c.v[b]! * 0.12) return false;
+  // A gap for the bodies, and room for whoever is faster to brake for the other comfortably (no car stops dead).
+  if (a >= 0 && c.s[a]! - s - c.body[a]! - c.body[i]! < IDM.standGap + closeIn(v - c.v[a]!) + v * MERGE_HEADWAY) return false;
+  if (b >= 0 && s - c.s[b]! - c.body[b]! - c.body[i]! < IDM.standGap * 0.7 + closeIn(c.v[b]! - v) + c.v[b]! * MERGE_HEADWAY) return false;
+  // Near the lane's start the car coming up behind may still be on the turn into it.
+  if (b < 0) for (const f of feeders(sim, t)) for (let q = f.head; q >= 0; q = c.behind[q]!) {
+    const gap = s + f.len - c.s[q]! - c.body[q]! - c.body[i]!;
+    if (gap < 80 && gap < IDM.standGap * 0.7 + closeIn(c.v[q]! - v) + c.v[q]! * MERGE_HEADWAY) return false;
+  }
   return true;
 }
+
+/** The tracks leading into lane t (its junction's turns), found once per world. */
+const FEED = new WeakMap<Track, Track[]>();
+const FED = new WeakSet<object>();
+function feeders(sim: Sim, t: Track): readonly Track[] {
+  if (!FED.has(sim.world)) {
+    FED.add(sim.world);
+    for (const x of sim.world.tracks) if (x.to && x.kind !== LANE_T) { const l = FEED.get(x.to) ?? []; l.push(x); FEED.set(x.to, l); }
+  }
+  return FEED.get(t) ?? [];
+}
+
+/** Seconds of headway a lane change leaves the car it moves in front of or behind (a third of a following headway). */
+const MERGE_HEADWAY = 0.35;
+
+/** Px a car closing at dv px/s on another needs to match its speed at the planned braking, its foot ramping for 0.4 s first. */
+const closeIn = (dv: number): number => (dv > 0 ? (dv * dv) / (2 * IDM.brake) + dv * 0.4 : 0);
 
 function leaderGap(sim: Sim, i: number, lane: number, s: number): number {
   const c = sim.cars;
@@ -133,13 +146,34 @@ function lanesFor(sim: Sim, i: number, link: number): readonly [number, number] 
   return [o.lo, o.hi];
 }
 
+/** A car beside i in its own lane still sliding in from another (its body is partly in the lane i would move to). */
+function crossing(sim: Sim, i: number, t: Track): boolean {
+  const c = sim.cars;
+  for (let q = t.head; q >= 0; q = c.behind[q]!) {
+    if (q !== i && c.sliding(q) > 0 && Math.abs(c.s[q]! - c.s[i]!) < c.body[q]! + c.body[i]! + IDM.standGap + c.v[q]! * 0.5) return true;
+  }
+  return false;
+}
+
+/** Share of a lane change's length over which its body is still partly in the lane it leaves. */
+const STILL_IN = 0.7;
+
+/** The car ahead in its own lane leaves it room to get across before its body would reach it. */
+function clearsAhead(sim: Sim, i: number): boolean {
+  const c = sim.cars;
+  const a = c.ahead[i]!;
+  if (a < 0) return true;
+  return c.s[a]! - c.s[i]! - c.body[a]! - c.body[i]! > IDM.standGap + STILL_IN * shiftLength(LANE, c.v[i]!) - c.v[a]! * 1.5;
+}
+
 function moveTo(sim: Sim, i: number, lane: number): void {
   const c = sim.cars;
   const t = c.track[i]!;
   const l = sim.world.links[t.link]!;
   const x = c.rx[i]!, y = c.ry[i]!;
-  const s = Math.min(l.lanes[lane]!.len, (c.s[i]! / t.len) * l.lanes[lane]!.len);
-  if (!fits(sim, i, lane, s)) return;
+  // Where the car is, along the lane it moves to (the car's progress is read off where it is, src/sim/drawn.ts).
+  const s = nearest(l.lanes[lane]!, x, y).s;
+  if (!fits(sim, i, lane, s) || crossing(sim, i, t) || !clearsAhead(sim, i)) return;
   c.unlink(i);
   c.insert(i, l.lanes[lane]!, s);
   c.forget(i);

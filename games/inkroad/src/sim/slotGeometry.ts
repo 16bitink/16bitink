@@ -14,8 +14,33 @@ import { BIGGEST, PITCH_BODY, reach, sizeOf, spansTwo } from './vehicleSize';
  */
 export interface SlotPose { readonly x: number; readonly y: number; /** Plan heading, radians. */ readonly a: number }
 
-/** A car park with two rows: the gate on its edge, where the gate lane meets the aisle, and the aisle's line. */
-export interface Aisle { readonly gate: SlotPose; readonly join: Pt; readonly y: number }
+/**
+ * A car park's way round (the owner, rule 22): the gate on its edge, the gate lane from it to the aisle (`join`), and
+ * the aisle between the rows' bay mouths, `half` each side of its line `y`, from `x0` to `x1`. Bays open onto the
+ * aisle; `lane` is the gate lane's half width.
+ */
+export interface Aisle {
+  readonly gate: SlotPose;
+  readonly join: Pt;
+  readonly y: number;
+  readonly half: number;
+  readonly x0: number;
+  readonly x1: number;
+  readonly lane: number;
+  /** Depth of a bay from its mouth on the aisle to its back line. */
+  readonly depth: number;
+  /**
+   * The aisle runs along plan y (a beach's track away from its road): every field above is in the aisle's own frame,
+   * plan x and y swapped (`inPlan` turns a point or pose back). Absent: the frame is the plan's.
+   */
+  readonly swap?: boolean;
+}
+
+/** A point or pose of an aisle's frame in plan, or back (the swap is its own inverse); headings mirror with it. */
+export function inPlan<T extends { readonly x: number; readonly y: number; readonly a?: number }>(a: Aisle, p: T): T {
+  if (!a.swap) return p;
+  return { ...p, x: p.y, y: p.x, ...(p.a === undefined ? {} : { a: Math.PI / 2 - p.a }) };
+}
 
 export interface SlotLayout {
   readonly poses: readonly SlotPose[];
@@ -58,10 +83,16 @@ const COUNT_PITCH: typeof PITCH_BODY = { len: PITCH_BODY.len, wid: COUNT_WID };
 export const NOSE_PITCH = COUNT_WID + GAP_ACROSS;
 export const SIDE_PITCH = PITCH_BODY.len + GAP_ALONG;
 const NOSE_GAP = 9;
-/** Car park bays: nose to the aisle, rows facing each other. */
+/** Car park bays: rows along the long edges, nose in (away from the aisle), left by backing out into the aisle. */
 const PARK_EDGE = 12;
 export const PARK_PITCH = COUNT_WID + GAP_ALONG;
 const PARK_ROW_IN = 18;
+/** Drivers take the far row's bays first: a near-row bay is a turn back off the gate lane (px of aisle it is worth). */
+const TURN_BACK = 40;
+/** A bay is painted this deep, its mouth this far from its row's line toward the aisle. */
+const BAY_DEPTH = 20, BAY_MOUTH = 10;
+/** The aisle stops this far short of the park's side edges. */
+const AISLE_END = 3;
 /** Kinds of car park with bays on the ground (the others take cars inside). */
 const SURFACE: ReadonlySet<CarParkKind> = new Set<CarParkKind>(['lot', 'ride']);
 /** The gate lane keeps this far from a bay's middle. */
@@ -188,19 +219,27 @@ function parkLayout(p: { readonly gx: number; readonly gy: number; readonly w: n
       const x = r.x + PARK_EDGE + (i + 0.5) * ((r.w - PARK_EDGE * 2) / n);
       // The gate lane runs through the near row: no bay stands in it.
       if (near && Math.abs(x - gate.x) < GATE_CLEAR) continue;
-      out.push({ pose: { x, y, a: up ? -Math.PI / 2 : Math.PI / 2 }, u: x, rank: Math.hypot(x - gate.x, y - gate.y), dir: 1 });
+      // Nose in: a bay above the aisle faces up (north), one below it faces down.
+      out.push({ pose: { x, y, a: up ? Math.PI / 2 : -Math.PI / 2 }, u: x, rank: Math.abs(x - gate.x) + (near ? TURN_BACK : 0), dir: 1 });
     }
     return out;
   });
-  const aisle = twoRows ? { gate, join: { x: gate.x, y: aisleY }, y: aisleY } : undefined;
+  const aisle = twoRows ? aisleOf(r, gate, aisleY) : undefined;
   return { ...fromRows(rows, true, PARK_PITCH, aisle), maxLen: PARK_MAX_LEN };
+}
+
+/** The aisle of a two-row car park: between the rows' bay mouths, the full width bar its ends; the gate lane as wide as the gap in the near row. */
+function aisleOf(r: Box, gate: SlotPose, y: number): Aisle {
+  const half = y - (r.y + PARK_ROW_IN + BAY_MOUTH);
+  return { gate, join: { x: gate.x, y }, y, half, x0: r.x + AISLE_END, x1: r.x + r.w - AISLE_END, lane: GATE_CLEAR - PARK_PITCH / 2 - 0.5, depth: BAY_DEPTH };
 }
 
 /** Where a car drives to reach bay `k` of a two-row car park: through the gate, to the aisle, along it to the bay's column. */
 export function aisleRoute(l: SlotLayout, to: SlotPose): readonly Pt[] | null {
   const a = l.aisle;
   if (!a) return null;
-  return [{ x: a.gate.x, y: a.gate.y }, a.join, { x: to.x, y: a.y }];
+  const col = inPlan(a, to);
+  return [inPlan(a, { x: a.gate.x, y: a.gate.y }), inPlan(a, a.join), inPlan(a, { x: col.x, y: a.y })];
 }
 
 // ---------------------------------------------------------------- sand
@@ -224,8 +263,105 @@ function sandFrame(r: Box, road: RoadPoint | null): { readonly anchor: Pt; reado
   return { anchor, away };
 }
 
-/** Rows of cars on the sand by the road, from the middle column outward; a space off the sand is not one. */
+/**
+ * Sand with a track (the owner, rule 22: beach lots as car parks): bays nose in either side of a sand track that a car
+ * reaches from the road through a gate, built like a car park in the track's own frame. The track runs along the road
+ * (a short spur from the gate) or away from it (the gate at its end), whichever holds more cars. Loose: each car a
+ * little askew and off its column. Null where the road meets the sand at a slant (the loose rows stay there).
+ */
+function sandAisles(r: Box, road: RoadPoint, k: { readonly gx: number; readonly gy: number }): SlotLayout | null {
+  const { away } = sandFrame(r, road);
+  const q = Math.round(away / (Math.PI / 2));
+  if (Math.abs(away - q * (Math.PI / 2)) > SAND_SQUARE) return null;
+  const roadAlongX = q % 2 !== 0;
+  const tries = [sandTrack(r, road, roadAlongX ? false : true, false, k), sandTrack(r, road, roadAlongX ? true : false, true, k)];
+  return tries.reduce<SlotLayout | null>((b, l) => (l && (!b || l.poses.length > b.poses.length) ? l : b), null);
+}
+/** The sand's track and bays start this far past the road's paved edge (clear of a kerb car's body). */
+const SAND_EDGE = 9;
+/** Px of track inside the gate before the first bays. */
+const SAND_GATE_ROOM = 8;
+/** Rad within which the sand's way from its road counts as square to the plan. */
+const SAND_SQUARE = 0.15;
+/** Sand bays: a little wider than a car park's (cars stand loose), as deep. */
+const SAND_BAY_PITCH = PARK_PITCH + 1.2;
+/** The track between the bay mouths: a car park aisle's width. */
+const SAND_AISLE_HALF = 12;
+/** Px a sand car stands askew (rad) and off its column (px) at most. */
+const SAND_SKEW = 0.08, SAND_SHIFT = 0.8;
+
+/** A box in the swapped frame. */
+const swapBox = (b: Box, swap: boolean): Box => (swap ? { x: b.y, y: b.x, w: b.h, h: b.w } : b);
+
+/**
+ * One track on the sand in its own frame (x along the track): `away` true runs it away from the road (gate at its
+ * road end), false along the road (gate on the sand's road edge, a spur to the track). Null: no room for it.
+ */
+function sandTrack(plan: Box, road: RoadPoint, swap: boolean, away: boolean, k: { readonly gx: number; readonly gy: number }): SlotLayout | null {
+  const r = swapBox(plan, swap);
+  const at = swap ? { x: road.at.y, y: road.at.x } : road.at;
+  const half = road.half ?? 0;
+  const deep = BAY_DEPTH;
+  if (away) {
+    // The track runs along x away from the road: the sand starts past the road's edge.
+    const su = r.x + r.w / 2 >= at.x ? 1 : -1;
+    const near = su > 0 ? Math.max(r.x + SAND_INSET, at.x + half + SAND_EDGE) : Math.min(r.x + r.w - SAND_INSET, at.x - half - SAND_EDGE);
+    const far = su > 0 ? r.x + r.w - SAND_INSET : r.x + SAND_INSET;
+    const both = r.h - 2 * SAND_INSET >= 2 * (deep + SAND_AISLE_HALF);
+    if (r.h - 2 * SAND_INSET < deep + 2 * SAND_AISLE_HALF || su * (far - near) < 40) return null;
+    const lo = r.y + SAND_INSET + (both ? deep : 0) + SAND_AISLE_HALF, hi = r.y + r.h - SAND_INSET - deep - SAND_AISLE_HALF;
+    const y = Math.min(hi, Math.max(lo, at.y));
+    const gate = { x: near, y, a: su > 0 ? 0 : Math.PI };
+    const aisle: Aisle = { gate, join: { x: near, y }, y, half: SAND_AISLE_HALF, x0: Math.min(near, far) + (su > 0 ? 1 : 0), x1: Math.max(near, far) - (su < 0 ? 1 : 0), lane: SAND_AISLE_HALF, depth: deep, ...(swap ? { swap } : {}) };
+    const rows = [both || y - SAND_AISLE_HALF - deep >= r.y + SAND_INSET ? y - SAND_AISLE_HALF - BAY_MOUTH : null, y + SAND_AISLE_HALF + deep <= r.y + r.h - SAND_INSET + 0.01 ? y + SAND_AISLE_HALF + BAY_MOUTH : null];
+    // The first bays keep a little room from the gate (a car turns into them off the track).
+    return sandRows(aisle, rows, Math.min(near, far) + (su > 0 ? SAND_GATE_ROOM : 0), Math.max(near, far) - (su < 0 ? SAND_GATE_ROOM : 0), null, k);
+  }
+  // The track runs along x by the road, the road on one side (y): one row beyond it, a row between if there is room.
+  const sv = r.y + r.h / 2 >= at.y ? 1 : -1;
+  const near = sv > 0 ? Math.max(r.y + SAND_INSET, at.y + half + SAND_EDGE) : Math.min(r.y + r.h - SAND_INSET, at.y - half - SAND_EDGE);
+  const far = sv > 0 ? r.y + r.h - SAND_INSET : r.y + SAND_INSET;
+  const depth = sv * (far - near);
+  if (depth < deep + 2 * SAND_AISLE_HALF) return null;
+  const two = depth >= 2 * (deep + SAND_AISLE_HALF);
+  const y = near + sv * ((two ? deep : 0) + SAND_AISLE_HALF);
+  const gx = Math.min(r.x + r.w - PARK_EDGE - SAND_AISLE_HALF, Math.max(r.x + PARK_EDGE + SAND_AISLE_HALF, at.x));
+  const gate = { x: gx, y: near, a: sv > 0 ? Math.PI / 2 : -Math.PI / 2 };
+  const aisle: Aisle = { gate, join: { x: gx, y }, y, half: SAND_AISLE_HALF, x0: r.x + SAND_INSET, x1: r.x + r.w - SAND_INSET, lane: GATE_CLEAR - SAND_BAY_PITCH / 2 - 0.5, depth: deep, ...(swap ? { swap } : {}) };
+  const rows = [two ? y - sv * (SAND_AISLE_HALF + BAY_MOUTH) : null, y + sv * (SAND_AISLE_HALF + BAY_MOUTH)];
+  return sandRows(aisle, rows, r.x + SAND_INSET, r.x + r.w - SAND_INSET, gx, k);
+}
+
+/** Bays along each row line given (in the track's frame), nose in, loose; none within the gate lane of `gate` (x). */
+function sandRows(a: Aisle, rowYs: readonly (number | null)[], x0: number, x1: number, gate: number | null, k: { readonly gx: number; readonly gy: number }): SlotLayout | null {
+  const n = Math.floor((x1 - x0) / SAND_BAY_PITCH);
+  if (n <= 0) return null;
+  const step = (x1 - x0) / n;
+  const rows = rowYs.filter((y): y is number => y !== null).map((y, ri) => {
+    const up = y > a.y;
+    const out: RowSlot[] = [];
+    for (let i = 0; i < n; i++) {
+      const x = x0 + (i + 0.5) * step;
+      const nearGate = gate !== null && Math.sign(y - a.y) === Math.sign(a.gate.y - a.y);
+      if (nearGate && Math.abs(x - gate) < GATE_CLEAR) continue;
+      const j = hash01(i * SALT.sand + k.gx + ri * 31, k.gy) - 0.5, t = hash01(i * SALT.turn + k.gy + ri * 17, k.gx) - 0.5;
+      const pose = { x: x + j * 2 * SAND_SHIFT, y, a: (up ? Math.PI / 2 : -Math.PI / 2) + t * 2 * SAND_SKEW };
+      out.push({ pose: inPlan(a, pose), u: x, rank: Math.abs(x - a.join.x) + (nearGate ? TURN_BACK : 0), dir: 1 });
+    }
+    return out;
+  });
+  if (rows.every((r) => r.length === 0)) return null;
+  return { ...fromRows(rows.filter((r) => r.length > 0), true, step, a), maxLen: PARK_MAX_LEN };
+}
+
+/** The sand's cars: by a track where the road meets the sand square, else loose rows by the road. */
 function sandLayout(cells: { readonly gx: number; readonly gy: number; readonly w: number; readonly h: number }, road: RoadPoint | null): SlotLayout {
+  const tracked = road ? sandAisles(boxOf(cells), road, cells) : null;
+  return tracked ?? looseSand(cells, road);
+}
+
+/** Rows of cars on the sand by the road, from the middle column outward; a space off the sand is not one. */
+function looseSand(cells: { readonly gx: number; readonly gy: number; readonly w: number; readonly h: number }, road: RoadPoint | null): SlotLayout {
   const r = boxOf(cells);
   const { anchor, away } = sandFrame(r, road);
   const along = away - Math.PI / 2;

@@ -10,6 +10,8 @@ import { flatPlaceholder } from '../placeholders';
 import { HAND, INK, INK_SOFT, KERB_BLUE } from '../style';
 import type { Brush } from './roadPaint';
 import { isGarden } from '../gardenLayout';
+import { parkLayout, sandLayout } from '../../city/spotShapes';
+import { GATE_HALF, gateOpening, paintCarPark, paintSandTrack } from './carParkPaint';
 
 /** The ground under lots and car parks: worn pads, driveways, parks, squares, the Master Plan's outlines. */
 const INSET = 5;
@@ -45,6 +47,8 @@ export function paintLots(b: Brush, s: LotScene, box: Box): void {
     else if (planned(l, s.year)) plan(b.g, l, s.firstYear);
   }
   for (const p of s.parks) if (boxesMeet(lotBox(p), box)) carPark(b, s, p);
+  // A public beach's cars drive a worn track on the sand (the same layout the city parks them by).
+  for (const beach of s.beaches) if (beach.state === 'public' && boxesMeet(lotBox(beach.rect), box)) paintSandTrack(b.g, sandLayout([...s.roads.values()], beach.rect));
   for (const pr of s.plans) planRoad(b.g, pr, s.firstYear, box);
 }
 
@@ -139,6 +143,28 @@ function driveway(b: Brush, s: LotScene, r: Rect, access: { readonly road: Id; r
   g.restore();
 }
 
+/** A car park's gate apron: paved from the road straight to the gate, as wide as the gate the cars turn square into. */
+function gateApron(b: Brush, s: LotScene, gate: Pt, access: { readonly road: Id; readonly s: number }): void {
+  const road = s.roads.get(access.road);
+  if (!road) return;
+  const n = nearestOnLine(road.line, gate);
+  const { g } = b;
+  g.save();
+  g.lineCap = 'butt';
+  const way = linePath([n.at, gate]);
+  g.strokeStyle = INK_SOFT;
+  g.lineWidth = GATE_APRON + 1.4;
+  g.stroke(way);
+  g.strokeStyle = b.pattern('asphalt');
+  g.lineWidth = GATE_APRON;
+  g.stroke(way);
+  g.restore();
+}
+/** A car park's tarmac starts this far inside its paved rim. */
+const TARMAC_IN = 4;
+/** Px wide (the planner's gate apron, src/city/moveGround.ts). */
+const GATE_APRON = 2 * GATE_HALF;
+
 /** The Master Plan: pencil on the sand where a lot will open. */
 function plan(g: CanvasRenderingContext2D, l: Lot, firstYear: number): void {
   const r = lotRect(l);
@@ -187,7 +213,10 @@ function label(g: CanvasRenderingContext2D, r: Rect, name: string, when: string)
 function carPark(b: Brush, s: LotScene, p: CarPark): void {
   const { g } = b;
   const r = lotRect(p);
-  if (p.access) driveway(b, s, r, p.access);
+  const surface = p.kind === 'lot' || p.kind === 'ride';
+  const l = surface ? parkLayout([...s.roads.values()], p) : null;
+  if (l?.aisle && p.access) gateApron(b, s, l.aisle.gate, p.access);
+  else if (p.access) driveway(b, s, r, p.access);
   g.save();
   const edge = polyPath(wobble(corners(r, 3), 0.6, 18, p.id));
   g.lineJoin = 'round';
@@ -196,7 +225,15 @@ function carPark(b: Brush, s: LotScene, p: CarPark): void {
   g.lineWidth = 1.4;
   g.fill(edge);
   g.stroke(edge);
-  if (p.kind === 'lot' || p.kind === 'ride') {
+  // Bays, aisle and gate painted where the cars really park and drive; the picture only where there is no aisle.
+  if (l?.aisle) {
+    // Tarmac inside a paved rim, so the white bay lines read as they do on the roads.
+    const inner = polyPath(wobble(corners(r, TARMAC_IN), 0.4, 18, p.id + 7));
+    g.fillStyle = b.pattern('asphalt');
+    g.fill(inner);
+    gateOpening(g, l, r, b.pattern('asphalt'));
+    paintCarPark(g, l);
+  } else if (surface) {
     const key = p.kind === 'lot' ? 'flat/carpark-lot' : 'flat/carpark-ride';
     const pic = b.pics.get(key, () => flatPlaceholder(key));
     g.drawImage(pic.img, r.x + 5, r.y + 5, r.w - 10, r.h - 10);

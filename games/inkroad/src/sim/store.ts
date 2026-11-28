@@ -39,12 +39,11 @@ export class CarStore implements CarsView {
   readonly track: (Track | null)[] = new Array<Track | null>(MAX_CARS).fill(null);
   readonly s = f64();
   readonly v = f64();
-  readonly nv = f64(); // speed wanted next
-  readonly acc = f64(); // acceleration this step (jerk-limited)
-  readonly room = f64(); // hard limit on this step's travel
+  readonly acc = f64(); // acceleration the IDM commands this step (the car's own limits bound it, src/sim/drawn.ts)
+  readonly room = f64(); // px the front may still go before what it must never drive into (plus that thing's own stopping)
   readonly len = f32();
   readonly half = f32();
-  /** Half the drawn body's length (src/sim/vehicleSize.ts), and px the drawn car is behind its sim point (+) or past it (-). */
+  /** Half the drawn body's length (src/sim/vehicleSize.ts), and px of a played turn's sweep behind the car's point. */
   readonly body = f32();
   readonly lag = f32();
   readonly vf = f32(); // driver's speed factor
@@ -69,7 +68,7 @@ export class CarStore implements CarsView {
   readonly rx = f32();
   readonly ry = f32();
   readonly rh = f32();
-  // the drawn car (src/sim/drawn.ts): rear axle, heading, speed, wheel angle, acceleration; fOn: 0 new, 1 driving, 2 held
+  // the car itself (src/sim/drawn.ts): rear axle, heading, speed, wheel angle, acceleration; fOn: 0 new, 1 driving, 2 held
   readonly fx = f64();
   readonly fy = f64();
   readonly fth = f64();
@@ -77,6 +76,8 @@ export class CarStore implements CarsView {
   readonly fdelta = f64();
   readonly fa = f64();
   readonly fOn = new Uint8Array(MAX_CARS);
+  /** The sim tick the car was last driven (its frames of this step are written). */
+  readonly drove = new Uint32Array(MAX_CARS);
   /** A turn round on the road played by the vehicle model (src/sim/turning.ts), and the sim time it starts playing: the car stands until it is done. */
   readonly play: (Played | null)[] = new Array<Played | null>(MAX_CARS).fill(null);
   readonly playAt = f64();
@@ -89,8 +90,7 @@ export class CarStore implements CarsView {
   /** Tracks it came by (the rear axle may still be on them), newest first. */
   readonly hist0: (Track | null)[] = new Array<Track | null>(MAX_CARS).fill(null);
   readonly hist1: (Track | null)[] = new Array<Track | null>(MAX_CARS).fill(null);
-  /** Speed at the start of this step and px driven in it (the drawn car's sub-steps ramp between them). */
-  readonly v0 = f64();
+  /** Px of progress the car made in this step. */
   readonly travel = f64();
   /** Drawn frames: SUB + 1 per car (frame 0 = the last of the step before), x, y, heading, z each. */
   readonly frames = new Float64Array(MAX_CARS * (SUB + 1) * FRAME_STRIDE);
@@ -137,9 +137,10 @@ export class CarStore implements CarsView {
     this.track[i] = null;
     this.opt[i] = this.outTo[i] = this.exitBy[i] = null;
     this.field[i] = '';
-    for (const a of [this.s, this.v, this.nv, this.waited, this.stuck, this.linkWait, this.tolls, this.until, this.ticket, this.destS, this.destAt, this.rerouted]) a[i] = 0;
-    for (const a of [this.offX, this.offY, this.offEnd, this.offLen, this.anger, this.z, this.speed, this.v0, this.travel, this.acc]) a[i] = 0;
+    for (const a of [this.s, this.v, this.waited, this.stuck, this.linkWait, this.tolls, this.until, this.ticket, this.destS, this.destAt, this.rerouted]) a[i] = 0;
+    for (const a of [this.offX, this.offY, this.offEnd, this.offLen, this.anger, this.z, this.speed, this.travel, this.acc]) a[i] = 0;
     this.fOn[i] = 0;
+    this.drove[i] = 0;
     this.play[i] = this.reserve[i] = null;
     this.playTo[i] = null;
     this.hist0[i] = this.hist1[i] = null;
@@ -217,8 +218,10 @@ export class CarStore implements CarsView {
   /** Start a sideways slide of the reference from its pose before (x, y) to the car's new place: no step in it. */
   slideFrom(i: number, x: number, y: number, over: number): void {
     poseAt(this.track[i]!, this.s[i]!, POSE);
-    this.offX[i] = x - POSE.x;
-    this.offY[i] = y - POSE.y;
+    // Only the sideways part slides: along the track the car's progress is read off where the car is (src/sim/drawn.ts).
+    const nx = -Math.sin(POSE.h), ny = Math.cos(POSE.h), side = (x - POSE.x) * nx + (y - POSE.y) * ny;
+    this.offX[i] = side * nx;
+    this.offY[i] = side * ny;
     // Never a sideways move tighter than a car turns, nor one its wheels can't follow at its speed.
     const len = Math.max(over, shiftLength(Math.hypot(this.offX[i]!, this.offY[i]!), this.v[i]!));
     this.offEnd[i] = this.s[i]! + len;

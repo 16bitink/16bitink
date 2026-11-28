@@ -19,6 +19,8 @@ import type { Standing } from './day';
 import { lotRect, polyLength, type Rect } from './geometry';
 import { groundFor, nearestRoad, roadSide, type Ground } from './moveGround';
 import { logMove } from '../sim/moveLog';
+import { inPlan, type Aisle } from '../sim/slotGeometry';
+import { aisleIn, aisleOut } from './aislePlan';
 import { roadSlots, spanOf, standS } from './slots';
 import type { City } from './state';
 
@@ -89,6 +91,8 @@ export function standPose(c: City, e: Standing): MiddlePose | null {
 function moveRoad(c: City, e: Standing): Road | undefined {
   const k = e.spot.kind;
   const poses = e.spot.layout?.poses ?? [];
+  const a = e.spot.layout?.aisle;
+  if (k === 'sand' && a) return nearestRoad(c, inPlan(a, a.gate));
   if (k === 'sand' && poses.length) return nearestRoad(c, poses[0]!);
   return roadOf(c, k === 'kerb' || k === 'street' || k === 'double' ? e.spot.id : 'road' in e.spot.access ? e.spot.access.road : -1);
 }
@@ -164,11 +168,16 @@ export function planIn(c: City, e: Standing, lane: LanePose, uid = -1, gap: (at:
   const road = moveRoad(c, e);
   const cross = e.spot.kind !== 'double' && isAcross(road, lane, space.pose);
   const turn = turnsRound(lane, space.pose);
-  const w = groundFor(c, { spot: e.spot, from: lane, to: space.pose, self: e.uid, road: uid, poseOf: (o) => standPose(c, o), mouth: space.fade ? mouthArea(c, e) : null, ...(road && !turn ? { reverseOn: { road: road.id, side: roadSide(road, lane) } } : {}) });
-  const backIn = e.spot.kind === 'park' || e.spot.kind === 'home';
+  const ask = { spot: e.spot, from: lane, to: space.pose, self: e.uid, road: uid, poseOf: (o: Standing) => standPose(c, o), mouth: space.fade ? mouthArea(c, e) : null, ...(road && !turn ? { reverseOn: { road: road.id, side: roadSide(road, lane) } } : {}) };
+  const w = groundFor(c, ask);
+  const aisle = aisleOf(e);
+  // A car park bay is reached by its aisle, on the aisle's ground only (falling back to the whole park where that does not fit).
+  const wa = aisle && road ? groundFor(c, { ...ask, bay: space.pose, reverseOn: { road: road.id, side: roadSide(road, lane) } }) : null;
+  const backIn = e.spot.kind === 'home';
   // Across the road it stops in its lane and waits for its gap first (the wait is part of the move it plays).
   const at0 = road ? { road: road.id, s: project(road.line, lane).s } : null;
-  const play = (pause: number): Played => viaAisle(c, e, p, lane, space.pose, w, pause) ?? playInto(p, lane, space.pose, w, !space.fade, { turnaround: turn, backIn: backIn && !cross, forwardOnly: (cross && !turn) || e.spot.kind === 'double', onRoad: e.spot.kind === 'double', pause }, lane.v ?? 0, lane.acc ?? 0, lane.delta ?? 0);
+  // A multi-storey's or underground mouth is driven into nose first.
+  const play = (pause: number): Played => (aisle && wa ? aisleIn(p, lane, space.pose, aisle, wa, pause) : null) ?? playInto(p, lane, space.pose, w, !space.fade, { turnaround: turn, backIn: backIn && !cross, forwardOnly: (cross && !turn) || e.spot.kind === 'double' || space.fade, onRoad: e.spot.kind === 'double', pause }, lane.v ?? 0, lane.acc ?? 0, lane.delta ?? 0);
   // `after`: it stands that long first in any case (another move's body is in its way until then).
   let wait = Math.max(after, cross && at0 ? gap(at0, lane.a) : 0);
   let played = play(wait);
@@ -203,23 +212,8 @@ function restAhead(c: City, e: Standing, lane: LanePose, p: VehicleParams): void
 /** As src/sim/vehicle/moves.ts: braking gentler than the planned most. */
 const REST_SHARE = 0.7;
 
-/** Px along the aisle past a bay's column a car drives before it backs into the bay. */
-const AISLE_PAST = 22;
-
-/**
- * A two-row car park: through the gate and along the aisle past the bay, then back into it (the owner: turn in at the
- * gate, drive the aisle, line up, enter the bay). Null where it has no aisle or that way does not fit.
- */
-function viaAisle(c: City, e: Standing, p: VehicleParams, lane: LanePose, slot: MiddlePose, w: Ground, wait: number): Played | null {
-  const a = e.spot.kind === 'park' ? e.spot.layout?.aisle : undefined;
-  if (!a) return null;
-  const way = slot.x >= a.gate.x ? 1 : -1;
-  const wp = { x: slot.x + way * AISLE_PAST, y: a.y, a: way > 0 ? 0 : Math.PI };
-  const first = playInto(p, lane, wp, w, false, { pause: wait }, lane.v ?? 0, lane.acc ?? 0, lane.delta ?? 0);
-  if (!first.fits) return null;
-  const second = playInto(p, endOf(first), slot, w, true, { backIn: true });
-  return second.fits ? joinPlayed(first, second) : null;
-}
+/** The aisle of a two-row car park the standing car's place has (none elsewhere). */
+const aisleOf = (e: Standing): Aisle | undefined => (e.spot.kind === 'park' || e.spot.kind === 'sand' ? e.spot.layout?.aisle : undefined);
 
 function mouthArea(c: City, e: Standing): { rect: Rect; at: Pt } | null {
   const park = c.parks.find((q) => q.id === e.spot.id);
@@ -249,9 +243,11 @@ function laneAlong(road: Road, base: LanePose): { at: (s: number) => MiddlePose 
  */
 export function planOut(c: City, e: Standing, lane: LanePose, ahead = JOIN_AHEAD): OutPlan | null {
   const t0 = performance.now();
-  const from = standPose(c, e);
+  const stood = standPose(c, e);
   const space = spaceOf(c, e, lane);
-  if (!from || !space) return null;
+  if (!stood || !space) return null;
+  // Inside a multi-storey or underground the car has turned round: it comes out of the mouth nose first.
+  const from = space.fade ? { ...stood, a: stood.a + Math.PI } : stood;
   const p = paramsOf(e.kind);
   const road = moveRoad(c, e);
   const turn = turnsRound(from, lane);
@@ -259,10 +255,16 @@ export function planOut(c: City, e: Standing, lane: LanePose, ahead = JOIN_AHEAD
   const goals = along ? laneOffers((d) => along.at(along.s0 + along.way * (d - along.s0)), along.s0, ahead) : [];
   const offers = goals.length ? goals : [{ s: 0, pose: lane, cost: 0 }];
   const cross = e.spot.kind !== 'double' && isAcross(road, lane, from);
-  const w = groundFor(c, { spot: e.spot, from, to: lane, self: e.uid, poseOf: (o) => standPose(c, o), mouth: space.fade ? mouthArea(c, e) : null, ...(road && !turn ? { reverseOn: { road: road.id, side: roadSide(road, from) } } : {}) });
+  const ask = { spot: e.spot, from, to: lane, self: e.uid, poseOf: (o: Standing) => standPose(c, o), mouth: space.fade ? mouthArea(c, e) : null, ...(road && !turn ? { reverseOn: { road: road.id, side: roadSide(road, from) } } : {}) };
+  const w = groundFor(c, ask);
   // A car a few px off its lane line facing its way (double-parked, a taxi at the kerb) is no manoeuvre: it drives off and steers back (the moving car's own slide).
   if (e.spot.kind === 'double' && !turn && nearLine(from, lane)) return null;
-  const m = playOutOf(p, from, offers, w, bandOf(road, lane, cross || turn), { turnaround: turn });
+  const band = bandOf(road, lane, cross || turn);
+  const aisle = aisleOf(e);
+  // A car park bay is left by its aisle: back out into it, then forward out of the gate.
+  const viaAisle = aisle && road ? aisleOut(p, from, aisle, offers, groundFor(c, { ...ask, bay: space.pose, reverseOn: { road: road.id, side: roadSide(road, lane) } }), band) : null;
+  const plain = viaAisle ? null : playOutOf(p, from, offers, w, band, { turnaround: turn, forwardOnly: space.fade });
+  const m = viaAisle ? { ...viaAisle.out, toEdge: joinPlayed(viaAisle.back, viaAisle.out.toEdge) } : plain;
   if (!m) return null;
   const over = !!road && !cross && !turn && e.spot.kind !== 'double' && (reachesFar(m.toEdge, road, lane, roadSide(road, lane), p.len, p.wid) || reachesFar(m.join, road, lane, roadSide(road, lane), p.len, p.wid));
   const s = along ? along.s0 + along.way * (offers[m.goal]!.s - along.s0) : 0;

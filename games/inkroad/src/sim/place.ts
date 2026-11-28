@@ -33,6 +33,19 @@ export function spaceAt(sim: Sim, t: Track, s: number, h: number, v: number): bo
     const gap = Math.abs(d) - c.half[q]! - h - (d >= 0 ? Math.max(0, c.lag[q]!) : 0);
     if (d >= 0 ? gap < IDM.standGap : gap < IDM.standGap + Math.max(0, c.v[q]! - v) * MERGE_TIME) return false;
   }
+  return t.kind !== LANE_T || clearPastEnd(sim, t, s, h);
+}
+
+/** No car just past the lane's end (on a turn out of it) has its back within reach of a car standing at s. */
+function clearPastEnd(sim: Sim, t: Track, s: number, h: number): boolean {
+  const c = sim.cars;
+  const left = t.len - s - h;
+  if (left > 40) return true;
+  for (const o of sim.world.links[t.link]?.opts ?? []) {
+    const n = o.conn[t.lane];
+    if (!n || n.kind === LANE_T) continue;
+    for (let q = n.tail; q >= 0; q = c.ahead[q]!) if (left + c.s[q]! - c.body[q]! < IDM.standGap) return false;
+  }
   return true;
 }
 
@@ -104,7 +117,8 @@ export function place(sim: Sim, i: number, l: LinkRt, from: Access, still = fals
     const s = gate ? c.half[i]! : laneS(l, from.s);
     const v = gate ? t.vmax * 0.8 * sim.speed : still ? 0 : ENTRY_SPEED;
     const q = t.tail;
-    const startV = gate && q >= 0 ? Math.min(v, c.v[q]! + Math.max(0, c.s[q]! - s) * 0.4) : v;
+    // A car entering at a gate behind a queue could have stopped for it: no faster than it can brake to its tail.
+    const startV = gate && q >= 0 ? Math.min(v, Math.sqrt(c.v[q]! ** 2 + 2 * IDM.brake * 0.6 * Math.max(0, c.s[q]! - c.body[q]! - s - c.half[i]! - IDM.standGap))) : v;
     if (!gate && t.incoming > 0 && s - c.half[i]! < t.incoming && (q < 0 || c.s[q]! > s)) continue;
     if (gate ? q >= 0 && c.s[q]! - c.half[q]! - c.len[i]! < IDM.standGap + startV * 0.25 : !spaceAt(sim, t, s, c.half[i]!, v)) continue;
     c.insert(i, t, s);

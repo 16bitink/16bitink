@@ -3,7 +3,7 @@ import type { MovePlay, Pt, Road } from '../sim/types';
 import type { Leg, Spot, Standing } from './day';
 import { centreOf } from './geometry';
 import { accessExists } from './net';
-import { bodyPose } from '../sim/slotGeometry';
+import { bodyPose, inPlan } from '../sim/slotGeometry';
 import { claim, clearToLeave, freeSlots, pickSlot, roadSlots, sAlong, sideHeading, spanOf, standS } from './slots';
 import { legKind } from './vehicleKinds';
 import { viewKind } from './stand';
@@ -153,10 +153,10 @@ function aimOffRoad(c: City, leg: Leg, spot: Spot): Access {
   const k = l ? pickSlot(c, spot, 0, leg, leg.tour.id, kind) : -1;
   const pose = l && k >= 0 ? bodyPose(l, spanOf(spot, k, kind), kind) : null;
   // The road by the space (a beach's sand may lie by another road than its lot's access).
-  const road = pose && spot.kind === 'sand' ? nearestRoad(c, pose) : 'road' in spot.access ? roadOf(c, spot.access.road) : undefined;
-  if (!l || !road || !pose) return spot.access;
-  // A two-row car park is entered by its gate: the driver stops by the gate, not by the bay.
-  const by = l.aisle ? l.aisle.gate : pose;
+  // A car park or a beach track is entered by its gate: the driver stops by the gate, not by the bay.
+  const by = l?.aisle ? inPlan(l.aisle, l.aisle.gate) : pose;
+  const road = by && spot.kind === 'sand' ? nearestRoad(c, by) : 'road' in spot.access ? roadOf(c, spot.access.road) : undefined;
+  if (!l || !road || !pose || !by) return spot.access;
   const at = { road: road.id, s: sAlong(road, by) };
   if (!accessExists(c.net, at)) return spot.access;
   claim(c, spot, k, leg);

@@ -57,6 +57,8 @@ export interface PlanOptions {
   readonly turnaround?: boolean;
   /** Forward only (turning across the road into a space: one nose-first turn, never backing across a lane). */
   readonly forwardOnly?: boolean;
+  /** Reverse only (backing out of a nose-in car-park bay into the aisle). */
+  readonly reverseOnly?: boolean;
 }
 
 /**
@@ -93,6 +95,7 @@ const wrapA = (a: number): number => Math.atan2(Math.sin(a), Math.cos(a));
 /** May this candidate run between these poses? No loops; a goal nearly ahead is a forward S. */
 function allowed(p: RsPath, a: Pose, b: Pose, o: PlanOptions): boolean {
   if (o.forwardOnly && p.lengths.some((l) => l < -1e-9)) return false;
+  if (o.reverseOnly && p.lengths.some((l) => l > 1e-9)) return false;
   const net = Math.abs(wrapA(b.th - a.th));
   // Never a loop, not even turning round: the heading never sweeps much more than the change it is for.
   if (sweepOf(p) > net + LOOP_SLACK) return false;
@@ -170,7 +173,7 @@ export function planManoeuvre(starts: readonly Offer[], goals: readonly Offer[],
     if (m && (!best || m.cost < best.cost)) best = m;
   }
   if (best) return best;
-  return cheapest(starts, goals, v, w, v.rPlan, false, o) ?? cheapest(starts, goals, v, w, v.rPlan, false, { turnaround: true, forwardOnly: o.forwardOnly });
+  return cheapest(starts, goals, v, w, v.rPlan, false, o) ?? cheapest(starts, goals, v, w, v.rPlan, false, { turnaround: true, forwardOnly: o.forwardOnly, reverseOnly: o.reverseOnly });
 }
 
 function cheapest(starts: readonly Offer[], goals: readonly Offer[], v: VehicleParams, w: World, r: number, mustFit: boolean, o: PlanOptions): Manoeuvre | null {

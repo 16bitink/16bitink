@@ -83,8 +83,13 @@ function lightAllows(sim: Sim, i: number, conn: Track, n: NodeRt, d: number): bo
   if (greenFor(n, lane, sim)) return true;
   // A driver who waited out the green for a gap turns on the amber.
   const mine = n.phases[n.phase]!.some((l) => l.i === lane.link);
-  return mine && n.light === 1 && conn.left && d < SIGNAL.sneak && sim.cars.linkWait[i]! > 1;
+  if (mine && n.light === 1 && conn.left && d < SIGNAL.sneak && sim.cars.linkWait[i]! > 1) return true;
+  // The amber is for stopping: a driver too close to stop short of the line comfortably goes on through it.
+  return mine && n.light === 1 && d < tooCloseToStop(sim.cars.v[i]!);
 }
+
+/** Px within which a car at v can't stop short of a line at a comfortable rate (its foot ramps for 0.4 s first). */
+const tooCloseToStop = (v: number): number => (v * v) / (2 * IDM.brake) + v * 0.4;
 
 /** Patience shrinks the gap a driver will take. */
 function gapNow(wait: number, gap: number): number {
