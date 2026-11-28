@@ -12,13 +12,15 @@ import { SEED, inner } from './city-helpers';
 const palm = (lots: readonly Lot[]): Lot => lots.find((l) => l.name === 'Palm Row')!;
 
 describe('garden lots', () => {
-  it('Palm Row is a 4 x 4 garden lot that counts as the 4 x 2 lot it replaced', () => {
+  it('Palm Row has two garden lots whose gardens add no households', () => {
     const c = inner(createCity(SAFFRON, SEED));
     const garden = palm(c.lots);
-    expect(garden).toMatchObject({ w: 4, h: 4, garden: true });
+    const east = c.lots.find((l) => l.name === 'Palm Row East')!;
+    expect(garden).toMatchObject({ w: 2, h: 4, garden: true });
+    expect(east).toMatchObject({ w: 2, h: 4, garden: true });
     const plain: Lot = { ...garden, h: 2, gy: garden.gy + 2, garden: undefined };
     expect(builtArea(garden)).toBe(builtArea(plain));
-    expect(builtArea(garden)).toBe(8);
+    expect(builtArea(garden) + builtArea(east)).toBe(8);
     const profile = routineOf(c);
     expect(householdsIn(c, { ...garden, access: garden.access ?? plain.access }, profile)).toBe(householdsIn(c, { ...plain, access: garden.access }, profile));
     const people = population(c);

@@ -1,6 +1,6 @@
 import type Phaser from 'phaser';
 import { FOOTPRINTS, GARDEN_KIND, GROUND_KINDS, PLOT_KINDS, VARIANTS } from '../../art/manifest';
-import { FRONT_STREET_SETBACK, insetRect, lotRect } from '../../city/geometry';
+import { lotRect } from '../../city/geometry';
 import { CELL } from '../../sim/constants';
 import { gardenPlan, gardenVariant, isGarden } from '../gardenLayout';
 import type { CarPark, CityView, Id, Lot } from '../../sim/types';
@@ -15,11 +15,11 @@ const PLOT = 2; // cells
 export interface PlotSpot { readonly x: number; readonly y: number; readonly size: number; readonly kind: string; readonly variant: number }
 
 /** Where a lot's buildings stand (the middle of each footprint's south edge). */
-export function plotSpots(l: Pick<Lot, 'id' | 'kind' | 'gx' | 'gy' | 'w' | 'h' | 'variant' | 'garden'>, setback = 0): PlotSpot[] {
+export function plotSpots(l: Pick<Lot, 'id' | 'kind' | 'gx' | 'gy' | 'w' | 'h' | 'variant' | 'garden'>): PlotSpot[] {
   if (GROUND_KINDS.includes(l.kind)) return [];
   // A garden lot builds only its north two rows; the rest is front garden.
   const built = isGarden(l) && PLOT_KINDS.includes(l.kind) ? { ...l, h: PLOT } : l;
-  const r = insetRect(lotRect(built), setback);
+  const r = lotRect(built);
   if (!PLOT_KINDS.includes(l.kind)) {
     const [fw, fh] = FOOTPRINTS[l.kind] ?? [2, 2];
     const size = Math.min(1, r.w / (fw * CELL), r.h / (fh * CELL));
@@ -40,13 +40,11 @@ export function plotSpots(l: Pick<Lot, 'id' | 'kind' | 'gx' | 'gy' | 'w' | 'h' |
 }
 
 /** A garden lot's front gardens: one painted piece under each plot column, standing on the lot's south edge. */
-export function gardenSpots(l: Pick<Lot, 'id' | 'kind' | 'gx' | 'gy' | 'w' | 'h' | 'variant' | 'garden'>, setback = 0): PlotSpot[] {
+export function gardenSpots(l: Pick<Lot, 'id' | 'kind' | 'gx' | 'gy' | 'w' | 'h' | 'variant' | 'garden'>): PlotSpot[] {
   if (!isGarden(l) || !PLOT_KINDS.includes(l.kind)) return [];
   const n = VARIANTS[GARDEN_KIND] ?? 1;
-  const r = lotRect(l), inner = insetRect(r, setback);
-  const size = Math.min(inner.w / r.w, (PLOT * CELL - 2 * setback) / (PLOT * CELL));
   return gardenPlan(l).pieces.map((p, i) => ({
-    x: inner.x + (p.x - r.x) * inner.w / r.w, y: p.y - setback, size, kind: GARDEN_KIND, variant: gardenVariant(l, i, n),
+    x: p.x, y: p.y, size: 1, kind: GARDEN_KIND, variant: gardenVariant(l, i, n),
   }));
 }
 
@@ -63,18 +61,18 @@ export class LotsView {
   /** Bring the buildings up to date. The first time nothing pops. */
   sync(city: CityView): void {
     const first = this.lastLots === null;
-    if (city.lots !== this.lastLots) { this.lastLots = city.lots; this.syncLots(city.lots, first, city.def.frontStreets ? FRONT_STREET_SETBACK : 0); }
+    if (city.lots !== this.lastLots) { this.lastLots = city.lots; this.syncLots(city.lots, first); }
     if (city.carParks !== this.lastParks) { this.lastParks = city.carParks; this.syncParks(city.carParks, first); }
   }
 
-  private syncLots(lots: readonly Lot[], quiet: boolean, setback: number): void {
+  private syncLots(lots: readonly Lot[], quiet: boolean): void {
     const seen = new Set<Id>();
     for (const l of lots) {
       seen.add(l.id);
       const s = this.lots.get(l.id);
       if (s && s.lot.level === l.level && s.lot.gx === l.gx && s.lot.gy === l.gy && s.lot.w === l.w && s.lot.h === l.h && s.lot.variant === l.variant && s.lot.garden === l.garden && s.lot.kind === l.kind) continue;
       s?.things.forEach((t) => this.things.remove(t));
-      const things = l.level === 0 ? [] : [...plotSpots(l, setback), ...gardenSpots(l, setback)].map((p) => this.things.add(this.things.atlas.building(p.kind, p.kind === GARDEN_KIND ? 1 : l.level, p.variant), p.x, p.y, { size: p.size }));
+      const things = l.level === 0 ? [] : [...plotSpots(l), ...gardenSpots(l)].map((p) => this.things.add(this.things.atlas.building(p.kind, p.kind === GARDEN_KIND ? 1 : l.level, p.variant), p.x, p.y, { size: p.size }));
       this.lots.set(l.id, { lot: l, things });
       if (!quiet) things.forEach((t, i) => this.pop(t, i));
     }

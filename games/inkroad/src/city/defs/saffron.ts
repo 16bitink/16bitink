@@ -1,5 +1,5 @@
 import type { CityDef } from '../../sim/types';
-import { BEACHES, GATES, LOTS, MAP, ROADS_DEF } from './saffronMap';
+import { BEACHES, GATES, LOTS, MAP, ROADS_DEF, saffronCell } from './saffronMap';
 import { SAFFRON_ROUTINE } from './saffronRoutine';
 import { SAFFRON_YEARS } from './saffronYears';
 
@@ -14,11 +14,12 @@ export const SAFFRON: CityDef = {
   startMoney: 240,
   startControl: 'yield',
   roads: ROADS_DEF,
-  controls: [{ cell: [22, 8], control: 'roundabout' }],
+  controls: [{ cell: saffronCell(22, 8), control: 'roundabout' }],
   lots: LOTS,
   gates: GATES,
   beaches: BEACHES,
   frontStreets: true,
+  wideRoadGrid: true,
   years: SAFFRON_YEARS,
   routine: SAFFRON_ROUTINE,
   rules: { carOwnership: 0.82, landPrice: 2, widen: true },

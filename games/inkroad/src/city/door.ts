@@ -4,7 +4,7 @@ import type { Access, LanePose, SpawnRequest } from '../sim/trafficTypes';
 import type { VehicleKind } from '../sim/types';
 import { carById } from './households';
 import type { Leg, Place } from './day';
-import { FRONT_STREET_SETBACK, insetRect, lotRect } from './geometry';
+import { lotRect } from './geometry';
 import { endOf, fitsInside, planDoor, type TryMerge } from './movePlan';
 import { hitsBody, rollingJoin } from './manoeuvre';
 import { viewKind } from './stand';
@@ -60,7 +60,7 @@ export function garageAccess(c: City, key: string | undefined): Access | null {
 function rectOf(c: City, key: string): Rect | null {
   const site = siteOf(c, key);
   if (!site) return null;
-  return insetRect(lotRect(site), key.startsWith('lot:') && c.def.frontStreets ? FRONT_STREET_SETBACK : 0);
+  return lotRect(site);
 }
 
 /** Drive through the entrance only when the whole car reaches the indoor pose. */

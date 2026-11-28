@@ -27,7 +27,10 @@ export function bandMeetsBox(b: Rect, ax: number, ay: number, bx: number, by: nu
 }
 
 export function roadMeetsBox(b: Rect, line: readonly Pt[], road: Pick<Road, 'type' | 'oneWay' | 'flyover'>): boolean {
-  const reach = halfWidth(road) + sidewalkWidth(road);
+  return lineMeetsBox(b, line, halfWidth(road) + sidewalkWidth(road));
+}
+
+function lineMeetsBox(b: Rect, line: readonly Pt[], reach: number): boolean {
   for (let i = 1; i < line.length; i++) {
     const a = line[i - 1]!, z = line[i]!;
     if (bandMeetsBox(b, a.x, a.y, z.x, z.y, reach)) return true;
@@ -44,12 +47,23 @@ const boxesOf = (def: CityDef): readonly Box[] => [
   ...(def.beaches ?? []).flatMap((b) => (b.plots ?? []).map((p) => ({ name: p.name, x: p.gx * CELL, y: p.gy * CELL, w: p.w * CELL, h: p.h * CELL }))),
 ];
 
+export function reservedRoadReach(type: Road['type']): number {
+  const road = { type: type === 'highway' ? type : 'boulevard' as const, oneWay: false };
+  return halfWidth(road) + sidewalkWidth(road) + KERB_ROOM;
+}
+
+/** Road corridors remain clear while the streets are still narrow or have yet to open. */
+export function meetsRoadReserve(def: CityDef, b: Rect): boolean {
+  return def.wideRoadGrid === true && def.roads.some((r) =>
+    lineMeetsBox(b, r.cells.map(([x, y]) => ({ x: x * CELL, y: y * CELL })), reservedRoadReach(r.type)));
+}
+
 /** Every lot or beach plot a Council road's paved width (and its kerb) reaches onto. */
 export function roadRoomProblems(def: CityDef): readonly string[] {
   const boxes = boxesOf(def);
   const out: string[] = [];
   for (const r of def.roads) {
-    const reach = halfWidth({ type: r.type, oneWay: false }) + KERB_ROOM;
+    const reach = def.wideRoadGrid ? reservedRoadReach(r.type) : halfWidth({ type: r.type, oneWay: false }) + KERB_ROOM;
     for (let i = 1; i < r.cells.length; i++) {
       const [ax, ay] = r.cells[i - 1]!, [bx, by] = r.cells[i]!;
       for (const b of boxes) {

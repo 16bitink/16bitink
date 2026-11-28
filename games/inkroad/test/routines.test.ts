@@ -175,7 +175,8 @@ describe('households and their days', () => {
     const b = inner(back);
     expect([...fleetOf(b).cars.values()].every((x) => atHome(b, x))).toBe(true);
     const home = (back.parking ?? []).filter((p) => p.kind === 'home').flatMap((p) => p.cars.filter((k) => k.household !== undefined));
-    expect(home).toHaveLength(fleetOf(b).cars.size);
+    const indoors = [...fleetOf(b).cars.values()].filter((car) => car.garage);
+    expect(home.length + indoors.length).toBe(fleetOf(b).cars.size);
   });
 
   it('answers who lives in a home and what they do', () => {

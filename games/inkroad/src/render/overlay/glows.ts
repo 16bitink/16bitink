@@ -1,4 +1,3 @@
-import { FRONT_STREET_SETBACK } from '../../city/geometry';
 import Phaser from 'phaser';
 import type { CityView, Pt } from '../../sim/types';
 import { projectY } from '../projection';
@@ -22,7 +21,7 @@ export class Glows {
     this.layer.removeAll(true);
     for (const l of city.lots) {
       if (l.level === 0) continue;
-      for (const s of plotSpots(l, city.def.frontStreets ? FRONT_STREET_SETBACK : 0)) this.add(s.x, s.y - 14, HOME.size * s.size * (1 + l.level * 0.08) * (s.kind === 'home' || s.kind === 'shops' || s.kind === 'office' ? 1 : 1.9), HOME.up, HOME.alpha);
+      for (const s of plotSpots(l)) this.add(s.x, s.y - 14, HOME.size * s.size * (1 + l.level * 0.08) * (s.kind === 'home' || s.kind === 'shops' || s.kind === 'office' ? 1 : 1.9), HOME.up, HOME.alpha);
     }
     for (const p of lamps) this.add(p.x, p.y, LAMP.size, LAMP.up, LAMP.alpha);
   }

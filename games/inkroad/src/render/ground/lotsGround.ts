@@ -1,11 +1,12 @@
 import type { PlannedRoad, BeachView, CarPark, CityView, Id, Lot, Pt, Road } from '../../sim/types';
-import { FRONT_STREET_SETBACK, insetRect, lotRect, type Rect } from '../../city/geometry';
+import { lotRect, type Rect } from '../../city/geometry';
 import { GROUND_KINDS } from '../../art/manifest';
 import { CELL } from '../../sim/constants';
 import { boxesMeet, boxOf, lineLength, nearestOnLine, offsetLine, pointAt, type Box } from '../geom';
 import { hash2 } from '../noise';
 import { linePath, polyPath, wobble } from '../pen';
 import { halfWidth } from '../../sim/roadGeom';
+import { reservedRoadReach } from '../../city/validateRoadRoom';
 import { flatPlaceholder } from '../placeholders';
 import { HAND, INK, INK_SOFT, KERB_BLUE } from '../style';
 import type { Brush } from './roadPaint';
@@ -19,10 +20,10 @@ const INSET = 5;
 export const PLAN_YEARS = 2;
 const DRIVE_W = 6;
 
-export interface LotScene { readonly lots: readonly Lot[]; readonly parks: readonly CarPark[]; readonly roads: ReadonlyMap<Id, Road>; readonly year: number; readonly firstYear: number; readonly beaches: readonly BeachView[]; readonly plans: readonly PlannedRoad[]; readonly style: string; readonly setback: number }
+export interface LotScene { readonly lots: readonly Lot[]; readonly parks: readonly CarPark[]; readonly roads: ReadonlyMap<Id, Road>; readonly year: number; readonly firstYear: number; readonly beaches: readonly BeachView[]; readonly plans: readonly PlannedRoad[]; readonly style: string; readonly wideRoadGrid?: boolean }
 
 export function lotScene(city: CityView): LotScene {
-  return { lots: city.lots, parks: city.carParks, roads: new Map(city.roads.map((r) => [r.id, r])), year: city.year, firstYear: (city.def.number - 1) * 10, beaches: city.beaches ?? [], plans: city.plannedRoads ?? [], style: city.def.style, setback: city.def.frontStreets ? FRONT_STREET_SETBACK : 0 };
+  return { lots: city.lots, parks: city.carParks, roads: new Map(city.roads.map((r) => [r.id, r])), year: city.year, firstYear: (city.def.number - 1) * 10, beaches: city.beaches ?? [], plans: city.plannedRoads ?? [], style: city.def.style, ...(city.def.wideRoadGrid ? { wideRoadGrid: true } : {}) };
 }
 
 const rectBox = (r: Rect, pad = 14): Box => ({ x0: r.x - pad, y0: r.y - pad, x1: r.x + r.w + pad, y1: r.y + r.h + pad });
@@ -49,17 +50,17 @@ export function paintLots(b: Brush, s: LotScene, box: Box): void {
   for (const p of s.parks) if (boxesMeet(lotBox(p), box)) carPark(b, s, p);
   // A public beach's cars drive a worn track on the sand (the same layout the city parks them by).
   for (const beach of s.beaches) if (beach.state === 'public' && boxesMeet(lotBox(beach.rect), box)) paintSandTrack(b.g, sandLayout([...s.roads.values()], beach.rect));
-  for (const pr of s.plans) planRoad(b.g, pr, s.firstYear, box);
+  for (const pr of s.plans) planRoad(b.g, pr, s.firstYear, box, s.wideRoadGrid === true);
 }
 
 export const planPts = (pr: PlannedRoad): Pt[] => pr.cells.map((c) => ({ x: c.gx * CELL, y: c.gy * CELL }));
 export const planSig = (pr: PlannedRoad): string => `R${pr.year}:${pr.type}:${pr.cells.map((c) => `${c.gx},${c.gy}`).join(';')}`;
 
 /** A Council road of the next years: pencil beside the line it will take, like a lot's plan. */
-function planRoad(g: CanvasRenderingContext2D, pr: PlannedRoad, firstYear: number, box: Box): void {
+function planRoad(g: CanvasRenderingContext2D, pr: PlannedRoad, firstYear: number, box: Box, wideGrid: boolean): void {
   const pts = planPts(pr);
-  if (pts.length < 2 || !boxesMeet(boxOf(pts, 30), box)) return;
-  const half = halfWidth({ type: pr.type, oneWay: false });
+  const half = wideGrid ? reservedRoadReach(pr.type) : halfWidth({ type: pr.type, oneWay: false });
+  if (pts.length < 2 || !boxesMeet(boxOf(pts, half + 16), box)) return;
   g.save();
   g.strokeStyle = '#2f6f80';
   g.lineWidth = 1.3;
@@ -85,10 +86,10 @@ function planRoad(g: CanvasRenderingContext2D, pr: PlannedRoad, firstYear: numbe
 function openLot(b: Brush, s: LotScene, l: Lot): void {
   const { g } = b;
   const r = lotRect(l);
+  if (l.access) driveway(b, s, r, l.access);
   // A garden lot's front garden is its painted garden pictures (upright/lots.ts); the ground stays bare under them.
   if (isGarden(l)) return;
-  if (l.access) driveway(b, s, r, l.access);
-  if (GROUND_KINDS.includes(l.kind)) garden(b, l, insetRect(r, s.setback));
+  if (GROUND_KINDS.includes(l.kind)) garden(b, l, r);
 }
 
 /** Parks and squares are painted ground of any size, with paths. */

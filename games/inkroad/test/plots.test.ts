@@ -1,12 +1,23 @@
 import { describe, expect, it } from 'vitest';
 import { createCity } from '../src/city/city';
-import { SAFFRON } from '../src/city/defs/saffron';
+import { SAFFRON as WIDE_SAFFRON } from '../src/city/defs/saffron';
+import { LEGACY_SAFFRON_LAYOUT } from '../src/city/defs/saffronMap';
 import { blocksMeet, vertexInBlock } from '../src/city/geometry';
 import { settlePlots, squeezeIn } from '../src/city/plots';
 import { DROPPED } from '../src/city/standing';
 import type { Cell, CityView, Terrain } from '../src/sim/types';
-import { cityAtYear, inner, newCity, ok } from './city-helpers';
+import { inner, ok, SEED } from './city-helpers';
 
+const SAFFRON = { ...WIDE_SAFFRON, ...LEGACY_SAFFRON_LAYOUT };
+const newCity = () => createCity(SAFFRON, SEED);
+function cityAtYear(year: number): CityView {
+  const v = newCity();
+  const c = inner(v);
+  c.money = 5000;
+  while (v.year < year) { c.phase = 'yearEnd'; ok(v, { t: 'next' }); }
+  ok(v, { t: 'next' });
+  return v;
+}
 const cell = (gx: number, gy: number): Cell => ({ gx, gy });
 const lot = (v: CityView, name: string) => v.lots.find((l) => l.name === name)!;
 /** A street from the end of the south road west across the plot of Henna Square (year 4), by the stadium. */

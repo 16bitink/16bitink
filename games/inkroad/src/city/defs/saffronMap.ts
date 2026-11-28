@@ -1,6 +1,6 @@
-import type { BeachDef, GateDef, LotDef, RoadDef, Terrain } from '../../sim/types';
+import type { BeachDef, CellRect, GateDef, LotDef, RoadDef, Terrain } from '../../sim/types';
 
-/** Saffron Bay's ground, roads and blocks. 56 x 38 cells; the busy crossroads is at (22, 18). */
+/** Saffron Bay's ground, roads and blocks. The survey's main crossroads is at (22, 18). */
 export const COLS = 56;
 export const ROWS = 38;
 export const CREEK_WEST = 37;
@@ -24,10 +24,27 @@ function terrainAt(x: number, y: number): Terrain {
   return '.';
 }
 
-export const MAP: readonly string[] = Array.from({ length: ROWS }, (_, y) =>
-  Array.from({ length: COLS }, (_, x) => terrainAt(x, y)).join(''));
+// Extra grid cells on both sides of the planned road axes. Parcels keep their original width and depth.
+const WEST_EAST = [1, 2, 7, 8, 11, 12, 21, 22, 35, 36, 44, 45, 50, 51];
+const NORTH_SOUTH = [4, 7, 8, 9, 10, 12, 13, 14, 17, 18, 21, 22, 22, 23, 23, 24, 25, 26, 29, 30, 31, 34, 35];
+const stretch = (n: number, cuts: readonly number[]): number => n + cuts.filter((cut) => cut < n).length;
+const copies = (n: number, cuts: readonly number[]): number => 1 + cuts.filter((cut) => cut === n).length;
 
-export const BEACHES: readonly BeachDef[] = [
+/** Grid coordinates of the master plan's street and terrain survey points. */
+export const saffronCell = (x: number, y: number): readonly [number, number] => [stretch(x, WEST_EAST), stretch(y, NORTH_SOUTH)];
+
+export const MAP: readonly string[] = Array.from({ length: ROWS }, (_, y) => {
+  const row = Array.from({ length: COLS }, (_, x) => terrainAt(x, y).repeat(copies(x, WEST_EAST))).join('');
+  return Array.from({ length: copies(y, NORTH_SOUTH) }, () => row);
+}).flat();
+
+function parcel<T extends CellRect>(p: T, frontage = true): T {
+  const bottom = p.gy + p.h;
+  const y = frontage ? stretch(bottom + 1, NORTH_SOUTH) - 2 : stretch(bottom, NORTH_SOUTH);
+  return { ...p, gx: stretch(p.gx, WEST_EAST), gy: y - p.h };
+}
+
+const BEACH_SURVEY: readonly BeachDef[] = [
   {
     id: 'pearl', name: 'Pearl Beach', gx: 6, gy: 3, w: 6, h: 2, decideYear: 3, share: 130,
     plots: [
@@ -44,16 +61,26 @@ export const BEACHES: readonly BeachDef[] = [
   },
 ];
 
-export const GATES: readonly GateDef[] = [
+export const BEACHES = BEACH_SURVEY.map((b) => {
+  const [gx, gy] = saffronCell(b.gx, b.gy);
+  const [east, south] = saffronCell(b.gx + b.w, b.gy + b.h);
+  return { ...b, gx, gy, w: east - gx, h: south - gy, plots: b.plots.map((p) => parcel(p, false)) };
+});
+
+const GATE_SURVEY: readonly GateDef[] = [
   { id: 'west', name: 'Dune Road', cell: [0, 18], weight: 1 },
   { id: 'south', name: 'South Road', cell: [22, 37], weight: 1.1 },
   { id: 'east', name: 'Far Shore Road', cell: [55, 18], weight: 0.8 },
   { id: 'north', name: 'Airfield Road', cell: [0, 5], weight: 1.2, opensYear: 4 },
 ];
 
-export const ROADS_DEF: readonly RoadDef[] = [
+export const GATES = GATE_SURVEY.map((g) => ({ ...g, cell: saffronCell(...g.cell) }));
+
+const BEACH_STREET: RoadDef = { cells: [[8, 8], [13, 8]], type: 'street', opensYear: 4 };
+const NORTH_AVENUE: RoadDef = { cells: [[4, 5], [5, 6], [7, 6], [8, 7], [8, 18]], type: 'avenue', opensYear: 4 };
+const ROAD_SURVEY: readonly RoadDef[] = [
   // The start: a cross of streets, four ways in, and the front street of every first block.
-  // The gate highways are one cell: a real eight-lane highway (92 px) would reach onto the lots beside a longer one.
+  // Short highway entrances mark the change from intercity traffic to the local street network.
   { cells: [[0, 18], [1, 18]], type: 'highway', fixed: true },
   { cells: [[1, 18], [22, 18]], type: 'street' },
   { cells: [[22, 18], [22, 8]], type: 'street' },
@@ -74,8 +101,8 @@ export const ROADS_DEF: readonly RoadDef[] = [
   // Year 3: the south street.
   { cells: [[12, 35], [22, 35]], type: 'street', opensYear: 3 },
   // Year 4: the office district and the west sands.
-  { cells: [[4, 5], [5, 6], [7, 6], [8, 7], [8, 18]], type: 'avenue', opensYear: 4 },
-  { cells: [[8, 8], [13, 8]], type: 'street', opensYear: 4 },
+  NORTH_AVENUE,
+  BEACH_STREET,
   { cells: [[2, 24], [12, 24]], type: 'street', opensYear: 4 },
   { cells: [[12, 24], [12, 35]], type: 'street', opensYear: 4 },
   { cells: [[2, 18], [2, 35]], type: 'street', opensYear: 4 },
@@ -102,6 +129,16 @@ export const ROADS_DEF: readonly RoadDef[] = [
   // Year 10: the fairground.
   { cells: [[1, 13], [8, 13]], type: 'street', opensYear: 10 },
 ];
+
+const OFFICE_STREETS: readonly RoadDef[] = [
+  { cells: [[2, 22], [11, 22]], type: 'street', opensYear: 4 },
+  { cells: [[31, 22], [36, 22], [36, 24]], type: 'street', opensYear: 5 },
+];
+const NEW_NORTH_ROUTE = [[4, 5], [4, 7], [8, 7], [8, 18]] as const;
+export const ROADS_DEF = [...ROAD_SURVEY, ...OFFICE_STREETS].map((r) => {
+  const cells = r === NORTH_AVENUE ? NEW_NORTH_ROUTE : r.cells;
+  return { ...r, opensYear: r === BEACH_STREET ? 1 : (r.opensYear ?? 1), cells: cells.map(([x, y]) => saffronCell(x, y)) };
+});
 
 type Row = readonly [name: string, kind: LotDef['kind'], gx: number, gy: number, w: number, h: number, year: number, district: string, level?: LotDef['level'], max?: LotDef['maxLevel']];
 
@@ -189,5 +226,32 @@ const ROWS_DEF: readonly Row[] = [
 const DEFAULT_MAX = 4;
 /** Home lots that fill the depth between two roads: the plots stand in the north two rows, the south two are their front garden. */
 const GARDENS: ReadonlySet<string> = new Set(['Palm Row', 'Heron Court', 'Egret Court']);
-export const LOTS: readonly LotDef[] = ROWS_DEF.map(([name, kind, gx, gy, w, h, opensYear, district, level = 1, maxLevel = DEFAULT_MAX]) =>
+const surveyedLots: readonly LotDef[] = ROWS_DEF.map(([name, kind, gx, gy, w, h, opensYear, district, level = 1, maxLevel = DEFAULT_MAX]) =>
   ({ name, kind, gx, gy, w, h, opensYear, level, maxLevel, district, ...(GARDENS.has(name) ? { garden: true } : {}) }));
+
+const properties = surveyedLots.map((l): LotDef[] => {
+  if (l.kind !== 'home' && l.kind !== 'shops' && l.kind !== 'office') return [parcel(l)];
+  const h = l.garden ? l.h : 2;
+  const front = Array.from({ length: l.w / 2 }, (_, col) => parcel({
+    ...l, name: col === 0 ? l.name : `${l.name} East`, gx: l.gx + 2 * col, gy: l.gy + l.h - h, w: 2, h,
+  }));
+  if (l.kind !== 'office' || l.h === h) return front;
+  const [, street] = saffronCell(l.gx, 22);
+  const north = front.map((p, i) => ({
+    ...p, name: i === 0 ? `${l.name} North` : `${l.name} Northeast`, gy: street - 2 - h,
+  }));
+  return [...front, ...north];
+});
+
+export const LOTS: readonly LotDef[] = [...properties.map(([first]) => first!), ...properties.flatMap(([, ...others]) => others)];
+
+/** The survey as it appeared in saves made before the streets gained their reserved widths. */
+export const LEGACY_SAFFRON_LAYOUT = {
+  map: Array.from({ length: ROWS }, (_, y) => Array.from({ length: COLS }, (_, x) => terrainAt(x, y)).join('')),
+  roads: ROAD_SURVEY,
+  gates: GATE_SURVEY,
+  beaches: BEACH_SURVEY,
+  lots: surveyedLots,
+  controls: [{ cell: [22, 8], control: 'roundabout' }] as const,
+  wideRoadGrid: false,
+};

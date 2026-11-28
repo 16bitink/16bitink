@@ -9,6 +9,7 @@ import { pickMode, type Choice } from '../src/city/modes';
 import { curve, scoreParking, scorePay, scoreTrip } from '../src/city/score';
 import { settleSeason } from '../src/city/settle';
 import { catchChance, daring } from '../src/city/legs';
+import { saffronCell } from '../src/city/defs/saffronMap';
 import { cityAtYear, inner, newCity, ok, runDay } from './city-helpers';
 
 const tour = (lot: number, to: number): Tour => ({ id: 0, from: { lot }, to: { lot: to }, purpose: 'shop', leave: 0, until: null, stay: 5, owns: true, value: 0.3, seed: 0.5 });
@@ -31,7 +32,7 @@ describe('money', () => {
   it('refuses what it can not pay, in plain words, and spends what it can', () => {
     const v = newCity();
     const c = inner(v);
-    const cells = [{ gx: 32, gy: 24 }, { gx: 36, gy: 24 }];
+    const cells = [saffronCell(32, 24), saffronCell(36, 24)].map(([gx, gy]) => ({ gx, gy }));
     c.money = 1;
     expect(v.quote({ t: 'road', cells, type: 'street' }).why).toMatch(/Too dear: \d+ of 1/);
     c.money = 400;

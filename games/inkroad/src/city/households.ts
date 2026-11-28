@@ -5,6 +5,7 @@ import { builtArea } from './geometry';
 import { residentFor } from './residents';
 import { createDice, mixSeed } from './rng';
 import { routineOf } from './routine';
+import { freeSlots } from './slots';
 import { stand, unstand } from './stand';
 import type { City } from './state';
 import { FAMILY, HOME_TOURS, HOUSEHOLDS_PER_TOUR } from './tune';
@@ -140,7 +141,9 @@ export function parkAllAtHome(c: City): void {
     const spot = h ? c.day.spots.get(`lot:${h.lot}`) : undefined;
     if (car.where && car.where.spot === spot && spot.cars.includes(car.where)) continue; // home already: it keeps its slot
     if (car.where) unstand(c, car.where);
-    car.where = spot ? stand(c, spot, car, false) : null;
+    const slot = spot?.layout ? freeSlots(c, spot, null, car.kind)[0] : undefined;
+    car.where = spot && slot !== undefined ? stand(c, spot, car, false, undefined, slot) : null;
+    if (!car.where && h) car.garage = `lot:${h.lot}`;
   }
 }
 

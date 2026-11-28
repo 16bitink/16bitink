@@ -1,6 +1,6 @@
 import { refuse, type Refusal } from '../../sim/netGround';
 import type { CarPark, CarParkKind } from '../../sim/types';
-import { blocksMeet, centreOf, vertexInBlock, type Block } from '../geometry';
+import { blocksMeet, centreOf, lotRect, vertexInBlock, type Block } from '../geometry';
 import { earn } from '../money';
 import { blockAccess } from '../net';
 import { buildSpots } from '../parking';
@@ -9,6 +9,7 @@ import { openParks } from '../state';
 import { beachServed, sandProblem } from '../rules/beachSites';
 import { holdsGround, lotRefusal, parkRefusal, plannedRoads, shownYear } from '../standing';
 import { PARKS, REFUND } from '../tune';
+import { meetsRoadReserve } from '../validateRoadRoom';
 import { landAt, needTool, no, noAt, priced, type Handler } from './shared';
 
 /** Ground the Council needs for its own roads within two years. Roads further ahead buy what stands in their way. */
@@ -43,6 +44,7 @@ function siteProblem(c: City, kind: CarParkKind, b: Block): Refusal | null {
   if (lot) return lotRefusal(c.def, lot);
   const park = c.parks.find((p) => blocksMeet(p, b));
   if (park) return parkRefusal(park);
+  if (meetsRoadReserve(c.def, lotRect(b))) return { why: 'This strip is reserved for a wider road and its sidewalk', at: b };
   for (const r of c.net.roads) {
     const x = r.flyover ? undefined : r.cells.find((q) => vertexInBlock(b, q));
     if (x) return refuse('A road runs here: leave it a cell of room', x);

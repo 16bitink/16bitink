@@ -1,6 +1,8 @@
-import { FRONT_STREET_SETBACK, insetRect, lotRect } from '../src/city/geometry';
+import { cellPt, lotRect } from '../src/city/geometry';
+import { saffronCell } from '../src/city/defs/saffronMap';
 import { junctionMeetsBox } from '../src/city/validateRoadRoom';
 import { sidewalkWidth } from '../src/sim/roadGeom';
+import { plotSpots } from '../src/render/upright/lots';
 import { describe, expect, it } from 'vitest';
 import type { Command, TransitMode } from '../src/sim/types';
 import { PAID_CITIES } from '../content/paid';
@@ -12,10 +14,16 @@ import { settleSeason } from '../src/city/settle';
 import { catchChance } from '../src/city/legs';
 import { cityAtYear, inner, newCity, ok, passSeason, runDay } from './city-helpers';
 
-const at = (v: ReturnType<typeof newCity>, gx: number, gy: number) => v.junctions.find((j) => j.cell.gx === gx && j.cell.gy === gy)!.id;
-const roadThrough = (v: ReturnType<typeof newCity>, gx: number, gy: number) =>
-  v.roads.find((r) => !r.flyover && r.cells.slice(1, -1).some((c) => c.gx === gx && c.gy === gy))!;
-const cell = (gx: number, gy: number) => ({ gx, gy });
+const grid = (v: ReturnType<typeof newCity>, x: number, y: number) => v.def.wideRoadGrid ? saffronCell(x, y) : [x, y];
+const at = (v: ReturnType<typeof newCity>, x: number, y: number) => {
+  const [gx, gy] = grid(v, x, y);
+  return v.junctions.find((j) => j.cell.gx === gx && j.cell.gy === gy)!.id;
+};
+const roadThrough = (v: ReturnType<typeof newCity>, x: number, y: number) => {
+  const [gx, gy] = grid(v, x, y);
+  return v.roads.find((r) => !r.flyover && r.cells.slice(1, -1).some((c) => c.gx === gx && c.gy === gy))!;
+};
+const cell = (x: number, y: number) => { const [gx, gy] = saffronCell(x, y); return { gx, gy }; };
 const why = (v: ReturnType<typeof newCity>, cmd: Command): string => { const q = v.quote(cmd); expect(q.ok).toBe(false); return q.why ?? ''; };
 
 describe('roads', () => {
@@ -34,7 +42,8 @@ describe('roads', () => {
 
   it('says why not', () => {
     const v = cityAtYear(1);
-    expect(why(v, { t: 'road', cells: [cell(20, 20), cell(18, 20)], type: 'street' })).toBe('Palm Row stands here');
+    const { gx, gy } = v.lots.find((l) => l.name === 'Palm Row')!;
+    expect(why(v, { t: 'road', cells: [{ gx, gy }, { gx: gx + 2, gy }], type: 'street' })).toBe('Palm Row stands here');
     expect(why(v, { t: 'road', cells: [cell(33, 24), cell(34, 24)], type: 'avenue' })).toMatch(/toolbox/);
     expect(why(v, { t: 'remove', road: v.roads.find((r) => r.fixed)!.id })).toMatch(/ministry/);
     expect(why(v, { t: 'remove', road: roadThrough(v, 22, 12).id })).toMatch(/would be cut off/);
@@ -51,6 +60,28 @@ describe('roads', () => {
     runDay(v);
     expect(v.roads.find((x) => x.id === r.id)!.works).toBe(0);
     expect(v.drainEvents().some((e) => e.t === 'opened')).toBe(true);
+  });
+
+  it('gives Lantern Street buildings their own parcels and driveway junction points', () => {
+    const v = cityAtYear(3);
+    const west = v.lots.find((l) => l.name === 'Lantern Street')!;
+    const east = v.lots.find((l) => l.name === 'Lantern Street East')!;
+    expect(west.id).not.toBe(east.id);
+    expect(west.gx + west.w).toBeLessThanOrEqual(east.gx);
+    for (const lot of [west, east]) {
+      expect(plotSpots(lot).map((p) => p.size)).toEqual([1]);
+      expect(lot.access).not.toBeNull();
+    }
+    expect(west.access).not.toEqual(east.access);
+  });
+
+  it('can widen the busiest corridor to a boulevard without changing its parcels', () => {
+    const v = cityAtYear(8);
+    const road = roadThrough(v, 22, 20);
+    const lots = v.lots.map(lotRect);
+    ok(v, { t: 'upgrade', road: road.id, type: 'boulevard' });
+    expect(v.roads.find((r) => r.id === road.id)?.type).toBe('boulevard');
+    expect(v.lots.map(lotRect)).toEqual(lots);
   });
 
   it('switches: one way, kerb bays, tolls, bus lanes', () => {
@@ -79,8 +110,7 @@ describe('junctions', () => {
     ok(v, { t: 'upgrade', road: road.id, type: 'avenue' });
     const j = v.junctions.find((n) => n.id === node)!;
     const reach = j.radius + sidewalkWidth(road);
-    expect(parcels.some((b) => junctionMeetsBox(b, j.x, j.y, reach))).toBe(true);
-    expect(parcels.some((b) => junctionMeetsBox(insetRect(b, FRONT_STREET_SETBACK), j.x, j.y, reach))).toBe(false);
+    expect(parcels.some((b) => junctionMeetsBox(b, j.x, j.y, reach))).toBe(false);
     expect(v.lots.filter((lot) => lot.level > 0).map(lotRect)).toEqual(parcels);
   });
 
@@ -122,8 +152,10 @@ describe('car parks', () => {
     expect(why(v, { t: 'carPark', kind: 'lot', at: cell(28, 10) })).toMatch(/stands here/);
     expect(why(v, { t: 'carPark', kind: 'lot', at: cell(37, 20) })).toMatch(/float/);
     expect(why(v, { t: 'carPark', kind: 'multi', at: cell(26, 15) })).toMatch(/toolbox/);
-    expect(why(v, { t: 'carPark', kind: 'lot', at: cell(8, 21) })).toBe('Blueprint Offices opens here in year 4');
-    const site = [...Array(30).keys()].flatMap((x) => [cell(5 + x, 9), cell(5 + x, 13)]).find((c) => v.quote({ t: 'carPark', kind: 'lot', at: c }).ok)!;
+    const { gx, gy } = v.lots.find((l) => l.name === 'Blueprint Offices')!;
+    expect(why(v, { t: 'carPark', kind: 'lot', at: { gx, gy } })).toBe('Blueprint Offices opens here in year 4');
+    const site = v.def.map.flatMap((row, gy) => Array.from(row, (_, gx) => ({ gx, gy })))
+      .find((c) => v.quote({ t: 'carPark', kind: 'lot', at: c }).ok)!;
     ok(v, { t: 'carPark', kind: 'lot', at: site });
     expect(v.carParks[0]!.spaces).toBeGreaterThan(5);
     ok(v, { t: 'removePark', park: v.carParks[0]!.id });
@@ -185,12 +217,13 @@ describe('lines', () => {
     const c = inner(v);
     expect(why(v, draw(v, 'bus', [cell(22, 12)]))).toMatch(/two stops/);
     expect(why(v, draw(v, 'bus', [cell(22, 12), cell(1, 37)]))).toMatch(/roads/);
-    expect(why(v, draw(v, 'bus', [cell(22, 12), cell(22, 13)]))).toMatch(/close/);
+    const first = cell(22, 12);
+    expect(why(v, draw(v, 'bus', [first, { ...first, gy: first.gy + 1 }]))).toMatch(/close/);
     ok(v, draw(v, 'bus', [cell(22, 11), cell(22, 21), cell(18, 24)]));
     const l = v.lines[0]!;
     expect(l.path.length).toBeGreaterThan(2);
     expect(capacity(c, l, 'am')).toBeGreaterThan(1);
-    const ride = bestRide(c, { x: 22 * 40, y: 11 * 40 }, { x: 18 * 40, y: 25 * 40 }, 'am')!;
+    const ride = bestRide(c, cellPt(cell(22, 11)), cellPt(cell(18, 25)), 'am')!;
     expect(ride.lines).toEqual([l.id]);
     ok(v, { t: 'lineVehicles', line: l.id, vehicles: 4 });
     expect(why(v, { t: 'lineVehicles', line: l.id, vehicles: 9 })).toMatch(/Between/);
@@ -207,15 +240,15 @@ describe('lines', () => {
     expect(q.works).toBe(9);
     expect(q.warn).toMatch(/Council pays/);
     ok(v, cmd);
-    expect(bestRide(inner(v), { x: 11 * 40, y: 14 * 40 }, { x: 44 * 40, y: 18 * 40 }, 'am')).toBeNull();
+    expect(bestRide(inner(v), cellPt(cell(11, 14)), cellPt(cell(44, 18)), 'am')).toBeNull();
     // Nine months: three seasons of the clock.
     for (let i = 0; i < 3; i++) passSeason(inner(v));
     expect(v.lines[0]!.works).toBe(0);
-    const a = { x: 11 * 40, y: 14 * 40 };
-    expect(bestRide(inner(v), a, { x: 44 * 40, y: 18 * 40 }, 'am')!.lines).toHaveLength(1);
+    const a = cellPt(cell(11, 14));
+    expect(bestRide(inner(v), a, cellPt(cell(44, 18)), 'am')!.lines).toHaveLength(1);
     ok(v, draw(v, 'metro', [cell(22, 13), cell(22, 24)]));
     for (let i = 0; i < 3; i++) passSeason(inner(v));
-    expect(bestRide(inner(v), a, { x: 22 * 40, y: 25 * 40 }, 'am')!.changes).toBe(1);
+    expect(bestRide(inner(v), a, cellPt(cell(22, 25)), 'am')!.changes).toBe(1);
   });
 
   it('straight paths for metro and boats', () => {
@@ -236,7 +269,10 @@ describe('Old Harbour', () => {
 
   it('walls do not move, and decks stay out', () => {
     const v = harbour();
-    expect(why(v, { t: 'upgrade', road: roadThrough(v, 28, 22).id, type: 'avenue' })).toMatch(/walls/);
+    const road = roadThrough(v, 28, 22).id;
+    expect(why(v, { t: 'upgrade', road, type: 'avenue' })).toMatch(/walls/);
+    ok(v, { t: 'oneWay', road, dir: 1 });
+    expect(v.roads.find((r) => r.id === road)).toMatchObject({ type: 'street', oneWay: true });
     expect(v.lots.filter((l) => l.level > 0 && !l.access).map((l) => l.name)).toEqual([]);
   });
 

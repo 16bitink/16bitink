@@ -1,4 +1,5 @@
-import type { Cell } from '../../sim/types';
+import type { Cell, CityView } from '../../sim/types';
+import { saffronCell } from '../defs/saffronMap';
 
 /** What the bots know about each city's map: big roads worth a thought, and sensible lines. */
 const cell = (gx: number, gy: number): Cell => ({ gx, gy });
@@ -6,7 +7,7 @@ const cell = (gx: number, gy: number): Cell => ({ gx, gy });
 /** Big roads worth a thought, per city. */
 interface Idea { readonly from: number; readonly cells: readonly Cell[] }
 /** Big roads worth a thought, per city, and the year they start to make sense. */
-export const ROADS: Readonly<Record<string, readonly Idea[]>> = {
+const ROADS: Readonly<Record<string, readonly Idea[]>> = {
   saffron: [
     { from: 1, cells: [cell(12, 24), cell(12, 18)] }, { from: 2, cells: [cell(32, 24), cell(36, 24), cell(36, 18)] },
     { from: 7, cells: [cell(32, 24), cell(45, 24)] }, { from: 3, cells: [cell(14, 8), cell(8, 8), cell(8, 18)] },
@@ -17,6 +18,13 @@ export const ROADS: Readonly<Record<string, readonly Idea[]>> = {
     { from: 3, cells: [cell(14, 15), cell(14, 7)] }, { from: 3, cells: [cell(42, 11), cell(42, 19)] },
   ],
 };
+
+export function roadIdeas(city: CityView): readonly Idea[] {
+  const ideas = ROADS[city.def.id] ?? [];
+  return city.def.id === 'saffron' && city.def.wideRoadGrid
+    ? ideas.map((r) => ({ ...r, cells: r.cells.map(({ gx, gy }) => cell(...saffronCell(gx, gy))) }))
+    : ideas;
+}
 
 export const BUSES: Readonly<Record<string, readonly (readonly string[])[]>> = {
   saffron: [

@@ -1,6 +1,6 @@
 import { CELL } from '../../sim/constants';
 import type { CityView, Command, Id, Pt } from '../../sim/types';
-import { ROADS } from './atlas';
+import { roadIdeas } from './atlas';
 import type { Move } from './moves';
 import { offPlan, sickest } from './tools';
 
@@ -59,7 +59,7 @@ function parkMoves(city: CityView): Move[] {
 }
 
 export function buildMoves(city: CityView): readonly Move[] {
-  const ideas = (ROADS[city.def.id] ?? []).filter((r) => r.from <= city.year).sort((a, b) => b.from - a.from);
+  const ideas = roadIdeas(city).filter((r) => r.from <= city.year).sort((a, b) => b.from - a.from);
   const roads = ideas.map(({ from, cells }) => build(`road of year ${from}`, 'road', [{ t: 'road', cells, type: 'street' }]));
   return [...sickest(city, 5).slice(0, 3).flatMap((s) => junctionMoves(city, s)), ...parkMoves(city), ...roads];
 }

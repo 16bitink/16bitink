@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { PAID_CITIES } from '../content/paid';
 import { reportDay, stretch } from '../src/city/approval';
 import { FREE_CITIES } from '../src/city/cities';
+import { saffronCell } from '../src/city/defs/saffronMap';
 import { createCity } from '../src/city/city';
 import { planDay } from '../src/city/demand';
 import { answerPrices } from '../src/city/payers';
@@ -52,7 +53,8 @@ describe('what prices do', () => {
     const v = cityAtYear(7);
     const c = inner(v);
     // The main street by the west gate, which every driver from Dune Road takes.
-    const busy = v.roads.find((r) => !r.fixed && r.cells.some((x) => x.gx === 7 && x.gy === 18))!;
+    const [gx, gy] = saffronCell(7, 18);
+    const busy = v.roads.find((r) => !r.fixed && r.cells.some((x) => x.gx === gx && x.gy === gy))!;
     ok(v, { t: 'toll', road: busy.id, on: true });
     answerPrices(c, plan(c));
     expect(c.day.shared.length).toBeGreaterThan(0);

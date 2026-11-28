@@ -119,9 +119,11 @@ export function startDay(c: City): void {
 /** The morning is already under way when the curtain rises; what happened before it makes no sound. */
 function preWarm(c: City): void {
   const heard = c.events;
+  c.events = [];
   while (c.clock < -STEP / 2) stepDay(c);
   c.clock = 0;
-  c.events = heard;
+  c.parking = parkingView(c);
+  c.events = [...heard, ...c.events.filter((e) => e.t === 'park' || e.t === 'parkGo')];
 }
 
 /** Tolls and speeds change with the hour. */

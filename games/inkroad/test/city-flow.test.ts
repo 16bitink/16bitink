@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DAY, WEEKEND } from '../src/sim/constants';
 import { createCity } from '../src/city/city';
+import { LEGACY_SAFFRON_LAYOUT, saffronCell } from '../src/city/defs/saffronMap';
 import { SAFFRON } from '../src/city/defs/saffron';
 import { cityAtYear, inner, newCity, ok, runDay, runYear, SEED } from './city-helpers';
 
@@ -70,6 +71,15 @@ describe('the year', () => {
 });
 
 describe('saves', () => {
+  it('keeps a pre-expansion city on its original grid when an older save is loaded', () => {
+    const old = createCity({ ...SAFFRON, ...LEGACY_SAFFRON_LAYOUT }, SEED);
+    inner(old).money = 987;
+    const restored = createCity(SAFFRON, SEED, JSON.parse(JSON.stringify(old.save())));
+    expect(restored.money).toBe(987);
+    expect(restored.def.map).toEqual(old.def.map);
+    expect(restored.roads).toEqual(old.roads);
+  });
+
   it('restores a year-start snapshot exactly and replays its saved dawn deterministically', () => {
     const a = newCity();
     ok(a, { t: 'next' });
@@ -86,7 +96,8 @@ describe('saves', () => {
 
   it('a save in a day starts the day again with what was built, and gives back what drivers paid (its paydays stay paid)', () => {
     const v = cityAtYear(2);
-    const node = v.junctions.find((j) => j.cell.gx === 22 && j.cell.gy === 18)!.id;
+    const [gx, gy] = saffronCell(22, 18);
+    const node = v.junctions.find((j) => j.cell.gx === gx && j.cell.gy === gy)!.id;
     ok(v, { t: 'control', node, control: 'roundabout' });
     const before = v.money;
     v.advance(90);

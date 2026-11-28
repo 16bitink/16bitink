@@ -1,5 +1,5 @@
 import type { CityView, Command } from '../../sim/types';
-import { METROS, ROADS } from './atlas';
+import { METROS, roadIdeas } from './atlas';
 import { kerbNear, liftWorst, mendBusy, parkNear, sickest, tryIt, lineThrough, worstMovement, type Bot } from './tools';
 
 /** Does nothing but close cards. */
@@ -39,7 +39,7 @@ const LINES: Readonly<Record<string, readonly (readonly string[])[]>> = {
 function followCoach(city: CityView, attempt: number): void {
   if (city.year === 3 && city.policies.inspectors === 0) tryIt(city, { t: 'policies', policies: { inspectors: 1 } });
   if (city.year === 2 && !city.policies.permits) tryIt(city, { t: 'policies', policies: { permits: true } });
-  if (city.season > 0 || city.year > 1) for (const r of (ROADS[city.def.id] ?? []).filter((x) => x.from === city.year && x.from < FIRST_BRIDGE).slice(0, 1)) tryIt(city, { t: 'road', cells: r.cells, type: 'street' });
+  if (city.season > 0 || city.year > 1) for (const r of roadIdeas(city).filter((x) => x.from === city.year && x.from < FIRST_BRIDGE).slice(0, 1)) tryIt(city, { t: 'road', cells: r.cells, type: 'street' });
   const want = city.year < 6 ? 1 : 2 + attempt;
   const line = LINES[city.def.id]?.[city.lines.length];
   const mode = city.tools.includes('tram') ? 'tram' : 'bus';
@@ -47,7 +47,7 @@ function followCoach(city: CityView, attempt: number): void {
   const metro = METROS[city.def.id]?.[0];
   if (metro && city.newTools.includes('metro') && !city.lines.some((l) => l.mode === 'metro')) lineThrough(city, 'metro', metro, 0);
   for (const l of city.lines) if (l.crowding > CRAMMED && l.vehicles < 4) tryIt(city, { t: 'lineVehicles', line: l.id, vehicles: l.vehicles + 1 });
-  if (city.newTools.includes('toll')) for (const r of (ROADS[city.def.id] ?? []).filter((x) => x.from === city.year).slice(0, 1)) tryIt(city, { t: 'road', cells: r.cells, type: 'street' });
+  if (city.newTools.includes('toll')) for (const r of roadIdeas(city).filter((x) => x.from === city.year).slice(0, 1)) tryIt(city, { t: 'road', cells: r.cells, type: 'street' });
 }
 
 /** Reacts to the reddest junction with the cheapest fix, and to a parking complaint with the cheapest space. */

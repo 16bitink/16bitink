@@ -4,6 +4,7 @@ import { beginner } from '../src/city/bots/beginner';
 import { playYear } from '../src/city/bots/play';
 import { createCity } from '../src/city/city';
 import { SAFFRON } from '../src/city/defs/saffron';
+import { saffronCell } from '../src/city/defs/saffronMap';
 import { cellsToBlock } from '../src/city/geometry';
 import { BEACH, leanOf, recordOf } from '../src/city/rules/beach';
 import { readRules } from '../src/city/rules/state';
@@ -14,6 +15,7 @@ import type { Cell, CityView } from '../src/sim/types';
 import { inner, newCity, ok, runDay } from './city-helpers';
 
 const cell = (gx: number, gy: number): Cell => ({ gx, gy });
+const mapped = (x: number, y: number): Cell => cell(...saffronCell(x, y));
 const DECIDES = 3;
 
 /** January of a year, rich. The approval is set before the Council looks at it. */
@@ -72,8 +74,8 @@ describe('the Council decides', () => {
     expect(v.beach).toBeUndefined();
     expect(v.quote({ t: 'beach', id: 'pearl', advice: 'sell' }).why).toMatch(/not asking/);
     expect(pearl(v)).toMatchObject({ state: 'open', decideYear: 3 });
-    expect(v.quote({ t: 'road', cells: [cell(8, 5), cell(8, 3)], type: 'street' }).why).toBe('The beach is protected');
-    expect(v.quote({ t: 'carPark', kind: 'lot', at: cell(7, 3) }).why).toMatch(/not decided about Pearl Beach/);
+    expect(v.quote({ t: 'road', cells: [mapped(8, 5), mapped(8, 3)], type: 'street' }).why).toBe('The beach is protected');
+    expect(v.quote({ t: 'carPark', kind: 'lot', at: mapped(7, 3) }).why).toMatch(/not decided about Pearl Beach/);
   });
 
   it('follows advice from 60 on, and its own lean under that', () => {
@@ -126,7 +128,7 @@ describe('the Council decides', () => {
     expect(v.ledger.income.grant).toBe(share);
     runDay(v);
     expect(inner(v).day.stats.sores.some((s) => s.kind === 'seaClosed')).toBe(true);
-    expect(v.quote({ t: 'carPark', kind: 'lot', at: cell(13, 3) }).why).toMatch(/private now|Water|protected/);
+    expect(v.quote({ t: 'carPark', kind: 'lot', at: mapped(13, 3) }).why).toMatch(/private now|Water|protected/);
     const c = inner(v);
     c.phase = 'yearEnd';
     ok(v, { t: 'next' });
@@ -140,17 +142,17 @@ describe('the Council decides', () => {
     expect(v.lots).toBe(v.lots);
     expect(v.beaches).toBe(v.beaches);
     expect(pearl(v)).toMatchObject({ state: 'public', reachable: true, spaces: 0 });
-    const site = { t: 'carPark', kind: 'lot', at: cell(10, 5) } as const;
+    const site = { t: 'carPark', kind: 'lot', at: mapped(10, 5) } as const;
     expect(v.quote(site)).toMatchObject({ ok: true, note: 'Beach parking: Pearl Beach' });
-    expect(v.quote({ t: 'carPark', kind: 'lot', at: cell(8, 2) }).why).toMatch(/water/i);
+    expect(v.quote({ t: 'carPark', kind: 'lot', at: mapped(8, 2) }).why).toMatch(/water/i);
     ok(v, site);
     expect(v.carParks[0]!.beach).toBe(true);
     // A surface car park holds the bays it draws (src/sim/slotGeometry.ts): every one is beach parking.
     expect(pearl(v).beachSpaces).toBe(pearl(v).spaces);
-    expect(pearl(v).spaces).toBeGreaterThanOrEqual(14);
-    const far = v.quote({ t: 'carPark', kind: 'lot', at: cell(25, 19) });
+    expect(pearl(v).spaces).toBeGreaterThanOrEqual(12);
+    const far = v.quote({ t: 'carPark', kind: 'lot', at: mapped(25, 19) });
     expect(far.note).toBeUndefined();
-    expect(v.quote({ t: 'road', cells: [cell(9, 8), cell(9, 4)], type: 'street' }).why).toBe('The beach is protected');
+    expect(v.quote({ t: 'road', cells: [mapped(9, 8), mapped(9, 4)], type: 'street' }).why).toBe('The beach is protected');
   });
 });
 
@@ -177,7 +179,7 @@ describe('a day at the sea', () => {
     const planned = (): number => inner(v).day.plan.filter((t) => 'lot' in t.to && inner(v).lots[t.to.lot]?.kind === 'beach').length;
     const spring = planned();
     runDay(v);
-    if (parks) ok(v, { t: 'carPark', kind: 'lot', at: cell(10, 5) });
+    if (parks) ok(v, { t: 'carPark', kind: 'lot', at: mapped(10, 5) });
     ok(v, { t: 'next' });
     const wish = planned();
     runDay(v);

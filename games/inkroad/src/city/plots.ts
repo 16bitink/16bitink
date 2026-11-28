@@ -1,6 +1,6 @@
 import type { CellRect, Lot, Terrain } from '../sim/types';
 import type { Block } from './geometry';
-import { builtArea, blocksMeet, centreOf, distPt, vertexInBlock } from './geometry';
+import { builtArea, blocksMeet, centreOf, distPt, lotRect, vertexInBlock } from './geometry';
 import { earn } from './money';
 import { blockAccess } from './net';
 import { CELL } from '../sim/constants';
@@ -8,6 +8,7 @@ import type { City } from './state';
 import { emit } from './state';
 import { defCells, DROPPED, holdsGround, isDue } from './standing';
 import { PARKS } from './tune';
+import { meetsRoadReserve } from './validateRoadRoom';
 
 /**
  * The Master Plan's plots. Two years before it opens a plot is drawn on the
@@ -49,6 +50,7 @@ function groundFor(c: City, l: Lot): Ground {
 function fits(c: City, g: Ground, b: Block, year: number): boolean {
   if (b.gx < 1 || b.gy < 1 || b.gx + b.w > c.net.width - 2 || b.gy + b.h > c.net.height - 2) return false;
   if (g.blocks.some((o) => blocksMeet(o, b))) return false;
+  if (meetsRoadReserve(c.def, lotRect(b))) return false;
   if (vertices(b).some((x) => !g.letters.has(c.net.terrain[x.gy]?.[x.gx] ?? '~') || g.roads.has(key(x)))) return false;
   if (!c.def.frontStreets) return blockAccess(c.net, b) !== null;
   return blockAccess(c.net, b, undefined, true) !== null || councilFront(c, b, year);
@@ -56,7 +58,7 @@ function fits(c: City, g: Ground, b: Block, year: number): boolean {
 
 /** A Council street of the lot's year or before will run along the site's south edge, past every gate. */
 function councilFront(c: City, b: Block, year: number): boolean {
-  const front = b.gy + b.h + 1;
+  const front = b.gy + b.h + (c.def.wideRoadGrid ? 2 : 1);
   const cells = new Set(c.def.roads.filter((r) => (r.opensYear ?? 1) <= year && r.type !== 'highway').flatMap((r) => [...defCells(r)]).filter((x) => x.gy === front).map((x) => x.gx));
   for (let x = b.gx + 1; x < b.gx + b.w; x++) if (!cells.has(x)) return false;
   return true;

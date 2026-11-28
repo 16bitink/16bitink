@@ -9,7 +9,7 @@ import { chromium } from 'playwright-core';
 const arg = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i > 0 ? process.argv[i + 1] : d; };
 const base = arg('base', 'http://localhost:5187/view.html');
 const secs = Number(arg('secs', '30'));
-const browser = await chromium.launch({ channel: 'chrome', args: ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist'] });
+const browser = await chromium.launch({ channel: 'chrome', args: ['--use-gl=angle', '--enable-unsafe-swiftshader'] });
 const page = await (await browser.newContext({ viewport: { width: 1100, height: 760 }, deviceScaleFactor: 1 })).newPage();
 page.on('pageerror', (e) => console.log('pageerror', e.message));
 await page.goto(`${base}?bare=1&${arg('q', 'year=3&warm=20')}`);

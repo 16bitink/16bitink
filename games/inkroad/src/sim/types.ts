@@ -808,6 +808,8 @@ export interface CityDef {
   readonly beaches?: readonly BeachDef[];
   /** Every lot faces the Council street along its south edge, and its driveway is on that street only. */
   readonly frontStreets?: boolean;
+  /** Reserve grid space for boulevard lanes and sidewalks along the council roads. */
+  readonly wideRoadGrid?: boolean;
   /** City-wide rules. */
   readonly rules: { readonly carOwnership: number; readonly landPrice: number; readonly widen: boolean; readonly zoneCells?: readonly (readonly [number, number, number, number])[] } & SpecialRules;
 }

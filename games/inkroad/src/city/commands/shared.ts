@@ -1,4 +1,4 @@
-import { FRONT_STREET_SETBACK, insetRect, lotRect } from '../geometry';
+import { lotRect } from '../geometry';
 import { holdsGround } from '../standing';
 import type { Rect } from '../geometry';
 import { CELL, MONTHS, MONTHS_PER_SEASON, STEP } from '../../sim/constants';
@@ -78,10 +78,9 @@ export const precast = (months: number): number => MONTHS_PER_SEASON * Math.ceil
 export const roadWorks = (c: City, works: number): Pick<Extra, 'works' | 'closes'> => ({ works, closes: !c.policies.nightWorks });
 export const isGround = (r: Road): boolean => r.level === 0 && !r.flyover;
 
-/** Check the usable parcel after its reserved setback. Car parks use the whole site. */
+/** Check each full parcel against the road or junction's footprint. */
 export function blockedFootprint(c: City, meets: (r: Rect) => boolean): Quote | null {
-  const setback = c.def.frontStreets ? FRONT_STREET_SETBACK : 0;
-  const lot = c.lots.find((l) => holdsGround(l, c.year) && meets(insetRect(lotRect(l), setback)));
+  const lot = c.lots.find((l) => holdsGround(l, c.year) && meets(lotRect(l)));
   if (lot) return noAt({ why: `No room: ${lot.name} stands too close`, at: lot });
   const park = c.parks.find((p) => meets(lotRect(p)));
   return park ? noAt({ why: 'No room beside the car park', at: park }) : null;

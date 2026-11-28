@@ -30,6 +30,7 @@ import { TECHS } from './techs';
 import { START_APPROVAL, START_EXPECT, START_PRICES } from './tune';
 import { traceRoad } from './voices';
 import { beginYear, freshTraffic } from './years';
+import { LEGACY_SAFFRON_LAYOUT } from './defs/saffronMap';
 
 const START_BARS: Readonly<Record<Bar, number>> = { trips: 58, parking: 70, cost: 80, streets: 78 };
 const START_PAY = 0.2;
@@ -62,6 +63,10 @@ function newCity(def: CityDef, seed: number): City {
 
 function loadCity(def: CityDef, saved: unknown): City | null {
   const save = upgradeSave(saved);
+  if (def.id === 'saffron' && def.wideRoadGrid && typeof save === 'object' && save !== null
+    && 'lots' in save && Array.isArray(save.lots) && save.lots.length === LEGACY_SAFFRON_LAYOUT.lots.length) {
+    def = { ...def, ...LEGACY_SAFFRON_LAYOUT };
+  }
   const problem = saveProblem(def, save);
   if (problem) { console.warn(`InkRoad: save not used (${problem})`); return null; }
   const s = save as CitySave;

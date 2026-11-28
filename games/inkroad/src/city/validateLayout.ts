@@ -5,8 +5,8 @@ import { roadRoomProblems } from './validateRoadRoom';
 
 /**
  * The layout rule of a city with front streets (docs/inkroad-build.md, "City layout: every gate on its street"):
- * every picture has its gate in the south wall, so a lot's road runs along its south edge, one cell out, built by the
- * Council no later than the lot; a block between two east-west streets holds one row; rows line up in whole plots.
+ * A lot's gate faces a Council street to the south. The desert grid leaves two cells for its wider corridor,
+ * and compact front-street maps leave one. A block between streets has one row lined up in whole plots.
  */
 const PLOT = 2;
 /** Lots farther apart than this along a row are a deliberate gap, not one row. */
@@ -37,12 +37,12 @@ function councilStreets(def: CityDef): Streets {
   return out;
 }
 
-const frontRow = (l: Block): number => l.gy + l.h + 1;
+const frontRow = (def: CityDef, l: Block): number => l.gy + l.h + (def.wideRoadGrid ? 2 : 1);
 /** The vertices along the frontage a street must pass: every gate (plot centres) and the kerb between them; the corners may be a street's end. */
 const xsOf = (l: Block): readonly number[] => Array.from({ length: Math.max(1, l.w - 1) }, (_, i) => l.gx + 1 + i);
 
-function frontProblem(l: LotDef, streets: Streets): string | null {
-  const y = frontRow(l);
+function frontProblem(def: CityDef, l: LotDef, streets: Streets): string | null {
+  const y = frontRow(def, l);
   const missing = xsOf(l).filter((x) => !streets.has(key(x, y)));
   if (missing.length > 0) return `${l.name}: no Council street along its south edge (row ${y}, x ${l.gx + 1} to ${l.gx + l.w - 1}; missing at x ${missing.join(' ')})`;
   const opens = Math.max(...xsOf(l).map((x) => streets.get(key(x, y))!.year));
@@ -61,7 +61,7 @@ function streetBetween(streets: Streets, a: Block, b: Block, top: number, bottom
 
 function gateProblems(def: CityDef, l: LotDef, streets: Streets): string[] {
   const out: string[] = [];
-  const strip: Block = { gx: l.gx, gy: l.gy + l.h, w: l.w, h: STRIP };
+  const strip: Block = { gx: l.gx, gy: l.gy + l.h, w: l.w, h: STRIP + (def.wideRoadGrid ? 1 : 0) };
   for (const o of [...def.lots, ...(def.beaches ?? [])]) {
     if (o === l || !blocksMeet(o, strip)) continue;
     out.push(`${l.name}: ${o.name} stands in its south strip and blocks its gate`);
@@ -90,10 +90,10 @@ function rowProblems(def: CityDef, l: LotDef, streets: Streets): string[] {
     const gap = o.gx - east;
     if (Array.from({ length: gap + 1 }, (_, i) => east + i).some((x) => partedAt(def, streets, x, l) || partedAt(def, streets, x, o))) continue;
     if (o.gy + o.h !== l.gy + l.h) out.push(`${l.name} and ${o.name} share a row but not a south edge (rows ${l.gy + l.h} and ${o.gy + o.h}): staggered`);
-    else if (gap > 0 && gap < PLOT) out.push(`${l.name} and ${o.name}: a sliver of sand ${gap} cell wide between them, less than a plot`);
+    else if (!def.wideRoadGrid && gap > 0 && gap < PLOT) out.push(`${l.name} and ${o.name}: a sliver of sand ${gap} cell wide between them, less than a plot`);
   }
   for (const [x, side] of [[l.gx - PLOT, l.gx - 1], [east + PLOT, east + 1]] as const) {
-    if (crossStreetAt(streets, x, l) && !crossStreetAt(streets, side, l)) out.push(`${l.name}: a sliver of sand between it and the street at x ${x}`);
+    if (!def.wideRoadGrid && crossStreetAt(streets, x, l) && !crossStreetAt(streets, side, l)) out.push(`${l.name}: a sliver of sand between it and the street at x ${x}`);
   }
   return out;
 }
@@ -102,6 +102,6 @@ function rowProblems(def: CityDef, l: LotDef, streets: Streets): string[] {
 export function layoutProblems(def: CityDef): readonly string[] {
   if (!def.frontStreets) return [];
   const streets = councilStreets(def);
-  const lots = def.lots.flatMap((l) => [frontProblem(l, streets), ...gateProblems(def, l, streets), ...rowProblems(def, l, streets)].filter((p): p is string => p !== null));
+  const lots = def.lots.flatMap((l) => [frontProblem(def, l, streets), ...gateProblems(def, l, streets), ...rowProblems(def, l, streets)].filter((p): p is string => p !== null));
   return [...lots, ...roadRoomProblems(def)];
 }

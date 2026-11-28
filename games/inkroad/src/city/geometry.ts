@@ -6,14 +6,6 @@ export interface Block { readonly gx: number; readonly gy: number; readonly w: n
 export interface Rect { readonly x: number; readonly y: number; readonly w: number; readonly h: number }
 
 export const lotRect = (b: Block): Rect => ({ x: b.gx * CELL, y: b.gy * CELL, w: b.w * CELL, h: b.h * CELL });
-/** Setback inside the grid parcel for streets that can become avenues and two-lane roundabouts. */
-export const FRONT_STREET_SETBACK = 11;
-
-export function insetRect(r: Rect, inset: number): Rect {
-  const d = Math.min(inset, r.w / 4, r.h / 4);
-  return { x: r.x + d, y: r.y + d, w: r.w - 2 * d, h: r.h - 2 * d };
-}
-
 export const centreOf = (b: Block): Pt => ({ x: (b.gx + b.w / 2) * CELL, y: (b.gy + b.h / 2) * CELL });
 export const cellPt = (c: Cell): Pt => ({ x: c.gx * CELL, y: c.gy * CELL });
 export const distPt = (a: Pt, b: Pt): number => Math.hypot(a.x - b.x, a.y - b.y);
