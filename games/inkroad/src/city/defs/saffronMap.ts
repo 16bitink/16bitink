@@ -25,13 +25,29 @@ function terrainAt(x: number, y: number): Terrain {
 }
 
 // Extra grid cells on both sides of the planned road axes. Parcels keep their original width and depth.
-const WEST_EAST = [1, 2, 7, 8, 11, 12, 21, 22, 35, 36, 44, 45, 50, 51];
-const NORTH_SOUTH = [4, 7, 8, 9, 10, 12, 13, 14, 17, 18, 21, 22, 22, 23, 23, 24, 25, 26, 29, 30, 31, 34, 35];
+const OLD_COLUMNS = [1, 2, 7, 8, 11, 12, 21, 22, 35, 36, 44, 45, 50, 51];
+const OLD_ROWS = [4, 7, 8, 9, 10, 12, 13, 14, 17, 18, 21, 22, 22, 23, 23, 24, 25, 26, 29, 30, 31, 34, 35];
+const WEST_EAST = [...OLD_COLUMNS, 21, 22];
+const NORTH_SOUTH = [...OLD_ROWS, 17, 18, 23, 24];
 const stretch = (n: number, cuts: readonly number[]): number => n + cuts.filter((cut) => cut < n).length;
 const copies = (n: number, cuts: readonly number[]): number => 1 + cuts.filter((cut) => cut === n).length;
 
 /** Grid coordinates of the master plan's street and terrain survey points. */
 export const saffronCell = (x: number, y: number): readonly [number, number] => [stretch(x, WEST_EAST), stretch(y, NORTH_SOUTH)];
+
+/** Each migration interpolates positions between the same survey points on the old and new maps. */
+export function saffronGridMigration(expanded: boolean) {
+  function axis(size: number, source: readonly number[], target: readonly number[]) {
+    const points = Array.from({ length: size }, (_, i) => ({ from: stretch(i, source), to: stretch(i, target) }));
+    return (n: number): number => {
+      const i = points.findIndex((p) => p.from > n);
+      if (i <= 0) return n + (i < 0 ? points.at(-1)!.to - points.at(-1)!.from : 0);
+      const a = points[i - 1]!, b = points[i]!;
+      return a.to + (n - a.from) * (b.to - a.to) / (b.from - a.from);
+    };
+  }
+  return { x: axis(COLS, expanded ? OLD_COLUMNS : [], WEST_EAST), y: axis(ROWS, expanded ? OLD_ROWS : [], NORTH_SOUTH) };
+}
 
 export const MAP: readonly string[] = Array.from({ length: ROWS }, (_, y) => {
   const row = Array.from({ length: COLS }, (_, x) => terrainAt(x, y).repeat(copies(x, WEST_EAST))).join('');
@@ -40,7 +56,9 @@ export const MAP: readonly string[] = Array.from({ length: ROWS }, (_, y) => {
 
 function parcel<T extends CellRect>(p: T, frontage = true): T {
   const bottom = p.gy + p.h;
-  const y = frontage ? stretch(bottom + 1, NORTH_SOUTH) - 2 : stretch(bottom, NORTH_SOUTH);
+  const street = bottom + 1;
+  const clearance = street === 18 || street === 24 ? 3 : 2;
+  const y = frontage ? stretch(street, NORTH_SOUTH) - clearance : stretch(bottom, NORTH_SOUTH);
   return { ...p, gx: stretch(p.gx, WEST_EAST), gy: y - p.h };
 }
 
@@ -135,10 +153,13 @@ const OFFICE_STREETS: readonly RoadDef[] = [
   { cells: [[31, 22], [36, 22], [36, 24]], type: 'street', opensYear: 5 },
 ];
 const NEW_NORTH_ROUTE = [[4, 5], [4, 7], [8, 7], [8, 18]] as const;
-export const ROADS_DEF = [...ROAD_SURVEY, ...OFFICE_STREETS].map((r) => {
+function surveyRoad(r: RoadDef): RoadDef {
   const cells = r === NORTH_AVENUE ? NEW_NORTH_ROUTE : r.cells;
   return { ...r, opensYear: r === BEACH_STREET ? 1 : (r.opensYear ?? 1), cells: cells.map(([x, y]) => saffronCell(x, y)) };
-});
+}
+export const ROADS_DEF = [...ROAD_SURVEY, ...OFFICE_STREETS].map(surveyRoad);
+/** Frontage roads added or opened earlier as part of moving the old compact parcels. */
+export const MIGRATED_FRONT_STREETS = [BEACH_STREET, ...OFFICE_STREETS].map(surveyRoad);
 
 type Row = readonly [name: string, kind: LotDef['kind'], gx: number, gy: number, w: number, h: number, year: number, district: string, level?: LotDef['level'], max?: LotDef['maxLevel']];
 
@@ -244,6 +265,7 @@ const properties = surveyedLots.map((l): LotDef[] => {
 });
 
 export const LOTS: readonly LotDef[] = [...properties.map(([first]) => first!), ...properties.flatMap(([, ...others]) => others)];
+export const LOT_SOURCES = [...properties.map((_, i) => i), ...properties.flatMap(([, ...others], i) => others.map(() => i))];
 
 /** The survey as it appeared in saves made before the streets gained their reserved widths. */
 export const LEGACY_SAFFRON_LAYOUT = {

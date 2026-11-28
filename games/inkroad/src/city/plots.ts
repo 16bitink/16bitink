@@ -2,13 +2,14 @@ import type { CellRect, Lot, Terrain } from '../sim/types';
 import type { Block } from './geometry';
 import { builtArea, blocksMeet, centreOf, distPt, lotRect, vertexInBlock } from './geometry';
 import { earn } from './money';
-import { blockAccess } from './net';
+import { blockAccess, wideFrontageReach } from './net';
 import { CELL } from '../sim/constants';
 import type { City } from './state';
 import { emit } from './state';
 import { defCells, DROPPED, holdsGround, isDue } from './standing';
 import { PARKS } from './tune';
 import { meetsRoadReserve } from './validateRoadRoom';
+import { frontageRows } from './validateLayout';
 
 /**
  * The Master Plan's plots. Two years before it opens a plot is drawn on the
@@ -53,15 +54,14 @@ function fits(c: City, g: Ground, b: Block, year: number): boolean {
   if (meetsRoadReserve(c.def, lotRect(b))) return false;
   if (vertices(b).some((x) => !g.letters.has(c.net.terrain[x.gy]?.[x.gx] ?? '~') || g.roads.has(key(x)))) return false;
   if (!c.def.frontStreets) return blockAccess(c.net, b) !== null;
-  return blockAccess(c.net, b, undefined, true) !== null || councilFront(c, b, year);
+  return blockAccess(c.net, b, wideFrontageReach(c), true) !== null || councilFront(c, b, year);
 }
 
 /** A Council street of the lot's year or before will run along the site's south edge, past every gate. */
 function councilFront(c: City, b: Block, year: number): boolean {
-  const front = b.gy + b.h + (c.def.wideRoadGrid ? 2 : 1);
-  const cells = new Set(c.def.roads.filter((r) => (r.opensYear ?? 1) <= year && r.type !== 'highway').flatMap((r) => [...defCells(r)]).filter((x) => x.gy === front).map((x) => x.gx));
-  for (let x = b.gx + 1; x < b.gx + b.w; x++) if (!cells.has(x)) return false;
-  return true;
+  const cells = new Set(c.def.roads.filter((r) => (r.opensYear ?? 1) <= year && r.type !== 'highway').flatMap((r) => [...defCells(r)]).map(key));
+  return frontageRows(c.def, b).some((gy) =>
+    Array.from({ length: b.w - 1 }, (_, i) => b.gx + i + 1).every((gx) => cells.has(key({ gx, gy }))));
 }
 
 /** The nearest free place of this size with a road beside it. */

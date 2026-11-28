@@ -5,7 +5,7 @@ import { roadRoomProblems } from './validateRoadRoom';
 
 /**
  * The layout rule of a city with front streets (docs/inkroad-build.md, "City layout: every gate on its street"):
- * A lot's gate faces a Council street to the south. The desert grid leaves two cells for its wider corridor,
+ * A lot's gate faces a Council street to the south. The desert grid leaves two or three cells for a wider corridor,
  * and compact front-street maps leave one. A block between streets has one row lined up in whole plots.
  */
 const PLOT = 2;
@@ -37,12 +37,14 @@ function councilStreets(def: CityDef): Streets {
   return out;
 }
 
-const frontRow = (def: CityDef, l: Block): number => l.gy + l.h + (def.wideRoadGrid ? 2 : 1);
+export const frontageRows = (def: CityDef, l: Block): readonly number[] =>
+  (def.wideRoadGrid ? [2, 3] : [1]).map((gap) => l.gy + l.h + gap);
 /** The vertices along the frontage a street must pass: every gate (plot centres) and the kerb between them; the corners may be a street's end. */
 const xsOf = (l: Block): readonly number[] => Array.from({ length: Math.max(1, l.w - 1) }, (_, i) => l.gx + 1 + i);
 
 function frontProblem(def: CityDef, l: LotDef, streets: Streets): string | null {
-  const y = frontRow(def, l);
+  const rows = frontageRows(def, l);
+  const y = rows.find((row) => xsOf(l).every((x) => streets.has(key(x, row)))) ?? rows[0]!;
   const missing = xsOf(l).filter((x) => !streets.has(key(x, y)));
   if (missing.length > 0) return `${l.name}: no Council street along its south edge (row ${y}, x ${l.gx + 1} to ${l.gx + l.w - 1}; missing at x ${missing.join(' ')})`;
   const opens = Math.max(...xsOf(l).map((x) => streets.get(key(x, y))!.year));

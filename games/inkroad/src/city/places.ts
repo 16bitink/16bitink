@@ -2,7 +2,7 @@ import { CELL } from '../sim/constants';
 import type { Access } from '../sim/trafficTypes';
 import type { Network } from '../sim/trafficTypes';
 import type { CarPark, Id, Lot, Pt } from '../sim/types';
-import { accessOpen, blockAccess } from './net';
+import { accessOpen, blockAccess, wideFrontageReach } from './net';
 import { areaOf, centreOf, lotRect, pointAlong } from './geometry';
 import type { Place } from './day';
 import { reachOf } from './rules/beach';
@@ -68,7 +68,7 @@ export function nearName(c: City, at: Pt): string {
 /** A lot's driveway. In a city of front streets a lot is served only by the road along its south edge (beach plots by any). */
 export function lotAccess(c: City, l: Lot): Lot['access'] {
   const reach = reachOf(l);
-  return blockAccess(c.net, l, reach, c.def.frontStreets === true && reach === undefined);
+  return blockAccess(c.net, l, reach ?? wideFrontageReach(c), c.def.frontStreets === true && reach === undefined);
 }
 
 /** Give every open block and car park its driveway again (after a network change). */

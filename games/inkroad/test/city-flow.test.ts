@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DAY, WEEKEND } from '../src/sim/constants';
 import { createCity } from '../src/city/city';
 import { LEGACY_SAFFRON_LAYOUT, saffronCell } from '../src/city/defs/saffronMap';
+import { setControl, setRoad } from '../src/sim/network';
 import { SAFFRON } from '../src/city/defs/saffron';
 import { cityAtYear, inner, newCity, ok, runDay, runYear, SEED } from './city-helpers';
 
@@ -71,13 +72,37 @@ describe('the year', () => {
 });
 
 describe('saves', () => {
-  it('keeps a pre-expansion city on its original grid when an older save is loaded', () => {
+  it('moves a saved Palm Row away from its avenue and roundabouts while retaining the built roads', () => {
     const old = createCity({ ...SAFFRON, ...LEGACY_SAFFRON_LAYOUT }, SEED);
-    inner(old).money = 987;
+    const c = inner(old);
+    while (c.year < 3) { c.phase = 'yearEnd'; ok(old, { t: 'next' }); }
+    c.money = 987;
+    const nodes = [18, 24].map((gy) => c.net.junctions.find((j) => j.cell.gx === 22 && j.cell.gy === gy)!);
+    const avenue = c.net.roads.find((r) => r.cells.some((p) => p.gx === 22 && p.gy === 20))!;
+    c.net = setRoad(c.net, avenue.id, { type: 'avenue' });
+    for (const node of nodes) c.net = setControl(c.net, node.id, 'roundabout');
+    const palm = c.lots.find((l) => l.name === 'Palm Row')!;
+    c.lots = c.lots.map((l) => l.id === palm.id ? { ...l, level: 3 } : l);
+
     const restored = createCity(SAFFRON, SEED, JSON.parse(JSON.stringify(old.save())));
     expect(restored.money).toBe(987);
-    expect(restored.def.map).toEqual(old.def.map);
-    expect(restored.roads).toEqual(old.roads);
+    expect(restored.year).toBe(3);
+    expect(restored.def.map).toBe(SAFFRON.map);
+    expect(restored.roads.map((r) => r.id)).toEqual(expect.arrayContaining(old.roads.map((r) => r.id)));
+    expect(restored.roads.find((r) => r.id === avenue.id)?.type).toBe('avenue');
+    for (const node of nodes) expect(restored.junctions.find((j) => j.id === node.id)).toMatchObject({ control: 'roundabout' });
+    const homes = restored.lots.filter((l) => l.name.startsWith('Palm Row'));
+    expect(homes).toHaveLength(2);
+    const [x, south] = saffronCell(22, 24);
+    for (const home of homes) {
+      expect(home).toMatchObject({ level: 3, w: 2, h: 4 });
+      expect(home.access).not.toBeNull();
+      expect(south - (home.gy + home.h)).toBeGreaterThanOrEqual(3);
+      expect(x - (home.gx + home.w)).toBeGreaterThanOrEqual(3);
+    }
+    expect(homes[0]!.access).not.toEqual(homes[1]!.access);
+    const migrated = JSON.stringify(restored.save());
+    expect(JSON.stringify(createCity(SAFFRON, SEED, JSON.parse(migrated)).save())).toBe(migrated);
   });
 
   it('restores a year-start snapshot exactly and replays its saved dawn deterministically', () => {

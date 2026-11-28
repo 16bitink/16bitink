@@ -79,6 +79,7 @@ describe('roads', () => {
     const v = cityAtYear(8);
     const road = roadThrough(v, 22, 20);
     const lots = v.lots.map(lotRect);
+    for (const y of [18, 24]) ok(v, { t: 'control', node: at(v, 22, y), control: 'roundabout' });
     ok(v, { t: 'upgrade', road: road.id, type: 'boulevard' });
     expect(v.roads.find((r) => r.id === road.id)?.type).toBe('boulevard');
     expect(v.lots.map(lotRect)).toEqual(lots);

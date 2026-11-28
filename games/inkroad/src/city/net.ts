@@ -20,3 +20,6 @@ export const accessExists = (net: Network, a: Access): boolean =>
 /** Can a car drive to or from here now? Not on a road under works. */
 export const accessOpen = (net: Network, a: Access): boolean =>
   ('gate' in a ? accessExists(net, a) : net.roads.some((r) => r.id === a.road && !closedForWorks(r)));
+
+/** Driveways can cross the full width of a reserved desert frontage. */
+export const wideFrontageReach = (c: City): number | undefined => (c.def.wideRoadGrid ? 3.25 : undefined);
