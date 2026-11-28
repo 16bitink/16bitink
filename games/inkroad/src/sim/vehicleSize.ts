@@ -6,23 +6,36 @@ import type { VehicleKind } from './types';
  * pictures, the parking slots (src/sim/slotGeometry.ts, shared by the city and the renderer) and the tests.
  */
 
-/** Vehicle pictures: straight from above, nose right, 8x. Their shape sets each body's width. */
+/**
+ * Vehicle pictures: straight from above, nose right, 8x, baked at real proportions (dev/art/build_vehicles.py: the
+ * body between the mirrors is the real width over the drawn length). The game draws each at its own aspect.
+ */
 export const VEHICLE_PICTURES = {
-  car: { w: 112, h: 58, n: 5 }, taxi: { w: 112, h: 56, n: 0 }, van: { w: 136, h: 67, n: 0 }, truck: { w: 232, h: 114, n: 0 },
-  bus: { w: 272, h: 102, n: 0 }, tram: { w: 440, h: 155, n: 0 }, tow: { w: 152, h: 65, n: 0 }, school: { w: 240, h: 94, n: 0 },
-  police: { w: 112, h: 57, n: 0 },
+  car: { w: 112, h: 54, n: 5 }, taxi: { w: 112, h: 54, n: 0 }, van: { w: 136, h: 63, n: 0 }, truck: { w: 232, h: 92, n: 0 },
+  bus: { w: 272, h: 93, n: 0 }, tram: { w: 440, h: 115, n: 0 }, tow: { w: 152, h: 74, n: 0 }, school: { w: 240, h: 94, n: 0 },
+  police: { w: 112, h: 53, n: 0 },
 } as const;
 
 export interface Size { readonly len: number; readonly wid: number }
 
-/** A lane is 9 px. Drawn a little bigger than the sim's cars (which keep 4 px apart), so they read on a phone. */
-export const WIDEST = 9.4;
+/**
+ * Real body widths, metres, without mirrors (the owner, November 28: real widths and real lanes, everything in true
+ * proportion). A car 1.8 m (Golf, Corolla), a van 2.0 (Transit, Sprinter), a tow truck 2.2, a school bus 2.5, a bus
+ * and a lorry 2.55 (the EU and US legal most), a tram 2.65 (a Citadis).
+ */
+export const WIDTH_M: Readonly<Record<VehicleKind, number>> = {
+  car: 1.8, taxi: 1.8, police: 1.8, van: 2.0, tow: 2.2, school: 2.5, bus: 2.55, truck: 2.55, tram: 2.65,
+};
 const BIGGER = { small: 1.14, long: 1.07, from: 20 } as const;
+const drawnLen = (kind: VehicleKind): number => LENGTHS[kind] * (LENGTHS[kind] < BIGGER.from ? BIGGER.small : BIGGER.long);
+/** Plan px per metre: a car is drawn 16 px long and is 4.5 m. */
+const PX_M = drawnLen('car') / 4.5;
+/** The widest body (a tram), px. */
+export const WIDEST = WIDTH_M.tram * PX_M;
 
+/** A vehicle's body: lengths drawn a little long so cars read on a phone, widths real. */
 export function sizeOf(kind: VehicleKind): Size {
-  const p = VEHICLE_PICTURES[kind];
-  const len = LENGTHS[kind] * (LENGTHS[kind] < BIGGER.from ? BIGGER.small : BIGGER.long);
-  return { len, wid: Math.min(WIDEST, (len * p.h) / p.w) };
+  return { len: drawnLen(kind), wid: WIDTH_M[kind] * PX_M };
 }
 
 /** The kinds the city parks (a minibus is a van). */

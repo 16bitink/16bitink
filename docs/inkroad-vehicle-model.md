@@ -320,3 +320,52 @@ The wide remainder is mostly geometry: vans, lorries and buses are drawn 9.0–9
 **Cost:** a city step is 0.80 / 2.21 / 1.02 ms (was 0.57 / 1.74 / 0.73) for the three seasons (`node dev/moves.mjs`): pull-outs that wait plan again when they look (backing off to 5–10 s), and the body checks (a circle test now goes first in `bodiesOverlap`).
 
 **Not done in this round** (next): followers overtaking a stopped car through a gap in the oncoming lane (they wait behind it, never through it); routing round the block instead of turning round on the road (a taxi facing away still turns round where no way round is reached); real aisles in car parks; conflicting junction turns granted together (the junction-box remainder); `drive.gate.inout` (445 frames, background cars at a gate's junction), `drive.t.all`, `drive.lanes.change`, `drive.works.closed`, `park.kerb.one-way` keep their moving-car overlaps.
+
+## Real widths and real lanes (November 28, not committed)
+
+The owner chose true proportion for everything: real vehicle widths and real lane widths. Wide vehicles drawn 9.0–9.4 px in 9 px lanes caused most of the overlap frames left after round 3.
+
+**Widths** (`WIDTH_M`, `src/sim/vehicleSize.ts`; the body without mirrors, 16 px = 4.5 m so 3.55 px/m):
+
+| Kind | Real width | px | Before (drawn) |
+|---|---|---|---|
+| car, taxi, police | 1.8 m | 6.4 | 8.0–8.3 |
+| van | 2.0 m | 7.1 | 9.0 |
+| tow truck | 2.2 m | 7.8 | 8.8 |
+| school bus | 2.5 m | 8.9 | 9.4 |
+| bus, lorry | 2.55 m | 9.05 | 9.4 |
+| tram | 2.65 m | 9.4 | 9.4 (unchanged) |
+
+Lengths are unchanged (drawn 14% / 7% long so cars read on a phone). R_MIN, wheelbases and turning circles are per vehicle in metres and unchanged.
+
+**Pictures.** The painted sprites are re-baked from `dev/art/raw/vehicles.png` by `dev/art/build_vehicles.py`: only the height is resampled so the body between the mirrors is the real width over the drawn length (the mirrors stand out past the body, as on a real car). Body factors: car variants ×0.82–1.00, taxi ×0.96, van ×0.95, lorry ×0.81, bus ×0.91, school bus ×1.00, tow ×1.14, tram ×0.74 (what the old 9.4 px cap already did). `carAtlas.ts` now draws each picture at its own aspect. The lorry and the chunky hatchback (car-2) lose a fifth of their width; a repaint at true proportion would remove that.
+
+**Lanes.** `LANE` is 11 px = 3.1 m (real town lanes are 3.0–3.25 m; a car has 0.65 m each side, a lorry or bus 0.28 m). Everything built on `halfWidth`/`laneOffset` follows: a street is 22 px, an avenue 44, a boulevard 72, a highway 92 (was 18 / 36 / 60 / 76). Junction radii, clothoid turn trims, rings (a street ring is 33 px), flyover clearances, kerb bays and the paint follow from the code. The lab's "crosses a kerb" rule now measures a way in from the road's band (`ACCESS_PAD`, it was a fixed 24 px from the road's middle).
+
+**Capacity unchanged.** Spaces are still counted and spread at the old pitch (`COUNT_WID` 8.3 px in `src/sim/slotGeometry.ts`): the narrower bodies stand in them with more room. Real pitch would add spaces at every home, car park and beach: a balance change for phase C.
+
+**Maps.** `src/city/validateRoadRoom.ts` (part of `layoutProblems`, cities with front streets): no lot or beach plot may stand on a Council road's paved width. An eight-lane highway (92 px) is wider than two cells, so in Saffron Bay the west and east gate highways are one cell (`[0,18]-[1,18]`, `[54,18]-[55,18]`, were two) and the Airfield Road gate and highway move a row north to `(0,5)` (the avenue goes `(4,5)-(5,6)-(7,6)-(8,7)-(8,18)`), clear of Crate Offices, Mangrove Shops, Coral Lagoon Park and The Grand Fair. Old Harbour fits as it is. Twin Isles (1 lot), Seven Hills (4) and Cross Rivers (20, its whole highway on row 22) have lots on a highway's width: they are laid out again after launch.
+
+**Shoulder stops.** With a real lane a car giving up or double parking has 2 px to the paved edge; its short forward S toward it would run into a car standing just ahead, so it now stops where it is when the stretch ahead is not clear (`stopOnRoad`, `src/city/kerbside.ts`).
+
+**Overlap frames by cause** (`node dev/overlaps.mjs`, before → after; chaotic seasons, read the rows):
+
+| Cause | Saffron Y3 | Saffron Y6 | Old Harbour Y4 |
+|---|---|---|---|
+| moving cars vs oncoming | 2317 → 87 | 4821 → 1929 | 3214 → 155 |
+| moving cars, next lane | 0 → 0 | 5014 → 614 | 533 → 0 |
+| moving vs parked | 220 → 306 | 6704 → 1065 | 0 → 0 |
+| moving vs manoeuvre | 1639 → 891 | 3192 → 1300 | 1879 → 536 |
+| manoeuvre vs manoeuvre | 140 → 201 | 1448 → 376 | 1144 → 528 |
+| manoeuvre vs parked | 144 → 346 | 1176 → 1648 | 2060 → 1935 |
+| junction box | 110 → 30 | 805 → 209 | 115 → 95 |
+| queues across a lane end ("lanes apart") | 0 → 0 | 0 → 3476 | 69 → 18 |
+| lane / junction and the rest | 15 → 2951 | 999 → 1105 | 816 → 1575 |
+| total | 4585 → 4812 | 25221 → 11739 | 9881 → 4842 |
+| a van, lorry or bus involved | 3012 → 4297 | 20679 → 8232 | 3726 → 193 |
+
+What is left, and the rises:
+- **Saffron Y3, the dead end at (30, 8)** (2978 frames, and all of Y3's new moving-car physics counts: slip 6, too tight 5, steers too fast 2, jerks 3, one reverse too fast, one too fast on a curve): a car stops on the road at the end of the dead-end street, rolls onto the turn-round track and waits there for room to turn that never comes; a lorry following creeps into it. A car waiting to turn round reserves nothing behind it. Next round (turning round, routing round the block).
+- **Saffron Y6, the joint at (30, 8)** ("lanes apart", 3476): queues standing across the straight joint of the two streets of row 8 touch by 1–2 px; the cause is not found yet.
+- **Too fast on a curve (moving)**: Saffron Y6 39 → 120, Old Harbour Y4 334 → 439 (393 on one turn, 1–8% over its cap). Steers too fast (manoeuvre): Y6 0 → 1, Harbour 2 → 4; jerks (manoeuvre) Y6 55 → 58.
+- **Lab**: city.year-start 54 → 94 (background cars at one queue), drive.uturn.deadend 8 → 11 (a car leaving a kerb space touching its parked neighbour), park.kerb.neighbour-swap jerks 1 → 2, drive.jam.giveup moving 462 → 468, drive.lanes.change and test/vehicle lane-change (A's move: steers too fast 1, jerks 1), park.night.home 0 → 9 manoeuvre overlaps, drive.diagonal (F is not through by 44 s), park.kerb.far-side (A ends on the near kerb), park.forecourt.far-lane with switches on (41 overlap frames). Every other lab count fell (drive.lanes.change 139 → 4, drive.t.all 138 → 0, drive.gate.inout 445 → 66, drive.works.closed 149 → 0, park.kerb.one-way 134 → 4, drive.uturn.avenue 34 → 5); ratchets rebased down only.

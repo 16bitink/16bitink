@@ -48,7 +48,9 @@ function drawHeading(kind: VehicleKind, l: Looks, a: number): HTMLCanvasElement 
     g.scale(1, TILT);
     g.rotate(a);
   };
-  const paste = (img: CanvasImageSource): void => g.drawImage(img, -b.len / 2, -b.wid / 2, b.len, b.wid);
+  // The picture at its own aspect (baked at real proportions): the body is b.wid, the mirrors stand out past it.
+  const wide = (b.len * l.side.height) / l.side.width;
+  const paste = (img: CanvasImageSource): void => g.drawImage(img, -b.len / 2, -wide / 2, b.len, wide);
   at(0, SHADOW.dx, SHADOW.dy);
   paste(l.shadow);
   const n = Math.max(2, Math.ceil(b.high * LAYERS_PER_PX));

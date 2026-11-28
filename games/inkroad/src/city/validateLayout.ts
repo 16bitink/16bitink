@@ -1,6 +1,7 @@
 import type { CityDef, LotDef } from '../sim/types';
 import { expandCells } from '../sim/netPlan';
 import { blocksMeet, type Block } from './geometry';
+import { roadRoomProblems } from './validateRoadRoom';
 
 /**
  * The layout rule of a city with front streets (docs/inkroad-build.md, "City layout: every gate on its street"):
@@ -101,5 +102,6 @@ function rowProblems(def: CityDef, l: LotDef, streets: Streets): string[] {
 export function layoutProblems(def: CityDef): readonly string[] {
   if (!def.frontStreets) return [];
   const streets = councilStreets(def);
-  return def.lots.flatMap((l) => [frontProblem(l, streets), ...gateProblems(def, l, streets), ...rowProblems(def, l, streets)].filter((p): p is string => p !== null));
+  const lots = def.lots.flatMap((l) => [frontProblem(l, streets), ...gateProblems(def, l, streets), ...rowProblems(def, l, streets)].filter((p): p is string => p !== null));
+  return [...lots, ...roadRoomProblems(def)];
 }

@@ -46,20 +46,28 @@ export const GAP_ACROSS = 2.6;
 export const GAP_ALONG = 3;
 /** Lot edges (roads keep a cell off a lot, so the strip is wide). */
 const LOT_INSET = 9;
+/**
+ * Spaces are counted and spread at the pitch they had when a car was drawn 8.3 px wide and the biggest parked body
+ * 9.4 px (before real widths, the owner, November 28): the city's capacity is unchanged until phase C rebalances, and
+ * the real, narrower bodies stand in them with more room (a home bay 3.1 m, a car-park bay 3.2 m).
+ */
+const COUNT_WID = 8.3;
+const COUNT_BIG: typeof BIGGEST = { len: BIGGEST.len, wid: 9.4 };
+const COUNT_PITCH: typeof PITCH_BODY = { len: PITCH_BODY.len, wid: COUNT_WID };
 /** Home bays stand nose to the road, a body across apart; forecourt spaces (square to the edge too) keep a body length apart. */
-export const NOSE_PITCH = PITCH_BODY.wid + GAP_ACROSS;
+export const NOSE_PITCH = COUNT_WID + GAP_ACROSS;
 export const SIDE_PITCH = PITCH_BODY.len + GAP_ALONG;
 const NOSE_GAP = 9;
 /** Car park bays: nose to the aisle, rows facing each other. */
 const PARK_EDGE = 12;
-export const PARK_PITCH = PITCH_BODY.wid + GAP_ALONG;
+export const PARK_PITCH = COUNT_WID + GAP_ALONG;
 const PARK_ROW_IN = 18;
 /** Kinds of car park with bays on the ground (the others take cars inside). */
 const SURFACE: ReadonlySet<CarParkKind> = new Set<CarParkKind>(['lot', 'ride']);
 /** The gate lane keeps this far from a bay's middle. */
 /** Room each side of the gate lane past the near row: a car leaving a bay by the gate swings round into the gate lane there (the owner, phase B). */
 const GATE_ROOM = 14;
-const GATE_CLEAR = PITCH_BODY.wid + 1.5 + GATE_ROOM;
+const GATE_CLEAR = COUNT_WID + 1.5 + GATE_ROOM;
 /** Car parks take cars and vans; lorries stand in front strips and at the kerb. */
 const PARK_MAX_LEN = sizeOf('van').len;
 /** Sand: lengthwise along the road, a little askew, each jittered a little; pitches hold the worst case of a car. */
@@ -72,8 +80,8 @@ const SAND_JIT_D = 1;
 const SAND_ANCHOR = SAND_INSET + SAND_JIT_D + 0.5;
 /** Px from a road's paved edge to the middle of a car on the sand (half the biggest body across, and a gap). */
 const SAND_ROAD_CLEAR = 8;
-const SAND_REACH = reach(PITCH_BODY, SAND_LOOSE);
-const SAND_BIG = reach(BIGGEST, SAND_LOOSE);
+const SAND_REACH = reach(COUNT_PITCH, SAND_LOOSE);
+const SAND_BIG = reach(COUNT_BIG, SAND_LOOSE);
 export const SAND_PITCH = SAND_REACH.x * 2 + SAND_JIT_U * 2 + GAP_ALONG;
 export const SAND_ROW = SAND_BIG.y * 2 + SAND_JIT_D * 2 + GAP_ACROSS;
 /** Neighbours in a row stand within this many pitches of each other. */
@@ -148,7 +156,7 @@ function lotLayout(lot: GardenLot, home: boolean, from: Pt | null): SlotLayout {
   const row: RowSlot[] = [];
   for (let j = 0; j < n; j++) {
     const u = LOT_INSET + (j + 0.5) * ((e.len - LOT_INSET * 2) / n);
-    if (gates.some((g) => Math.abs(u - g) <= GATE_W / 2 + PITCH_BODY.wid / 2)) continue;
+    if (gates.some((g) => Math.abs(u - g) <= GATE_W / 2 + COUNT_WID / 2)) continue;
     row.push({ pose: { x: e.x + e.tx * u + e.nx * NOSE_GAP, y: e.y + e.ty * u + e.ny * NOSE_GAP, a }, u, rank: Math.abs(u - u0), dir: 1 });
   }
   return fromRows([row], true, (e.len - LOT_INSET * 2) / Math.max(1, n));

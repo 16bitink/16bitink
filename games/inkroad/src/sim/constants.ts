@@ -2,7 +2,8 @@ import type { Control, RoadType, VehicleKind } from './types';
 
 /** World units are plan pixels (see types.ts). Tuning values live here; tests and the lab import them. */
 export const CELL = 40;
-export const LANE = 9;
+/** A lane is 11 px = 3.1 m (real town lanes are 3.0 to 3.25 m; a car 1.8 m wide has 0.65 m each side, a lorry 0.28 m). */
+export const LANE = 11;
 export const STEP = 0.1; // seconds per sim step
 /** A season is a drawn workday, then a short weekend day. */
 export const DAY = 120;

@@ -8,7 +8,7 @@ import { ctxOf, makeCanvas } from '../tiles';
 /** Stand-in vehicles, seen straight from above, nose to the right, at 8x. */
 export interface Body { readonly len: number; readonly wid: number; readonly high: number }
 
-/** Plan px. The length is the sim's, the width the picture's, kept inside a lane; `high` is the little that shows of its side. */
+/** Plan px. The body's length and real width (src/sim/vehicleSize.ts); `high` is the little that shows of its side. */
 export const BODIES: Readonly<Record<VehicleKind, Body>> = {
   car: body('car', 1.4), taxi: body('taxi', 1.4), van: body('van', 2.2), truck: body('truck', 2.6), bus: body('bus', 2.6),
   tram: body('tram', 2.8), tow: body('tow', 1.8), school: body('school', 2.6), police: body('police', 1.4),

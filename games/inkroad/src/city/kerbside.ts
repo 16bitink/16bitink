@@ -187,7 +187,9 @@ export function stopOnRoad(c: City, e: Standing | null, pose: { readonly x: numb
   // otherwise (double parking, a full kerb) it stops in its lane hugging the parked row (the paved edge), straight.
   const kerbLat = halfWidth(road) + KERB_OUT;
   const inKerb = shoulder && !road.oneWay && (road.kerb || road.type === 'street') && kerbFree(c, road, side, sAlong(road, pose), sizeOf(e.kind).len) && clearAhead(c, pose, sizeOf(e.kind).len);
-  const lat = inKerb ? side * kerbLat : lane + side * Math.min(DRIVEWAY.slide, edge);
+  // Hugging the edge takes a short S forward: with a car standing just ahead (a queue, a breakdown) it stops where it is.
+  const hug = clearAhead(c, pose, sizeOf(e.kind).len) ? lane + side * Math.min(DRIVEWAY.slide, edge) : here;
+  const lat = inKerb ? side * kerbLat : hug;
   const d = Math.abs(lat - here);
   const run = d < SAME_LINE ? 0 : 2 * R_MIN * Math.sin(d >= 2 * R_MIN ? Math.PI / 2 : Math.acos(1 - d / (2 * R_MIN))) + S_ROOM;
   // From where it really is (not the stand-in's spacing), and never onto a car already standing on that line ahead.

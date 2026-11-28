@@ -22,11 +22,12 @@ function harbourAt(year: number): CityView {
  * (test/vehicle/frameRules.ts) and the owner's phase B rules: reverse at walking pace, never across a lane of
  * traffic, parking speeds, no loops (test/motion-helpers.ts). Overlaps count every frame two bodies overlap. MOTION_STRICT=1 asks for zero.
  * Round 3 (one collision rule): overlaps 14780/37672/30434 -> 4585/25221/9881, 40-80% of the rest wide vehicles (`node dev/overlaps.mjs`).
+ * Real widths and lanes: rebased down only; the rises are explained in docs/inkroad-vehicle-model.md "Real widths and real lanes".
  */
 const CEILING: Readonly<Record<string, Readonly<Record<string, number>>>> = {
-  'Saffron Bay year 3': { 'bodies overlap (manoeuvre)': 1923, 'bodies overlap (moving)': 2662, 'cuts across without a gap (manoeuvre)': 10, 'jerks (manoeuvre)': 43, 'pulls away too hard (manoeuvre)': 6, 'reverses across a lane (manoeuvre)': 20, 'steers too fast (manoeuvre)': 1 },
-  'Saffron Bay year 6': { 'bodies overlap (manoeuvre)': 5840, 'bodies overlap (moving)': 19381, 'cuts across without a gap (manoeuvre)': 26, 'jerks (manoeuvre)': 55, 'pulls away too hard (manoeuvre)': 6, 'reverses across a lane (manoeuvre)': 32, 'too fast on a curve (moving)': 39 },
-  'Old Harbour year 4': { 'bodies overlap (manoeuvre)': 5090, 'bodies overlap (moving)': 4791, 'brakes too hard (moving)': 1, 'cuts across without a gap (manoeuvre)': 13, 'jerks (manoeuvre)': 44, 'jerks (moving)': 5, 'pulls away too hard (manoeuvre)': 3, 'pulls away too hard (moving)': 1, 'reverses across a lane (manoeuvre)': 14, 'slip (moving)': 6, 'steers too fast (manoeuvre)': 2, 'steers too fast (moving)': 2, 'too fast on a curve (moving)': 334 },
+  'Saffron Bay year 3': { 'bodies overlap (manoeuvre)': 1438, 'bodies overlap (moving)': 2662, 'cuts across without a gap (manoeuvre)': 6, 'jerks (manoeuvre)': 31, 'pulls away too hard (manoeuvre)': 1, 'reverses across a lane (manoeuvre)': 9, 'steers too fast (manoeuvre)': 1 },
+  'Saffron Bay year 6': { 'bodies overlap (manoeuvre)': 3324, 'bodies overlap (moving)': 8415, 'cuts across without a gap (manoeuvre)': 16, 'jerks (manoeuvre)': 55, 'pulls away too hard (manoeuvre)': 6, 'reverses across a lane (manoeuvre)': 19, 'too fast on a curve (moving)': 39 },
+  'Old Harbour year 4': { 'bodies overlap (manoeuvre)': 2999, 'bodies overlap (moving)': 1843, 'cuts across without a gap (manoeuvre)': 12, 'jerks (manoeuvre)': 41, 'pulls away too hard (manoeuvre)': 2, 'reverses across a lane (manoeuvre)': 9, 'steers too fast (manoeuvre)': 2, 'too fast on a curve (moving)': 334 },
 };
 
 const CASES: readonly { readonly name: string; readonly make: () => CityView }[] = [

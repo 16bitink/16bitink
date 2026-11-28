@@ -48,31 +48,33 @@ export const GATES: readonly GateDef[] = [
   { id: 'west', name: 'Dune Road', cell: [0, 18], weight: 1 },
   { id: 'south', name: 'South Road', cell: [22, 37], weight: 1.1 },
   { id: 'east', name: 'Far Shore Road', cell: [55, 18], weight: 0.8 },
-  { id: 'north', name: 'Airfield Road', cell: [0, 6], weight: 1.2, opensYear: 4 },
+  { id: 'north', name: 'Airfield Road', cell: [0, 5], weight: 1.2, opensYear: 4 },
 ];
 
 export const ROADS_DEF: readonly RoadDef[] = [
   // The start: a cross of streets, four ways in, and the front street of every first block.
-  { cells: [[0, 18], [2, 18]], type: 'highway', fixed: true },
-  { cells: [[2, 18], [22, 18]], type: 'street' },
+  // The gate highways are one cell: a real eight-lane highway (92 px) would reach onto the lots beside a longer one.
+  { cells: [[0, 18], [1, 18]], type: 'highway', fixed: true },
+  { cells: [[1, 18], [22, 18]], type: 'street' },
   { cells: [[22, 18], [22, 8]], type: 'street' },
   { cells: [[13, 8], [30, 8]], type: 'street' },
   { cells: [[22, 18], [22, 35]], type: 'street' },
   { cells: [[22, 35], [22, 37]], type: 'highway', fixed: true },
   { cells: [[22, 18], [36, 18]], type: 'street' },
   { cells: [[36, 18], [41, 18]], type: 'street' },
-  { cells: [[41, 18], [53, 18]], type: 'street' },
-  { cells: [[53, 18], [55, 18]], type: 'highway', fixed: true },
+  { cells: [[41, 18], [54, 18]], type: 'street' },
+  { cells: [[54, 18], [55, 18]], type: 'highway', fixed: true },
   { cells: [[10, 13], [22, 13]], type: 'street' },
   { cells: [[22, 13], [36, 13]], type: 'street' },
   { cells: [[12, 24], [32, 24]], type: 'street' },
   { cells: [[12, 30], [22, 30]], type: 'street' },
   { cells: [[22, 30], [33, 30]], type: 'street' },
-  { cells: [[0, 6], [4, 6]], type: 'highway', fixed: true },
+  // A row north of The Grand Fair (year 10): the highway is 92 px wide.
+  { cells: [[0, 5], [4, 5]], type: 'highway', fixed: true },
   // Year 3: the south street.
   { cells: [[12, 35], [22, 35]], type: 'street', opensYear: 3 },
   // Year 4: the office district and the west sands.
-  { cells: [[4, 6], [7, 6], [8, 7], [8, 18]], type: 'avenue', opensYear: 4 },
+  { cells: [[4, 5], [5, 6], [7, 6], [8, 7], [8, 18]], type: 'avenue', opensYear: 4 },
   { cells: [[8, 8], [13, 8]], type: 'street', opensYear: 4 },
   { cells: [[2, 24], [12, 24]], type: 'street', opensYear: 4 },
   { cells: [[12, 24], [12, 35]], type: 'street', opensYear: 4 },

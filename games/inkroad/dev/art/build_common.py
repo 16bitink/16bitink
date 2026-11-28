@@ -5,14 +5,7 @@ from PIL import Image
 def order_rows(cs, rows):
     return A.order(cs, rows)
 
-# ---- vehicles (nose right already). Lengths at 2x world size.
-cs = order_rows(A.cut("raw/vehicles.png", dilate=3), [5, 5, 5, 5])
-names = [("v-car-1", 112), ("v-car-2", 112), ("v-car-3", 112), ("v-car-4", 112), ("v-car-5", 112),
-         ("v-taxi", 112), ("v-van", 136), ("v-truck", 232), ("v-tow", 152), ("v-police", 112),
-         ("v-bus", 272), ("v-school", 240), ("v-tram", 440), ("v-metro", 272), ("v-boat", 150),
-         ("v-lorry", 260), ("v-fire", 200), ("v-icecream", 136), ("v-jeep", 112), ("v-ambulance", 136)]
-for c, (n, w) in zip(cs, names):
-    print(n, A.save(c["img"], n, width=w))
+# ---- vehicles: build_vehicles.py (real proportions).
 
 # ---- trees
 t = A.cut("raw/gulf-trees.png", dilate=3)

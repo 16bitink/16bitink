@@ -1,7 +1,7 @@
 /**
  * `node dev/overlaps.mjs [case] [--top n] [--json]`: plays the motion test's seasons (Saffron Bay years 3 and 6, Old
  * Harbour year 4) through the motion watch and breaks every frame two drawn bodies overlap down by cause: wide
- * vehicles (vans, lorries, buses: drawn 9.0 to 9.4 px in 9 px lanes), queues, junction boxes, lane changes, oncoming
+ * vehicles (vans, lorries, buses: anything wider than a car), queues, junction boxes, lane changes, oncoming
  * traffic, manoeuvres by kind, parked cars, played turns, stand-ins, handoffs and spawns. docs/inkroad-vehicle-model.md
  * "Phase B, round 3".
  */
@@ -10,15 +10,15 @@ import { PAID_CITIES } from '../content/paid';
 import type { CityView } from '../src/sim/types';
 import { cityAtYear, inner } from '../test/city-helpers';
 import { MotionWatch, type DrawnCar } from '../test/motion-helpers';
-import { bodiesOverlap } from '../src/sim/vehicleSize';
+import { bodiesOverlap, sizeOf } from '../src/sim/vehicleSize';
 import type { CarStore } from '../src/sim/store';
 import { turn } from '../src/render/cars/drawnPose';
 import { lotRect } from '../src/city/geometry';
 import { halfWidth } from '../src/sim/roadGeom';
 
 const TRACK = ['lane', 'turn', 'entry', 'arc', 'span', 'exit'];
-/** Drawn wider than a car (vans, lorries, buses). */
-const WIDE = 8.6;
+/** Wider than a car (vans, lorries, buses). */
+const WIDE = sizeOf('car').wid + 0.01;
 
 function harbourAt(year: number): CityView {
   const v = createCity(PAID_CITIES[0]!, 3);

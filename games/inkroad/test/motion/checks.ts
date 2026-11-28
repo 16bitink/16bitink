@@ -38,8 +38,11 @@ const JUNCTION_PAD = 8;
 /** The paved band: half width plus this; streets and kerb-bay roads add a parking band. */
 const EDGE_PAD = 2;
 const PARK_BAND = 11;
-/** A way in: crossing the edge within this many px of an access point (or a gate) is fine. */
-const ACCESS_R = 24;
+/**
+ * A way in: crossing the edge within this many px past the edge of an access point (or a gate) is fine. Ways in stand
+ * on the road's line, so the reach is the band plus this (24 px on a 9 px lane street; it grows with real lanes).
+ */
+const ACCESS_PAD = 2;
 
 interface Seg { readonly road: Road; readonly ax: number; readonly ay: number; readonly ux: number; readonly uy: number; readonly len: number }
 
@@ -127,7 +130,7 @@ export function extraChecks(c: City, trace: readonly (readonly Sample[])[]): Vio
       const paved = n.d <= band || inJunction(s.x, s.y);
       const was = onRoad.get(s.uid);
       onRoad.set(s.uid, paved);
-      if (was !== undefined && was !== paved && !doors.some((p) => Math.hypot(p.x - s.x, p.y - s.y) < ACCESS_R)) {
+      if (was !== undefined && was !== paved && !doors.some((p) => Math.hypot(p.x - s.x, p.y - s.y) < band + ACCESS_PAD)) {
         out.push({ rule: `crosses a kerb (${s.state === 'manoeuvre' ? 'manoeuvre' : 'moving'})`, who: s.who, uid: s.uid, t: s.t, frame: s.frame, value: n.d, limit: band, x: s.x, y: s.y, a: s.a, detail: `${paved ? 'onto' : 'off'} road ${r.id} ${n.d.toFixed(1)} px from its middle, no way in near` });
       }
       if (s.state === 'moving' && againstTraffic(n, s.a) && !inJunction(s.x, s.y) && n.d <= halfWidth(r) && r.level === 0) {

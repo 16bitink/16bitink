@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { LANE } from '../src/sim/constants';
 import { buildingFallbacks, textureKeys } from '../src/art/manifest';
 import { pack } from '../src/render/atlas';
 import { headingFrame, HEADINGS } from '../src/render/cars/carAtlas';
@@ -123,8 +124,8 @@ describe('roads', () => {
   });
   it('marks lanes on both sides, or across a one-way road', () => {
     expect(laneMarks(road())).toEqual([]);
-    expect(laneMarks(road({ type: 'avenue' })).sort((a, b) => a - b)).toEqual([-9, 9]);
-    expect(laneMarks(road({ type: 'avenue', oneWay: true }))).toEqual([-9, 0, 9]);
+    expect(laneMarks(road({ type: 'avenue' })).sort((a, b) => a - b)).toEqual([-LANE, LANE]);
+    expect(laneMarks(road({ type: 'avenue', oneWay: true }))).toEqual([-LANE, 0, LANE]);
     expect(taperOf(40, 10, 1000)).toBeCloseTo(78);
     expect(taperOf(40, 10, 50)).toBeCloseTo(35);
   });
