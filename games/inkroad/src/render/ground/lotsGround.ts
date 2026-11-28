@@ -1,5 +1,5 @@
 import type { PlannedRoad, BeachView, CarPark, CityView, Id, Lot, Pt, Road } from '../../sim/types';
-import { lotRect, type Rect } from '../../city/geometry';
+import { FRONT_STREET_SETBACK, insetRect, lotRect, type Rect } from '../../city/geometry';
 import { GROUND_KINDS } from '../../art/manifest';
 import { CELL } from '../../sim/constants';
 import { boxesMeet, boxOf, lineLength, nearestOnLine, offsetLine, pointAt, type Box } from '../geom';
@@ -19,10 +19,10 @@ const INSET = 5;
 export const PLAN_YEARS = 2;
 const DRIVE_W = 6;
 
-export interface LotScene { readonly lots: readonly Lot[]; readonly parks: readonly CarPark[]; readonly roads: ReadonlyMap<Id, Road>; readonly year: number; readonly firstYear: number; readonly beaches: readonly BeachView[]; readonly plans: readonly PlannedRoad[]; readonly style: string }
+export interface LotScene { readonly lots: readonly Lot[]; readonly parks: readonly CarPark[]; readonly roads: ReadonlyMap<Id, Road>; readonly year: number; readonly firstYear: number; readonly beaches: readonly BeachView[]; readonly plans: readonly PlannedRoad[]; readonly style: string; readonly setback: number }
 
 export function lotScene(city: CityView): LotScene {
-  return { lots: city.lots, parks: city.carParks, roads: new Map(city.roads.map((r) => [r.id, r])), year: city.year, firstYear: (city.def.number - 1) * 10, beaches: city.beaches ?? [], plans: city.plannedRoads ?? [], style: city.def.style };
+  return { lots: city.lots, parks: city.carParks, roads: new Map(city.roads.map((r) => [r.id, r])), year: city.year, firstYear: (city.def.number - 1) * 10, beaches: city.beaches ?? [], plans: city.plannedRoads ?? [], style: city.def.style, setback: city.def.frontStreets ? FRONT_STREET_SETBACK : 0 };
 }
 
 const rectBox = (r: Rect, pad = 14): Box => ({ x0: r.x - pad, y0: r.y - pad, x1: r.x + r.w + pad, y1: r.y + r.h + pad });
@@ -88,7 +88,7 @@ function openLot(b: Brush, s: LotScene, l: Lot): void {
   // A garden lot's front garden is its painted garden pictures (upright/lots.ts); the ground stays bare under them.
   if (isGarden(l)) return;
   if (l.access) driveway(b, s, r, l.access);
-  if (GROUND_KINDS.includes(l.kind)) garden(b, l, r);
+  if (GROUND_KINDS.includes(l.kind)) garden(b, l, insetRect(r, s.setback));
 }
 
 /** Parks and squares are painted ground of any size, with paths. */

@@ -95,7 +95,7 @@ function keep(sim: Sim, was: Was): boolean {
   if ((ring && !exit) || (was.outKey && !out)) return false;
   const way = t.kind === LANE_T ? opt.conn[t.lane] : null;
   // The junction ahead is another kind now: ask again.
-  if (t.kind === LANE_T && (!way || (way.kind === ENTRY_T && !exit))) { c.insert(was.i, t, was.s); return true; }
+  if (t.kind === LANE_T && (!way || (way.kind === ENTRY_T && (!exit || exit.lane !== way.lane)))) { c.insert(was.i, t, was.s); return true; }
   c.insert(was.i, t, was.s);
   c.opt[was.i] = opt;
   c.link[was.i] = opt.from.i;
@@ -152,7 +152,7 @@ export function relocate(sim: Sim, next: World): void {
 
 function replan(sim: Sim, i: number, old: Network): void {
   const { cars: c, world: w } = sim;
-  if (c.state[i]! >= 2) { c.link[i] = c.track[i]!.link; return; }
+  if (c.state[i]! >= 2) { c.link[i] = c.track[i]?.link ?? -1; return; }
   const to: Access = c.destNode[i]! >= 0 ? { gate: c.destNode[i]! } : { road: c.destRoad[i]!, s: c.destS[i]! };
   const moved = remapAccess(old, w, to);
   const now = moved && openEnd(w, moved);

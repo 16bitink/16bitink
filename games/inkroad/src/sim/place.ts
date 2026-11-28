@@ -25,13 +25,13 @@ const DRIVER_GAP = 0.18;
 const MERGE_TIME = 0.75;
 
 /** Is there space at s for a car of half-length h moving at v? */
-export function spaceAt(sim: Sim, t: Track, s: number, h: number, v: number): boolean {
+export function spaceAt(sim: Sim, t: Track, s: number, h: number, v: number, mergeSpeed = 0): boolean {
   const c = sim.cars;
   for (let q = t.head; q >= 0; q = c.behind[q]!) {
     const d = c.s[q]! - s;
     // A car ahead turning round sweeps behind its point (its lag): the gap is to the sweep.
     const gap = Math.abs(d) - c.half[q]! - h - (d >= 0 ? Math.max(0, c.lag[q]!) : 0);
-    if (d >= 0 ? gap < IDM.standGap : gap < IDM.standGap + Math.max(0, c.v[q]! - v) * MERGE_TIME) return false;
+    if (d >= 0 ? gap < IDM.standGap + mergeSpeed * mergeSpeed / (2 * IDM.brake) : gap < IDM.standGap + Math.max(0, c.v[q]! - v) * MERGE_TIME) return false;
   }
   return t.kind !== LANE_T || clearPastEnd(sim, t, s, h);
 }
@@ -106,25 +106,34 @@ function entryLanes(sim: Sim, l: LinkRt, gate: boolean, bus: boolean): Track[] {
   return open.map((t) => ({ t, r: room(t) })).sort((p, q) => q.r - p.r || p.t.lane - q.t.lane).map((e) => e.t);
 }
 
+const laneDistance = (track: Track, lo: number, hi: number): number => Math.max(0, lo - track.lane, track.lane - hi);
+
 /**
  * Put car i (already taken) on link l. False = no space now. `still`: it pulls out of a space and stands
  * in the lane first, so it needs a gap a standing car can take (no upstream car close at its speed).
  */
-export function place(sim: Sim, i: number, l: LinkRt, from: Access, still = false): boolean {
+export function place(sim: Sim, i: number, l: LinkRt, from: Access, still = false, driver = sim.cars.uid[i]!, mergeSpeed = 0): boolean {
   const c = sim.cars;
   const gate = 'gate' in from;
-  for (const t of entryLanes(sim, l, gate, c.bus[i] === 1)) {
+  const lanes = entryLanes(sim, l, gate, c.bus[i] === 1);
+  // A driver arriving from outside town already knows which exit they need at the next roundabout.
+  if (gate && lanes.length > 1 && l.node.kind === 'ring') {
+    const key = sim.routes.keyFor(c.destRoad[i]!, c.destNode[i]!, c.value[i]!, c.kind[i]!, c.destDir[i]);
+    const turn = sim.routes.choose(key, c.value[i]!, l, c.uid[i]!);
+    if (turn) lanes.sort((a, b) => laneDistance(a, turn.lo, turn.hi) - laneDistance(b, turn.lo, turn.hi));
+  }
+  for (const t of lanes) {
     const s = gate ? c.half[i]! : laneS(l, from.s);
     const v = gate ? t.vmax * 0.8 * sim.speed : still ? 0 : ENTRY_SPEED;
     const q = t.tail;
     // A car entering at a gate behind a queue could have stopped for it: no faster than it can brake to its tail.
     const startV = gate && q >= 0 ? Math.min(v, Math.sqrt(c.v[q]! ** 2 + 2 * IDM.brake * 0.6 * Math.max(0, c.s[q]! - c.body[q]! - s - c.half[i]! - IDM.standGap))) : v;
     if (!gate && t.incoming > 0 && s - c.half[i]! < t.incoming && (q < 0 || c.s[q]! > s)) continue;
-    if (gate ? q >= 0 && c.s[q]! - c.half[q]! - c.len[i]! < IDM.standGap + startV * 0.25 : !spaceAt(sim, t, s, c.half[i]!, v)) continue;
+    if (gate ? q >= 0 && c.s[q]! - c.half[q]! - c.len[i]! < IDM.standGap + startV * 0.25 : !spaceAt(sim, t, s, c.half[i]!, v, mergeSpeed)) continue;
     c.insert(i, t, s);
     c.v[i] = still ? 0 : startV;
     if (!gate && !still) fromKerb(sim, i, t, s);
-    drivers(sim, i);
+    drivers(sim, i, driver);
     plan(sim, i, l);
     // Never faster than it could brake for the curves ahead or the line at the lane's end (it enters the map at a speed it could have had).
     c.v[i] = Math.min(c.v[i]!, speedAhead(sim, i, c.v[i]!), capAhead(t, s, IDM.brake * 0.6), Math.sqrt(2 * IDM.brake * 0.6 * Math.max(0, t.len - s)));
@@ -149,11 +158,10 @@ function fromKerb(sim: Sim, i: number, t: Track, s: number): void {
 }
 
 /** No two drivers are the same. */
-function drivers(sim: Sim, i: number): void {
+function drivers(sim: Sim, i: number, driver: number): void {
   const c = sim.cars;
-  const uid = c.uid[i]!;
-  c.vf[i]! *= 1 + DRIVER_SPEED * (hash01(uid, 1) - 0.5) * 2;
-  c.hw[i] = 1 + DRIVER_GAP * (hash01(uid, 2) - 0.5) * 2;
+  c.vf[i]! *= 1 + DRIVER_SPEED * (hash01(driver, 1) - 0.5) * 2;
+  c.hw[i] = 1 + DRIVER_GAP * (hash01(driver, 2) - 0.5) * 2;
 }
 
 /**

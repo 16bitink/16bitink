@@ -39,11 +39,11 @@ const GAVE_UP_HOLD = 3;
 const TAXI: Choice = { mode: 'taxi', minutes: 0, seconds: 0, coins: 0, spot: null, lines: [] };
 
 /** The open map gate nearest a point (a taxi's base), or null. With a heading, only gates ahead of it count when there are any. */
-export function nearestGate(c: City, at: { readonly x: number; readonly y: number }, a?: number): Place | null {
+export function nearestGate(c: City, at: { readonly x: number; readonly y: number }, a?: number, usable: (gate: Access) => boolean = () => true): Place | null {
   let best: Place | null = null;
   let d = Infinity;
   const ahead = (j: { readonly x: number; readonly y: number }): boolean => a === undefined || (j.x - at.x) * Math.cos(a) + (j.y - at.y) * Math.sin(a) > 0;
-  const open = c.net.junctions.filter((j) => j.gate && accessExists(c.net, { gate: j.id }));
+  const open = c.net.junctions.filter((j) => j.gate && accessExists(c.net, { gate: j.id }) && usable({ gate: j.id }));
   const pool = open.some(ahead) ? open.filter(ahead) : open;
   for (const j of pool) {
     const e = distPt({ x: j.x, y: j.y }, at);
@@ -66,7 +66,7 @@ const kerbOf = (c: City, p: Place): Extract<Access, { road: number }> | null => 
 export function sendAway(c: City, e: Standing, like: Tour, hold: number): void {
   const from = standingAccess(c, e);
   // A car stopped on the road drives on the way it faces (to the nearest gate ahead), never turning round in the street.
-  const gate = nearestGate(c, accessPoint(c, from), facingOf(c, e));
+  const gate = nearestGate(c, accessPoint(c, from), facingOf(c, e), (to) => c.traffic.estimate(from, to, like.value).reachable);
   if (!gate) return;
   const away = newLeg(c, emptyTour(gate, gate, like), true, TAXI);
   c.day.stays.push({ leg: away, until: c.clock + hold + 1, spot: null, from, parked: e });
@@ -94,22 +94,28 @@ export function taxiArrive(c: City, leg: Leg, a: Arrival): void {
   if (rider) {
     // Their ride starts at the kerb: the taxi's way there is the taxi's, as when taxis came out of the door.
     const ride: Leg = { ...rider, start: c.clock, leaving: e };
-    drive(c, ride, e ? standingAccess(c, e) : road ?? accessOf(c, leg.target), accessOf(c, rider.tour.from));
+    drive(c, ride, e ? standingAccess(c, e) : road ?? accessOf(c, leg.target), accessOf(c, rider.target));
     return;
   }
   if (leg.out) stayThere(c, leg, null, accessOf(c, leg.target));
   if (e && !leg.tour.deadhead) sendAway(c, e, leg.tour, hold);
 }
 
-/** A ride home by taxi from a lot: the taxi comes from the nearest gate first. False: no gate, the old way. */
+/** A taxi brings its rider in through a gate, or drives from a gate to a local pickup first. */
 export function callTaxi(c: City, rider: Leg): boolean {
-  const at = rider.tour.to;
-  if (!('lot' in at) || rider.tour.deadhead || !kerbOf(c, at)) return false;
-  const gate = nearestGate(c, pointOf(c, at));
+  const at = rider.out ? rider.tour.from : rider.tour.to;
+  if (rider.tour.deadhead) return false;
+  if ('gate' in at) {
+    drive(c, rider, accessOf(c, at), accessOf(c, rider.target));
+    return true;
+  }
+  const kerb = kerbOf(c, at);
+  if (!kerb) return false;
+  const gate = nearestGate(c, pointOf(c, at), undefined, (from) => c.traffic.estimate(from, kerb, rider.tour.value).reachable);
   if (!gate) return false;
   const pick = newLeg(c, emptyTour(gate, at, rider.tour), true, TAXI);
   pick.then = rider;
-  drive(c, pick, accessOf(c, gate), accessOf(c, at));
+  drive(c, pick, accessOf(c, gate), kerb);
   return true;
 }
 

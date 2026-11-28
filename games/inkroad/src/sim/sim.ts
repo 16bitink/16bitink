@@ -20,6 +20,7 @@ export interface Sim {
   /** Weather: 1 = normal. */
   speed: number;
   trucksAllowed: boolean;
+  readonly preserveCars: boolean;
   arrivals: Arrival[];
   gaveUp: Arrival[];
   honks: Pt[];

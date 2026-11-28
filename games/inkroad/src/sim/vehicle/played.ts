@@ -22,7 +22,7 @@ export interface Played {
   readonly n: number;
   /** Seconds from the first frame to the last. */
   readonly seconds: number;
-  /** The rear-axle state at the last frame (standing). */
+  /** The rear-axle state at the last frame. A lane merge can finish rolling. */
   readonly end: CarState;
   /** The plan fits the ground and clears the bodies around it (false: drawn anyway, the best there was). */
   readonly fits: boolean;
@@ -40,16 +40,18 @@ export function standingAt(p: VehicleParams, middle: { readonly x: number; reado
 }
 
 /** Plays runs (one path, a stop at every change of gear and at its end) from a standing car. */
-export function playRuns(start: CarState, runs: readonly Run[], p: VehicleParams, fits: boolean, word: string): Played {
+export function playRuns(start: CarState, runs: readonly Run[], p: VehicleParams, fits: boolean, word: string, open = false): Played {
   const kept = runs.filter((r) => r.pts.length > 1);
   if (kept.length === 0) return standingAt(p, { ...middleOf(p, start.x, start.y, start.th), a: start.th });
-  const plan: PlanItem[] = [{ kind: 'path', path: pathOf(kept) }];
+  const path = pathOf(kept);
+  const rollingEnd = open && path.legs[path.legs.length - 1]!.dir === 1;
+  const plan: PlanItem[] = [{ kind: 'path', path, open: rollingEnd }];
   const out: number[] = [];
   const put = (q: CarState): void => { const m = middleOf(p, q.x, q.y, q.th); out.push(m.x, m.y, q.th); };
   const most = Math.ceil(MAX_SECONDS / PLAY_DT);
   let k = 0;
   // A driver turns the wheels for the first bend before setting off (dry steering, as at every change of gear).
-  const first = pathOf(kept).legs[0]!;
+  const first = path.legs[0]!;
   const want = Math.max(-p.steerMax, Math.min(p.steerMax, Math.atan(first.ks[Math.min(first.ks.length - 1, 2)]! * p.wheelbase)));
   // A car still rolling forward (it lagged the sim's stop) goes on at its speed; one standing turns its wheels first.
   const rolling = start.u > 0 && first.dir === 1;
@@ -61,7 +63,7 @@ export function playRuns(start: CarState, runs: readonly Run[], p: VehicleParams
   if (rolling && d.car.u < car.u) d = { ...d, car: { ...d.car, u: car.u, a: car.a } };
   for (; k < most && d.phase !== 'done'; k++) { d = driveStep(d, plan, p, PLAY_DT); put(d.car); }
   const n = out.length / PLAY_STRIDE;
-  return { frames: Float64Array.from(out), n, seconds: (n - 1) * PLAY_DT, end: { ...d.car, u: 0, a: 0 }, fits: fits && k < most, word };
+  return { frames: Float64Array.from(out), n, seconds: (n - 1) * PLAY_DT, end: rollingEnd && d.phase === 'done' ? d.car : { ...d.car, u: 0, a: 0 }, fits: fits && k < most, word };
 }
 
 /**

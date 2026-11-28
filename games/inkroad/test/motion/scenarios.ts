@@ -1,10 +1,13 @@
+import { LANE } from '../../src/sim/constants';
+import { ringRadius } from '../../src/sim/netCore';
+import type { City } from '../../src/city/state';
 /**
  * The worked scenarios (docs/inkroad-motion-lab.md): one of each kind, written out in full as examples to copy.
  * Cells are 40 px; roads run between grid vertices; a block sits beside the road it faces.
  */
 import { lotRect } from '../../src/city/geometry';
-import type { Scenario } from './lab';
-import { anticlockwise, brakesUnder, clean, closest, expect, firstManoeuvre, leavesBy, lotDoor, parksIn, passesBy, standsOffRoad, wasInside } from './checks';
+import type { RunResult, Scenario } from './lab';
+import { anticlockwise, brakesUnder, clean, closest, expect, firstManoeuvre, leavesBy, lotDoor, parksIn, passesBy, samplesOf, standsOffRoad, wasInside } from './checks';
 import { CROSS_GAP } from '../../src/city/manoeuvre';
 
 /**
@@ -116,12 +119,62 @@ export const ROUNDABOUT: Scenario = {
     { kind: 'through', id: 'C', at: 4.5, from: 'S', to: 'W' },
   ],
   flows: [{ from: 'W', to: 'E', every: 6, start: 1 }],
-  seconds: 26,
+  seconds: 38,
   expectations: (r) => {
-    const c = (r.city as unknown as { c: import('../../src/city/state').City }).c;
+    const c = (r.city as unknown as { c: City }).c;
     const j = c.net.junctions.find((x) => x.arms.length === 4)!;
-    return ['A', 'B', 'C'].flatMap((who) => [passesBy(r, who, 26), anticlockwise(r, who, j), clean(r, who)]);
+    return ['A', 'B', 'C'].flatMap((who) => [passesBy(r, who, who === 'C' ? 38 : 26), anticlockwise(r, who, j), clean(r, who)]);
   },
+};
+
+const WIDE_ROUNDABOUT: Scenario = {
+  ...ROUNDABOUT,
+  id: 'drive.roundabout.two-lanes',
+  title: 'Two-lane roundabout with crossing traffic',
+  expect: 'First-exit traffic uses the outer lane, later exits use the inner lane, and drivers clear both routes without overlap',
+  roads: [
+    { cells: [[0, 5], [10, 5]], type: 'avenue' },
+    { cells: [[5, 0], [5, 10]], type: 'avenue' },
+  ],
+  seconds: 45,
+  expectations: (r) => wideRoundaboutChecks(r, 45),
+};
+
+function wideRoundaboutChecks(r: RunResult, lastExitBy: number) {
+  const c = (r.city as unknown as { c: City }).c;
+  const j = c.net.junctions.find((x) => x.arms.length === 4)!;
+  const radius = ringRadius(c.net.roads);
+  const follows = (who: string, lane: string, at: number) => {
+    const samples = samplesOf(r, who).filter((s) => Math.abs(Math.hypot(s.x - j.x, s.y - j.y) - at) < 2);
+    return expect(`${who} uses the ${lane} lane`, samples.length > 15, `${samples.length} frames at its radius`);
+  };
+  return [
+    follows('A', 'outer', radius + LANE), follows('C', 'inner', radius),
+    ...['A', 'B', 'C'].flatMap((who) => [passesBy(r, who, who === 'C' ? lastExitBy : 45), anticlockwise(r, who, j), clean(r, who)]),
+  ];
+}
+
+const MIXED_ROUNDABOUT: Scenario = {
+  ...WIDE_ROUNDABOUT,
+  id: 'drive.roundabout.mixed-widths',
+  title: 'Two-lane roundabout with single-lane exits',
+  expect: 'An inner-lane driver can exit onto a narrow street without cutting up traffic in the outer lane',
+  roads: [{ cells: [[0, 5], [10, 5]] }, { cells: [[5, 0], [5, 10]], type: 'avenue' }],
+  seconds: 65,
+  expectations: (r) => wideRoundaboutChecks(r, 65),
+};
+
+const NARROW_APPROACH_ROUNDABOUT: Scenario = {
+  ...MIXED_ROUNDABOUT,
+  id: 'drive.roundabout.narrow-approach',
+  title: 'Single-lane street feeding a two-lane roundabout',
+  expect: 'Drivers from the same narrow approach use the outer lane for the first exit and the inner lane for a left turn',
+  actors: [
+    { kind: 'through', id: 'A', at: 0.5, from: 'W', to: 'S' },
+    { kind: 'through', id: 'B', at: 2.5, from: 'W', to: 'E' },
+    { kind: 'through', id: 'C', at: 4.5, from: 'W', to: 'N' },
+  ],
+  flows: [{ from: 'S', to: 'N', every: 9, start: 1 }],
 };
 
 /** The kerb full on both sides and nowhere else to stand: a lorry stops in the lane (double parks), delivers, drives on. */
@@ -143,4 +196,4 @@ export const DOUBLE_PARK: Scenario = {
   expectations: (r) => [parksIn(r, 'A', 'double:'), leavesBy(r, 'A', 80), passesBy(r, 'B', 65), brakesUnder(r, 'B', 400), clean(r, 'A')],
 };
 
-export const SCENARIOS: readonly Scenario[] = [KERB_PARALLEL, FORECOURT_FAR, CARPARK_GATE, CROSS_RIGHT, ROUNDABOUT, DOUBLE_PARK];
+export const SCENARIOS: readonly Scenario[] = [KERB_PARALLEL, FORECOURT_FAR, CARPARK_GATE, CROSS_RIGHT, ROUNDABOUT, WIDE_ROUNDABOUT, MIXED_ROUNDABOUT, NARROW_APPROACH_ROUNDABOUT, DOUBLE_PARK];

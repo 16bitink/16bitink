@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { createCity } from '../src/city/city';
+import { callTaxi } from '../src/city/kerbside';
+import { finish, newLeg } from '../src/city/legs';
+import { STEP } from '../src/sim/constants';
 import { PAID_CITIES } from '../content/paid';
 import type { CityView } from '../src/sim/types';
 import { cityAtYear, inner } from './city-helpers';
@@ -32,4 +35,48 @@ describe('cars never teleport (a whole season: workday, night, weekend)', () => 
       expect(counts).toEqual({});
     }, 120_000);
   }
+});
+
+describe('vehicle handoffs near buildings', () => {
+  function setup() {
+    const c = inner(cityAtYear(3));
+    c.traffic.startDay();
+    const gates = c.net.junctions.filter((j) => j.gate !== undefined);
+    const lot = c.lots.find((l) => l.level > 0 && l.access && gates.some((j) =>
+      c.traffic.estimate({ gate: j.id }, l.access!, 1).reachable))!;
+    const home = { lot: lot.id };
+    const gate = { gate: gates.find((j) => c.traffic.estimate({ gate: j.id }, lot.access!, 1).reachable)!.id };
+    const tour = { id: 1, from: gate, to: home, purpose: 'shop' as const, leave: 0, until: null, stay: 10, owns: false, value: 1, seed: 0.5 };
+    return { c, gates, lot, home, gate, tour };
+  }
+
+  it('keeps a car at its last driven pose if no parking handoff exists', () => {
+    const { c, lot, gate, tour } = setup();
+    const leg = newLeg(c, tour, true, { mode: 'car', minutes: 0, seconds: 0, coins: 0, spot: null, lines: [] });
+    const uid = c.traffic.spawn({ from: gate, to: lot.access!, kind: 'car', value: 1, tag: 0 });
+    expect(uid).toBeGreaterThan(0);
+    let arrived = false;
+    for (let t = 0; t < 120 && !arrived; t += STEP) {
+      c.traffic.step();
+      arrived = c.traffic.drainArrivals().some((a) => a.uid === uid);
+    }
+    expect(arrived).toBe(true);
+    const at = c.traffic.poseOf(uid)!;
+    finish(c, leg, uid);
+    for (let i = 0; i < 30; i++) c.traffic.step();
+    expect(c.traffic.poseOf(uid)).toMatchObject({ x: at.x, y: at.y, a: at.a, v: 0 });
+    const slot = c.traffic.cars.uid.indexOf(uid);
+    expect(c.traffic.cars.state[slot]).not.toBe(4);
+  });
+
+  it('dispatches a taxi from an intercity gate to a local pickup', () => {
+    const { c, gates, home, gate, tour } = setup();
+    const rider = newLeg(c, { ...tour, from: home, to: gate }, true, { mode: 'taxi', minutes: 0, seconds: 0, coins: 0, spot: null, lines: [] });
+    expect(callTaxi(c, rider)).toBe(true);
+    const pickup = c.day.legs.find((l) => l.then === rider)!;
+    expect(pickup.from).toHaveProperty('gate');
+    expect(pickup.target).toEqual(home);
+    const at = c.traffic.poseOf(pickup.uid)!;
+    expect(Math.min(...gates.map((j) => Math.hypot(at.x - j.x, at.y - j.y)))).toBeLessThan(30);
+  });
 });

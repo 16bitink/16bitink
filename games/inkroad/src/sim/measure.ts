@@ -1,3 +1,4 @@
+import { ringExit, ringWay } from './ringBuild';
 /** What the player reads: movements, junction and road numbers. */
 import { STEP } from './constants';
 import { gradeOf, ROUTE } from './tune';
@@ -289,16 +290,8 @@ function arrowOf(n: NodeRt, o: OutOpt): Pt[] {
   const mid: Pt[] = conn ? conn.points() : [];
   let out: Track = conn?.kind === TURN_T && conn.to ? conn.to : o.to.lanes[0]!;
   if (conn && n.ring && conn.kind !== TURN_T) {
-    let at = conn.arm;
-    const arms = n.ring.arms;
-    for (let hop = 0; hop < arms.length; hop++) {
-      mid.push(...arms[at]!.arc.points());
-      at = (at + 1) % arms.length;
-      if (at === o.exitArm) break;
-      mid.push(...arms[at]!.span.points());
-    }
-    const x = arms[o.exitArm]!.exits[0]!;
-    mid.push(...x.points());
+    const x = ringExit(n.ring.arms[o.exitArm]!, conn.lane);
+    for (const part of ringWay(conn, x).slice(1)) mid.push(...part.points());
     out = x.to!;
   }
   const after = out.points();

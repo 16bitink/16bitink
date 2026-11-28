@@ -55,6 +55,12 @@ describe('parking moves are the vehicle model on the real ground (a Saffron seas
     expect(unfit / events.length).toBeLessThan(0.15);
   });
 
+  it('uses continuous merges and retains departures with a lane-edge stop', () => {
+    const departures = events.filter((e) => e.dir === 'out' && e.play?.b && e.play.b.end.u > 1);
+    expect(departures.some((e) => e.play!.a.seconds === 0 && e.play!.b!.seconds > STEP)).toBe(true);
+    expect(departures.some((e) => e.play!.a.seconds > STEP)).toBe(true);
+  });
+
   it('never drives into another lot: no frame of a move into a home or forecourt has a corner inside a lot that is not its own', () => {
     const hits: string[] = [];
     for (const e of events) {

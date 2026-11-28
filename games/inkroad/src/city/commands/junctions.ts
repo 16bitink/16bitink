@@ -1,12 +1,15 @@
+import { ringOuter } from '../../sim/netCore';
+import { sidewalkWidth } from '../../sim/roadGeom';
+import { junctionMeetsBox } from '../validateRoadRoom';
 import { CONTROL_COST } from '../../sim/constants';
 import { planFlyover, roundaboutFits, setControl, setSplit } from '../../sim/network';
 import { refuse } from '../../sim/netGround';
 import type { Control } from '../../sim/types';
 import { commitNetwork } from '../network';
 import type { City } from '../state';
-import { has, junctionById, openControls, openTools } from '../state';
+import { has, junctionById, roadById, openControls, openTools } from '../state';
 import { FLYOVER, SMART_SHARE } from '../tune';
-import { homesBeside, landFor, middle, needTool, nightRate, no, noAt, precast, priced, worksEnd, type Handler } from './shared';
+import { blockedFootprint, homesBeside, landFor, middle, needTool, nightRate, no, noAt, precast, priced, worksEnd, type Handler } from './shared';
 
 const MIN_GREEN = 0.1;
 const names: Readonly<Record<Control, string>> = { yield: 'a plain crossing', roundabout: 'a roundabout', signal: 'signals', smart: 'smart signals' };
@@ -28,6 +31,10 @@ export const control: Handler<'control'> = {
     if (cmd.control === 'roundabout') {
       const fits = roundaboutFits(c.net, cmd.node);
       if (!fits.ok) return noAt(refuse(fits.why ?? 'No room for a circle', j.cell));
+      const roads = j.arms.map((id) => roadById(c, id)!).filter((r) => !r.flyover);
+      const reach = ringOuter(roads) + Math.max(...roads.map(sidewalkWidth));
+      const near = blockedFootprint(c, (b) => junctionMeetsBox(b, j.x, j.y, reach));
+      if (near) return near;
     }
     const upgrade = j.control === 'signal' && cmd.control === 'smart' ? CONTROL_COST.signal / 2 : 0;
     const list = CONTROL_COST[cmd.control] * (cmd.control === 'smart' ? SMART_SHARE : 1);

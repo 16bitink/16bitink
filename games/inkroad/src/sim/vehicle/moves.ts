@@ -151,6 +151,8 @@ export interface OutMove {
   /** Off the road to the lane edge (standing there while it waits for its gap), and from the edge into the lane. */
   readonly toEdge: Played;
   readonly join: Played;
+  /** Play across the lane edge in one move when a gap is available from the start. */
+  readonly roll: () => Played;
   /** Which lane goal it joins at. */
   readonly goal: number;
   readonly fits: boolean;
@@ -196,8 +198,16 @@ export function playOutOf(p: VehicleParams, slot: MiddlePose, goals: readonly { 
   if (!m) return null;
   const [off, on] = cutAtBand(m.runs, p, b);
   const toEdge = playRuns(standing(a), off, p, m.fits, wordOf(m));
-  const join = on.length ? playRuns(toEdge.end, on, p, m.fits, wordOf(m)) : standingAt(p, goals[m.to]!.pose);
-  return { toEdge, join, goal: m.to, fits: m.fits, word: wordOf(m) };
+  const join = playRuns(toEdge.end, departureRuns(on, p), p, m.fits, wordOf(m), true);
+  const roll = (): Played => playRuns(standing(a), [...off, ...departureRuns(on, p)], p, m.fits, wordOf(m), true);
+  return { toEdge, join, roll, goal: m.to, fits: m.fits, word: wordOf(m) };
+}
+
+/** Once entering the lane a forward car may accelerate to the driveway turn speed. */
+function departureRuns(runs: readonly Run[], p: VehicleParams): Run[] {
+  return runs.map((run) => run.dir < 0 ? run : {
+    dir: run.dir, pts: run.pts.map((pt) => ({ ...pt, vcap: p.turnIn })),
+  });
 }
 
 /** A car turning round on the road: from where it stands to one of the goals on the other lane. */

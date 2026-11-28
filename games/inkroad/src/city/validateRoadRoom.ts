@@ -1,6 +1,7 @@
+import type { Rect } from './geometry';
 import { CELL } from '../sim/constants';
-import { halfWidth } from '../sim/roadGeom';
-import type { CityDef } from '../sim/types';
+import { halfWidth, sidewalkWidth } from '../sim/roadGeom';
+import type { CityDef, Pt, Road } from '../sim/types';
 
 /**
  * Real lanes (the owner, November 28: 3.1 m lanes) make roads wide: an eight-lane highway is 92 px, more than two
@@ -12,27 +13,30 @@ interface Box { readonly name: string; readonly x: number; readonly y: number; r
 /** Clear px a lot keeps from a road's paved edge (its kerb stone). */
 export const KERB_ROOM = 1;
 
-/** True when a point lies on the paved band of segment a-b: beside its run (not past its ends) and within reach. */
-function onBand(px: number, py: number, ax: number, ay: number, bx: number, by: number, reach: number): boolean {
+/** The rectangle of a straight road segment (no cap) against an axis-aligned parcel, using separating axes. */
+export function bandMeetsBox(b: Rect, ax: number, ay: number, bx: number, by: number, reach: number): boolean {
   const dx = bx - ax, dy = by - ay, len = Math.hypot(dx, dy);
-  const t = ((px - ax) * dx + (py - ay) * dy) / len;
-  return t > 0 && t < len && Math.abs((px - ax) * dy - (py - ay) * dx) / len < reach;
+  if (len === 0) return false;
+  const x = b.x + b.w / 2 - (ax + bx) / 2, y = b.y + b.h / 2 - (ay + by) / 2;
+  const u = dx / len, v = dy / len;
+  const wx = b.w / 2, wy = b.h / 2;
+  return Math.abs(x) < wx + Math.abs(dx) / 2 + Math.abs(v) * reach
+    && Math.abs(y) < wy + Math.abs(dy) / 2 + Math.abs(u) * reach
+    && Math.abs(x * u + y * v) < len / 2 + Math.abs(u) * wx + Math.abs(v) * wy
+    && Math.abs(y * u - x * v) < reach + Math.abs(v) * wx + Math.abs(u) * wy;
 }
 
-/**
- * Does the band reach onto the box? Its rim is walked every px. The band stops at the segment's ends: where a wide
- * road meets a narrow one the junction tapers between them (src/render/ground/roadShape.ts), so it is not a round cap.
- */
-function bandMeetsBox(b: Box, ax: number, ay: number, bx: number, by: number, reach: number): boolean {
-  const rim = (k: number): readonly [number, number] => {
-    const w = b.w, h = b.h;
-    if (k < w) return [b.x + k, b.y];
-    if (k < w + h) return [b.x + w, b.y + k - w];
-    if (k < 2 * w + h) return [b.x + 2 * w + h - k, b.y + h];
-    return [b.x, b.y + 2 * (w + h) - k];
-  };
-  for (let k = 0; k < 2 * (b.w + b.h); k++) { const [x, y] = rim(k); if (onBand(x, y, ax, ay, bx, by, reach)) return true; }
+export function roadMeetsBox(b: Rect, line: readonly Pt[], road: Pick<Road, 'type' | 'oneWay' | 'flyover'>): boolean {
+  const reach = halfWidth(road) + sidewalkWidth(road);
+  for (let i = 1; i < line.length; i++) {
+    const a = line[i - 1]!, z = line[i]!;
+    if (bandMeetsBox(b, a.x, a.y, z.x, z.y, reach)) return true;
+  }
   return false;
+}
+
+export function junctionMeetsBox(b: Rect, x: number, y: number, radius: number): boolean {
+  return Math.hypot(Math.max(b.x - x, 0, x - b.x - b.w), Math.max(b.y - y, 0, y - b.y - b.h)) < radius;
 }
 
 const boxesOf = (def: CityDef): readonly Box[] => [

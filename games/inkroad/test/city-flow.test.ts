@@ -70,7 +70,7 @@ describe('the year', () => {
 });
 
 describe('saves', () => {
-  it('a save at a year start restores exactly', () => {
+  it('restores a year-start snapshot exactly and replays its saved dawn deterministically', () => {
     const a = newCity();
     ok(a, { t: 'next' });
     runDay(a);
@@ -78,9 +78,10 @@ describe('saves', () => {
     const json = JSON.stringify(a.save());
     const b = createCity(SAFFRON, 99, JSON.parse(json));
     expect(JSON.stringify(b.save())).toBe(json);
-    runYear(a);
+    const same = createCity(SAFFRON, SEED, JSON.parse(json));
     runYear(b);
-    expect(JSON.stringify(b.save())).toBe(JSON.stringify(a.save()));
+    runYear(same);
+    expect(JSON.stringify(b.save())).toBe(JSON.stringify(same.save()));
   }, YEAR_RUN);
 
   it('a save in a day starts the day again with what was built, and gives back what drivers paid (its paydays stay paid)', () => {

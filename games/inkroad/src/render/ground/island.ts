@@ -1,5 +1,6 @@
 import { islandKeys } from '../../art/sets';
 import { FLATS } from '../../art/manifest';
+import { ringLaneCount, ringRadius } from '../../sim/netCore';
 import { LANE } from '../../sim/constants';
 import { INK, PAINT } from '../style';
 import { flatPlaceholder } from '../placeholders';
@@ -7,13 +8,11 @@ import type { Brush } from './roadPaint';
 import type { JunctionShape } from './roadShape';
 
 /** A roundabout's middle: lane rings and the planted island. Its palms stand on it (islandSpots). */
-const RING_EDGE = 3;
 const SMALL = 24;
 
 /** The planted island's radius: inside the ring the traffic drives. */
 export function islandRadius(j: JunctionShape): number {
-  const wide = j.arms.some((a) => a.half > LANE + 0.5 || (a.road.oneWay && a.half >= LANE));
-  return Math.max(5, j.j.radius - RING_EDGE - LANE * (wide ? 2 : 1) - 2);
+  return ringRadius(j.arms.map((a) => a.road)) - LANE / 2;
 }
 
 export function paintIsland(b: Brush, j: JunctionShape): void {
@@ -25,8 +24,8 @@ export function paintIsland(b: Brush, j: JunctionShape): void {
   g.globalAlpha = 0.6;
   g.lineWidth = 0.7;
   g.setLineDash([5, 6]);
-  const wide = j.j.radius - r > LANE * 1.8;
-  if (wide) { g.beginPath(); g.arc(x, y, r + 2 + LANE, 0, Math.PI * 2); g.stroke(); }
+  const wide = ringLaneCount(j.arms.map((a) => a.road)) > 1;
+  if (wide) { g.beginPath(); g.arc(x, y, r + LANE, 0, Math.PI * 2); g.stroke(); }
   g.setLineDash([]);
   g.globalAlpha = 1;
   g.fillStyle = 'rgba(40,34,44,0.25)';

@@ -21,7 +21,8 @@ import { placeKey } from './day';
 import { catchChance, daring, doubleSpot, streetFine } from './fines';
 export { catchChance, daring } from './fines';
 import { aimAt, aimOf, arrivalSlot, backIn, crossClear, crossHold, pulledOut, pullingOut, readyAtEdge, standingAccess, stoppedAt, turnIn } from './manoeuvre';
-import { doorBack, doorGone, doorIn, doorReady, nearestDoor, needsDoor, type Look } from './door';
+import { atDoorLane, doorBack, doorGone, doorReady, type Look } from './door';
+import { standPose, type TryMerge } from './movePlan';
 import { kindOf, legKind } from './vehicleKinds';
 import { hasRoom } from './slots';
 import { callTaxi, dropOff, isDropOff, pullOver, riderLost, sendAway, sendStraysAway, stopOnRoad, taxiArrive } from './kerbside';
@@ -54,34 +55,53 @@ function enter(c: City, leg: Leg, from: Access, to: Access): boolean {
   leg.tag = tag;
   const car = carById(c, leg.car);
   const look = lookOf(c, leg);
+  const chain = leg.tour.chain;
   // A car in a space pulls out from its own slot, once its lane has a gap, and holds the lane while it does.
   // A car with none drawn comes out of the building's entrance the same way.
-  const out = pullingOut(leg);
-  const door = !out && needsDoor({ from } as SpawnRequest);
-  const base: SpawnRequest = { from: out ? standingAccess(c, out) : from, to, ...look, value: leg.tour.value, tag };
-  if (out && !readyAtEdge(c, out, base)) return false;
+  const standing = pullingOut(leg);
+  const out = standing && (standing.edge || standPose(c, standing)) ? standing : null;
+  const base: SpawnRequest = { from: standing ? standingAccess(c, standing) : from, to, ...look, value: leg.tour.value, tag, ...(chain ? { driver: chain.household * 2 + chain.person } : {}) };
+  const door = !out && !('gate' in base.from);
+  // A non-gate departure is a handoff from a parked car or a recorded garage.
+  if (door && !standing && !car?.garage) return false;
+  let uid = -1;
+  const tryMerge: TryMerge = (mergeFrom, lane, merge) => {
+    uid = c.traffic.spawn({ ...base, from: mergeFrom, hold: Math.max(STEP, merge.seconds), pose: lane, mergeEnd: merge.end });
+    return uid >= 0;
+  };
+  if (out && !readyAtEdge(c, out, base, tryMerge)) return false;
+  if (door && !doorReady(c, leg, base, look, tryMerge)) return false;
   const hold = out ? out.edge?.hold ?? STEP : 0;
   // The played move out joins the lane where it chose (edge.from): the spawn stands just there.
   const at = out?.edge?.from ?? base.from;
   const pose = out?.edge?.lane;
   const req: SpawnRequest = { ...base, from: at, ...(hold > 0 ? { hold } : {}), ...(out?.edge && pose ? { pose } : {}) };
-  if (out && !crossClear(c, out)) return false;
+  if (uid < 0 && out && !crossClear(c, out)) return false;
   // Its way from the edge into the lane touches no other move under way (src/sim/sweeps.ts).
-  if (out?.edge?.join && (c.traffic.sweeps.hit(out.edge.join, 0, out.kind, out.uid) >= 0 || !c.traffic.sweeps.coming(out.edge.join, out.kind, out.blockUid))) return false;
-  if (door && !doorReady(c, leg, req, look)) return false;
-  if (door && leg.door?.join && (c.traffic.sweeps.hit(leg.door.join, 0, look.kind, leg.door.uid) >= 0 || !c.traffic.sweeps.coming(leg.door.join, look.kind))) return false;
+  if (uid < 0 && out?.edge?.join && (c.traffic.sweeps.hit(out.edge.join, 0, out.kind, out.uid) >= 0 || !c.traffic.sweeps.coming(out.edge.join, out.kind, out.blockUid))) return false;
+  if (uid < 0 && door && leg.door?.join && (c.traffic.sweeps.hit(leg.door.join, 0, look.kind, leg.door.uid) >= 0 || !c.traffic.sweeps.coming(leg.door.join, look.kind))) return false;
   // A car that stood in its lane takes its stand-in's place (put back if it cannot set off yet).
   const stood = out?.blockUid !== undefined && out.blockUid >= 0 ? c.traffic.poseOf(out.blockUid) : null;
   if (stood && out) c.traffic.remove(out.blockUid!);
-  const uid = c.traffic.spawn(door && leg.door ? { ...req, hold: leg.door.hold } : req);
+  const garage = door ? leg.door : undefined;
+  const merge = (garage?.join ?? out?.edge?.join)?.end;
+  const entry = {
+    ...req, ...(garage ? { from: garage.from, hold: garage.hold, pose: garage.lane } : {}),
+    ...(merge?.dir === 1 && merge.u > 0 ? { mergeEnd: merge } : {}),
+  };
+  if (uid < 0 && garage) {
+    const next = c.traffic.entryPose(entry);
+    if (!next || !atDoorLane(next, garage.lane)) return false;
+  }
+  if (uid < 0) uid = c.traffic.spawn(entry);
   if (out && stood) out.blockUid = uid < 0 && 'road' in req.from ? c.traffic.block({ ...req.from, ...(out.side ? { dir: out.side } : {}) }, STAND_BACK, 4, out.kind) : undefined;
   if (uid < 0) return false;
   leg.uid = uid;
   if (out) { crossHold(c, out); pulledOut(c, uid, out, hold); c.traffic.sweeps.drop(out.uid); if (out.edge?.join) c.traffic.sweeps.put(-uid, out.edge.join, 0, out.kind, false, undefined, true); }
-  if (door) doorGone(c, leg, uid);
+  if (door) doorGone(c, leg, uid, look);
   c.day.drawn[dayKindAt(c.clock)] += 1;
   releaseSpot(c, leg);
-  if (car) { car.where = null; car.away = false; car.leg = leg; }
+  if (car) { car.where = null; car.garage = car.garagePose = undefined; car.away = false; car.leg = leg; }
   return true;
 }
 
@@ -120,8 +140,11 @@ export function retryWaiting(c: City, all: boolean): void {
   for (const leg of c.day.waiting) {
     if (!all && !onTheMove(c, leg)) { still.push(leg); continue; }
     const ok = leg.from && leg.to && accessExists(c.net, leg.from) && accessExists(c.net, leg.to);
-    if (!ok || (c.clock - leg.heldAt > HELD_LIMIT && !pullingOut(leg)?.edge && !leg.door)) { lose(c, leg); giveUpLeaving(c, leg); continue; }
-    if (enter(c, leg, leg.from!, leg.to!)) continue;
+    if (!ok || (c.clock - leg.heldAt > HELD_LIMIT && !pullingOut(leg)?.edge)) {
+      if (all && doorBack(c, leg, lookOf(c, leg))) { lose(c, leg); giveUpLeaving(c, leg); continue; }
+      if (!leg.door && !all) { still.push(leg); continue; }
+    }
+    if (ok && enter(c, leg, leg.from!, leg.to!)) continue;
     still.push(leg);
   }
   c.day.waiting = still;
@@ -129,7 +152,6 @@ export function retryWaiting(c: City, all: boolean): void {
 
 /** A held car that gives up its trip goes back where it stood: into its slot, or back inside. */
 function giveUpLeaving(c: City, leg: Leg): void {
-  doorBack(c, leg, lookOf(c, leg));
   const e = pullingOut(leg);
   // A visitor's car (a lorry, a taxi) has nobody else to drive it: it tries again in a while.
   if (e) { backIn(c, e); leg.leaving = null; if (e.household === undefined) sendAway(c, e, leg.tour, HELD_LIMIT); return; }
@@ -155,6 +177,10 @@ export function startTour(c: City, tour: Tour): void {
   if (pick.mode !== 'car' && dear > 0) scorePricedOut(c, leg, dear);
   if (pick.mode === 'stay') { leg.done = true; if (ch) ch.now = ch.stops.length + 1; if (ch?.kind === 'weekend') return; if (dear * COST.minPerCoin < PRICED_AWAY) scoreLost(c, leg, pointOf(c, tour.from), 'stayed'); return; }
   if (pick.mode === 'transit' || pick.mode === 'walk') { offRoad(c, leg, pick); stayThere(c, leg, null, null); return; }
+  if (pick.mode === 'taxi') {
+    if (!callTaxi(c, leg)) lose(c, leg);
+    return;
+  }
   const go = refuel(c, leg);
   drive(c, go, carAt(c, go) ?? accessOf(c, go.tour.from), aimOf(c, go) ?? accessOf(c, go.tour.to));
 }
@@ -215,14 +241,17 @@ function goHome(c: City, was: Leg, spot: Spot | null, from: Access | null, parke
   if (came.mode === 'walk') { offRoad(c, leg, { ...base, seconds: leg.free }); return; }
   if (came.mode === 'transit') { rideHome(c, leg, base); return; }
   if (came.mode === 'ride') { c.day.stats.transit += 1; board(c, leg, came.lines); }
-  if (came.mode === 'taxi' && callTaxi(c, leg)) return;
+  if (came.mode === 'taxi' && !parked) {
+    if (!callTaxi(c, leg)) lose(c, leg);
+    return;
+  }
   const dest = chooseHome(c, t.from);
   leg.spot = dest;
   leg.leaving = parked;
   leg.car = was.car;
   const go = refuel(c, leg);
   const start = startOf(c, from, spot, t.to);
-  drive(c, go, start, (t.purpose === 'truck' || leg.mode === 'taxi' ? null : aimOf(c, go)) ?? accessOf(c, go === leg ? t.from : go.tour.to));
+  drive(c, go, carAt(c, go) ?? start, (t.purpose === 'truck' || leg.mode === 'taxi' ? null : aimOf(c, go)) ?? accessOf(c, go === leg ? t.from : go.tour.to));
 }
 
 export const chooseHome = (c: City, p: Place): Spot | null => ('lot' in p ? chooseSpot(c, p, c.clock, true, []) : null);
@@ -231,7 +260,7 @@ function rideHome(c: City, leg: Leg, base: Choice): void {
   const ride = bestRide(c, pointOf(c, leg.tour.to), pointOf(c, leg.tour.from), periodAt(c.clock));
   if (ride) { offRoad(c, leg, { ...base, seconds: ride.seconds + ride.wait + ride.walk * COST.walkPerCell + ride.crowd, lines: ride.lines }); return; }
   const taxi: Leg = { ...leg, mode: 'taxi' };
-  drive(c, taxi, accessOf(c, leg.tour.to), accessOf(c, leg.tour.from));
+  if (!callTaxi(c, taxi)) lose(c, taxi);
 }
 
 // ---------------------------------------------------------------- arriving
@@ -246,17 +275,15 @@ function remember(c: City, leg: Leg, seconds: number): void {
 /** The trip is over: the car turns into the place it now stands in, or leaves the road where it is (a gate, a driveway, a car park). */
 export function finish(c: City, leg: Leg, uid: number, into: Standing | null = null, hold?: number, blockAt?: Access): void {
   leg.done = true;
-  const inside = !into && doorIn(c, uid, leg, lookOf(c, leg));
-  if (!inside) turnIn(c, uid, into, hold, blockAt);
+  if (into) turnIn(c, uid, into, hold, blockAt);
+  else if ('gate' in leg.target) c.traffic.remove(uid);
+  else { c.traffic.stop(uid); return; }
   endOfTrip(c, leg);
-  // A household car that went into a building (no space of its own drawn) is off the map until it is next driven.
-  const car = inside ? carById(c, leg.car) : undefined;
-  if (car && !car.where) car.away = true;
 }
 
 export function arrive(c: City, a: Arrival): void {
   const leg = c.day.legs[a.tag];
-  if (a.tag < 0 || !leg || leg.done) { if (a.tag >= 0) c.traffic.remove(a.uid); return; }
+  if (a.tag < 0 || !leg || leg.done) { if (a.tag >= 0) c.traffic.stop(a.uid); return; }
   if (leg.tolls < a.tolls) { bank(c, c.prices.zone > 0 ? 'zone' : 'tolls', a.tolls - leg.tolls, a.at); leg.tolls = a.tolls; }
   if (queueAtPump(c, leg)) { waitAtPump(c, leg, a); return; }
   // A taxi drops its rider at the door like any taxi; only a household car stands at the gate for the school run.
@@ -267,9 +294,13 @@ export function arrive(c: City, a: Arrival): void {
   if (leg.spot && hasRoom(c, leg.spot, leg, legKind(c, leg))) {
     if (dodges(c, leg, leg.spot)) { doublePark(c, leg, a, a.at); return; }
     // Free spaces only on the far kerb: a driver goes round (turns round where it may) and parks from that side.
-    if (farSideOnly(c, leg, leg.spot, a) && !leg.wentRound) { leg.wentRound = true; if (c.traffic.redirect(a.uid, aimAt(c, leg, leg.spot))) return; }
-    park(c, leg, a, leg.spot);
-    return;
+    if (!farSideOnly(c, leg, leg.spot, a)) { park(c, leg, a, leg.spot); return; }
+    if (!leg.wentRound) {
+      leg.wentRound = true;
+      if (c.traffic.redirect(a.uid, aimAt(c, leg, leg.spot))) return;
+    }
+    // Still no usable slot on this side. Continue the search without creating a parked car.
+
   }
   if (leg.spot) leg.tried.push(leg.spot.key);
   const next = leg.tried.length < SEARCH_TRIES ? chooseSpot(c, leg.target, c.clock, !leg.out, leg.tried) : null;
@@ -299,11 +330,8 @@ function park(c: City, leg: Leg, a: Arrival, spot: Spot): void {
   const coins = completeTrip(c, leg, a);
   // Every visitor stands where it parked, in sight: nobody drives into a building.
   const closed = leg.car === null && !leg.tour.chain && c.clock >= WEEKEND_AT - STEP / 2 && c.clock < NIGHT_END;
-  // Somebody home in a car that is not one of the household's drawn ones puts it in their own garage.
-  const garage = !leg.out && leg.car === null && spot.kind === 'home';
-  leg.parked = garage ? null : standHere(c, leg, a, spot, true, undefined, arrivalSlot(c, leg, spot, c.traffic.poseOf(a.uid)));
+  leg.parked = standHere(c, leg, a, spot, true, undefined, arrivalSlot(c, leg, spot, c.traffic.poseOf(a.uid)));
   finish(c, leg, a.uid, leg.parked);
-  if (garage) spot.used += 1;
   if (spot.kind === 'street') streetFine(c, leg, a.at);
   const price = priceAt(c, spot, c.clock, !leg.out);
   if (price > 0) bank(c, 'parking', price, spot.at);
@@ -373,8 +401,8 @@ export function gaveUp(c: City, a: Arrival): void {
   riderLost(c, leg, a.at);
   // It pulls onto the shoulder where it is; a household car is driven home from there, anybody else's drives off.
   const over = pullOver(c, leg, a);
-  if (!over) doorIn(c, a.uid, leg, lookOf(c, leg), nearestDoor(c, a.at), { x: a.at.x, y: a.at.y, a: a.a ?? 0 });
-  if (over && carById(c, leg.car)) { if (leg.tour.chain) leg.tour.chain.now = leg.tour.chain.stops.length; } else carHome(c, leg);
+  const car = carById(c, leg.car);
+  if (car && over && leg.tour.chain) leg.tour.chain.now = leg.tour.chain.stops.length;
   if (over && leg.car === null) sendAway(c, over.e, leg.tour, DOUBLE_PARK_SECONDS);
   emit(c, { t: 'gaveUp', at: a.at });
   scoreLost(c, leg, a.at, 'gaveUp');
@@ -386,15 +414,6 @@ export function standHere(c: City, leg: Leg, a: Arrival, spot: Spot | null, coun
   const car = carById(c, leg.car);
   if (car) return standCar(c, car, spot, counted, at, slot);
   return stand(c, spot, { uid: a.uid, tint: Math.floor(leg.tour.seed * TINTS * 97) % TINTS, kind: kindOf(leg.tour, leg.mode) }, counted, at, slot);
-}
-
-/** A household car whose trip ended badly pulled in at a building: off the map until it is next driven (never put home by hand). */
-export function carHome(c: City, leg: Leg): void {
-  const car = carById(c, leg.car);
-  if (!car || car.where) return;
-  car.leg = null;
-  car.away = true;
-  if (leg.tour.chain) leg.tour.chain.now = leg.tour.chain.stops.length + 1;
 }
 
 /** Every pump is busy: the car waits in the lane, and the queue stands on the road. */

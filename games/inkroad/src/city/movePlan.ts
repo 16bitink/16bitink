@@ -13,7 +13,7 @@ import { bodyPose } from '../sim/slotGeometry';
 import type { Access, LanePose } from '../sim/trafficTypes';
 import type { Pt, Road, VehicleKind } from '../sim/types';
 import { paramsOf, type VehicleParams } from '../sim/vehicle/params';
-import { inBand, joinPlayed, lastPose, secondsUntilOut, standingAt, type Band, type Played } from '../sim/vehicle/played';
+import { inBand, joinPlayed, lastPose, secondsUntilOut, type Band, type Played } from '../sim/vehicle/played';
 import { laneOffers, playInto, playOutOf, type MiddlePose } from '../sim/vehicle/moves';
 import type { Standing } from './day';
 import { lotRect, polyLength, type Rect } from './geometry';
@@ -30,7 +30,7 @@ export const KERB_OUT = 1.1 + 3.6;
 const LANE_HALF = LANE / 2;
 /** Junction ends keep this clear (the renderer's JUNCTION_CLEAR); a mouth's point is this far inside. */
 const JUNCTION_CLEAR = 36;
-const MOUTH_IN = 5;
+const GARAGE_CLEARANCE = 3;
 /** Px of lane ahead of its access a car leaving a space may join at (goal offers). */
 const JOIN_AHEAD = 72;
 
@@ -61,25 +61,36 @@ function doublePose(c: City, e: Standing): MiddlePose | null {
 }
 
 /** A building's or a multi-storey's mouth as seen from a lane pose: the point of its rect nearest the lane, a little inside. */
-export function mouthOf(r: Rect, lane: Pt): MiddlePose {
+export function mouthOf(r: Rect, lane: Pt, kind: VehicleKind): MiddlePose {
   const ex = Math.min(r.x + r.w, Math.max(r.x, lane.x)), ey = Math.min(r.y + r.h, Math.max(r.y, lane.y));
   const a = Math.atan2(r.y + r.h / 2 - ey, r.x + r.w / 2 - ex);
-  return { x: ex + Math.cos(a) * MOUTH_IN, y: ey + Math.sin(a) * MOUTH_IN, a };
+  // The whole car clears the façade before it stops indoors.
+  const depth = paramsOf(kind).len / 2 + GARAGE_CLEARANCE;
+  const x = r.x + r.w / 2, y = r.y + r.h / 2;
+  const extra = Math.min(Math.hypot(x - ex, y - ey), depth);
+  return { x: ex + Math.cos(a) * extra, y: ey + Math.sin(a) * extra, a };
 }
 
-/** Where a standing car's space is (its body's middle) and whether it fades there (a mouth). Null: no space drawn. */
-export function spaceOf(c: City, e: Standing, lane?: LanePose | null): { pose: MiddlePose; fade: boolean } | null {
+export function fitsInside(r: Rect, q: MiddlePose, kind: VehicleKind): boolean {
+  const { len, wid } = paramsOf(kind);
+  const x = (Math.abs(Math.cos(q.a)) * len + Math.abs(Math.sin(q.a)) * wid) / 2;
+  const y = (Math.abs(Math.sin(q.a)) * len + Math.abs(Math.cos(q.a)) * wid) / 2;
+  return q.x - x >= r.x && q.x + x <= r.x + r.w && q.y - y >= r.y && q.y + y <= r.y + r.h;
+}
+
+/** Where a standing car's space is (its body's middle) and whether it is indoors. Null: no space drawn. */
+export function spaceOf(c: City, e: Standing, lane?: LanePose | null): { pose: MiddlePose; indoor: boolean } | null {
   const k = e.spot.kind;
-  if (k === 'double') { const pose = doublePose(c, e); return pose ? { pose, fade: false } : null; }
+  if (k === 'double') { const pose = doublePose(c, e); return pose ? { pose, indoor: false } : null; }
   if (k === 'park' && !e.spot.layout) {
     const park = c.parks.find((p) => p.id === e.spot.id);
-    return park && lane ? { pose: mouthOf(lotRect(park), lane), fade: true } : null;
+    return park && lane ? { pose: mouthOf(lotRect(park), lane, e.kind), indoor: true } : null;
   }
-  if (k === 'kerb' || k === 'street') { const pose = roadSlotPose(c, e); return pose ? { pose, fade: false } : null; }
+  if (k === 'kerb' || k === 'street') { const pose = roadSlotPose(c, e); return pose ? { pose, indoor: false } : null; }
   const l = e.spot.layout;
   if (!l || e.slot < 0) return null;
   const pose = bodyPose(l, spanOf(e.spot, e.slot, e.kind), e.kind);
-  return pose ? { pose, fade: false } : null;
+  return pose ? { pose, indoor: false } : null;
 }
 
 /** Where a standing car is drawn: where its move in ended, else its space. */
@@ -129,15 +140,19 @@ const isAcross = (road: Road | undefined, lane: LanePose, at: Pt): boolean =>
 
 export interface InPlan {
   readonly played: Played;
+  readonly indoor: boolean;
   /** Seconds from the start the body is in the lane it holds (or the road it crosses). */
   readonly lane: number;
   readonly cross: Access | null;
-  readonly fade: boolean;
   /** Seconds of it standing in its lane first, for a gap across the road. */
   readonly wait: number;
 }
 
+/** Reserve the joining pose in traffic before committing to a continuous pull-out. */
+export type TryMerge = (from: Access, lane: LanePose, merge: Played) => boolean;
+
 export interface OutPlan {
+  readonly roll: () => Played;
   readonly toEdge: Played;
   readonly join: Played;
   /** Seconds the lane is held: the part from the edge into the lane. */
@@ -145,7 +160,6 @@ export interface OutPlan {
   /** Where on its road the car joins the lane (the goal chosen). */
   readonly s: number;
   readonly cross: Access | null;
-  readonly fade: boolean;
 }
 
 /** A turn round on the road (a car stopped facing away from its way on): reversing may cross the road, so it waits for both ways clear. */
@@ -168,7 +182,7 @@ export function planIn(c: City, e: Standing, lane: LanePose, uid = -1, gap: (at:
   const road = moveRoad(c, e);
   const cross = e.spot.kind !== 'double' && isAcross(road, lane, space.pose);
   const turn = turnsRound(lane, space.pose);
-  const ask = { spot: e.spot, from: lane, to: space.pose, self: e.uid, road: uid, poseOf: (o: Standing) => standPose(c, o), mouth: space.fade ? mouthArea(c, e) : null, ...(road && !turn ? { reverseOn: { road: road.id, side: roadSide(road, lane) } } : {}) };
+  const ask = { spot: e.spot, from: lane, to: space.pose, self: e.uid, road: uid, poseOf: (o: Standing) => standPose(c, o), mouth: space.indoor ? mouthArea(c, e) : null, ...(road && !turn ? { reverseOn: { road: road.id, side: roadSide(road, lane) } } : {}) };
   const w = groundFor(c, ask);
   const aisle = aisleOf(e);
   // A car park bay is reached by its aisle, on the aisle's ground only (falling back to the whole park where that does not fit).
@@ -177,7 +191,7 @@ export function planIn(c: City, e: Standing, lane: LanePose, uid = -1, gap: (at:
   // Across the road it stops in its lane and waits for its gap first (the wait is part of the move it plays).
   const at0 = road ? { road: road.id, s: project(road.line, lane).s } : null;
   // A multi-storey's or underground mouth is driven into nose first.
-  const play = (pause: number): Played => (aisle && wa ? aisleIn(p, lane, space.pose, aisle, wa, pause) : null) ?? playInto(p, lane, space.pose, w, !space.fade, { turnaround: turn, backIn: backIn && !cross, forwardOnly: (cross && !turn) || e.spot.kind === 'double' || space.fade, onRoad: e.spot.kind === 'double', pause }, lane.v ?? 0, lane.acc ?? 0, lane.delta ?? 0);
+  const play = (pause: number): Played => (aisle && wa ? aisleIn(p, lane, space.pose, aisle, wa, pause) : null) ?? playInto(p, lane, space.pose, w, !space.indoor, { turnaround: turn, backIn: backIn && !cross, forwardOnly: (cross && !turn) || e.spot.kind === 'double' || space.indoor, onRoad: e.spot.kind === 'double', pause }, lane.v ?? 0, lane.acc ?? 0, lane.delta ?? 0);
   // `after`: it stands that long first in any case (another move's body is in its way until then).
   let wait = Math.max(after, cross && at0 ? gap(at0, lane.a) : 0);
   let played = play(wait);
@@ -186,11 +200,13 @@ export function planIn(c: City, e: Standing, lane: LanePose, uid = -1, gap: (at:
   // Its nose swings over the line (backing into a kerb space): it waits for a gap in the far lanes too.
   const late = over && at0 ? gap(at0, lane.a) : 0;
   if (late > wait) { wait = late; played = play(late); }
+  const building = space.indoor ? mouthArea(c, e) : null;
+  if (building && !fitsInside(building.rect, endOf(played), e.kind)) played = { ...played, fits: false };
   const band = bandOf(road, lane, cross);
   const laneS = secondsUntilOut(played, band, p.len, p.wid);
   logMove({ what: 'in', kind: e.spot.kind, seconds: played.seconds, lane: laneS, fits: played.fits, ms: performance.now() - t0, word: played.word, from: lane, to: space.pose });
   const at = road ? { road: road.id, s: project(road.line, lane).s } : null;
-  return { played, lane: e.spot.kind === 'double' ? played.seconds : laneS, cross: (cross || over) && at ? at : null, fade: space.fade, wait };
+  return { played, indoor: space.indoor, lane: e.spot.kind === 'double' ? played.seconds : laneS, cross: (cross || over) && at ? at : null, wait };
 }
 
 /**
@@ -243,11 +259,13 @@ function laneAlong(road: Road, base: LanePose): { at: (s: number) => MiddlePose 
  */
 export function planOut(c: City, e: Standing, lane: LanePose, ahead = JOIN_AHEAD): OutPlan | null {
   const t0 = performance.now();
-  const stood = standPose(c, e);
   const space = spaceOf(c, e, lane);
+  const stood = e.stood ?? space?.pose;
   if (!stood || !space) return null;
   // Inside a multi-storey or underground the car has turned round: it comes out of the mouth nose first.
-  const from = space.fade ? { ...stood, a: stood.a + Math.PI } : stood;
+  const roadside = (e.blockUid ?? -1) >= 0;
+  const indoor = space.indoor && !roadside;
+  const from = indoor ? { ...stood, a: stood.a + Math.PI } : stood;
   const p = paramsOf(e.kind);
   const road = moveRoad(c, e);
   const turn = turnsRound(from, lane);
@@ -255,28 +273,38 @@ export function planOut(c: City, e: Standing, lane: LanePose, ahead = JOIN_AHEAD
   const goals = along ? laneOffers((d) => along.at(along.s0 + along.way * (d - along.s0)), along.s0, ahead) : [];
   const offers = goals.length ? goals : [{ s: 0, pose: lane, cost: 0 }];
   const cross = e.spot.kind !== 'double' && isAcross(road, lane, from);
-  const ask = { spot: e.spot, from, to: lane, self: e.uid, poseOf: (o: Standing) => standPose(c, o), mouth: space.fade ? mouthArea(c, e) : null, ...(road && !turn ? { reverseOn: { road: road.id, side: roadSide(road, from) } } : {}) };
+  const ask = { spot: e.spot, from, to: lane, self: e.uid, poseOf: (o: Standing) => standPose(c, o), mouth: indoor ? mouthArea(c, e) : null, ...(road && !turn ? { reverseOn: { road: road.id, side: roadSide(road, from) } } : {}) };
   const w = groundFor(c, ask);
   // A car a few px off its lane line facing its way (double-parked, a taxi at the kerb) is no manoeuvre: it drives off and steers back (the moving car's own slide).
-  if (e.spot.kind === 'double' && !turn && nearLine(from, lane)) return null;
+  if ((roadside || e.spot.kind === 'double') && !turn && nearLine(from, lane)) return null;
   const band = bandOf(road, lane, cross || turn);
   const aisle = aisleOf(e);
   // A car park bay is left by its aisle: back out into it, then forward out of the gate.
   const viaAisle = aisle && road ? aisleOut(p, from, aisle, offers, groundFor(c, { ...ask, bay: space.pose, reverseOn: { road: road.id, side: roadSide(road, lane) } }), band) : null;
-  const plain = viaAisle ? null : playOutOf(p, from, offers, w, band, { turnaround: turn, forwardOnly: space.fade });
-  const m = viaAisle ? { ...viaAisle.out, toEdge: joinPlayed(viaAisle.back, viaAisle.out.toEdge) } : plain;
+  const plain = viaAisle ? null : playOutOf(p, from, offers, w, band, { turnaround: turn, forwardOnly: indoor });
+  const m = viaAisle ? {
+    ...viaAisle.out, toEdge: joinPlayed(viaAisle.back, viaAisle.out.toEdge),
+    roll: () => joinPlayed(viaAisle.back, viaAisle.out.roll()),
+  } : plain;
   if (!m) return null;
   const over = !!road && !cross && !turn && e.spot.kind !== 'double' && (reachesFar(m.toEdge, road, lane, roadSide(road, lane), p.len, p.wid) || reachesFar(m.join, road, lane, roadSide(road, lane), p.len, p.wid));
   const s = along ? along.s0 + along.way * (offers[m.goal]!.s - along.s0) : 0;
   logMove({ what: 'out', kind: e.spot.kind, seconds: m.toEdge.seconds + m.join.seconds, lane: m.join.seconds, fits: m.fits, ms: performance.now() - t0, word: m.word, from, to: lane });
-  return { toEdge: m.toEdge, join: m.join, lane: m.join.seconds, s, cross: (cross || turn || over) && road ? { road: road.id, s: project(road.line, lane).s } : null, fade: space.fade };
+  return { toEdge: m.toEdge, join: m.join, roll: m.roll, lane: m.join.seconds, s, cross: (cross || turn || over) && road ? { road: road.id, s: project(road.line, lane).s } : null };
 }
 
+interface DoorMove { readonly played: Played; readonly lane: number; readonly toEdge: Played }
+interface DoorExit extends DoorMove { readonly roll: () => Played; readonly goal: number }
+type DoorGoal = { readonly pose: LanePose; readonly cost: number };
+interface DoorPath { readonly parked?: MiddlePose; readonly goals?: readonly DoorGoal[] }
+
+export function planDoor(c: City, rect: Rect, lane: LanePose, dir: 'in', kind: VehicleKind, uid: number, path?: DoorPath): DoorMove;
+export function planDoor(c: City, rect: Rect, lane: LanePose, dir: 'out', kind: VehicleKind, uid: number, path?: DoorPath): DoorExit | null;
 /** A move into (or out of) a building's mouth, with no space drawn (src/city/door.ts). */
-export function planDoor(c: City, rect: Rect, lane: LanePose, dir: 'in' | 'out', kind: VehicleKind, uid: number): { played: Played; lane: number; toEdge: Played } {
+export function planDoor(c: City, rect: Rect, lane: LanePose, dir: 'in' | 'out', kind: VehicleKind, uid: number, path: DoorPath = {}): DoorMove | DoorExit | null {
   const p = paramsOf(kind);
   const t0 = performance.now();
-  const mouth = mouthOf(rect, lane);
+  const mouth = path.parked ?? mouthOf(rect, lane, kind);
   const w = groundFor(c, { spot: null, from: lane, to: mouth, self: uid, poseOf: (o) => standPose(c, o), mouth: { rect, at: mouth } });
   const band = bandOf(undefined, lane, false);
   if (dir === 'in') {
@@ -285,11 +313,10 @@ export function planDoor(c: City, rect: Rect, lane: LanePose, dir: 'in' | 'out',
     logMove({ what: 'door', kind: 'in', seconds: played.seconds, lane: laneS, fits: played.fits, ms: performance.now() - t0, word: played.word });
     return { played, lane: laneS, toEdge: played };
   }
-  const m = playOutOf(p, mouth, [{ pose: lane, cost: 0 }], w, band);
-  const toEdge = m?.toEdge ?? standingAt(p, mouth);
-  const join = m?.join ?? standingAt(p, lane);
-  logMove({ what: 'door', kind: 'out', seconds: toEdge.seconds + join.seconds, lane: join.seconds, fits: m?.fits ?? false, ms: performance.now() - t0 });
-  return { played: join, lane: join.seconds, toEdge };
+  const m = playOutOf(p, { ...mouth, a: mouth.a + Math.PI }, path.goals ?? [{ pose: lane, cost: 0 }], w, band);
+  if (!m) return null;
+  logMove({ what: 'door', kind: 'out', seconds: m.toEdge.seconds + m.join.seconds, lane: m.join.seconds, fits: m.fits, ms: performance.now() - t0, word: m.word });
+  return { played: m.join, lane: m.join.seconds, toEdge: m.toEdge, roll: m.roll, goal: m.goal };
 }
 
 /** Where a played move into a space left the car standing (its middle). */

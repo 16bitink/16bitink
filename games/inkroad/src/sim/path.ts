@@ -15,9 +15,7 @@ export function nextTrack(sim: Sim, i: number, t: Track): Track | null {
   }
   if (t.kind === ARC_T) {
     const exit = c.exitBy[i];
-    const arms = sim.world.nodes[t.node]!.ring!.arms;
-    const next = (t.arm + 1) % arms.length;
-    if (exit && exit.arm === next) return exit;
+    if (exit && exit.arm === t.to!.arm) return exit;
     return t.to;
   }
   return t.to;

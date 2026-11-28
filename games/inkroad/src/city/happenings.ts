@@ -73,7 +73,7 @@ export function happen(c: City, kind: string, place: string | undefined): void {
   const road = busiest(c, place === 'bridge');
   const at = lot ? { x: (lot.gx + lot.w / 2) * 40, y: (lot.gy + lot.h / 2) * 40 } : road ? accessPoint(c, { road: road.id, s: polyLength(road.line) / 2 }) : { x: 0, y: 0 };
   if ((kind === 'breakdown' || kind === 'swans' || kind === 'goats') && road) {
-    c.traffic.block({ road: road.id, s: polyLength(road.line) / 2 }, BLOCK_SECONDS * (has(c, 'tow') ? 0.45 : 1), 3);
+    c.traffic.block({ road: road.id, s: polyLength(road.line) / 2 }, BLOCK_SECONDS * (has(c, 'tow') ? 0.45 : 1), 4);
     c.day.stats.crashes += 1;
   }
   emit(c, { t: 'incident', kind, at, text: h.text });

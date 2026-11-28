@@ -28,7 +28,8 @@ export const WORKS_SLOW = 0.6;
  * Px from the widest arm's edge to the ring's lane: a street ring of 31 px (8.7 m) is driven at about 21 px/s (17 km/h
  * at game pace) and leaves its entries room for a planned-radius curve (docs/inkroad-vehicle-model.md "Phase A").
  */
-export const RING_EXTRA = 22;
+const RING_EXTRA = 22;
+const SMALL_RING_EXTRA = 20;
 export const RING_EDGE = 3;
 const JUNCTION_PAD = 5;
 /** Junctions big enough for a R_MIN right turn (with FILLET 15 in src/render/ground/roadShape.ts). */
@@ -95,13 +96,13 @@ export function sortArms(node: Id, roads: readonly Road[]): Road[] {
 export const groundArms = (arms: readonly Road[]): Road[] => arms.filter((r) => !r.flyover);
 
 export function ringRadius(arms: readonly Road[]): number {
-  return Math.max(0, ...groundArms(arms).map(halfWidth)) + RING_EXTRA;
+  return Math.max(0, ...groundArms(arms).map(halfWidth)) + (ringLaneCount(arms) === 1 ? SMALL_RING_EXTRA : RING_EXTRA);
 }
-export function ringHasSlip(arms: readonly Road[]): boolean {
-  return groundArms(arms).some((r) => lanesPerLink(r) > 1);
+export function ringLaneCount(arms: readonly Road[]): number {
+  return groundArms(arms).some((r) => lanesPerLink(r) > 1) ? 2 : 1;
 }
 export function ringOuter(arms: readonly Road[]): number {
-  return ringRadius(arms) + LANE / 2 + (ringHasSlip(arms) ? LANE : 0) + RING_EDGE;
+  return ringRadius(arms) + LANE / 2 + (ringLaneCount(arms) - 1) * LANE + RING_EDGE;
 }
 
 function junctionRadius(node: NodeCore, arms: readonly Road[]): number {

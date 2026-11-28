@@ -1,3 +1,4 @@
+import type { LanePose } from '../sim/trafficTypes';
 import type { Id, Lot, RoutineProfile } from '../sim/types';
 import type { Leg, Spot, Standing } from './day';
 import { builtArea } from './geometry';
@@ -32,6 +33,9 @@ export interface FleetCar {
   tank: number;
   /** Where it stands, or null while it is out (on the road, or out of town). */
   where: Standing | null;
+  /** Entrance of the building or structure where the car is parked indoors. */
+  garage?: string;
+  garagePose?: LanePose;
   /** The leg it is driving now. */
   leg: Leg | null;
   /** Out by a gate: the place it left the map, to come back to. */
@@ -90,7 +94,7 @@ function makeCar(c: City, h: Household, k: number, profile: RoutineProfile): Fle
 }
 
 /** Dawn: who lives where now. */
-export function buildFleet(c: City): Fleet {
+export function buildFleet(c: City, previous?: Fleet): Fleet {
   const profile = routineOf(c);
   const households = new Map<Id, Household>();
   const byLot = new Map<Id, Household[]>();
@@ -104,12 +108,19 @@ export function buildFleet(c: City): Fleet {
       const h = makeHousehold(c, l, i);
       list.push(h);
       households.set(h.id, h);
-      const own = Array.from({ length: carCount(c, h, profile) }, (_, k) => makeCar(c, h, k, profile));
+      const old = previous?.carsOf.get(h.id) ?? [];
+      const own = Array.from({ length: Math.max(old.length, carCount(c, h, profile)) }, (_, k) => {
+        if (old[k]) return old[k]!;
+        const car = makeCar(c, h, k, profile);
+        if (previous) car.garage = `lot:${h.lot}`;
+        return car;
+      });
       for (const car of own) cars.set(car.uid, car);
       carsOf.set(h.id, own);
     }
     byLot.set(l.id, list);
   }
+  for (const old of previous?.cars.values() ?? []) if (!cars.has(old.uid)) cars.set(old.uid, old);
   return { households, byLot, cars, carsOf };
 }
 
@@ -124,6 +135,7 @@ export function parkAllAtHome(c: City): void {
   for (const car of fleet.cars.values()) {
     car.leg = null;
     car.away = false;
+    car.garage = car.garagePose = undefined;
     const h = fleet.households.get(car.household);
     const spot = h ? c.day.spots.get(`lot:${h.lot}`) : undefined;
     if (car.where && car.where.spot === spot && spot.cars.includes(car.where)) continue; // home already: it keeps its slot
@@ -143,6 +155,7 @@ export function isHome(c: City, e: Standing): boolean {
 export function standCar(c: City, car: FleetCar, spot: Spot, counted: boolean, s?: number, slot?: number): Standing {
   car.leg = null;
   car.away = false;
+  car.garage = car.garagePose = undefined;
   car.where = stand(c, spot, car, counted, s, slot);
   return car.where;
 }

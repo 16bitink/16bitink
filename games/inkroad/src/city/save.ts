@@ -9,8 +9,8 @@ import type { ActiveCommission, City, DayReport, Measures, Mood } from './state'
 import { emptyLedger } from './state';
 
 /**
- * JSON-safe snapshots. A save made at a year's start restores exactly; one made in a day restarts that day, keeping
- * the paydays it has had. Version 2: months (paydays) instead of seasons for the books and the works.
+ * JSON-safe city snapshots. Traffic is initialized at dawn on load. A mid-day save keeps paydays already passed.
+ * Version 2: months (paydays) instead of seasons for the books and the works.
  */
 export const SAVE_VERSION = 2;
 

@@ -1,6 +1,6 @@
 import type { CityEvent, MovePlay } from '../../sim/types';
 import { playedAt, type MutablePose, type Played } from '../../sim/vehicle/played';
-import { clamp, smooth } from '../geom';
+import { clamp } from '../geom';
 
 /**
  * The pure half of the manoeuvre layer (no Phaser): which cars are turning into or out of their spaces, and where
@@ -21,11 +21,7 @@ export interface Places {
 
 /** More than a city ever moves at once; past it a move is skipped. */
 const MAX_ACTIVE = 1024;
-/** A move into a mouth starts fading this far through. */
-const FADE_FROM = 0.45;
 const MAX_BLINKERS = 64;
-/** Seconds a pull-out stands at its end in the lane (one sim step) before the moving car takes over. */
-const HANDOFF = 0.1;
 
 /** move: the played move (in), or the part to the lane edge (out); wait: at the edge for its `parkGo`; go: edge into the lane. */
 export type Phase = 'move' | 'wait' | 'go';
@@ -40,17 +36,16 @@ export interface Move<T> {
   /** The played parts: 'in' plays a; 'out' plays a to the edge and b into the lane. */
   a: Played;
   b: Played | null;
-  fade: boolean;
   /** Seconds into the current phase (below zero: standing first, waiting for a gap). */
   at: number;
   phase: Phase;
   /** A `parkGo` that came while the car was still on its way to the edge. */
   go: boolean;
+  trafficUid: number | undefined;
   /** The pose drawn this frame. */
   px: number;
   py: number;
   pa: number;
-  alpha: number;
   blink: -1 | 0 | 1;
   /** Share of the whole move done (0..1), and where it ends (for the lab's checks). */
   done: number;
@@ -89,16 +84,16 @@ export class ManoeuvreCore<T> {
     m.tint = e.tint;
     m.a = play.a;
     m.b = play.b ?? null;
-    m.fade = play.fade === true;
     m.phase = 'move';
     m.go = false;
+    m.trafficUid = undefined;
     // A car waiting for a gap across the road (or double-parked a while) stands first: its clock starts below zero.
     m.at = (e.dir === 'in' ? -Math.max(0, e.wait ?? 0) : 0) + Math.max(0, e.age ?? 0);
     const last = (m.b ?? m.a);
     const o = (last.n - 1) * 3;
     m.endX = last.frames[o]!; m.endY = last.frames[o + 1]!;
     this.live++;
-    if (e.dir === 'in' && e.slot >= 0) this.places.hold(e.car);
+    if (e.slot >= 0) this.places.hold(e.car);
     this.draw(m);
   }
 
@@ -106,23 +101,25 @@ export class ManoeuvreCore<T> {
   go(e: GoEvent): void {
     const m = this.find(e.car);
     if (!m || m.dir !== 'out') return;
-    if (m.phase === 'move') { m.go = true; return; }
+    m.trafficUid = e.uid;
+    if (m.phase === 'move' && m.at < m.a.seconds) { m.go = true; return; }
     this.begin(m);
     m.at = Math.max(0, e.age ?? 0);
   }
 
-  /** A day's end (or the weekend): nobody is left waiting at an edge. */
-  dropWaiting(): void {
-    for (let i = this.live - 1; i >= 0; i--) if (this.pool[i]!.phase === 'wait') this.finish(i);
-  }
-
   /** `seconds`: sim seconds since last frame (zero while paused). */
-  update(seconds: number): void {
+  update(seconds: number, holdingLane: (uid: number) => boolean): void {
     this.blinkCount = 0;
     for (let i = this.live - 1; i >= 0; i--) {
       const m = this.pool[i]!;
+      const uid = m.trafficUid;
+      if (uid !== undefined && !holdingLane(uid)) { this.finish(i); continue; }
       if (m.phase !== 'wait') m.at += seconds;
-      if (m.phase !== 'wait' && m.at >= this.length(m) && !this.next(m)) { this.finish(i); continue; }
+      // The lane draws this same car as soon as the traffic step releases it.
+      if (m.phase !== 'wait' && m.at >= this.part(m).seconds && !(m.phase === 'go' && uid !== undefined) && !this.next(m)) {
+        this.finish(i);
+        continue;
+      }
       this.draw(m);
     }
     this.blinkers.length = this.blinkCount;
@@ -134,15 +131,13 @@ export class ManoeuvreCore<T> {
   }
 
   private grow(): Move<T> {
-    const m: Move<T> = { tag: this.make(), uid: 0, dir: 'in', kind: 'car', tint: 0, a: STILL, b: null, fade: false, at: 0, phase: 'move', go: false, px: 0, py: 0, pa: 0, alpha: 1, blink: 0, done: 0, endX: 0, endY: 0 };
+    const m: Move<T> = { tag: this.make(), uid: 0, dir: 'in', kind: 'car', tint: 0, a: STILL, b: null, at: 0, phase: 'move', go: false, trafficUid: undefined, px: 0, py: 0, pa: 0, blink: 0, done: 0, endX: 0, endY: 0 };
     this.pool.push(m);
     return m;
   }
 
   /** The played part of the current phase. */
   private part(m: Move<T>): Played { return m.phase === 'go' ? m.b ?? STILL : m.a; }
-  /** The 'go' part stands at its end one sim step more: the sim lets the moving car go on the step after its hold. */
-  private length(m: Move<T>): number { return this.part(m).seconds + (m.phase === 'go' ? HANDOFF : 0); }
 
   private find(uid: number): Move<T> | undefined {
     for (let i = 0; i < this.live; i++) if (this.pool[i]!.uid === uid) return this.pool[i];
@@ -156,7 +151,12 @@ export class ManoeuvreCore<T> {
   /** The 'out' move ends at the edge, where the car waits (or goes on at once if its release already came). */
   private next(m: Move<T>): boolean {
     if (m.phase !== 'move' || m.dir !== 'out') return false;
-    if (m.go) { this.begin(m); return true; }
+    if (m.go) {
+      const remainder = m.at - m.a.seconds;
+      this.begin(m);
+      m.at = remainder;
+      return true;
+    }
     m.phase = 'wait';
     m.at = m.a.seconds;
     return true;
@@ -171,7 +171,7 @@ export class ManoeuvreCore<T> {
   private finish(i: number): void {
     const m = this.pool[i]!;
     this.onEnd(m);
-    if (m.dir === 'in') this.places.unhold(m.uid);
+    this.places.unhold(m.uid);
     const last = this.live - 1;
     if (i !== last) { this.pool[i] = this.pool[last]!; this.pool[last] = m; }
     this.live--;
@@ -185,9 +185,6 @@ export class ManoeuvreCore<T> {
     const total = m.a.seconds + (m.b?.seconds ?? 0);
     const so = m.phase === 'go' ? m.a.seconds + s : s;
     m.done = total > 0 ? so / total : 1;
-    // A mouth: fading in as it comes out, out as it goes in.
-    const k = m.dir === 'in' ? m.done : 1 - m.done;
-    m.alpha = m.fade ? 1 - smooth((k - FADE_FROM) / (1 - FADE_FROM)) : 1;
     const moving = m.phase !== 'wait' && m.at > 0 && m.at < part.seconds;
     const side = (m.endX - q.x) * -Math.sin(q.a) + (m.endY - q.y) * Math.cos(q.a);
     m.blink = moving || m.phase === 'wait' ? (side >= 0 ? 1 : -1) : 0;

@@ -116,7 +116,7 @@ export function tickMinis(c: City): void {
 function stopAnywhere(c: City, l: TransitLine, seed: number, seconds: number): void {
   const p = pointAlong(l.path, polyLength(l.path) * (0.1 + 0.8 * ((seed % 997) / 997)));
   const at = stopAccess(c, { gx: Math.round(p.x / CELL), gy: Math.round(p.y / CELL) });
-  if (at) c.traffic.block(at, seconds, 2);
+  if (at) c.traffic.block(at, seconds, 4);
 }
 
 // ---------------------------------------------------------------- lines that differ

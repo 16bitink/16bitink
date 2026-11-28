@@ -1,3 +1,4 @@
+import type { CarState } from './vehicle/bicycle';
 import type { Played } from './vehicle/played';
 /** Every car, as struct of arrays, and the queue operations that keep lanes ordered. */
 import { MAX_CARS, VEHICLES } from './constants';
@@ -81,6 +82,7 @@ export class CarStore implements CarsView {
   /** A turn round on the road played by the vehicle model (src/sim/turning.ts), and the sim time it starts playing: the car stands until it is done. */
   readonly play: (Played | null)[] = new Array<Played | null>(MAX_CARS).fill(null);
   readonly playAt = f64();
+  readonly mergeEnd = new Map<number, CarState>();
   /** Px along the lane back where a dead-end turn ends (-1: the car already stands there, a turn on the road). */
   readonly playGoal = f64();
   /** The lane a played move ends on when it is not the turn's own way back (a car reversing out of a dead end). */
@@ -158,6 +160,7 @@ export class CarStore implements CarsView {
     this.alive[i] = 0;
     this.active--;
     this.slotOf.delete(this.uid[i]!);
+    this.mergeEnd.delete(i);
     this.free.push(i);
   }
 

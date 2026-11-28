@@ -199,7 +199,7 @@ const NEIGHBOUR_SWAP: Scenario = {
   // Slot 2 is the only free one; slot 4 (its neighbour on the south kerb) holds B, who leaves just as A comes.
   actors: [
     ...fillExcept([2, 4]),
-    { kind: 'parked', id: 'B', spot: { kerb: [6, 4] }, slot: 4, lot: 'Shop', leaveAt: 3.5, to: 'E' },
+    { kind: 'parked', id: 'B', spot: { kerb: [6, 4] }, slot: 4, lot: 'Shop', leaveAt: 5, to: 'E' },
     { kind: 'arrive', id: 'A', at: 0.5, from: 'W', home: 'E', lot: 'Shop', spot: { kerb: [6, 4] }, stay: 23 },
   ],
   seconds: 80,

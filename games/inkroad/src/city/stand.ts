@@ -1,5 +1,4 @@
 import type { Id, ParkedCar, ParkingView, VehicleKind } from '../sim/types';
-import { goneAtNight, standBack } from './manoeuvre';
 import type { Spot, Standing } from './day';
 import { distPt, polyLength } from './geometry';
 import { freeSlots, hasRoom, slotCount, spanOf, standS } from './slots';
@@ -69,7 +68,10 @@ export function unstand(c: City, e: Standing): void {
 /** A place went (a road removed, kerbs taken away): its cars move to the nearest place that is left. */
 export function rehome(c: City, gone: Spot): void {
   const all = [...c.day.spots.values()].filter((s) => s.kind !== 'double');
-  if (all.length === 0) return;
+  if (all.length === 0) {
+    c.day.spots.set(gone.key, gone);
+    return;
+  }
   for (const e of [...gone.cars]) {
     const room = all.filter((s) => hasRoom(c, s, null, e.kind));
     const pool = room.length > 0 ? room : all;
@@ -85,18 +87,9 @@ export function rehome(c: City, gone: Spot): void {
   c.day.parkingDirty = true;
 }
 
-/** Night: nobody is out, nothing stands anywhere but what `keep` keeps (household cars already home stay in their slots). */
-export function clearStanding(c: City, keep: (e: Standing) => boolean = () => false): void {
-  for (const s of c.day.spots.values()) {
-    if (s.cars.length === 0 && s.used === 0) continue;
-    for (const e of s.cars) if (!keep(e) && e.blockUid !== undefined && e.blockUid >= 0) { c.traffic.remove(e.blockUid); e.blockUid = undefined; }
-    for (const e of s.cars) if (!keep(e)) goneAtNight(c, e);
-    s.cars = s.cars.filter(keep);
-    for (const e of s.cars) standBack(c, e);
-    s.used = s.cars.filter((e) => e.counted).length;
-    s.ver += 1;
-  }
-  c.day.parkingDirty = true;
+/** Reset parked fixtures before the isolated motion lab starts. */
+export function clearStanding(c: City): void {
+  for (const s of c.day.spots.values()) for (const e of [...s.cars]) unstand(c, e);
 }
 
 // ---------------------------------------------------------------- the view
@@ -107,7 +100,7 @@ export const viewKind = (k: VehicleKind): ParkedCar['kind'] => k;
 
 function parkedOf(e: Standing): ParkedCar {
   const span = spanOf(e.spot, e.slot, e.kind);
-  return { uid: e.uid, tint: e.tint, kind: viewKind(e.kind), slot: e.slot, ...(span.length > 1 ? { span } : {}), ...(e.household !== undefined ? { household: e.household } : {}), ...(e.s !== undefined ? { s: e.s, side: e.side ?? 1 } : {}), ...(e.lat !== undefined ? { lat: e.lat } : {}), ...(e.stood ? { pose: e.stood } : {}) };
+  return { uid: e.uid, tint: e.tint, kind: viewKind(e.kind), slot: e.slot, ...(span.length > 1 ? { span } : {}), ...(e.household !== undefined ? { household: e.household } : {}), ...(e.s !== undefined ? { s: e.s, side: e.side ?? 1 } : {}), ...(e.lat !== undefined ? { lat: e.lat } : {}), ...(e.stood ? { pose: e.stood } : {}), ...(e.spot.kind === 'park' && !e.spot.layout && (e.blockUid ?? -1) < 0 ? { indoor: true } : {}) };
 }
 
 function viewOf(s: Spot): ParkingView {

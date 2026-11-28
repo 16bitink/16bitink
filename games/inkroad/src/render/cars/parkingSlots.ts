@@ -51,7 +51,7 @@ export const slotOf = (c: ParkedCar, i: number): number => c.slot ?? i;
 /** The slots for every car of one place; a car whose move in ended a hair off its slot stands just where it ended (src/city/movePlan.ts). */
 export function layoutPlace(v: ParkingView, geo: ParkingGeo): Slots {
   const slots = slotsOfPlace(v, geo);
-  return v.cars.some((c) => c.pose) ? slots.map((s, i) => { const p = v.cars[i]?.pose; return p && s ? { ...s, x: p.x, y: p.y, a: p.a } : s; }) : slots;
+  return v.cars.some((c) => c.pose) ? slots.map((s, i) => { const c = v.cars[i]; return c?.pose && !c.indoor ? { ...s, ...c.pose } : s; }) : slots;
 }
 
 function slotsOfPlace(v: ParkingView, geo: ParkingGeo): Slots {

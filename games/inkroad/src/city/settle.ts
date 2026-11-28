@@ -208,7 +208,7 @@ export function settleSeason(c: City): void {
   reviewCommissions(c);
   updateMoods(c);
   growLots(c);
-  c.traffic.endDay();
+  c.traffic.endDay(c.day.endedAt !== undefined);
   advanceWorks(c, true);
   nightRules(c);
   c.priceBase = c.prices;

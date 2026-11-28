@@ -32,7 +32,7 @@ interface Slot {
   i: number;
   x1: number; y1: number; z1: number;
   uid: number;
-  kind: number; tint: number; frame: number; deck: boolean; born: number;
+  kind: number; tint: number; frame: number; deck: boolean;
   slowing: boolean; speed: number;
   /** In state 4 (parking or leaving): the manoeuvre layer draws it, this one waits where it is. */
   held: boolean;
@@ -51,11 +51,8 @@ export class CarLayer {
   private lastClock = -1;
   private sinceStep = 0;
   private interval = 0.1;
-  private now = 0;
   drawn = 0;
   private cars: CarsView | null = null;
-  /** Traffic uids handed over by a pull-out: drawn at once, without fading in. */
-  private readonly expected = new Set<number>();
   /** Cars here are inside a tunnel: not drawn. */
   private hidden: (x: number, y: number) => boolean = () => false;
 
@@ -65,11 +62,6 @@ export class CarLayer {
     this.layer = scene.add.layer().setDepth(depths.ground);
   }
 
-  /** A car pulling out of a space (drawn by the manoeuvre layer until now) joins the road as this traffic uid. */
-  expect(uid: number): void {
-    this.expected.add(uid);
-  }
-
   setHidden(fn: (x: number, y: number) => boolean): void {
     this.hidden = fn;
   }
@@ -77,7 +69,6 @@ export class CarLayer {
   /** `stamp` changes whenever the sim has stepped (the city's clock). */
   update(cars: CarsView, stamp: number, dt: number, view: Box, alpha: number): void {
     this.cars = cars;
-    this.now += dt;
     this.sinceStep += dt;
     if (stamp !== this.lastClock) this.take(cars, stamp);
     const t = clamp(this.sinceStep / this.interval, 0, 1);
@@ -112,7 +103,7 @@ export class CarLayer {
   private make(i: number): Slot {
     const img = new Phaser.GameObjects.Image(this.scene, 0, 0, 'cars-0').setVisible(false);
     this.layer.add(img);
-    const s: Slot = { img, i, uid: 0, x1: 0, y1: 0, z1: 0, kind: -1, tint: -1, frame: -1, deck: false, born: 0, slowing: false, speed: 0, held: false };
+    const s: Slot = { img, i, uid: 0, x1: 0, y1: 0, z1: 0, kind: -1, tint: -1, frame: -1, deck: false, slowing: false, speed: 0, held: false };
     while (this.slots.length <= i) this.slots.push(null);
     this.slots[i] = s;
     return s;
@@ -125,8 +116,6 @@ export class CarLayer {
     const fresh = resumed || s.uid !== c.uid[i] || Math.hypot(start.x - s.x1, start.y - s.y1) > TELEPORT;
     if (fresh) {
       s.uid = c.uid[i]!;
-      // A car that stood in its space (drawn by the manoeuvre layer) picks up from the lane without fading in.
-      s.born = resumed || this.expected.delete(c.uid[i]!) ? this.now - 1 : this.now;
       s.kind = c.kind[i]!;
       s.tint = c.tint[i]!;
       s.frame = -1;
@@ -151,7 +140,7 @@ export class CarLayer {
     const step = (index * Math.PI * 2) / HEADINGS;
     s.img.setPosition(x, projectY(y, Math.max(0, z)));
     s.img.rotation = projectAngle(step + rest) - projectAngle(step);
-    s.img.alpha = alpha * Math.min(1, (this.now - s.born) * 5) * (z < 0 ? clamp(1 - z / UNDER, 0, 1) : 1);
+    s.img.alpha = alpha * (z < 0 ? clamp(1 - z / UNDER, 0, 1) : 1);
     this.lift(s, z > RAMP_FOOT, y, z);
   }
 
@@ -207,6 +196,11 @@ export class CarLayer {
       if (k < d) { d = k; best = i; }
     });
     return best < 0 ? null : { slot: best, uid: this.slots[best]!.uid };
+  }
+
+  /** A departing vehicle is still reserved in traffic while the manoeuvre layer draws it. */
+  holdingLane(uid: number): boolean {
+    return this.slots.some((s) => s?.uid === uid && s.held);
   }
 
   /** Is this still the same car? */

@@ -4,8 +4,8 @@ import type { VehicleKind } from './types';
 import { gapAcross, holdAcross, laneClear } from './crossing';
 import { STEP } from './constants';
 import { considerLane, think } from './drive';
-import { feel, move, plan, pose } from './motion';
-import { drawStep, placeDrawn } from './drawn';
+import { feel, move, plan, pose, stopHere } from './motion';
+import { drawStep, placeDrawn, resumeMerge } from './drawn';
 import { FRAME_STRIDE, SUB } from './store';
 import { Measure } from './measure';
 import { entryPose, exists, firstLink, place, reachableFrom, reachableTo, setDest, standAt, turnBack } from './place';
@@ -29,12 +29,12 @@ import type { Access, Arrival, LanePose, Network, SpawnRequest, Traffic } from '
 
 const HONK_KEEP = 8;
 
-function createSim(net: Network, seed: number): Sim {
+function createSim(net: Network, seed: number, preserveCars: boolean): Sim {
   // The parts look the Sim up lazily, because they and the Sim hold each other.
   const box: { sim?: Sim } = {};
   const get = (): Sim => box.sim!;
   const sim: Sim = {
-    world: buildWorld(net), cars: new CarStore(), rng: createRng(seed), time: 0, tick: 0, tollNow: 0, speed: 1, trucksAllowed: true,
+    world: buildWorld(net), cars: new CarStore(), rng: createRng(seed), time: 0, tick: 0, tollNow: 0, speed: 1, trucksAllowed: true, preserveCars,
     arrivals: [], gaveUp: [], honks: [], routes: new Routes(get), measure: new Measure(get), services: new Services(get), sweeps: new Sweeps(),
   };
   box.sim = sim;
@@ -42,21 +42,25 @@ function createSim(net: Network, seed: number): Sim {
   return sim;
 }
 
-/** Cars the city neither sent on nor took off since the last step have parked. */
+/** Resolve arrivals left over from the last step. A city car without a handoff stays where it stopped. */
 function clearArrived(sim: Sim): void {
   const c = sim.cars;
-  for (let i = 0; i < c.count; i++) if (c.alive[i] && c.arrived[i]) c.drop(i);
+  for (let i = 0; i < c.count; i++) {
+    if (!c.alive[i] || !c.arrived[i]) continue;
+    if (sim.preserveCars && c.tag[i]! >= 0) stopHere(sim, i);
+    else c.drop(i);
+  }
 }
 
 function stepCars(sim: Sim): void {
   const c = sim.cars;
   for (let i = 0; i < c.count; i++) {
-    if (!c.alive[i]) continue;
+    if (!c.alive[i] || !c.track[i]) continue;
     if (c.state[i]! >= 2 && c.until[i]! <= sim.time && !release(sim, i)) { c.drop(i); continue; }
     if (!feel(sim, i)) continue;
     if ((i + sim.tick) % CHANGE.every === 0) considerLane(sim, i);
   }
-  for (let i = 0; i < c.count; i++) if (c.alive[i]) think(sim, i);
+  for (let i = 0; i < c.count; i++) if (c.alive[i] && c.track[i]) think(sim, i);
   // Leaders first within a track, so a queue moves off together.
   for (const t of sim.world.tracks) {
     for (let i = t.head; i >= 0;) {
@@ -65,7 +69,7 @@ function stepCars(sim: Sim): void {
       i = behind;
     }
   }
-  for (let i = 0; i < c.count; i++) if (c.alive[i]) { pose(sim, i); drawStep(sim, i); }
+  for (let i = 0; i < c.count; i++) if (c.alive[i] && c.track[i]) { pose(sim, i); drawStep(sim, i); }
 }
 
 /** A car that pulled out of a space has held its lane long enough: it drives off. False: it was only standing there. */
@@ -73,6 +77,8 @@ function release(sim: Sim, i: number): boolean {
   const c = sim.cars;
   if (c.state[i] !== 4 || (c.destRoad[i]! < 0 && c.destNode[i]! < 0)) return false;
   c.state[i] = 0;
+  const end = c.mergeEnd.get(i);
+  if (end) { resumeMerge(c, i, end); c.mergeEnd.delete(i); }
   plan(sim, i, sim.world.links[c.track[i]!.link]!);
   return true;
 }
@@ -81,10 +87,11 @@ function release(sim: Sim, i: number): boolean {
 function parkIn(sim: Sim, uid: number, seconds: number): boolean {
   const c = sim.cars;
   const i = c.slotOf.get(uid);
-  if (i === undefined || c.track[i]?.kind !== LANE_T) return false; // only from a lane: never inside a junction
+  if (i === undefined || (seconds !== Infinity && c.track[i]?.kind !== LANE_T)) return false;
   c.revoke(i); // a right of way it held ahead is given back before its route is forgotten
   c.arrived[i] = 0;
   c.state[i] = 4;
+  c.mergeEnd.delete(i);
   c.until[i] = sim.time + seconds;
   c.v[i] = 0;
   // No trip left, so it is gone when the hold ends; destLink stays, so it is drawn just where it stopped.
@@ -146,8 +153,16 @@ function spawn(sim: Sim, req: SpawnRequest): number {
   c.moved[i] = sim.tick % 2;
   setDest(sim, i, r.to);
   const hold = r.hold ?? 0;
-  if (!place(sim, i, l, r.from, hold > 0)) { c.drop(i); return -1; }
-  if (hold > 0) { c.state[i] = 4; c.until[i] = sim.time + hold; }
+  if (!place(sim, i, l, r.from, hold > 0, r.driver, r.mergeEnd?.u)) { c.drop(i); return -1; }
+  if (hold > 0) {
+    c.state[i] = 4;
+    c.until[i] = sim.time + hold;
+    if (r.mergeEnd?.dir === 1 && r.mergeEnd.u > 0) {
+      // City departures are scheduled for the end of the tick about to run. Keep the join drawn until its last frame.
+      c.until[i]! += STEP;
+      c.mergeEnd.set(i, r.mergeEnd);
+    }
+  }
   if (r.pose) placeDrawn(sim, i, r.pose.x, r.pose.y, r.pose.a);
   if (l.road.toll) c.tolls[i]! += sim.tollNow;
   return c.uid[i]!;
@@ -260,8 +275,8 @@ function sweepsOf(sim: Sim): MoveSweeps {
   };
 }
 
-export function createTraffic(net: Network, seed: number): Traffic {
-  const sim = createSim(net, seed);
+export function createTraffic(net: Network, seed: number, preserveCars = false): Traffic {
+  const sim = createSim(net, seed, preserveCars);
   const drain = (key: 'arrivals' | 'gaveUp'): Arrival[] => { const list = sim[key]; sim[key] = []; return list; };
   return {
     get cars() { return sim.cars; },
@@ -271,6 +286,7 @@ export function createTraffic(net: Network, seed: number): Traffic {
     spawn: (r) => spawn(sim, r),
     redirect: (uid, to) => redirect(sim, uid, to),
     remove: (uid) => { const i = sim.cars.slotOf.get(uid); if (i !== undefined) sim.cars.drop(i); },
+    stop: (uid) => { const i = sim.cars.slotOf.get(uid); if (i !== undefined) stopHere(sim, i); },
     park: (uid, seconds) => parkIn(sim, uid, seconds),
     poseOf: (uid) => poseOf(sim, uid),
     framesOf: (uid) => framesOf(sim, uid),
@@ -297,8 +313,8 @@ export function createTraffic(net: Network, seed: number): Traffic {
       const c = sim.cars, i = c.slotOf.get(uid);
       return i === undefined ? null : { tag: c.tag[i]!, seconds: sim.time - c.born[i]!, waited: c.waited[i]! };
     },
-    startDay: () => { clearAll(sim); sim.measure.startDay(); },
-    endDay: () => { sim.measure.endDay(); clearAll(sim); },
+    startDay: (keepCars) => { if (!keepCars) clearAll(sim); sim.measure.startDay(); },
+    endDay: (keepCars) => { sim.measure.endDay(); if (!keepCars) clearAll(sim); },
   };
 }
 

@@ -541,7 +541,7 @@ export interface ResidentView {
  */
 export type ParkingKind = 'home' | 'private' | 'kerb' | 'park' | 'street' | 'sand' | 'double';
 /** A parking move as the vehicle model played it (src/sim/vehicle/played.ts): the view draws these frames. */
-export interface MovePlay { readonly a: Played; readonly b?: Played; /** It drives into a mouth: the body fades as it goes in. */ readonly fade?: boolean }
+export interface MovePlay { readonly a: Played; readonly b?: Played; }
 
 export interface ParkedCar {
   /** Stable while the car stands here; a household's car keeps its uid all season. */
@@ -558,6 +558,8 @@ export interface ParkedCar {
   readonly slot?: number;
   /** Where its move in ended (the body's middle): it is drawn just there (src/city/movePlan.ts). */
   readonly pose?: { readonly x: number; readonly y: number; readonly a: number };
+  /** The parked pose is beneath the roof of a parking structure. */
+  readonly indoor?: boolean;
   /** A vehicle longer than a bay (van, lorry): every slot it covers, its own first (the next one on its side). */
   readonly span?: readonly number[];
 }

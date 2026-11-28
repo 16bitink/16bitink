@@ -1,6 +1,6 @@
 import { MOTION_SWITCHES } from '../../sim/switches';
 import type { CityView, Id, Junction, Link, Pt, Road } from '../../sim/types';
-import { halfWidth, lanesPerLink, MEDIAN } from '../../sim/roadGeom';
+import { sidewalkWidth, halfWidth, lanesPerLink, MEDIAN } from '../../sim/roadGeom';
 import { CELL, LANE } from '../../sim/constants';
 import { groundParts } from '../deckHeight';
 import { boxOf, lineLength, offsetLine, pointAt, subLine, type Box } from '../geom';
@@ -14,7 +14,7 @@ import { bucket } from './wornRoads';
  * A road is a ribbon along its line; a junction is a polygon whose corners
  * are rounded kerbs, so any number of arms at any angle meets cleanly.
  */
-export const KERB_W = 5.5;
+const KERB_W = sidewalkWidth({ type: 'street' });
 /** Kerb corners (15 with ROOMY_CORNERS in src/sim/netCore.ts, so a R_MIN right turn keeps its body off the kerb). */
 const fillet = (): number => (MOTION_SWITCHES.ROOMY_CORNERS ? 15 : 11);
 const MAX_CORNER = 3.2; // of the wider half width: sharper corners are cut off there
@@ -73,9 +73,7 @@ export interface RoadShape {
 
 export interface RoadScene { readonly roads: readonly RoadShape[]; readonly joins: readonly JunctionShape[] }
 
-const PAVED: readonly Road['type'][] = ['street', 'avenue', 'boulevard'];
-/** Width of the walk beside the asphalt. */
-export const kerbOf = (road: Road): number => (road.flyover ? 1.5 : PAVED.includes(road.type) ? KERB_W : 2.5);
+export const kerbOf = sidewalkWidth;
 
 const at = (c: Pt, a: number, along: number, side: number): Pt => ({
   x: c.x + Math.cos(a) * along - Math.sin(a) * side,

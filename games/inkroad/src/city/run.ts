@@ -3,10 +3,10 @@ import { bodyAt, type Body } from '../sim/vehicleSize';
 import { MONTHS_PER_SEASON, STEP } from '../sim/constants';
 import { setRoad } from '../sim/network';
 import { isPeak, NIGHT_END, PAYDAYS, periodAt, SEASON_END, WEEKEND_AT } from './clock';
-import type { Leg, Tour } from './day';
+import type { Day, Leg, Tour } from './day';
 import { emptyDay } from './day';
 import { planDay, planWeekend } from './demand';
-import { busyCars, lateLeg, nightSweep, sendStrandedHome, smallHours } from './hops';
+import { busyCars, sendStrandedHome, smallHours } from './hops';
 import { buildFleet, parkAllAtHome } from './households';
 import { parkingView } from './stand';
 import { createDice } from './rng';
@@ -17,7 +17,7 @@ import { arrive, closeWorkday, gaveUp, leaveAll, retryWaiting, startTour } from 
 import { commitNetwork } from './network';
 import { buildSpots, publishParks, sampleSpots } from './parking';
 import { accessOf } from './places';
-import { scoreLost, scorePricedOut, scoreTrip } from './score';
+import { scorePricedOut } from './score';
 import { settleMonth, tickWorks } from './settle';
 import type { City } from './state';
 import { emit, has } from './state';
@@ -47,7 +47,6 @@ function firstMorning<T>(c: City, plan: () => T): T {
   return out;
 }
 
-/** Dawn: plan the day and open the roads. */
 /** The bodies of the cars standing in places within a box (where they are drawn). */
 function parkedIn(c: City, x0: number, y0: number, x1: number, y1: number): Body[] {
   const out: Body[] = [];
@@ -59,26 +58,62 @@ function parkedIn(c: City, x0: number, y0: number, x1: number, y1: number): Body
   return out;
 }
 
+/** Keep active manoeuvres, reservations and parked poses across the review's clock reset. */
+function carryVehicles(c: City, old: Day, previousClock: number): void {
+  const offset = c.clock - previousClock;
+  const legs = new Set([...old.legs, ...old.waiting, ...old.stays.map((s) => s.leg)]);
+  const chains = new Set([...legs].flatMap((l) => l.tour.chain ? [l.tour.chain] : []));
+  for (const ch of chains) ch.stops = ch.stops.map((s) => ({
+    ...s, at: s.at + offset, until: s.until === null ? null : s.until + offset,
+  }));
+  for (const l of legs) {
+    const until = l.tour.until;
+    l.tour = { ...l.tour, leave: l.tour.leave + offset, until: until === null ? null : until + offset };
+    l.start += offset;
+    l.heldAt += offset;
+    if (l.door) l.door = { ...l.door, goAt: l.door.goAt + offset };
+    if (l.doorLook !== undefined) l.doorLook += offset;
+  }
+  for (const spot of old.spots.values()) {
+    spot.sum = spot.samples = 0;
+    for (const e of spot.cars) {
+      if (e.readyAt !== undefined) e.readyAt += offset;
+      if (e.edge) e.edge = { ...e.edge, goAt: e.edge.goAt + offset };
+    }
+  }
+  c.events = c.events.map((e) => (e.t === 'park' || e.t === 'parkGo') && e.when !== undefined ? { ...e, when: e.when + offset } : e);
+  c.day.legs = old.legs;
+  c.day.spots = old.spots;
+  c.day.waiting = old.waiting;
+  c.day.stays = old.stays.map((s) => ({ ...s, until: s.until + offset }));
+  c.day.crossings = old.crossings.map((k) => ({ ...k, from: k.from + offset }));
+  c.day.pumps = old.pumps;
+  for (const pump of c.day.pumps.values()) pump.served = 0;
+}
+
 export function startDay(c: City): void {
-  c.clock = -PREWARM;
+  const old = c.day;
+  const continuing = old.endedAt !== undefined;
+  c.clock = continuing ? 0 : -PREWARM;
   c.carry = 0;
   c.opening = { bars: c.bars, approval: c.approval };
   c.day = emptyDay();
+  if (old.endedAt !== undefined) carryVehicles(c, old, old.endedAt);
   buildSpots(c);
-  c.fleet = buildFleet(c);
-  parkAllAtHome(c);
-  c.traffic.startDay();
+  c.fleet = buildFleet(c, continuing ? c.fleet : undefined);
+  if (!continuing) parkAllAtHome(c);
+  c.traffic.startDay(continuing);
   const pipe = pipeRoad(c);
   // A burst pipe digs for the rest of the season: it is done at the season's last payday.
   if (pipe !== null) commitNetwork(c, setRoad(c.net, pipe, { works: MONTHS_PER_SEASON - c.month }));
-  syncServices(c);
+  if (!continuing) syncServices(c);
   const today = todayPlan(c);
   c.weather = { speed: today.speed, crashes: 0 };
   c.day.agenda = [...today.agenda];
   c.day.plan = firstMorning(c, () => answerPrices(c, planDay(c, today.crowds, today.schoolRate)));
   c.parking = parkingView(c);
   conditions(c);
-  preWarm(c);
+  if (!continuing) preWarm(c);
 }
 
 /** The morning is already under way when the curtain rises; what happened before it makes no sound. */
@@ -134,7 +169,10 @@ function depart(c: City): void {
     // A car is never in two places: a day whose car is still out (a late night) waits until it is free.
     const car = t.chain?.car ?? null;
     if (car !== null && (busy ??= busyCars(c)).has(car)) { insert(c, { ...t, leave: c.clock + BUSY_WAIT }); continue; }
-    if (!retime(c, t)) startTour(c, t);
+    if (retime(c, t)) continue;
+    startTour(c, t);
+    // Another departure in this same step sees the newly started or waiting car.
+    if (car !== null) busy = null;
   }
 }
 
@@ -188,14 +226,11 @@ export function stepDay(c: City): boolean {
   return c.clock >= SEASON_END - STEP / 2;
 }
 
-/** Night: whoever is still on the road gets home late. */
+/** Freeze the review at the actual map state. The next season resumes the same vehicles. */
 export function endDay(c: City): void {
-  nightSweep(c);
+  c.day.endedAt = c.clock;
   c.parking = parkingView(c);
   for (const s of c.day.shared) scorePricedOut(c, s, s.coins);
-  for (const leg of c.day.waiting) scoreLost(c, leg, pointOf(c, leg.out ? leg.tour.from : leg.tour.to), 'gaveUp');
-  c.day.waiting = [];
-  for (const leg of c.day.legs) if (!leg.done) lateLeg(c, leg);
 }
 
 /** Cars that waited for their gap across the road now hold the far lanes while their bodies are in them. */

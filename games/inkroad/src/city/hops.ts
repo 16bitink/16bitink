@@ -1,9 +1,10 @@
+import { garageAccess } from './door';
 import type { Access } from '../sim/trafficTypes';
 import type { FuelView, Lot, Pt } from '../sim/types';
 import type { Chain, Leg, Place, Stay, Stop, Tour } from './day';
 import { clockAt, dayKindAt, SEASON_END, WEEKEND_AT } from './clock';
 import { distPt } from './geometry';
-import { carById, fleetOf, isHome, parkAllAtHome } from './households';
+import { carById, fleetOf } from './households';
 import { chooseHome, drive, lookOf, newLeg, startOf, startTour } from './legs';
 import type { Choice } from './modes';
 import { aimOf } from './manoeuvre';
@@ -11,7 +12,6 @@ import { chooseSpot } from './parking';
 import { accessOf, cellsBetween, pointOf } from './places';
 import { routineOf } from './routine';
 import { scoreTrip } from './score';
-import { clearStanding } from './stand';
 import type { City } from './state';
 import { FUEL_LOW, PUMPS, STOPS } from './tune';
 
@@ -79,7 +79,7 @@ export function goOn(c: City, s: Stay): boolean {
   hop.car = car.uid;
   hop.leaving = car.where;
   const go = refuel(c, hop);
-  drive(c, go, startOf(c, s.from, car.where?.spot ?? s.spot, here), aimOf(c, go) ?? accessOf(c, go.tour.to));
+  drive(c, go, carAt(c, go) ?? startOf(c, s.from, car.where?.spot ?? s.spot, here), aimOf(c, go) ?? accessOf(c, go.tour.to));
   return true;
 }
 
@@ -164,28 +164,7 @@ export function endOfTrip(c: City, leg: Leg): void {
 /** Where its car stands, to set off from. */
 export function carAt(c: City, leg: Leg): Access | null {
   const car = carById(c, leg.car);
-  return car?.where && car.where.spot.access ? car.where.spot.access : null;
-}
-
-/** Whoever is still on the road gets home late. */
-export function lateLeg(c: City, leg: Leg): void {
-  leg.done = true;
-  const spent = c.clock - leg.start;
-  if (spent > leg.free * c.expect.trip) scoreTrip(c, leg, spent * LATE_FACTOR);
-}
-
-/** The small hours: households still out are home, nothing else stands anywhere, every car is in its driveway. */
-export function nightSweep(c: City): void {
-  for (const leg of c.day.legs) {
-    if (leg.done || leg.car === null) continue;
-    lateLeg(c, leg);
-    if (leg.uid >= 0) c.traffic.remove(leg.uid);
-  }
-  c.day.waiting = c.day.waiting.filter((l) => l.car === null);
-  c.day.stays = [];
-  for (const list of c.day.chains.values()) for (const ch of list) ch.now = ch.stops.length + 1;
-  clearStanding(c, (e) => isHome(c, e));
-  parkAllAtHome(c);
+  return car?.where?.spot.access ?? garageAccess(c, car?.garage);
 }
 
 /** Open petrol stations and their queues. */
@@ -223,9 +202,11 @@ export function busyCars(c: City): Set<number> {
 /** A chain's car standing away from home with nobody to drive it drives home now, by road. */
 function driveHome(c: City, ch: Chain, busy: ReadonlySet<number>): void {
   const car = carById(c, ch.car);
-  if (!car?.where || car.leg || car.away || busy.has(car.uid)) return;
+  if (!car || car.leg || car.away || busy.has(car.uid)) return;
+  const from = car.where?.spot.access ?? garageAccess(c, car.garage);
+  if (!from) return;
   const home = ch.home;
-  if ('lot' in home && car.where.spot.key === `lot:${home.lot}`) return;
+  if ('lot' in home && (car.where?.spot.key ?? car.garage) === `lot:${home.lot}`) return;
   const here = ch.stops[Math.max(0, Math.min(ch.now, ch.stops.length - 1))]?.place;
   if (!here) return;
   ch.now = ch.stops.length;
@@ -234,7 +215,7 @@ function driveHome(c: City, ch: Chain, busy: ReadonlySet<number>): void {
   const leg = newLeg(c, t, false, { mode: 'car', minutes: 0, seconds: 0, coins: 0, spot, lines: [] });
   leg.car = car.uid;
   leg.leaving = car.where;
-  drive(c, leg, car.where.spot.access, aimOf(c, leg) ?? accessOf(c, home));
+  drive(c, leg, from, aimOf(c, leg) ?? accessOf(c, home));
 }
 
 /**

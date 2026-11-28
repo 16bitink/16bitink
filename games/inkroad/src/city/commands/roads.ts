@@ -1,3 +1,6 @@
+import { ringOuter } from '../../sim/netCore';
+import { sidewalkWidth } from '../../sim/roadGeom';
+import { junctionMeetsBox, roadMeetsBox } from '../validateRoadRoom';
 import { CELL, ROADS } from '../../sim/constants';
 import { addRoad, planRoad, removeRoad, setRoad } from '../../sim/network';
 import type { Network } from '../../sim/trafficTypes';
@@ -9,7 +12,7 @@ import { commitNetwork } from '../network';
 import type { City } from '../state';
 import { has, roadById } from '../state';
 import { BRIDGE_MATCH, BRIDGE_PER_CELL, BUS_LANE_PER_CELL, KERB_COST, ONE_WAY_COST, REFUND, REMOVE_COST, SQUARE_PER_CELL, TOLL_GATE, TRUCK_BAN_COST, WIDEN, WORKS } from '../tune';
-import { middle, homesBeside, isGround, landFor, needTool, nightRate, no, noAt, priced, roadDig, roadWorks, type Handler } from './shared';
+import { blockedFootprint, middle, homesBeside, isGround, landFor, needTool, nightRate, no, noAt, priced, roadDig, roadWorks, type Handler } from './shared';
 
 const NOISY_CELLS = 1.6;
 export const cellsOf = (r: Road): number => polyLength(r.line) / CELL;
@@ -33,6 +36,8 @@ export const road: Handler<'road'> = {
     if (closed) return no(closed);
     const plan = planRoad(c.net, cmd.cells, cmd.type, { oneWay: cmd.oneWay ?? false, blocked: blockedBy(c) });
     if (!plan.ok) return { ...no(plan.why ?? 'No road fits here'), line: plan.line, ...(plan.at ? { at: plan.at } : {}) };
+    const blocked = plan.level === 0 && blockedFootprint(c, (b) => roadMeetsBox(b, plan.line, { type: cmd.type, oneWay: cmd.oneWay ?? false }));
+    if (blocked) return { ...blocked, line: plan.line };
     const bridge = plan.cellsOnWater * BRIDGE_PER_CELL * (1 + RANK[cmd.type] * 0.5);
     const paid = Math.round(bridge * (BRIDGE_MATCH[c.def.id] ?? 0));
     const council = paid > 0 ? `The Council pays ${paid} of the bridge` : undefined;
@@ -57,8 +62,18 @@ export const upgrade: Handler<'upgrade'> = {
     if (r.works > 0) return no('Men with shovels are here already');
     const widening = RANK[cmd.type] > RANK[r.type];
     if (widening && (!c.def.rules.widen || r.cells.some((x) => c.net.terrain[x.gy]?.[x.gx] === 'h'))) return no('These old walls will not move');
-    const near = widening && RANK[cmd.type] >= RANK.boulevard ? tooNear(c, r) : undefined;
-    if (near) return noAt({ why: `No room: ${near.name} stands too close`, at: rectOf(near) });
+    if (widening) {
+      const next = { ...r, type: cmd.type };
+      const blocked = blockedFootprint(c, (b) => roadMeetsBox(b, next.line, next));
+      if (blocked) return blocked;
+      for (const j of c.net.junctions) {
+        if (j.control !== 'roundabout' || j.arms.length < 3 || !j.arms.includes(r.id)) continue;
+        const arms = j.arms.map((id) => id === r.id ? next : roadById(c, id)!).filter((arm) => !arm.flyover);
+        const reach = ringOuter(arms) + Math.max(...arms.map(sidewalkWidth));
+        const near = blockedFootprint(c, (b) => junctionMeetsBox(b, j.x, j.y, reach));
+        if (near) return near;
+      }
+    }
     const door = cmd.type === 'highway' ? c.lots.find((l) => l.access?.road === r.id) : undefined;
     if (door) return noAt({ why: `The driveway of ${door.name} opens here: not onto a highway`, at: rectOf(door) });
     const per = Math.max(2, ROADS[cmd.type].cost - ROADS[r.type].cost * WIDEN.keep);
@@ -77,11 +92,6 @@ export const upgrade: Handler<'upgrade'> = {
 const wetCells = (c: City, r: Road): number => r.cells.filter((x) => c.net.terrain[x.gy]?.[x.gx] === '~').length;
 
 const rectOf = (l: Lot): CellRect => ({ gx: l.gx, gy: l.gy, w: l.w, h: l.h });
-
-/** A boulevard is 54 px wide: the block that stands too close for it. */
-function tooNear(c: City, r: Road): Lot | undefined {
-  return c.lots.find((l) => l.level > 0 && r.line.some((p) => Math.abs(p.x - (l.gx + l.w / 2) * CELL) < (l.w / 2) * CELL + 24 && Math.abs(p.y - (l.gy + l.h / 2) * CELL) < (l.h / 2) * CELL + 24));
-}
 
 export const oneWay: Handler<'oneWay'> = {
   quote(c, cmd) {

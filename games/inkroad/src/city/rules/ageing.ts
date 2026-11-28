@@ -91,7 +91,7 @@ export function tickHoles(c: City): void {
     const roll = (mixSeed(c.seed, c.year, c.season, second, r.id) % 10000) / 10000;
     if (roll >= (AGE.poor - cond) * AGE.holeChance * Math.min(2, c.traffic.roadStats(r.id).flow / 12)) continue;
     const s = polyLength(r.line) * (0.3 + 0.4 * ((second % 10) / 10));
-    if (c.traffic.block({ road: r.id, s }, AGE.holeSeconds * (has(c, 'tow') ? 0.45 : 1), 3) < 0) continue;
+    if (c.traffic.block({ road: r.id, s }, AGE.holeSeconds * (has(c, 'tow') ? 0.45 : 1), 4) < 0) continue;
     setRuleDay(c, { holes: ruleDay(c).holes + 1 });
     c.day.stats.crashes += AGE.holeCrash;
     sore(c, { bar: 'streets', kind: 'pothole', at: midOf(r), weight: 2.2, lot: null, n: Math.round(cond * 100) });

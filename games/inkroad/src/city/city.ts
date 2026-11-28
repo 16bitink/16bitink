@@ -47,7 +47,7 @@ const baseLots = (def: CityDef, seed: number): readonly Lot[] => def.lots.map((l
 function newCity(def: CityDef, seed: number): City {
   const net0 = createNetwork(def.map, def.roads.filter((r) => (r.opensYear ?? 1) === 1), def.gates);
   const c: City = {
-    def, seed, dice: createDice(mixSeed(seed, 1)), net: net0, traffic: createTraffic(net0, seed), year: 1, season: 0, month: 0, phase: 'yearStart', clock: 0, carry: 0,
+    def, seed, dice: createDice(mixSeed(seed, 1)), net: net0, traffic: createTraffic(net0, seed, true), year: 1, season: 0, month: 0, phase: 'yearStart', clock: 0, carry: 0,
     nextId: 1, lots: baseLots(def, seed), parks: [], lines: [], projects: [], money: def.startMoney, approval: START_APPROVAL,
     bars: START_BARS, opening: { bars: START_BARS, approval: START_APPROVAL }, lastBars: { ...START_BARS, approval: START_APPROVAL }, yearApprovals: [], yearHabits: [], letters: [], plates: [],
     prices: START_PRICES, priceBase: START_PRICES, policies: { inspectors: 0, permits: false, truckHours: false, nightWorks: false, taxis: 0 },
@@ -66,7 +66,7 @@ function loadCity(def: CityDef, saved: unknown): City | null {
   if (problem) { console.warn(`InkRoad: save not used (${problem})`); return null; }
   const s = save as CitySave;
   const fields = restoreFields(def, s, baseLots(def, s.seed));
-  const c: City = { ...fields, traffic: createTraffic(fields.net, s.seed) };
+  const c: City = { ...fields, traffic: createTraffic(fields.net, s.seed, true) };
   freshTraffic(c);
   if (c.phase === 'day') startDay(c);
   return c;

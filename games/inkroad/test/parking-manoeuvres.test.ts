@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { STEP } from '../src/sim/constants';
+import { paramsOf, rearOf } from '../src/sim/vehicle/params';
 import { createTraffic } from '../src/sim/traffic';
 import type { Traffic } from '../src/sim/trafficTypes';
 import type { ParkingView, Pt } from '../src/sim/types';
@@ -82,6 +83,24 @@ describe('parking manoeuvres in traffic', () => {
     for (let k = 0; k < steps(3); k++) t.step();
     const p = t.poseOf(uid);
     expect(p === null || (t.cars.state[slotIndex(t, uid)] === 0 && Math.hypot(p.x - start.x, p.y - start.y) > 5)).toBe(true);
+  });
+
+  it('carries a forward merge’s speed into the first traffic frame', () => {
+    const net = cross(10);
+    const t = createTraffic(net, 1);
+    const req = { from: { road: armTo(net, W), s: 200 }, to: { gate: gateNode(net, 'E') }, kind: 'car' as const, value: 1, tag: 3 };
+    const lane = t.entryPose(req)!;
+    const speed = 12;
+    const end = { ...rearOf(paramsOf('car'), lane.x, lane.y, lane.a), th: lane.a, u: speed, dir: 1 as const, delta: 0, a: 0 };
+    const uid = t.spawn({ ...req, hold: PARK_OUT, pose: lane, mergeEnd: end });
+    expect(uid).toBeGreaterThan(0);
+    const i = slotIndex(t, uid);
+    for (let k = 0; t.cars.state[i] === 4 && k < steps(2); k++) t.step();
+    expect(t.cars.state[i]).toBe(0);
+    expect(t.cars.speed[i]!).toBeGreaterThanOrEqual(speed - 0.2);
+    const frames = t.framesOf(uid)!;
+    expect(Math.hypot(frames[0]! - lane.x, frames[1]! - lane.y)).toBeLessThan(0.01);
+    expect(Math.hypot(frames.at(-3)! - lane.x, frames.at(-2)! - lane.y)).toBeGreaterThan(speed * STEP * 0.9);
   });
 });
 

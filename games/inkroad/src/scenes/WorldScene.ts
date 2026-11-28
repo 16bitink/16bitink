@@ -241,8 +241,7 @@ export class WorldScene extends Phaser.Scene {
   private startMoves(list: readonly CityEvent[]): void {
     let synced = false;
     for (const e of list) {
-      if (e.t === 'phase') this.moves.dropWaiting(); // the season's end; the night keeps everyone, they drive home
-      else if (e.t === 'parkGo') { this.moves.go(e); if (e.uid !== undefined) this.cars.expect(e.uid); }
+      if (e.t === 'parkGo') this.moves.go(e);
       else if (e.t === 'park') {
         if (!synced) { this.parked.sync(this.city); synced = true; } // an `in` car is in its slot already
         this.moves.start(e);

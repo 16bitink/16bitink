@@ -2,10 +2,11 @@
 import { GIVE_UP, STEP } from './constants';
 import { toDest } from './drive';
 import { hasRoom } from './grant';
+import { ringExit } from './ringBuild';
 import { nextTrack } from './path';
 import { receipt, type Sim } from './sim';
-import { driveCar, refAt } from './drawn';
-import { LANE_T, TURN_T, type Track } from './track';
+import { driveCar, placeDrawn, refAt } from './drawn';
+import { ENTRY_T, LANE_T, TURN_T, type Track } from './track';
 import { ANGER_FULL, HONK_AT, REROUTE_AFTER } from './tune';
 import { laneS, type LinkRt } from './world';
 import { runsWith } from './routes';
@@ -41,14 +42,29 @@ export function plan(sim: Sim, i: number, l: LinkRt): void {
   c.opt[i] = sim.routes.choose(c.field[i]!, c.value[i]!, l, c.uid[i]!);
 }
 
-/** A car stuck too long leaves the road (its receipt keeps where it was drawn, so the city can turn it in at a building). */
+/** Keep the last driven pose when no legal manoeuvre is available. */
+export function stopHere(sim: Sim, i: number): void {
+  const c = sim.cars;
+  c.revoke(i);
+  c.arrived[i] = 0;
+  c.state[i] = 3;
+  c.until[i] = Infinity;
+  c.v[i] = 0;
+  c.play[i] = c.reserve[i] = null;
+  c.mergeEnd.delete(i);
+  placeDrawn(sim, i, c.x[i]!, c.y[i]!, c.heading[i]!);
+}
+
+/** A driver gives up the trip. The city either pulls the car over or leaves it at the stopped pose. */
 export function giveUp(sim: Sim, i: number): void {
-  if (sim.cars.service[i]! >= 0) { sim.services.lost(i); return; }
-  if (sim.cars.state[i]! < 2) {
+  const c = sim.cars;
+  if (c.service[i]! >= 0) { sim.services.lost(i); return; }
+  if (c.state[i]! < 2) {
     sim.measure.gaveUp(i);
     sim.gaveUp.push(receipt(sim, i));
   }
-  sim.cars.drop(i);
+  if (sim.preserveCars && c.tag[i]! >= 0) stopHere(sim, i);
+  else c.drop(i);
 }
 
 // ---------------------------------------------------------------- track to track
@@ -114,7 +130,7 @@ export function move(sim: Sim, i: number): void {
   c.travel[i] = 0;
   if (c.play[i] && holdTurning(sim, i)) { if (!c.play[i]) driveCar(sim, i, true); return; }
   if (c.playGoal[i] === WAIT_TURN && waitToTurn(sim, i, rolled)) { if (!c.play[i]) driveCar(sim, i, true); return; }
-  if (c.state[i] === 4) { c.v[i] = 0; return; }
+  if (c.state[i]! >= 2) { c.v[i] = 0; return; }
   driveCar(sim, i);
   if (c.arrived[i]) return;
   const d = toDest(sim, i);
@@ -197,6 +213,7 @@ function tryAnotherWay(sim: Sim, i: number): void {
   const conn = o.conn[t.lane];
   c.rerouted[i] = sim.time;
   if (conn?.to && conn.kind === TURN_T && hasRoom(sim, i, conn.to)) return;
+  if (conn?.kind === ENTRY_T && hasRoom(sim, i, ringExit(sim.world.nodes[conn.node]!.ring!.arms[o.exitArm]!, conn.lane).to!)) return;
   const l = sim.world.links[t.link]!;
   const lanes = (q: typeof o): boolean => q !== o && t.lane >= q.lo && t.lane <= q.hi && !!q.conn[t.lane] && hasRoom(sim, i, q.to.lanes[0]!);
   const other = sim.routes.choose(c.field[i]!, c.value[i]!, l, c.uid[i]!, lanes);
@@ -210,6 +227,7 @@ function settleLane(sim: Sim, i: number): void {
   const o = c.opt[i];
   if (!o || c.granted[i] || t.kind !== LANE_T || t.len - c.s[i]! > 34) return;
   const l = sim.world.links[t.link]!;
+  if (l.node.kind === 'ring' && o.conn[t.lane]) return;
   if (t.lane >= l.carLanes || (t.lane >= o.lo && t.lane <= o.hi && o.conn[t.lane])) return;
   const inLane = sim.routes.choose(c.field[i]!, c.value[i]!, l, c.uid[i]!, (q) => t.lane >= q.lo && t.lane <= q.hi && !!q.conn[t.lane]);
   if (inLane) c.opt[i] = inLane;

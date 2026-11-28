@@ -27,11 +27,10 @@ export class Manoeuvres {
 
   start(e: ParkEvent): void { this.core.start(e); this.paint(); }
   go(e: GoEvent): void { this.core.go(e); }
-  dropWaiting(): void { this.core.dropWaiting(); }
 
   /** `seconds`: sim seconds since last frame (zero while paused). */
   update(seconds: number): void {
-    this.core.update(seconds);
+    this.core.update(seconds, (uid) => this.cars.holdingLane(uid));
     this.paint();
   }
 
@@ -47,7 +46,6 @@ export class Manoeuvres {
     for (let i = 0; i < this.core.active; i++) {
       const m = this.core.at(i);
       dressCar(m.tag, this.cars, m.kind, m.tint, m.px, m.py, m.pa);
-      m.tag.setAlpha(m.alpha);
     }
   }
 }

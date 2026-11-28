@@ -24,6 +24,7 @@ import { yearMeanApproval, yearPlates } from './settle';
 import type { City } from './state';
 import { emit, emptyLedger } from './state';
 import { offerTechs } from './techs';
+import { captureParkedPoses } from './network';
 import { blockedBy } from './net';
 import { AUCTION } from './tune';
 import { NO_VOTE } from './zone';
@@ -65,12 +66,13 @@ function councilRoads(c: City, net: Network): Network {
   return out;
 }
 
-/** March, the Council's new year: roads and districts open, the year card goes up. A fresh traffic run keeps saves exact. */
+/** March: roads and districts open and the Council's year card goes up. */
 export function beginYear(c: City): void {
   c.season = 0;
   c.month = 0;
   c.phase = 'yearStart';
   c.clock = 0;
+  if (c.day.endedAt !== undefined) captureParkedPoses(c);
   clearForRoads(c);
   c.net = councilRoads(c, c.net);
   settlePlots(c);
@@ -82,22 +84,31 @@ export function beginYear(c: City): void {
   c.techChoices = [];
   c.ledger = emptyLedger();
   offerCommissions(c);
-  // Last year's parked cars are gone, as they are in a city loaded from its save.
-  c.day = emptyDay();
-  freshTraffic(c);
+  if (c.day.endedAt === undefined) {
+    c.day = emptyDay();
+    freshTraffic(c);
+  } else {
+    c.net = shapeNet(c, c.net);
+    refreshAccess(c);
+    repairLines(c);
+    c.traffic.setNetwork(c.net);
+    syncServices(c);
+    buildSpots(c);
+    c.parking = parkingView(c);
+  }
   yearRules(c);
   emit(c, { t: 'phase', phase: 'yearStart' });
 }
 
 export function freshTraffic(c: City): void {
   c.net = shapeNet(c, c.net);
-  c.traffic = createTraffic(c.net, mixSeed(c.seed, c.year));
+  c.traffic = createTraffic(c.net, mixSeed(c.seed, c.year), true);
   c.services = new Map();
   refreshAccess(c);
   repairLines(c);
   syncServices(c);
   buildSpots(c);
-  // Every household car is at home: at a year start and in a city loaded from its save.
+  // A newly initialized city starts with household cars at home.
   c.fleet = buildFleet(c);
   parkAllAtHome(c);
   c.parking = parkingView(c);

@@ -18,6 +18,10 @@ export function halfWidth(road: Pick<Road, 'type' | 'oneWay' | 'flyover'>): numb
   return ROADS[road.type].lanes * LANE + (road.oneWay ? 0 : MEDIAN[road.type] / 2);
 }
 
+/** Width outside the asphalt occupied by paving or a shoulder. */
+export const sidewalkWidth = (road: Pick<Road, 'type' | 'flyover'>): number =>
+  road.flyover ? 1.5 : road.type === 'highway' ? 2.5 : 5.5;
+
 /** How far right of the road's centre line (in the link's direction) lane i runs; lane 0 is leftmost. */
 export function laneOffset(road: Pick<Road, 'type' | 'oneWay' | 'flyover'>, i: number): number {
   const n = lanesPerLink(road);

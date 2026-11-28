@@ -1,7 +1,7 @@
 // The browser-level teleport detector. Records every drawn car each frame (car-layer cars by traffic uid, parked
 // pictures by uid, manoeuvre pictures by uid) and flags any car drawn more than JUMP px plus its speed from where it
 // was drawn last frame, across the hand-offs car layer -> manoeuvre -> parked picture and back, and any car that
-// appears or vanishes away from a gate or a building's mouth (a fade). Runs at 1x, with pauses, then at 4x.
+// appears or vanishes away from a gate or a building entrance. Runs at 1x, with pauses, then at 4x.
 //   node dev/teleSnap.mjs [--q "year=3&warm=20"] [--secs 30] [--base http://localhost:5187/view.html] [--zoom 1.6]
 // Needs the dev server (vite on 5187: `npx vite dev --port 5187` in games/inkroad). Exit code 1 when anything jumps.
 import { chromium } from 'playwright-core';
@@ -18,7 +18,7 @@ await page.waitForFunction(() => window.__ready === true, null, { timeout: 90000
 await page.evaluate((zoom) => {
   const JUMP = 3; // px a drawn car may be off its last frame's place, beyond what its speed allows
   const SPEED_SLACK = 1.6; // its speed this frame may be this much more than last step's (it speeds up)
-  const FADED = 0.12; // an alpha this low is a car fading at a gate or into a building's mouth
+  const FADED = 0.12; // the camera fade and covered road segments can hide cars
   const EDGE = 50; // px inside the camera view a car must be to count (the rest may leave the view)
   const GATE = 90;
   const ir = window.__ir, scene = ir.scene, city = ir.city;
@@ -34,13 +34,16 @@ await page.evaluate((zoom) => {
     for (const sh of scene.parked.shown.values()) {
       let used = 0;
       for (const car of sh.view.cars) {
-        if (scene.parked.held.has(car.uid)) continue;
+        if (car.indoor || scene.parked.held.has(car.uid) || !scene.parked.poses.has(car.uid)) continue;
         const img = sh.imgs[used++];
         if (img && img.visible) out.set(`p${car.uid}`, { x: img.x, y: img.y, a: img.alpha, v: 0 });
       }
     }
-    const m = scene.moves;
-    for (let i = 0; i < m.live; i++) { const a = m.pool[i]; if (a.img.visible) out.set(`m${a.uid}`, { x: a.img.x, y: a.img.y, a: a.img.alpha, v: 30 }); }
+    const moves = scene.moves.core;
+    for (let i = 0; i < moves.active; i++) {
+      const move = moves.at(i);
+      if (move.tag.visible) out.set(`m${move.uid}`, { x: move.tag.x, y: move.tag.y, a: move.tag.alpha, v: 30 });
+    }
     return out;
   }
   scene.events.on('postupdate', () => {
@@ -65,7 +68,6 @@ await page.evaluate((zoom) => {
         continue;
       }
       if (!inView(p) || p.a < FADED || nearGate(p)) continue;
-      if (k[0] === 'c' && p.a < 0.5) continue; // a car layer car fading in: only gate spawns fade now
       if (!near(p, last, JUMP + 30 * SPEED_SLACK * dtSim + 2)) flag(`${k[0]} appears`, { k, x: Math.round(p.x), y: Math.round(p.y) });
     }
     for (const [k, p] of last) {

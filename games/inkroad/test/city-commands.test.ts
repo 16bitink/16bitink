@@ -1,3 +1,6 @@
+import { FRONT_STREET_SETBACK, insetRect, lotRect } from '../src/city/geometry';
+import { junctionMeetsBox } from '../src/city/validateRoadRoom';
+import { sidewalkWidth } from '../src/sim/roadGeom';
 import { describe, expect, it } from 'vitest';
 import type { Command, TransitMode } from '../src/sim/types';
 import { PAID_CITIES } from '../content/paid';
@@ -67,6 +70,20 @@ describe('roads', () => {
 });
 
 describe('junctions', () => {
+  it('keeps the buildings and sidewalk clear when a Saffron roundabout grows with its avenue', () => {
+    const v = cityAtYear(3);
+    const node = at(v, 22, 18);
+    const road = roadThrough(v, 22, 20);
+    const parcels = v.lots.filter((lot) => lot.level > 0).map(lotRect);
+    ok(v, { t: 'control', node, control: 'roundabout' });
+    ok(v, { t: 'upgrade', road: road.id, type: 'avenue' });
+    const j = v.junctions.find((n) => n.id === node)!;
+    const reach = j.radius + sidewalkWidth(road);
+    expect(parcels.some((b) => junctionMeetsBox(b, j.x, j.y, reach))).toBe(true);
+    expect(parcels.some((b) => junctionMeetsBox(insetRect(b, FRONT_STREET_SETBACK), j.x, j.y, reach))).toBe(false);
+    expect(v.lots.filter((lot) => lot.level > 0).map(lotRect)).toEqual(parcels);
+  });
+
   it('circle, signals, green split, and no smart ones without the technology', () => {
     const v = cityAtYear(4);
     const node = at(v, 22, 18);

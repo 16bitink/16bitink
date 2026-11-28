@@ -1,7 +1,7 @@
 /** Right of way: who may leave the stop line now. */
 import { ENTRY_T, LANE_T, poseAt, type Track } from './track';
 import { IDM, PATIENCE, RING, SIGNAL, YIELD } from './tune';
-import { ringExitLane } from './ringBuild';
+import { ringExit, ringConflictEnd, ringJoinPace, ringWay } from './ringBuild';
 import type { NodeRt, OutOpt } from './world';
 import type { Sim } from './sim';
 import { MOTION_SWITCHES } from './switches';
@@ -23,9 +23,9 @@ export function hasRoom(sim: Sim, i: number, lane: Track): boolean {
   return free >= lane.incoming + c.need(i);
 }
 
-const exitOf = (sim: Sim, i: number, conn: Track, o: OutOpt): { lane: Track; exit: Track | null } => {
+const exitOf = (sim: Sim, conn: Track, o: OutOpt): { lane: Track; exit: Track | null } => {
   if (conn.kind !== ENTRY_T) return { lane: conn.to!, exit: null };
-  const exit = ringExitLane(sim.world.nodes[conn.node]!.ring!.arms[o.exitArm]!);
+  const exit = ringExit(sim.world.nodes[conn.node]!.ring!.arms[o.exitArm]!, conn.lane);
   return { lane: exit.to!, exit };
 };
 
@@ -58,12 +58,12 @@ export function askWay(sim: Sim, i: number): boolean {
   if (conn.free && conn.node >= 0 && sim.world.nodes[conn.node]!.kind === 'free') return true;
   if (d > askWhen(sim, i, conn)) return false;
   if (c.ticket[i] === 0) c.ticket[i] = sim.time;
-  const { lane, exit } = exitOf(sim, i, conn, o);
+  const { lane, exit } = exitOf(sim, conn, o);
   if (!hasRoom(sim, i, lane)) return false;
   // A turn-round folds back on itself: one car in it at a time.
   if (conn.turnRound && conn.occ.length > 0) return false;
   const n = sim.world.nodes[conn.node]!;
-  const ok = conn.free || (n.kind === 'ring' ? ringClear(sim, i, conn, n, d) : turnClear(sim, i, conn, n, d));
+  const ok = conn.free || (n.kind === 'ring' ? ringClear(sim, i, conn, exit!, n, d) : turnClear(sim, i, conn, n, d));
   if (ok) {
     grant(sim, i, conn, lane, exit);
     n.lastWay = sim.time;
@@ -176,17 +176,17 @@ function yieldsTo(sim: Sim, i: number, conn: Track, other: Track, n: NodeRt, d: 
 // ---------------------------------------------------------------- roundabouts
 
 /** Cars on the ring or promised a place: a full ring would lock. */
-function ringLoad(n: NodeRt): number {
+function ringLoad(n: NodeRt, lane: number): number {
   let sum = 0;
   for (const a of n.ring!.arms) {
-    sum += a.arc.count + a.span.count;
-    for (const e of a.entries) sum += e.occ.length;
+    sum += a.arcs[lane]!.count + a.spans[lane]!.count;
+    for (const e of a.entries) if (e.lane === lane) sum += e.occ.length;
   }
   return sum;
 }
 
 /** A driver who has just come lets in one who has waited far too long at another entry. */
-function waitsForStarved(sim: Sim, i: number, n: NodeRt): boolean {
+function waitsForStarved(sim: Sim, i: number, n: NodeRt, entry: Track, exit: Track): boolean {
   const c = sim.cars;
   const enough = Math.max(RING.starving, sim.time - c.ticket[i]! + RING.fresh);
   for (const a of n.ring!.arms) {
@@ -194,35 +194,62 @@ function waitsForStarved(sim: Sim, i: number, n: NodeRt): boolean {
       const q = e.from!.head;
       if (q < 0 || q === i || c.granted[q] || c.ticket[q] === 0 || sim.time - c.ticket[q]! < enough) continue;
       const o = c.opt[q];
-      if (o && o.exitArm >= 0 && o.conn[e.from!.lane] === e && hasRoom(sim, q, ringExitLane(n.ring!.arms[o.exitArm]!).to!)) return true;
+      if (!o || o.exitArm < 0 || o.conn[e.from!.lane] !== e) continue;
+      const leave = ringExit(n.ring!.arms[o.exitArm]!, e.lane);
+      if (!hasRoom(sim, q, leave.to!)) continue;
+      if (e.lane === entry.lane || movementsConflict(entry, exit, e, leave)) return true;
     }
   }
   return false;
 }
 
 /** Nothing on the ring near enough to be cut up, going back RING.back px from the entry. */
-function ringClear(sim: Sim, i: number, conn: Track, n: NodeRt, d: number): boolean {
+function ringClear(sim: Sim, i: number, conn: Track, exit: Track, n: NodeRt, d: number): boolean {
   const c = sim.cars;
   const arms = n.ring!.arms;
   const arm = arms[conn.arm]!;
-  if (ringLoad(n) >= n.ring!.max || waitsForStarved(sim, i, n)) return false;
-  for (const e of arm.entries) if (e !== conn && e.occ.length > 0) return false;
-  const tail = arm.arc.tail;
+  const lane = conn.lane;
+  if (ringLoad(n, lane) >= n.ring!.max[lane]! || waitsForStarved(sim, i, n, conn, exit)) return false;
+  if (n.ring!.max.length > 1 && !ringCrossingsClear(sim, conn, exit, n)) return false;
+  // Different approaches from the same road share a merge. Followers on the same entry keep their gap.
+  if (arm.entries.some((e) => e !== conn && e.lane === lane && e.occ.length > 0)) return false;
+  const tail = arm.arcs[lane]!.tail;
   if (tail >= 0 && c.s[tail]! - c.half[tail]! + c.v[tail]! * 0.6 < c.len[i]! * 0.7) return false;
   const gap = gapNow(sim.time - c.ticket[i]!, RING.gap);
-  const mine = timeTo(Math.max(0, d) + conn.len, c.v[i]!, conn.vmax);
+  const mine = timeTo(Math.max(0, d) + conn.len, c.v[i]!, ringJoinPace(conn));
   let back = 0;
   for (let k = 0; k < arms.length && back < RING.back; k++) {
     const at = arms[(conn.arm - k + arms.length) % arms.length]!;
     if (k > 0) {
-      if (anyBlocks(sim, at.arc, back, k, arms.length, mine, gap)) return false;
-      back += at.arc.len;
-      for (const e of at.entries) if (entering(sim, e, back, k, arms.length, mine, gap)) return false;
+      if (anyBlocks(sim, at.arcs[lane]!, back, k, arms.length, mine, gap)) return false;
+      back += at.arcs[lane]!.len;
+      for (const e of at.entries) if (e.lane === lane && entering(sim, e, back, k, arms.length, mine, gap)) return false;
     }
-    if (anyBlocks(sim, at.span, back, k, arms.length, mine, gap)) return false;
-    back += at.span.len;
+    if (anyBlocks(sim, at.spans[lane]!, back, k, arms.length, mine, gap)) return false;
+    back += at.spans[lane]!.len;
   }
   return true;
+}
+
+/** Reserve crossing movements before entering, so nobody has to stop across a circulating lane. */
+function ringCrossingsClear(sim: Sim, entry: Track, exit: Track, n: NodeRt): boolean {
+  const c = sim.cars;
+  const path = ringWay(entry, exit);
+  for (const part of n.ring!.tracks) {
+    if (part.lane === entry.lane) continue;
+    for (const q of part.occ) {
+      const leave = c.exitBy[q];
+      if (!leave) continue;
+      const rear = c.track[q] === part ? c.s[q]! - c.body[q]! - Math.max(0, c.lag[q]!) : 0;
+      if (ringWay(part, leave).some((a) => path.some((b) => ringConflictEnd(a, b) >= (a === part ? rear : 0)))) return false;
+    }
+  }
+  return true;
+}
+
+function movementsConflict(entry: Track, exit: Track, other: Track, leave: Track): boolean {
+  const path = ringWay(entry, exit);
+  return ringWay(other, leave).some((a) => path.some((b) => ringConflictEnd(a, b) >= 0));
 }
 
 /** Seconds to drive `d` px from speed v, pulling away at the sim's rate up to `top` (an entry's own cap). */
@@ -261,6 +288,6 @@ function anyBlocks(sim: Sim, t: Track, back: number, hops: number, arms: number,
 function blocks(sim: Sim, q: number, dq: number, mine: number, gap: number): boolean {
   const c = sim.cars;
   // A slow ring car is about to pick up to the ring's own speed (never assumed faster than the ring is driven).
-  const v = Math.max(Math.min(RING.assume, c.track[q]!.vmax), c.v[q]!);
-  return (dq - c.half[q]!) / v < mine + gap * RING.ahead && (dq + c.half[q]!) / v > mine - gap * RING.behind;
+  const v = Math.max(Math.min(RING.assume, ringJoinPace(c.track[q]!)), c.v[q]!);
+  return (dq - c.body[q]!) / v < mine + gap * RING.ahead && (dq + c.half[q]!) / v > mine - gap * RING.behind;
 }

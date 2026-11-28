@@ -6,6 +6,7 @@ import type { Played } from './vehicle/played';
  * src/city decides who drives, where they park and what it costs; Traffic only
  * moves what it is given and measures it.
  */
+import type { CarState } from './vehicle/bicycle';
 import type { Body } from './vehicleSize';
 import type {
   CarsView, Cell, CellRect, Control, Id, Junction, JunctionStats, Level, Link, Movement, Pt, Road, RoadDef, RoadStats, RoadType, Terrain, VehicleKind,
@@ -73,6 +74,8 @@ export interface SpawnRequest {
   readonly to: Access;
   readonly kind: VehicleKind;
   readonly tint?: number;
+  /** A resident keeps the same driving preferences across trips. */
+  readonly driver?: number;
   /** Money the driver would pay to save one second (tolls in routing). */
   readonly value: number;
   /** Opaque to Traffic; comes back on the arrival. */
@@ -84,6 +87,8 @@ export interface SpawnRequest {
   readonly hold?: number;
   /** Where the car is drawn when it appears (the end of its played move out, the body's middle): it goes on from there. */
   readonly pose?: LanePose;
+  /** State at the end of the played merge, applied when its lane hold ends. */
+  readonly mergeEnd?: CarState;
 }
 
 /** Where a car stands in its lane: plan px and heading (radians, 0 = east, clockwise). */
@@ -109,6 +114,8 @@ export interface Traffic {
   remove(uid: number): void;
   /** An arrived car turns into its space: it holds its lane where it stopped (state 4) for `seconds`, then is gone. False: no such car. */
   park(uid: number, seconds: number): boolean;
+  /** Leave the same vehicle visibly stopped at its last drawn pose. */
+  stop(uid: number): void;
   /** The drawn frames of a car through the last step (x, y, heading each, SUB + 1 of them), or null. */
   framesOf(uid: number): Float64Array | null;
   /** Where a car on the road stands now, or null. */
@@ -144,9 +151,9 @@ export interface Traffic {
   /** uids now on the road, for `trace`. */
   carsOn(road: Id): readonly number[];
   routeOf(uid: number): { readonly tag: number; readonly seconds: number; readonly waited: number } | null;
-  /** Clear the day's measurements (dawn) or every car (night). */
-  startDay(): void;
-  endDay(): void;
+  /** Start or finish measurements, optionally preserving the live traffic. */
+  startDay(keepCars?: boolean): void;
+  endDay(keepCars?: boolean): void;
 }
 
 /** The sweeps as the city sees them: times are seconds from now. Ids: the city's car uids (positive). */

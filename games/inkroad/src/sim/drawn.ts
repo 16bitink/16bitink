@@ -249,9 +249,16 @@ export function placeDrawn(sim: Sim, i: number, x: number, y: number, a: number)
   const p = paramsOfKind(c.kind[i]!);
   store(c, i, { x: x - p.toMiddle * Math.cos(a), y: y - p.toMiddle * Math.sin(a), th: a, u: 0, dir: 1, delta: 0, a: 0 });
   const o = i * (SUB + 1) * FRAME_STRIDE;
-  for (let k = 0; k <= SUB; k++) { c.frames[o + k * FRAME_STRIDE] = x; c.frames[o + k * FRAME_STRIDE + 1] = y; c.frames[o + k * FRAME_STRIDE + 2] = a; c.frames[o + k * FRAME_STRIDE + 3] = 0; }
+  for (let k = 0; k <= SUB; k++) { c.frames[o + k * FRAME_STRIDE] = x; c.frames[o + k * FRAME_STRIDE + 1] = y; c.frames[o + k * FRAME_STRIDE + 2] = a; c.frames[o + k * FRAME_STRIDE + 3] = c.z[i]!; }
   c.fOn[i] = HELD;
   c.x[i] = x; c.y[i] = y; c.heading[i] = a; c.speed[i] = 0;
+}
+
+/** Continue from the final frame of a forward merge, including acceleration and steering. */
+export function resumeMerge(c: CarStore, i: number, end: CarState): void {
+  store(c, i, end);
+  c.fOn[i] = 1;
+  c.v[i] = c.speed[i] = end.u;
 }
 
 /** The car set on its reference at progress m (the body's middle), at its sim speed, as frame 0. */

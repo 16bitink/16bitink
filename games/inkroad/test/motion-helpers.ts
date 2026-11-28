@@ -210,8 +210,7 @@ export class MotionWatch {
   private play(evs: readonly CityEvent[]): void {
     for (const e of evs) {
       if (env('MOTION_UID') && (e.t === 'park' || e.t === 'parkGo') && e.car === Number(env('MOTION_UID'))) console.log(`EV @${this.v.clock.toFixed(1)} ${JSON.stringify(e)}`);
-      if (e.t === 'phase') this.core.dropWaiting();
-      else if (e.t === 'parkGo') { this.core.go(e); if (e.uid !== undefined) this.handed.set(e.uid, e.car); }
+      if (e.t === 'parkGo') { this.core.go(e); if (e.uid !== undefined) this.handed.set(e.uid, e.car); }
       else if (e.t === 'park') this.core.start(e);
     }
   }
@@ -234,10 +233,13 @@ export class MotionWatch {
   private frameAt(t: number): void {
     this.frame++;
     this.frames++;
-    this.core.update(DT);
+    const c = this.v.cars;
+    this.core.update(DT, (uid) => {
+      const i = c.uid.indexOf(uid);
+      return i >= 0 && c.alive[i] === 1 && c.state[i] === HOLDING;
+    });
     if (this.places.dirty) { this.places.redo(this.v); this.places.dirty = false; }
     const drawn: Drawn[] = [];
-    const c = this.v.cars;
     for (let i = 0; i < this.seen.length; i++) {
       const uid = this.seen[i];
       if (!uid) continue;
