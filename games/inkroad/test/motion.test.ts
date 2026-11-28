@@ -25,9 +25,9 @@ function harbourAt(year: number): CityView {
  * Real widths and lanes: rebased down only; the rises are explained in docs/inkroad-vehicle-model.md "Real widths and real lanes".
  */
 const CEILING: Readonly<Record<string, Readonly<Record<string, number>>>> = {
-  'Saffron Bay year 3': { 'bodies overlap (manoeuvre)': 1438, 'bodies overlap (moving)': 2662, 'cuts across without a gap (manoeuvre)': 6, 'jerks (manoeuvre)': 31, 'pulls away too hard (manoeuvre)': 1, 'reverses across a lane (manoeuvre)': 9, 'steers too fast (manoeuvre)': 1 },
-  'Saffron Bay year 6': { 'bodies overlap (manoeuvre)': 3324, 'bodies overlap (moving)': 8415, 'cuts across without a gap (manoeuvre)': 16, 'jerks (manoeuvre)': 55, 'pulls away too hard (manoeuvre)': 6, 'reverses across a lane (manoeuvre)': 19, 'too fast on a curve (moving)': 39 },
-  'Old Harbour year 4': { 'bodies overlap (manoeuvre)': 2999, 'bodies overlap (moving)': 1843, 'cuts across without a gap (manoeuvre)': 12, 'jerks (manoeuvre)': 41, 'pulls away too hard (manoeuvre)': 2, 'reverses across a lane (manoeuvre)': 9, 'steers too fast (manoeuvre)': 2, 'too fast on a curve (moving)': 334 },
+  'Saffron Bay year 3': { 'bodies overlap (manoeuvre)': 533, 'bodies overlap (moving)': 143, 'cuts across without a gap (manoeuvre)': 6, 'jerks (manoeuvre)': 31, 'pulls away too hard (manoeuvre)': 1, 'reverses across a lane (manoeuvre)': 9 },
+  'Saffron Bay year 6': { 'bodies overlap (manoeuvre)': 3324, 'bodies overlap (moving)': 8103, 'cuts across without a gap (manoeuvre)': 16, 'jerks (manoeuvre)': 55, 'pulls away too hard (manoeuvre)': 5, 'reverses across a lane (manoeuvre)': 19, 'too fast on a curve (moving)': 39 },
+  'Old Harbour year 4': { 'bodies overlap (manoeuvre)': 2999, 'bodies overlap (moving)': 1713, 'cuts across without a gap (manoeuvre)': 8, 'jerks (manoeuvre)': 41, 'pulls away too hard (manoeuvre)': 2, 'reverses across a lane (manoeuvre)': 9, 'too fast on a curve (moving)': 334 },
 };
 
 const CASES: readonly { readonly name: string; readonly make: () => CityView }[] = [

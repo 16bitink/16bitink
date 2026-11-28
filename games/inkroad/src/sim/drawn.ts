@@ -7,9 +7,10 @@
  */
 import { STEP } from './constants';
 import { nextTrack } from './path';
+import { capAhead } from './trackCaps';
 import type { Sim } from './sim';
 import { FRAME_STRIDE, SUB, type CarStore } from './store';
-import type { Track } from './track';
+import { LANE_T, type Track } from './track';
 import { followInto, startOn } from './vehicle/follow';
 import { playedAt, type MutablePose } from './vehicle/played';
 import { sweepBehind } from './turning';
@@ -70,6 +71,22 @@ function lineAt(t: Track, s: number): void {
   REF.k = (t.hs[i + 1]! - t.hs[i]!) * t.inv;
   const over = s < 0 ? s : s > t.len ? s - t.len : 0;
   if (over !== 0) { REF.x += over * Math.cos(h); REF.y += over * Math.sin(h); REF.k = 0; }
+}
+
+/**
+ * The speed a drawn car at progress p (its middle, px along the car's track) may have so it can still brake to every
+ * curve cap ahead: the rest of the track it is drawn on and the lowest cap of the next one.
+ */
+function capFrom(sim: Sim, i: number, p: number, brake: number): number {
+  chainAt(sim, i, p);
+  const t = chainT!, s = Math.max(0, Math.min(t.len, chainS));
+  let lim = capAhead(t, s, brake);
+  const n = nextTrack(sim, i, t);
+  if (!n || n === t) return lim;
+  const d = Math.max(0, t.len - s);
+  const there = Math.min(n.kind === LANE_T ? Infinity : n.vmax, capAhead(n, 0, brake));
+  return there === Infinity ? lim : Math.min(lim, Math.sqrt(there * there + 2 * brake * d));
+  return lim;
 }
 
 /** Height of the road under the body's middle at progress p. */
@@ -150,7 +167,7 @@ export function drawStep(sim: Sim, i: number): void {
   const off = Math.hypot(c.fx[i]! + p.toMiddle * Math.cos(c.fth[i]!) - c.rx[i]!, c.fy[i]! + p.toMiddle * Math.sin(c.fth[i]!) - c.ry[i]!);
   const lost = c.fOn[i] !== 0 && (off > LOST || (off > LOST_STANDING && c.travel[i] === 0 && c.v[i] === 0));
   // A dead end's three-point turn with no played turn (none fitted): drawn as the sim has it.
-  if (held || c.track[i]!.turnRound === 'three') { c.lag[i] = 0; still(sim, i, p, s, held); return; }
+  if (held) { c.lag[i] = 0; still(sim, i, p, s, held); return; }
   // A car that just appeared (or was put elsewhere by the sim) starts on its reference where it was at the step's start.
   // Released from a hold where it was drawn (a pull-out's played move ends on its lane): it goes on from there; held
   // anywhere else (a bus turned round beyond the map's edge) it starts on its reference.
@@ -170,12 +187,14 @@ export function drawStep(sim: Sim, i: number): void {
     if (Math.abs(lead) > 0.5) r = refAt(sim, i, at - lead);
     const x = r.x, y = r.y, th = r.th;
     const kAhead = refAt(sim, i, at - lead + PREVIEW_PX + car.u * PREVIEW_S).k;
-    followInto(car, x, y, th, kAhead, simV, simA, lead, p, DT);
+    followInto(car, x, y, th, kAhead, simV, simA, lead, p, DT, Math.max(simV, capFrom(sim, i, at - lead + p.toMiddle, p.planBrake)));
     lastLead = lead;
     frame(c, i, k, p, z, car);
   }
   store(c, i, car);
-  c.lag[i] = lastLead;
+  // A car waiting at a dead end to turn round (it brakes to a stop on its point): followers keep back from the whole turn it will make.
+  const r = c.reserve[i];
+  c.lag[i] = r ? Math.max(lastLead, sweepBehind(r, 0, c.track[i]!, s, p.len, p.wid, c.body[i]!)) : lastLead;
   c.x[i] = car.x + p.toMiddle * Math.cos(car.th);
   c.y[i] = car.y + p.toMiddle * Math.sin(car.th);
   c.heading[i] = car.th;

@@ -168,7 +168,7 @@ export function planIn(c: City, e: Standing, lane: LanePose, uid = -1, gap: (at:
   const backIn = e.spot.kind === 'park' || e.spot.kind === 'home';
   // Across the road it stops in its lane and waits for its gap first (the wait is part of the move it plays).
   const at0 = road ? { road: road.id, s: project(road.line, lane).s } : null;
-  const play = (pause: number): Played => viaAisle(c, e, p, lane, space.pose, w, pause) ?? playInto(p, lane, space.pose, w, !space.fade, { turnaround: turn, backIn: backIn && !cross, forwardOnly: (cross && !turn) || e.spot.kind === 'double', onRoad: e.spot.kind === 'double', pause }, lane.v ?? 0, lane.acc ?? 0);
+  const play = (pause: number): Played => viaAisle(c, e, p, lane, space.pose, w, pause) ?? playInto(p, lane, space.pose, w, !space.fade, { turnaround: turn, backIn: backIn && !cross, forwardOnly: (cross && !turn) || e.spot.kind === 'double', onRoad: e.spot.kind === 'double', pause }, lane.v ?? 0, lane.acc ?? 0, lane.delta ?? 0);
   // `after`: it stands that long first in any case (another move's body is in its way until then).
   let wait = Math.max(after, cross && at0 ? gap(at0, lane.a) : 0);
   let played = play(wait);
@@ -215,7 +215,7 @@ function viaAisle(c: City, e: Standing, p: VehicleParams, lane: LanePose, slot: 
   if (!a) return null;
   const way = slot.x >= a.gate.x ? 1 : -1;
   const wp = { x: slot.x + way * AISLE_PAST, y: a.y, a: way > 0 ? 0 : Math.PI };
-  const first = playInto(p, lane, wp, w, false, { pause: wait }, lane.v ?? 0, lane.acc ?? 0);
+  const first = playInto(p, lane, wp, w, false, { pause: wait }, lane.v ?? 0, lane.acc ?? 0, lane.delta ?? 0);
   if (!first.fits) return null;
   const second = playInto(p, endOf(first), slot, w, true, { backIn: true });
   return second.fits ? joinPlayed(first, second) : null;

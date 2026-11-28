@@ -13,7 +13,8 @@ import type { Sim } from './sim';
 import { POSE } from './store';
 import type { World } from './vehicle/planner';
 import { playTurn, type MiddlePose } from './vehicle/moves';
-import { PLAY_DT, type Played } from './vehicle/played';
+import { PLAY_DT, standingAt, type Played } from './vehicle/played';
+import { delayed } from './sweeps';
 import { paramsOfKind } from './drawn';
 import { sizeOf, type Body } from './vehicleSize';
 import { logMove } from './moveLog';
@@ -48,7 +49,10 @@ export function roadWorld(sim: Sim, x0: number, y0: number, x1: number, y1: numb
     const t = Math.max(0, Math.min(1, ((x - s.ax) * s.dx + (y - s.ay) * s.dy) / s.l2));
     return Math.hypot(s.ax + s.dx * t - x, s.ay + s.dy * t - y) <= s.hw;
   }) || discs.some((j) => Math.hypot(j.x - x, j.y - y) <= j.radius + KERB);
-  return { drivable, bodies: [...standingNear(sim, x0, y0, x1, y1, self), ...(sim.parked?.(x0 - REACH, y0 - REACH, x1 + REACH, y1 + REACH) ?? [])] };
+  // Moves under way stand where they are drawn too (a car waiting at a lane edge): the turn is planned round them.
+  const box = [x0 - REACH, y0 - REACH, x1 + REACH, y1 + REACH] as const;
+  const moving = sim.sweeps.bodiesAt(sim.time, box, -sim.cars.uid[self]!);
+  return { drivable, bodies: [...standingNear(sim, x0, y0, x1, y1, self), ...moving, ...(sim.parked?.(...box) ?? [])] };
 }
 
 /**
@@ -96,12 +100,73 @@ export function startTurn(sim: Sim, i: number, to: Track, s0: number, wait: numb
   if (!m || !m.played.fits) return null;
   // Nor one that would touch another move under way (the one collision rule, src/sim/sweeps.ts).
   const z = sizeOf(kindName(c.kind[i]!));
-  if (sim.sweeps.hit(m.played, sim.time + wait, z.len, z.wid, -c.uid[i]!) >= 0) return null;
+  // A waiting car's reserved way into the lane is no wall for a turn that only passes (it is checked when that car goes).
+  if (sim.sweeps.hit(m.played, sim.time + wait, z.len, z.wid, -c.uid[i]!, false, false) >= 0) return null;
   sim.sweeps.put(-c.uid[i]!, m.played, sim.time + wait, z.len, z.wid, false, undefined, true);
   c.play[i] = m.played;
   c.playAt[i] = sim.time + wait;
   logMove({ what: 'turn', kind: kindName(c.kind[i]!), seconds: m.played.seconds, lane: wait + m.played.seconds, fits: m.played.fits, ms: 0, word: m.played.word });
   return { s: goals[m.goal]!.s, played: m.played };
+}
+
+/** Seconds a waiting car's reservation stands before it is renewed (it lapses by itself if the car is gone). */
+const RESERVE_S = 3;
+
+/**
+ * A car waiting at a dead end to turn round reserves the turn it will make (planned on the road alone): pull-outs and
+ * moves keep out of it, and followers keep their gap to its whole sweep (src/sim/drawn.ts), so nothing creeps into it.
+ */
+export function reserveTurn(sim: Sim, i: number, to: Track): void {
+  const c = sim.cars;
+  const from = drawnPose(sim, i);
+  const goals = laneGoals(to, 1);
+  if (goals.length === 0) return;
+  if (!c.reserve[i]) {
+    const xs = [from.x, ...goals.map((g) => g.pose.x)], ys = [from.y, ...goals.map((g) => g.pose.y)];
+    const w = roadWorld(sim, Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys), i);
+    c.reserve[i] = playTurn(paramsOfKind(c.kind[i]!), from, goals, { ...w, bodies: [] })?.played ?? null;
+  }
+  const z = sizeOf(kindName(c.kind[i]!));
+  const stand = delayed(standingAt(paramsOfKind(c.kind[i]!), from), RESERVE_S);
+  sim.sweeps.put(-c.uid[i]!, stand, sim.time, z.len, z.wid, false, c.reserve[i] ?? undefined, false);
+}
+
+/** Px past a junction's line the goals of a reverse out of a dead end are offered. */
+const OUT_FROM = 6;
+
+/** The lanes leaving the junction a lane starts at (not the lane itself): where a car backing out of a dead end may end. */
+function lanesOut(sim: Sim, lane: Track): Track[] {
+  const into = sim.world.tracks.find((t) => t.kind !== LANE_T && t.to === lane);
+  if (!into) return [];
+  const out = new Set<Track>();
+  for (const t of sim.world.tracks) if (t.kind !== LANE_T && t.node === into.node && t.to && t.to.kind === LANE_T && t.to.link !== lane.link) out.add(t.to);
+  return [...out];
+}
+
+/**
+ * The last resort of a car that cannot turn round at a dead end (the owner, round 5: a car never waits forever): it
+ * reverses out at walking pace along its lane to the junction and on into another road there, as real drivers do.
+ * Planned on the road's ground clear of every body; true when it starts.
+ */
+export function reverseOut(sim: Sim, i: number, lane: Track): boolean {
+  const c = sim.cars;
+  const from = drawnPose(sim, i);
+  const offers = lanesOut(sim, lane).flatMap((t) => laneGoals(t, OUT_FROM).map((g) => ({ ...g, t })));
+  if (offers.length === 0) return false;
+  const xs = [from.x, ...offers.map((g) => g.pose.x)], ys = [from.y, ...offers.map((g) => g.pose.y)];
+  const w = roadWorld(sim, Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys), i);
+  const m = playTurn(paramsOfKind(c.kind[i]!), from, offers, w);
+  if (!m || !m.played.fits) return false;
+  const z = sizeOf(kindName(c.kind[i]!));
+  if (sim.sweeps.hit(m.played, sim.time, z.len, z.wid, -c.uid[i]!, false, false) >= 0) return false;
+  sim.sweeps.put(-c.uid[i]!, m.played, sim.time, z.len, z.wid, false, undefined, true);
+  c.play[i] = m.played;
+  c.playAt[i] = sim.time;
+  c.playGoal[i] = offers[m.goal]!.s;
+  c.playTo[i] = offers[m.goal]!.t;
+  c.reserve[i] = null;
+  logMove({ what: 'turn', kind: kindName(c.kind[i]!), seconds: m.played.seconds, lane: m.played.seconds, fits: true, ms: 0, word: `out ${m.played.word}` });
+  return true;
 }
 
 /** Is car i still in its played turn? */

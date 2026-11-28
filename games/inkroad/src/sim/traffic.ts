@@ -106,7 +106,7 @@ function framesOf(sim: Sim, uid: number): Float64Array | null {
 function poseOf(sim: Sim, uid: number): LanePose | null {
   const c = sim.cars;
   const i = c.slotOf.get(uid);
-  return i === undefined ? null : { x: c.x[i]!, y: c.y[i]!, a: c.heading[i]!, v: c.speed[i]!, acc: c.fa[i]! };
+  return i === undefined ? null : { x: c.x[i]!, y: c.y[i]!, a: c.heading[i]!, v: c.speed[i]!, acc: c.fa[i]!, delta: c.fdelta[i]! };
 }
 
 /** Where a pull-out spawn of `r` would stand, without making it. */

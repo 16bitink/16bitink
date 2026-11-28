@@ -82,6 +82,10 @@ export class CarStore implements CarsView {
   readonly playAt = f64();
   /** Px along the lane back where a dead-end turn ends (-1: the car already stands there, a turn on the road). */
   readonly playGoal = f64();
+  /** The lane a played move ends on when it is not the turn's own way back (a car reversing out of a dead end). */
+  readonly playTo: (Track | null)[] = new Array<Track | null>(MAX_CARS).fill(null);
+  /** The turn a car waiting at a dead end will make (planned clear of the ground only): followers keep clear of its sweep. */
+  readonly reserve: (Played | null)[] = new Array<Played | null>(MAX_CARS).fill(null);
   /** Tracks it came by (the rear axle may still be on them), newest first. */
   readonly hist0: (Track | null)[] = new Array<Track | null>(MAX_CARS).fill(null);
   readonly hist1: (Track | null)[] = new Array<Track | null>(MAX_CARS).fill(null);
@@ -136,7 +140,8 @@ export class CarStore implements CarsView {
     for (const a of [this.s, this.v, this.nv, this.waited, this.stuck, this.linkWait, this.tolls, this.until, this.ticket, this.destS, this.destAt, this.rerouted]) a[i] = 0;
     for (const a of [this.offX, this.offY, this.offEnd, this.offLen, this.anger, this.z, this.speed, this.v0, this.travel, this.acc]) a[i] = 0;
     this.fOn[i] = 0;
-    this.play[i] = null;
+    this.play[i] = this.reserve[i] = null;
+    this.playTo[i] = null;
     this.hist0[i] = this.hist1[i] = null;
     this.ahead[i] = this.behind[i] = this.service[i] = this.destLink[i] = this.destRoad[i] = this.destNode[i] = this.link[i] = -1;
     this.courtesy[i] = this.granted[i] = this.arrived[i] = this.state[i] = this.tint[i] = this.destDir[i] = 0;

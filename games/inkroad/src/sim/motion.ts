@@ -9,7 +9,7 @@ import { LANE_T, TURN_T, type Track } from './track';
 import { ANGER_FULL, HONK_AT, REROUTE_AFTER } from './tune';
 import { laneS, type LinkRt } from './world';
 import { runsWith } from './routes';
-import { startTurn, turning } from './turning';
+import { reserveTurn, reverseOut, startTurn, turning } from './turning';
 
 const TINY = 1e-3;
 const CRAWL = 4;
@@ -144,7 +144,8 @@ function holdTurning(sim: Sim, i: number): boolean {
   if (turning(sim, i)) { c.v[i] = 0; c.acc[i] = 0; return true; }
   c.play[i] = null;
   const t = c.track[i]!;
-  const back = t.turnRound !== null && c.playGoal[i]! >= 0 ? nextTrack(sim, i, t) : null;
+  const back = c.playTo[i] ?? (t.turnRound !== null && c.playGoal[i]! >= 0 ? nextTrack(sim, i, t) : null);
+  c.playTo[i] = null;
   if (back) {
     // Off the turn and onto the lane back just where the turn ended (the drawn car stands there).
     c.unlink(i);
@@ -158,24 +159,32 @@ function holdTurning(sim: Sim, i: number): boolean {
 
 /** Entering a dead end's three-point turn: plan it on the road and play it (src/sim/turning.ts); no clear way: it waits. */
 function turnOnto(sim: Sim, i: number, t: Track): void {
+  const c = sim.cars;
   const back = nextTrack(sim, i, t);
   if (!back) return;
   const r = startTurn(sim, i, back, 0, 0);
-  sim.cars.playGoal[i] = r ? r.s : WAIT_TURN;
+  if (r) { c.playGoal[i] = r.s; c.reserve[i] = null; return; }
+  // Waiting: it reserves its turn, and remembers since when it waits (playAt is free while nothing plays).
+  if (c.playGoal[i] !== WAIT_TURN) c.playAt[i] = sim.time;
+  c.playGoal[i] = WAIT_TURN;
+  reserveTurn(sim, i, back);
 }
 
 /** playGoal of a car standing at a dead end's turn, waiting for room to turn round (a car in the way). */
 const WAIT_TURN = -2;
-/** Seconds between its looks. */
-const TURN_LOOK = 1;
+/** Seconds between its looks, and seconds of waiting after which it backs out of the dead end instead. */
+const TURN_LOOK = 1, BACK_OUT_AFTER = 12;
 
 /** Standing at the start of its turn until a turn that clears every body fits. True: still waiting. */
 function waitToTurn(sim: Sim, i: number): boolean {
   const c = sim.cars;
   const t = c.track[i]!;
   c.v[i] = 0; c.travel[i] = 0; c.acc[i] = 0;
-  if (t.turnRound !== 'three') { c.playGoal[i] = -1; return false; }
-  if (Math.round(sim.time / STEP) % Math.round(TURN_LOOK / STEP) === 0) turnOnto(sim, i, t);
+  if (t.turnRound !== 'three') { c.playGoal[i] = -1; c.reserve[i] = null; return false; }
+  if (Math.round(sim.time / STEP) % Math.round(TURN_LOOK / STEP) !== 0) return true;
+  const waited = sim.time - c.playAt[i]!;
+  if (waited > BACK_OUT_AFTER && t.from && reverseOut(sim, i, t.from)) return true;
+  turnOnto(sim, i, t);
   return true;
 }
 

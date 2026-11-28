@@ -72,7 +72,7 @@ export function followStep(c: CarState, t: Target, p: VehicleParams, dt: number)
  * rear-wheel feedback (Samson): the reference curvature fed forward, heading and sideways errors fed back; the speed
  * loop is the sim's acceleration plus corrections toward its speed and its point.
  */
-export function followInto(c: MutableCar, x: number, y: number, th: number, kAhead: number, v: number, a: number, lead: number, p: VehicleParams, dt: number): void {
+export function followInto(c: MutableCar, x: number, y: number, th: number, kAhead: number, v: number, a: number, lead: number, p: VehicleParams, dt: number, vCap = Infinity): void {
   const dx = c.x - x, dy = c.y - y, cs = Math.cos(th), sn = Math.sin(th);
   const e = -dx * sn + dy * cs, psi = wrap(c.th - th);
   const kTh = K_TH / p.wheelbase, kE = (kTh * kTh) / 4;
@@ -84,6 +84,8 @@ export function followInto(c: MutableCar, x: number, y: number, th: number, kAhe
   // Braking eases off as the car comes to a stop, so it stands without a jolt (|a| ≤ √(2·jerk·u)).
   // Catching up is never faster than the curve it is on allows.
   const curve = Math.abs(kAhead) > 1e-6 ? KV * (Math.sqrt((CURVE_SHARE * p.aLat) / Math.abs(kAhead)) - c.u) : Infinity;
-  const want = Math.max(Math.min(raw, Math.max(curve, -p.planBrake)), -Math.sqrt(2 * p.jerk * c.u));
+  // Nor faster than the curves ahead of where it is drawn allow (a lagging car never enters a turn at the speed it caught up with).
+  const ahead = c.u > vCap ? KV * (vCap - c.u) : Infinity;
+  const want = Math.max(Math.min(raw, Math.max(curve, -p.planBrake), Math.max(ahead, -p.planBrake)), -Math.sqrt(2 * p.jerk * c.u));
   stepInto(c, want, Math.atan(k * p.wheelbase), p, dt);
 }

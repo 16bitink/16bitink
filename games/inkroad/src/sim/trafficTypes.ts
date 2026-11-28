@@ -88,7 +88,7 @@ export interface SpawnRequest {
 
 /** Where a car stands in its lane: plan px and heading (radians, 0 = east, clockwise). */
 /** `v`: the drawn car's speed there (px/s), when it is moving (a manoeuvre starts from it, never from a standstill it never reached). */
-export interface LanePose { readonly x: number; readonly y: number; readonly a: number; readonly v?: number; /** Its acceleration (px/s²) then. */ readonly acc?: number }
+export interface LanePose { readonly x: number; readonly y: number; readonly a: number; readonly v?: number; /** Its acceleration (px/s²) then. */ readonly acc?: number; /** Its road-wheel angle (rad) then. */ readonly delta?: number }
 
 export interface Arrival { readonly uid: number; readonly slot: number; readonly tag: number; readonly seconds: number; readonly waited: number; readonly tolls: number; readonly at: Pt; /** Heading where it was last drawn. */ readonly a?: number }
 
